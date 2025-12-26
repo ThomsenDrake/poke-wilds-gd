@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "godot": {
+      "command": "/Users/drake.thomsen/Documents/godot-projects/Godot-MCP/python/.venv/bin/python",
+      "args": ["/Users/drake.thomsen/Documents/godot-projects/Godot-MCP/python/server.py"],
+      "env": {}
+    }
+  }
+}

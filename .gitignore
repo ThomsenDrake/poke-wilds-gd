@@ -1,0 +1,10 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Continuous Claude cache (local only)
+.claude/cache/
+
+# User-specific directories
+/addons
+/thoughts

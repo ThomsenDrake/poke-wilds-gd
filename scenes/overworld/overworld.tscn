@@ -1,0 +1,14 @@
+[gd_scene load_steps=4 format=3 uid="uid://bpj3o8m2h1xck"]
+
+[ext_resource type="Script" path="res://scripts/overworld/overworld.gd" id="1_overworld"]
+[ext_resource type="PackedScene" path="res://scenes/overworld/player.tscn" id="2_player"]
+[ext_resource type="Script" path="res://scripts/entities/camera_controller.gd" id="3_camera"]
+
+[node name="Overworld" type="Node2D"]
+script = ExtResource("1_overworld")
+
+[node name="Player" parent="." instance=ExtResource("2_player")]
+position = Vector2(240, 216)
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+script = ExtResource("3_camera")
