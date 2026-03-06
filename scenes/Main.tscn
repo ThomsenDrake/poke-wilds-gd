@@ -1,0 +1,41 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_3iusm"]
+[ext_resource type="Script" path="res://scripts/world/world_renderer.gd" id="2_vx8nb"]
+[ext_resource type="Script" path="res://scripts/player/player_controller.gd" id="3_4xm75"]
+[ext_resource type="PackedScene" path="res://scenes/ui/MessageBox.tscn" id="4_13y55"]
+[ext_resource type="PackedScene" path="res://scenes/ui/BattleView.tscn" id="5_2u4oc"]
+[ext_resource type="PackedScene" path="res://scenes/ui/StartMenu.tscn" id="6_w2r8b"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_3iusm")
+
+[node name="World" type="Node2D" parent="."]
+script = ExtResource("2_vx8nb")
+
+[node name="GroundLayer" type="Node2D" parent="World"]
+
+[node name="PropLayer" type="Node2D" parent="World"]
+
+[node name="Player" type="Node2D" parent="."]
+z_index = 5
+script = ExtResource("3_4xm75")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="Player"]
+centered = false
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+position = Vector2(8, 8)
+zoom = Vector2(3, 3)
+enabled = true
+
+[node name="MusicPlayer" type="AudioStreamPlayer" parent="."]
+volume_db = -8.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="MessageBox" parent="UI" instance=ExtResource("4_13y55")]
+
+[node name="BattleView" parent="UI" instance=ExtResource("5_2u4oc")]
+
+[node name="StartMenu" parent="UI" instance=ExtResource("6_w2r8b")]

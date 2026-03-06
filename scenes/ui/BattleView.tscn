@@ -1,0 +1,199 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/battle_view.gd" id="1_6gyk7"]
+
+[node name="BattleView" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_6gyk7")
+
+[node name="Backdrop" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Dim" type="ColorRect" parent="Backdrop"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0784314, 0.101961, 0.156863, 0.95)
+
+[node name="BattleBackground" type="TextureRect" parent="Backdrop"]
+layout_mode = 0
+offset_left = 50.0
+offset_top = 22.0
+offset_right = 818.0
+offset_bottom = 534.0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="EnemySprite" type="TextureRect" parent="Backdrop"]
+layout_mode = 0
+offset_left = 556.0
+offset_top = 168.0
+offset_right = 684.0
+offset_bottom = 296.0
+stretch_mode = 5
+
+[node name="PlayerSprite" type="TextureRect" parent="Backdrop"]
+layout_mode = 0
+offset_left = 136.0
+offset_top = 276.0
+offset_right = 264.0
+offset_bottom = 404.0
+stretch_mode = 5
+
+[node name="HUD" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="EnemyInfo" type="PanelContainer" parent="HUD"]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 56.0
+offset_right = 320.0
+offset_bottom = 124.0
+
+[node name="Margin" type="MarginContainer" parent="HUD/EnemyInfo"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Name" type="Label" parent="HUD/EnemyInfo/Margin"]
+layout_mode = 2
+text = "Wild ???"
+
+[node name="HP" type="Label" parent="HUD/EnemyInfo/Margin"]
+layout_mode = 2
+text = "HP 0/0"
+
+[node name="PlayerInfo" type="PanelContainer" parent="HUD"]
+layout_mode = 0
+offset_left = 536.0
+offset_top = 330.0
+offset_right = 796.0
+offset_bottom = 398.0
+
+[node name="Margin" type="MarginContainer" parent="HUD/PlayerInfo"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="Name" type="Label" parent="HUD/PlayerInfo/Margin"]
+layout_mode = 2
+text = "???"
+
+[node name="HP" type="Label" parent="HUD/PlayerInfo/Margin"]
+layout_mode = 2
+text = "HP 0/0"
+
+[node name="BottomPanel" type="PanelContainer" parent="HUD"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 454.0
+offset_right = 828.0
+offset_bottom = 604.0
+
+[node name="Margin" type="MarginContainer" parent="HUD/BottomPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Message" type="Label" parent="HUD/BottomPanel/Margin"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "A wild battle starts."
+autowrap_mode = 2
+
+[node name="ActionMenu" type="HBoxContainer" parent="HUD/BottomPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="FightButton" type="Button" parent="HUD/BottomPanel/Margin/ActionMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Fight"
+
+[node name="BagButton" type="Button" parent="HUD/BottomPanel/Margin/ActionMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Bag"
+
+[node name="RunButton" type="Button" parent="HUD/BottomPanel/Margin/ActionMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Run"
+
+[node name="MoveMenu" type="GridContainer" parent="HUD/BottomPanel/Margin"]
+visible = false
+layout_mode = 2
+columns = 2
+
+[node name="MoveButton0" type="Button" parent="HUD/BottomPanel/Margin/MoveMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Move 1"
+
+[node name="MoveButton1" type="Button" parent="HUD/BottomPanel/Margin/MoveMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Move 2"
+
+[node name="MoveButton2" type="Button" parent="HUD/BottomPanel/Margin/MoveMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Move 3"
+
+[node name="MoveButton3" type="Button" parent="HUD/BottomPanel/Margin/MoveMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Move 4"
+
+[node name="MoveBackButton" type="Button" parent="HUD/BottomPanel/Margin/MoveMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back"
+
+[node name="BagMenu" type="HBoxContainer" parent="HUD/BottomPanel/Margin"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PokeballButton" type="Button" parent="HUD/BottomPanel/Margin/BagMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Poké Ball"
+
+[node name="PotionButton" type="Button" parent="HUD/BottomPanel/Margin/BagMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Potion"
+
+[node name="BagBackButton" type="Button" parent="HUD/BottomPanel/Margin/BagMenu"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Back"

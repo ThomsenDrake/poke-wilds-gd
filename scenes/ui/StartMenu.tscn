@@ -1,0 +1,86 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/start_menu.gd" id="1_tx833"]
+
+[node name="StartMenu" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_tx833")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 160.0
+offset_top = 88.0
+offset_right = 704.0
+offset_bottom = 632.0
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Menu"
+
+[node name="PartyLabel" type="VBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PartyTitle" type="Label" parent="Panel/Margin/VBox/PartyLabel"]
+layout_mode = 2
+text = "Party"
+
+[node name="PartyList" type="ItemList" parent="Panel/Margin/VBox/PartyLabel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BagLabel" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+text = "Bag: ..."
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SetLeadButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Set Lead"
+
+[node name="SaveButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Save"
+
+[node name="NewGameButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "New Game"
+
+[node name="CloseButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Close"
