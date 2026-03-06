@@ -30,9 +30,13 @@ func hide_menu() -> void:
 	closed.emit()
 
 
+func perform_save() -> void:
+	_on_save_pressed()
+
+
 func _refresh() -> void:
-	var state: Node = _state()
-	var party = state.get("party")
+	var runtime = _runtime()
+	var party = runtime.call("get_party_snapshot")
 	_party_list.clear()
 
 	if party is Array:
@@ -43,7 +47,7 @@ func _refresh() -> void:
 			var mon: Dictionary = mon_variant
 			var line = "%d. %s Lv.%d HP %d/%d" % [
 				i + 1,
-				str(mon.get("name", "Pokémon")),
+				str(mon.get("name", "Pokemon")),
 				int(mon.get("level", 1)),
 				int(mon.get("current_hp", 0)),
 				int(mon.get("max_hp", 1))
@@ -52,27 +56,26 @@ func _refresh() -> void:
 				line += "  [LEAD]"
 			_party_list.add_item(line)
 
-	var pokeballs = int(state.call("get_item_count", "pokeball"))
-	var potions = int(state.call("get_item_count", "potion"))
-	_bag_label.text = "Bag: Poké Balls x%d, Potions x%d" % [pokeballs, potions]
+	var pokeballs = int(runtime.call("get_item_count", "pokeball"))
+	var potions = int(runtime.call("get_item_count", "potion"))
+	_bag_label.text = "Bag: Poke Balls x%d, Potions x%d" % [pokeballs, potions]
 
 
 func _on_set_lead_pressed() -> void:
 	var selected = _party_list.get_selected_items()
 	if selected.is_empty():
 		return
-	var index = int(selected[0])
-	_state().call("set_party_lead", index)
+	_runtime().call("set_party_lead", int(selected[0]))
 	_refresh()
 
 
 func _on_save_pressed() -> void:
-	_state().call("save_game")
+	_runtime().call("save_game")
 	_refresh()
 
 
 func _on_new_game_pressed() -> void:
-	_state().call("new_game")
+	_runtime().call("new_game")
 	_refresh()
 	game_reset.emit()
 
@@ -81,5 +84,5 @@ func _on_close_pressed() -> void:
 	hide_menu()
 
 
-func _state() -> Node:
-	return get_node("/root/GameState")
+func _runtime() -> Node:
+	return get_node("/root/GameRuntime")

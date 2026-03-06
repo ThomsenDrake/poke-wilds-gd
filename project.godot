@@ -11,13 +11,13 @@ config_version=5
 [application]
 
 config/name="PokeWilds-Godot"
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/app/Main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
-GameState="*res://scripts/core/game_state.gd"
+GameRuntime="*res://scripts/runtime/game_runtime.gd"
 
 [physics]
 

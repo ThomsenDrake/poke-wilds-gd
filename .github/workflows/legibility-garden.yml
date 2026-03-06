@@ -1,0 +1,65 @@
+name: legibility-garden
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 14 * * 1"
+
+jobs:
+  legibility-garden:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 tools/generate_legibility_report.py --output docs/generated/legibility-report.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: legibility-report
+          path: docs/generated/legibility-report.md
+      - name: Create or update Legibility Debt issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const body = fs.readFileSync("docs/generated/legibility-report.md", "utf8");
+            const findingsMatch = body.match(/Total findings: (\d+)/);
+            const findings = findingsMatch ? Number(findingsMatch[1]) : 0;
+            const { owner, repo } = context.repo;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100,
+            });
+            const existing = issues.find((issue) => issue.title === "Legibility Debt");
+            if (findings === 0) {
+              if (existing) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  state: "closed",
+                });
+              }
+              return;
+            }
+            if (existing) {
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: existing.number,
+                body,
+              });
+              return;
+            }
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: "Legibility Debt",
+              body,
+            });

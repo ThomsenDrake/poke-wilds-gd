@@ -1,0 +1,25 @@
+name: repo-contracts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+  pull_request:
+
+jobs:
+  static-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 tools/check_repo_contracts.py
+      - run: python3 tools/check_architecture.py
+      - run: python3 tools/check_quality_docs.py
+      - if: github.event_name == 'pull_request'
+        run: python3 tools/check_change_contract.py --base origin/${{ github.base_ref }}

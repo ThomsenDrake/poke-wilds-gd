@@ -1,0 +1,122 @@
+schema_version = 1
+
+[[subsystems]]
+name = "app_bootstrap"
+status = "active"
+layer = "app"
+code_paths = ["scripts/app/main.gd"]
+scene_paths = ["scenes/app/Main.tscn"]
+spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario boot",
+]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt"]
+quality_bucket = "bootstrap"
+
+[[subsystems]]
+name = "session_runtime"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/core/trace_logger.gd",
+  "scripts/runtime/game_runtime.gd",
+  "scripts/runtime/session_state.gd",
+  "scripts/runtime/save_store.gd",
+  "scripts/runtime/music_router.gd",
+  "scripts/runtime/smoke_scenario_runner.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/menu-and-save.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
+]
+required_trace_events = ["session_loaded", "session_created", "save_written", "warning"]
+quality_bucket = "runtime"
+
+[[subsystems]]
+name = "world_runtime"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/runtime/world_view.gd",
+  "scripts/runtime/player_avatar.gd",
+  "scripts/domain/world_generator.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario overworld_step",
+]
+required_trace_events = ["world_rebuilt"]
+quality_bucket = "world"
+
+[[subsystems]]
+name = "pokemon_data"
+status = "active"
+layer = "data"
+code_paths = ["scripts/data/pokemon_catalog.gd"]
+scene_paths = []
+spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+]
+required_trace_events = ["warning"]
+quality_bucket = "data"
+
+[[subsystems]]
+name = "pokemon_progression"
+status = "active"
+layer = "domain"
+code_paths = ["scripts/domain/pokemon_rules.gd"]
+scene_paths = []
+spec_doc = "docs/product-specs/battle-and-capture.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
+]
+required_trace_events = ["warning"]
+quality_bucket = "progression"
+
+[[subsystems]]
+name = "battle_loop"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/runtime/battle_runtime.gd",
+  "scripts/domain/battle_rules.gd",
+  "scripts/ui/battle_view.gd",
+]
+scene_paths = ["scenes/ui/BattleView.tscn"]
+spec_doc = "docs/product-specs/battle-and-capture.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
+]
+required_trace_events = ["encounter_started", "battle_finished"]
+quality_bucket = "battle"
+
+[[subsystems]]
+name = "menu_ui"
+status = "active"
+layer = "ui"
+code_paths = [
+  "scripts/ui/start_menu.gd",
+  "scripts/ui/message_box.gd",
+]
+scene_paths = [
+  "scenes/ui/StartMenu.tscn",
+  "scenes/ui/MessageBox.tscn",
+]
+spec_doc = "docs/product-specs/menu-and-save.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
+]
+required_trace_events = ["menu_opened", "menu_closed", "save_written"]
+quality_bucket = "ui"

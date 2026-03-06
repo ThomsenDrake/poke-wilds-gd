@@ -2,6 +2,7 @@
 .godot/
 /android/
 .firecrawl/
+.godot-smoke/
 .DS_Store
 .tmp_kris_frame_*.png
 .tmp_kris_strip.png
