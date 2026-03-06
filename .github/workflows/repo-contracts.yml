@@ -6,11 +6,41 @@ on:
       - main
       - master
       - "codex/**"
+    paths:
+      - ".github/workflows/**"
+      - ".gitignore"
+      - ".gitmodules"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "README.md"
+      - "docs/**"
+      - "project.godot"
+      - "scenes/**"
+      - "scripts/**"
+      - "tools/**"
   pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".gitignore"
+      - ".gitmodules"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "README.md"
+      - "docs/**"
+      - "project.godot"
+      - "scenes/**"
+      - "scripts/**"
+      - "tools/**"
+
+concurrency:
+  group: repo-contracts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   static-contracts:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:

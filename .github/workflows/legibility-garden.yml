@@ -5,9 +5,15 @@ on:
   schedule:
     - cron: "0 14 * * 1"
 
+concurrency:
+  group: legibility-garden-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   legibility-garden:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
