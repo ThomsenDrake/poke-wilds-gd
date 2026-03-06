@@ -1,6 +1,7 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+.firecrawl/
 .DS_Store
 .tmp_kris_frame_*.png
 .tmp_kris_strip.png

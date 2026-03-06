@@ -1,4 +1,0 @@
-interface:
-  display_name: "Godot IDE API"
-  short_description: "Drive local Godot IDE for playtesting"
-  default_prompt: "Use $godot-ide-api to launch the local Godot editor via DAP, collect debugger exceptions, and smoke-test this project."

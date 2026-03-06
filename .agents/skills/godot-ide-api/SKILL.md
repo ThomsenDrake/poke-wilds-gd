@@ -1,11 +1,17 @@
 ---
 name: godot-ide-api
-description: Use when the task requires connecting to a locally running Godot editor, launching a project or scene through the Godot Debug Adapter Protocol, collecting debugger exceptions, checking startup/runtime errors, or running repeatable smoke/playtest checks without leaving the terminal.
+description: Connect to a locally running Godot editor through the Debug Adapter Protocol, launch a project or scene for smoke tests, and collect debugger exceptions. Use when validating Godot startup or runtime behavior, checking debugger errors, or running repeatable playtest checks from the terminal.
+license: AGPL-3.0-or-later
+compatibility: Requires Python 3 and a locally running Godot editor exposing the Debug Adapter Protocol on localhost, typically 127.0.0.1:6006.
 ---
 
 # Godot IDE API
 
 Use the local Godot editor as a test harness. Prefer the bundled DAP script instead of ad hoc socket code.
+
+## Available scripts
+
+- `scripts/godot_dap.py` - Probe the Godot DAP endpoint, launch a project or scene, collect debugger exceptions, and run smoke tests.
 
 ## Prerequisite check
 
@@ -17,25 +23,18 @@ lsof -nP -iTCP -sTCP:LISTEN | rg 'Godot|:6006|:6005'
 
 If `6006` is not listening, ask the user to open the project in the Godot editor first.
 
-## Skill path
-
-```bash
-export PROJECT_ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel)}"
-export GODOT_DAP="$PROJECT_ROOT/.agents/skills/godot-ide-api/scripts/godot_dap.py"
-```
-
 ## Quick start
 
 Probe for the DAP endpoint:
 
 ```bash
-"$GODOT_DAP" probe
+python3 scripts/godot_dap.py probe
 ```
 
 Run a scene smoke test:
 
 ```bash
-"$GODOT_DAP" smoke-test \
+python3 scripts/godot_dap.py smoke-test \
   --project /absolute/path/to/project \
   --scene res://scenes/Main.tscn
 ```
@@ -43,7 +42,7 @@ Run a scene smoke test:
 Collect debugger exceptions with stack traces:
 
 ```bash
-"$GODOT_DAP" debugger-report \
+python3 scripts/godot_dap.py debugger-report \
   --project /absolute/path/to/project \
   --scene res://scenes/Main.tscn
 ```

@@ -5,7 +5,7 @@
 ### Check startup regressions
 
 ```bash
-"$GODOT_DAP" smoke-test \
+python3 scripts/godot_dap.py smoke-test \
   --project /absolute/path/to/project \
   --scene res://scenes/Main.tscn
 ```
@@ -15,7 +15,7 @@ Use after script edits, scene changes, or asset-path changes. Expect `RESULT: OK
 ### Inspect debugger errors
 
 ```bash
-"$GODOT_DAP" debugger-report \
+python3 scripts/godot_dap.py debugger-report \
   --project /absolute/path/to/project \
   --scene res://scenes/Main.tscn
 ```
@@ -25,7 +25,7 @@ Use when the user says "check the Godot debugger" or when `smoke-test` fails. Re
 ### Confirm the editor is reachable
 
 ```bash
-"$GODOT_DAP" probe
+python3 scripts/godot_dap.py probe
 ```
 
 If no DAP port is found, verify the project is open in the Godot editor and retry.
