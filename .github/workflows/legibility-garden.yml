@@ -5,14 +5,22 @@ on:
   schedule:
     - cron: "0 14 * * 1"
 
+concurrency:
+  group: legibility-garden-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   legibility-garden:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       issues: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
