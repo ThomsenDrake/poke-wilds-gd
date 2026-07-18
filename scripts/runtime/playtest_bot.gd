@@ -17,6 +17,24 @@ const CATCH_HP_PERCENT := 25
 
 var _had_save := false
 
+# Per-step spatial invariant violations seen by note_spatial_step; the soak
+# reports the count and refuses to pass while it is above zero.
+var spatial_violations := 0
+
+
+# Per-step soak invariant (spec Lane 3): after a completed step the player's
+# 16x16 world rect must not overlap the solid tile rect of any neighboring
+# tile rendered with a blocking prop.
+func note_spatial_step(player, world) -> void:
+	var rect: Rect2 = player.world_rect()
+	for offset in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		var tile: Vector2i = player.tile_position + offset
+		var logic: Dictionary = world.get_tile_logic(tile)
+		if bool(logic.get("walkable", true)) or str(logic.get("prop_path", "")).is_empty():
+			continue
+		if rect.intersects(Rect2(world.map_to_world(tile), Vector2(world.TILE_SIZE, world.TILE_SIZE))):
+			spatial_violations += 1
+
 
 # Copies the real save aside; restore_save() must run on every exit path.
 func backup_save() -> void:

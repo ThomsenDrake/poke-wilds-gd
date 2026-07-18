@@ -73,12 +73,15 @@ func run_soak(ctx: Dictionary) -> void:
 		var verify: Dictionary = _bot.verify_save_roundtrip(_runtime())
 		if not bool(verify.get("ok", false)):
 			fail = "final save check: " + str(verify.get("fail", ""))
+		if fail.is_empty() and _bot.spatial_violations > 0:
+			fail = "spatial invariants violated %d time(s)" % _bot.spatial_violations
 	stats["warnings"] = _bot.count_warnings_since(warn_cursor)
 	_bot.restore_save()
 	if fail.is_empty():
 		_runtime().emit_trace("playtest_soak_passed", "SmokeScenarios", {
 			"seed": SOAK_SEED, "iterations": iterations, "steps": int(stats["steps"]), "battles": int(stats["battles"]),
-			"victories": int(stats["victories"]), "catches": int(stats["catches"]), "escapes": int(stats["escapes"]), "defeats": int(stats["defeats"])
+			"victories": int(stats["victories"]), "catches": int(stats["catches"]), "escapes": int(stats["escapes"]), "defeats": int(stats["defeats"]),
+			"spatial_violations": _bot.spatial_violations
 		})
 	else:
 		push_error("Playtest soak failed at iteration %d: %s (warnings seen: %d)" % [iterations, fail, int(stats["warnings"])])
@@ -123,7 +126,7 @@ func _journey_battle() -> Dictionary:
 	_message_box().hide_message()
 	var result: Dictionary = _bot.play_scripted_battle(_runtime(), wild_mon)
 	_call("set_battle", [false])
-	_resync_player_tile()
+	_runner.resync_player_tile(_world(), _player(), _runtime())
 	var outcome := str(result.get("outcome", ""))
 	if not outcome in TERMINAL_OUTCOMES:
 		return {"fail": "battle reached no terminal outcome (got '%s')" % outcome, "outcome": outcome}
@@ -170,6 +173,7 @@ func _soak_iteration(rng: RandomNumberGenerator, stats: Dictionary) -> String:
 		if _player().smoke_step(direction):
 			await _player().tile_changed
 			stats["steps"] += 1
+			_bot.note_spatial_step(_player(), _world())
 		return ""
 	if roll < 0.75: # force a wild encounter and auto-play it
 		var wild_mon: Dictionary = _runtime().generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
@@ -184,7 +188,7 @@ func _soak_iteration(rng: RandomNumberGenerator, stats: Dictionary) -> String:
 		if counter.is_empty():
 			return "battle ended without a terminal outcome"
 		stats[counter] += 1
-		_resync_player_tile()
+		_runner.resync_player_tile(_world(), _player(), _runtime())
 		return ""
 	if roll < 0.85: # open and close the menu
 		_call("toggle_menu")
@@ -197,12 +201,6 @@ func _soak_iteration(rng: RandomNumberGenerator, stats: Dictionary) -> String:
 		return ""
 	await get_tree().create_timer(0.05).timeout # idle
 	return ""
-
-
-# A defeat returns the player to the start; mirror the app-side resync.
-func _resync_player_tile() -> void:
-	if _runtime().get_player_tile() != _player().tile_position:
-		_runner.teleport_player(_world(), _player(), _runtime(), _runtime().get_player_tile())
 
 
 func _call(key: String, args: Array = []) -> void:

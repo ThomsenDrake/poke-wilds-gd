@@ -43,7 +43,20 @@ func _ready() -> void:
 	_rng.randomize()
 	tile_position = start_tile
 	position = Vector2(tile_position.x * TILE_SIZE, tile_position.y * TILE_SIZE)
+	_setup_canvas_order()
 	_set_sprite_state(_facing, false)
+
+
+# Join the world's y-sort space (see world_view.gd): the scene's constant
+# z_index = 5 would keep the avatar above every prop even when standing north
+# of a tall tree. With y-sort, the sprite's origin must be its feet, so the
+# sprite node drops one tile and offsets the draw position back up — visuals
+# unchanged, sort key at the feet.
+func _setup_canvas_order() -> void:
+	z_index = 0
+	y_sort_enabled = true
+	_sprite.position = Vector2(0, TILE_SIZE)
+	_sprite.offset = Vector2(0, -TILE_SIZE)
 
 
 func setup(world_renderer) -> void:
@@ -64,6 +77,12 @@ func smoke_step(step_direction: Vector2i) -> bool:
 		return false
 	_try_start_step(step_direction)
 	return _moving
+
+
+# World-space rect of the avatar's 16x16 sprite footprint (position is the
+# current tile's top-left), used by the spatial oracles.
+func world_rect() -> Rect2:
+	return Rect2(position, Vector2(TILE_SIZE, TILE_SIZE))
 
 
 func _process(delta: float) -> void:

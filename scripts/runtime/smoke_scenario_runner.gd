@@ -218,6 +218,13 @@ func teleport_player(world, player, runtime, tile: Vector2i) -> void:
 	runtime.set_player_tile(tile)
 
 
+# A battle defeat returns the player to the session tile; mirrors the
+# app-side resync so playtests never leave the two disagreeing.
+func resync_player_tile(world, player, runtime) -> void:
+	if runtime.get_player_tile() != player.tile_position:
+		teleport_player(world, player, runtime, runtime.get_player_tile())
+
+
 # Line count of the JSONL trace log; capture before an action to scope
 # trace_log_has_since to records the action itself produced.
 func trace_log_line_count() -> int:

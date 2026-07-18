@@ -21,3 +21,4 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
 
 - `menu_save` opens the menu, performs a save, closes the menu, and confirms the menu trace and save trace events.
 - `field_move` finds a `cut`-gated tile, drives the field-move unlock path, and confirms the tile becomes walkable with the `field_move_used` trace.
+- `ui_render_audit` covers the start menu, party, and bag screens against the art-anchored render model.

@@ -147,10 +147,10 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 	_enemy_level.text = ":L " + str(int(enemy_mon.get("level", 1)))
 	_player_name.text = _layout.hud_name(_battle_font, BATTLE_FONT_SIZE, str(player_mon.get("name", "?")), _player_name.size.x)
 	_player_level.text = ":L " + str(int(player_mon.get("level", 1)))
-	_layout.place_hud_levels(_enemy_name, _enemy_level, _player_name, _player_level)
-	_player_hp.text = "%d/%d" % [int(player_mon.get("current_hp", 0)), int(player_mon.get("max_hp", 1))]
 	_enemy_status.text = str(enemy_mon.get("status", ""))
 	_player_status.text = str(player_mon.get("status", ""))
+	_layout.place_hud_levels(_enemy_name, _enemy_level, _player_name, _player_level, _enemy_status, _player_status)
+	_player_hp.text = "%d/%d" % [int(player_mon.get("current_hp", 0)), int(player_mon.get("max_hp", 1))]
 	_set_hp_bar(_enemy_hp_fill, enemy_mon, ENEMY_HP_BAR_WIDTH)
 	_set_hp_bar(_player_hp_fill, player_mon, PLAYER_HP_BAR_WIDTH)
 	_enemy_sprite.texture = _layout.pokemon_frame(str(enemy_mon.get("front_path", "")))
@@ -172,6 +172,11 @@ func _show_move_info(visible: bool, option: Dictionary = {}) -> void:
 	_move_type_value.text = str(move_data.get("type", "")).to_upper()
 	_move_pp_current.text = str(move_data.get("pp", ""))
 	_move_pp_max.text = str(move_data.get("max_pp", move_data.get("pp", "")))
+	# A type name wider than the after-"TYPE/" space in the side box (35px at
+	# the battle font, e.g. FIGHTING) drops to the box's empty second row
+	# instead of bleeding over the box border.
+	var type_width := _battle_font.get_string_size(_move_type_value.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, BATTLE_FONT_SIZE).x
+	_move_type_value.position = Vector2(46, 71) if type_width <= 35.0 else Vector2(8, 80)
 
 func _build_stage_texture(path: String) -> Texture2D:
 	var texture = load(path)

@@ -12,8 +12,10 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 - The player may select one of up to four moves, use a Poke Ball, use a Potion, or run.
 - The action box uses the baked `battle_screen2.png` command text for `FIGHT`, disabled `PKMN`, `ITEM`, and `RUN`.
 - Battle menu selection supports both directional input plus `Z`/`X` and direct mouse clicks.
-- HUD name plates show the full species display name when it fits at the battle font, falling back to the base-species first token for long alternate-form names; the `:L` level marker is redrawn dynamically after the measured name width.
+- HUD name plates show the full species display name when it fits at the battle font, falling back to the base-species first token for long alternate-form names; the `:L` level marker is redrawn dynamically after the measured name width, and a visible status tag reserves its width so level and status never collide.
 - Battle sprites render the first frame of the source vertical strip sheets (frame cropping keyed by texture shape), with an intentional `?` placeholder when a species has no sprite art.
+- The item box lists bag items single-column, GSC-style, so long item names can no longer overlap a second column.
+- Move info text that is too wide for the baked side box's first row (`TYPE/<type>`) drops to the box's second row instead of crossing the border.
 - Both HUD name plates show the active status condition (`BRN`/`PSN`/`PAR`/`SLP`/`FRZ`) when one is applied.
 - Move mode uses `attack_screen1.png`, shows only learned moves plus `BACK`, and fills the side info box from the existing move `TYPE` and `PP current/max` snapshot data.
 - Item mode remains the current single-box layout; ball and potion counts reflect the live bag.

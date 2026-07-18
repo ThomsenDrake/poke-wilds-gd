@@ -50,30 +50,30 @@ func hud_name(font: Font, font_size: int, raw_name: String, max_width: float) ->
 
 
 # Levels ride just after the rendered name ink; an overlong name slides the
-# whole name+level row left so the level label rect stays onstage.
-func place_hud_levels(enemy_name: Label, enemy_level: Label, player_name: Label, player_level: Label) -> void:
-	_place_hud_level(enemy_name, enemy_level, 13.0)
-	_place_hud_level(player_name, player_level, 76.0)
+# whole name+level row left so the level label rect stays onstage. A visible
+# status tag reserves its width at the stage edge and sits after the level ink.
+func place_hud_levels(enemy_name: Label, enemy_level: Label, player_name: Label, player_level: Label, enemy_status: Label = null, player_status: Label = null) -> void:
+	_place_hud_level(enemy_name, enemy_level, 13.0, enemy_status)
+	_place_hud_level(player_name, player_level, 76.0, player_status)
 
 
-func _place_hud_level(name_label: Label, level_label: Label, name_x: float) -> void:
+func _place_hud_level(name_label: Label, level_label: Label, name_x: float, status_label: Label = null) -> void:
 	var font := name_label.get_theme_font("font")
 	var font_size := name_label.get_theme_font_size("font_size")
 	var ink := minf(font.get_string_size(name_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x, name_label.size.x)
-	var level_x := name_x + ink + 2.0
-	var max_level_x := 160.0 - level_label.size.x - 1.0
-	name_label.position.x = name_x - maxf(0.0, level_x - max_level_x)
-	level_label.position.x = minf(level_x, max_level_x)
+	var reserve := status_label.size.x + 2.0 if status_label != null and not status_label.text.is_empty() else 0.0
+	var max_level_x := 160.0 - reserve - level_label.size.x - 1.0
+	name_label.position.x = name_x - maxf(0.0, name_x + ink + 2.0 - max_level_x)
+	level_label.position.x = minf(name_x + ink + 2.0, max_level_x)
+	if status_label != null:
+		var level_ink: float = font.get_string_size(level_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		status_label.position.x = minf(level_label.position.x + level_ink + 2.0, 160.0 - status_label.size.x)
 
 
 func overlay_key(menu_state: String) -> String:
-	match menu_state:
-		"moves":
-			return "moves"
-		"action":
-			return "action"
-		_:
-			return ""
+	if menu_state == "moves":
+		return "moves"
+	return "action" if menu_state == "action" else ""
 
 
 func model(menu_state: String, snapshot: Dictionary) -> Array:
@@ -202,11 +202,13 @@ func _move_model(moves: Array) -> Array:
 	return result
 
 
+# Single-column rows: "POKE BALL x99" measures 76px at the battle font, so the
+# old two-column layout drew the POKE BALL count over the POTION label.
 func _item_model(bag: Dictionary) -> Array:
 	return [
-		_entry("poke_ball", "POKE BALL x%d" % int(bag.get("poke_ball", 0)), Vector2(16, 111), Vector2(8, 112), Rect2(7, 110, 68, 12), Vector2i(0, 0), int(bag.get("poke_ball", 0)) > 0, Vector2(60, 8)),
-		_entry("potion", "POTION x%d" % int(bag.get("potion", 0)), Vector2(84, 111), Vector2(76, 112), Rect2(75, 110, 66, 12), Vector2i(1, 0), int(bag.get("potion", 0)) > 0, Vector2(58, 8)),
-		_entry("back", "BACK", Vector2(16, 127), Vector2(8, 128), Rect2(7, 124, 48, 12), Vector2i(0, 1), true, Vector2(38, 8)),
+		_entry("poke_ball", "POKE BALL x%d" % int(bag.get("poke_ball", 0)), Vector2(16, 111), Vector2(8, 112), Rect2(7, 110, 146, 8), Vector2i(0, 0), int(bag.get("poke_ball", 0)) > 0, Vector2(140, 8)),
+		_entry("potion", "POTION x%d" % int(bag.get("potion", 0)), Vector2(16, 119), Vector2(8, 120), Rect2(7, 118, 146, 8), Vector2i(0, 1), int(bag.get("potion", 0)) > 0, Vector2(140, 8)),
+		_entry("back", "BACK", Vector2(16, 127), Vector2(8, 128), Rect2(7, 126, 146, 8), Vector2i(0, 2), true, Vector2(140, 8)),
 	]
 
 

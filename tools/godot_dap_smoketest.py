@@ -73,6 +73,14 @@ SCENARIO_REQUIREMENTS = {
         "all": ["layout_audit_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "world_consistency_audit": {
+        "all": ["world_consistency_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "ui_render_audit": {
+        "all": ["ui_render_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

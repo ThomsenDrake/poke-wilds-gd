@@ -10,7 +10,7 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - The app boots into `res://scenes/app/Main.tscn`.
 - The autoload runtime initializes source data, session state, and save state before the main scene starts normal play.
 - The overworld is rebuilt from the saved seed and centered on the saved player tile.
-- The player moves on a 16x16 tile grid with continuous hold-to-move stepping and a faster run modifier on `X`, rendered from the source `ben-walking.png` / `ben-running.png` sprite sheets with direction-correct frames.
+- The player moves on a 16x16 tile grid with continuous hold-to-move stepping and a faster run modifier on `X`, rendered from the source `ben-walking.png` / `ben-running.png` sprite sheets with direction-correct frames. Draw order is y-sorted: the player renders behind tall prop canopies when standing north of them and in front when standing south.
 - Grass tiles can trigger wild encounters. Water, trees, cacti, swamp trees, rock cliffs, snow trees, and lava block movement.
 - Entering battle clears transient overworld message UI before the battle screen appears.
 - When movement is blocked the player avatar surfaces a biome-specific reason from the world view (for example "A tall tree blocks the way.").
@@ -52,3 +52,5 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - `biome_probe` drives `world_view.validate_world_invariants` and emits `biome_probe_passed` when the generated world satisfies determinism, ring progression, navigable spawn, and reachability invariants.
 - `biome_traverse` walks the player across a biome boundary (or teleports across one), triggers a traversal-gate block on a field-move-locked tile, then starts a biome-aware wild battle. Requires `biome_entered` or `traversal_blocked` plus a completed `encounter_started`/`battle_finished` pair.
 - `field_move` finds a `cut`-gated tile, drives the party-screen field-move unlock path, and confirms the tile becomes walkable with the `field_move_used` trace.
+- `world_consistency_audit` samples tiles around spawn and proves logic/render/collision agreement, player-vs-prop spatial contracts, z-order, and tall-grass/encounter alignment.
+- `ui_render_audit` verifies battle and menu screens against the art-anchored render model (expected strings, label overlap, cursor pairs) with a windowed pixel lint whose findings are quarantine-tier.

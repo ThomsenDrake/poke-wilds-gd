@@ -35,11 +35,27 @@ var _canvas_modulate: CanvasModulate = null
 
 
 func _ready() -> void:
+	_setup_canvas_order()
 	_canvas_modulate = CanvasModulate.new()
 	_canvas_modulate.name = "DayNightModulate"
 	add_child(_canvas_modulate)
 	set_time_of_day(TIME_OF_DAY_DEFAULT)
 	rebuild(world_seed)
+
+
+# Y-sort delivers the north/south depth contract: prop sprites sort by their
+# tile bottom, the player sprite by its feet (player_avatar.gd), and ground
+# tiles stay at z -1 below every actor (Godot sorts by z_index first, then by
+# Y within one z_index). Every canvas ancestor must be y-sort-enabled or its
+# subtree renders as a single block, so the parent (Main, which also parents
+# the player sibling) joins the chain here.
+func _setup_canvas_order() -> void:
+	y_sort_enabled = true
+	_ground_layer.y_sort_enabled = true
+	_prop_layer.y_sort_enabled = true
+	var parent := get_parent()
+	if parent is CanvasItem:
+		(parent as CanvasItem).y_sort_enabled = true
 
 
 func sync_visible(center_tile: Vector2i) -> void:
@@ -84,6 +100,38 @@ func get_traversal_block_reason(map_pos: Vector2i) -> String:
 
 func tile_requires_field_move(map_pos: Vector2i) -> String:
 	return str(_get_tile_data(map_pos).get("requires_field_move", ""))
+
+
+# Generator logic for one tile (biome, walkable, prop, gate, encounter).
+# Audits cross-check it against the rendered scene and the collision answer;
+# the view's generator is the one seeded from the session.
+func get_tile_logic(map_pos: Vector2i) -> Dictionary:
+	return _generator.get_tile_logic(map_pos)
+
+
+# Full render data the view cached for one tile (textures, colors, paths).
+func get_tile_render_data(map_pos: Vector2i) -> Dictionary:
+	return _get_tile_data(map_pos)
+
+
+# The texture the tile's ground sprite currently shows; null while the tile
+# sits outside the synced window.
+func get_tile_base_texture(map_pos: Vector2i) -> Texture2D:
+	var node: Sprite2D = _ground_nodes.get(map_pos, null)
+	return node.texture if node != null else null
+
+
+# The texture the tile's prop sprite currently shows; null when the tile
+# renders no prop (or sits outside the synced window).
+func get_tile_prop_texture(map_pos: Vector2i) -> Texture2D:
+	var node: Sprite2D = _prop_nodes.get(map_pos, null)
+	return node.texture if node != null else null
+
+
+# The live prop sprite for one tile (null when none); z-order audits read its
+# canvas ordering relative to the player.
+func get_prop_sprite(map_pos: Vector2i) -> Sprite2D:
+	return _prop_nodes.get(map_pos, null)
 
 
 func validate_world_invariants() -> Dictionary:
@@ -137,6 +185,7 @@ func _ensure_tile_nodes(map_pos: Vector2i) -> void:
 		ground_sprite.centered = false
 		ground_sprite.texture = _texture_cache.base_texture(tile_data)
 		ground_sprite.position = map_to_world(map_pos)
+		ground_sprite.z_index = -1
 		_ground_layer.add_child(ground_sprite)
 		_ground_nodes[map_pos] = ground_sprite
 
@@ -146,8 +195,11 @@ func _ensure_tile_nodes(map_pos: Vector2i) -> void:
 			var prop_sprite = Sprite2D.new()
 			prop_sprite.centered = false
 			prop_sprite.texture = prop_texture
-			prop_sprite.position = map_to_world(map_pos) + Vector2(0, TILE_SIZE - prop_texture.get_height())
-			prop_sprite.z_index = 2
+			# Origin at the tile bottom (the prop's base) so y-sort orders it
+			# against the player's feet; offset keeps the draw position
+			# unchanged, extending tall canopies into the tile above.
+			prop_sprite.position = map_to_world(map_pos) + Vector2(0, TILE_SIZE)
+			prop_sprite.offset = Vector2(0, -prop_texture.get_height())
 			_prop_layer.add_child(prop_sprite)
 			_prop_nodes[map_pos] = prop_sprite
 	elif _prop_nodes.has(map_pos):

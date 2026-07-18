@@ -29,6 +29,8 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 Run `biome_probe` after touching world generation, biome definitions, or the spawn/reachability logic. It asserts determinism, ring progression, navigable spawn, and reachability invariants in a single trace.
 Run `biome_traverse` after touching traversal gating, biome encounter filtering, or the player avatar blocked path. It exercises biome crossing, traversal-gate blocking, and a biome-aware wild battle.
 Run `field_move` after touching the party screen, field-move unlock flow, or traversal gating. It proves a `cut`-gated tile becomes walkable after the party-screen field move fires.
+Run `world_consistency_audit` after touching world rendering, prop scatter, traversal, or draw order. It proves tile logic/render/collision agreement plus player-vs-prop spatial, z-order, and tall-grass contracts.
+Run `ui_render_audit` after touching any UI scene or the battle surface. It verifies expected strings, label overlap, and cursor pairs against the art-anchored render model, and (windowed only) runs the pixel lint; heuristic pixel findings emit `quarantine_finding` traces that report without failing until graduated.
 Run `overworld_step` and `wild_battle` together after touching player animation timing, battle presentation, or scene-level UI transitions. Static checks will not catch sprite-sheet frame mapping, stage-scaling drift, stacked HUD regressions, or broken battle cursor navigation.
 
 ## Automated playtests
@@ -48,6 +50,10 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 ```
 
 `visual_sweep` captures a deterministic 16-shot set (fixed seed, crafted party including a strip-sprite canary species, fixed wild battle) to `.godot-smoke/shots/` and diffs it against `docs/generated/visual-baselines/` via `tools/visual_diff.py`; any shot drifting more than 0.5% of pixels fails the scenario. Run `visual_sweep_update` to accept intentional visual changes. Captures require a windowed run (editor DAP launch); headless captures are blank, and baselines are stable per-machine (resolution-dependent). The diff tool catches pixel drift against what exists — but a human or agent should still READ new shots when states are added, since baselines only guard what already exists.
+
+## Agent vision review
+
+After any sweep whose shots change, a vision-capable reviewer reads every shot against `docs/references/vision-review-rubric.md` and writes `.godot-smoke/vision-review.json` (per shot: defect class, region, severity, confidence). Findings are quarantine-tier — reported, never red — unless a coded oracle independently confirms the same defect.
 
 ## Current risks
 
