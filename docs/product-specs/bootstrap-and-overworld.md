@@ -12,7 +12,7 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - The overworld is rebuilt from the saved seed and centered on the saved player tile.
 - The player moves on a 16x16 tile grid with continuous hold-to-move stepping and a faster run modifier on `X`, rendered from the source `ben-walking.png` / `ben-running.png` sprite sheets with direction-correct frames. Draw order is y-sorted: the player renders behind tall prop canopies when standing north of them and in front when standing south.
 - Grass tiles can trigger wild encounters. Water, trees, cacti, swamp trees, rock cliffs, snow trees, and lava block movement.
-- Entering battle clears transient overworld message UI before the battle screen appears.
+- Entering battle clears transient overworld message UI before the battle screen appears, plays the wild species' cry, and switches to the battle theme; when the battle ends, the fainted side's cry sounds (victory or defeat) and the biome track resumes.
 - When movement is blocked the player avatar surfaces a biome-specific reason from the world view (for example "A tall tree blocks the way.").
 - Each completed step advances the session clock by one minute and the step counter by one; both persist in the save. The world view tints for time of day (night, dawn, dusk) via `set_time_of_day`.
 - The music router plays a biome-specific overworld track on boot and whenever the player crosses into a new biome, switches to the wild-battle theme during battle, and resumes the biome track afterward.

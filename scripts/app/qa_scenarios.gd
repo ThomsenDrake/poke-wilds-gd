@@ -11,6 +11,7 @@ const SCENARIOS := {
 	"layout_audit": [preload("res://scripts/app/layout_audit.gd"), "run", []],
 	"world_consistency_audit": [preload("res://scripts/app/world_consistency_audit.gd"), "run", []],
 	"ui_render_audit": [preload("res://scripts/app/ui_render_audit.gd"), "run", []],
+	"battle_anim": [preload("res://scripts/app/battle_anim_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
 }

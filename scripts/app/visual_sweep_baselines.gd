@@ -180,3 +180,12 @@ func _compare_with_baselines(shot_dir: String, threshold_pct: float) -> Dictiona
 	verdict["mode"] = MODE_COMPARE
 	verdict["auto_update"] = false
 	return verdict
+
+
+# Animations play asynchronously after a response; captures must wait them out.
+func await_battle_idle(tree: SceneTree, view: Node) -> void:
+	for _i in range(240):
+		if not view.visible or not view.is_animating():
+			break
+		await tree.process_frame
+	await tree.process_frame

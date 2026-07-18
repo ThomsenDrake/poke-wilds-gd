@@ -36,7 +36,7 @@ _spec.loader.exec_module(smoketest)
 
 SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",

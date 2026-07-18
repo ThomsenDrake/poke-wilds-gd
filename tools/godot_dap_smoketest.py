@@ -81,6 +81,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["ui_render_audit_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "battle_anim": {
+        "all": ["battle_anim_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

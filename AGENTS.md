@@ -45,7 +45,7 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 - Use the DAP smoke runner for runtime validation when the Godot editor is listening on `127.0.0.1:6006`.
 - Scenario coverage currently starts with `boot`, `overworld_step`, `menu_save`, and `wild_battle`, plus `biome_probe`, `biome_traverse`, and `field_move`.
 - Automated playtests: `playtest_journey` (scripted full loop) and `playtest_soak` (seeded invariant bot) via `python3 tools/run_playtests.py`.
-- Audit scenarios: `nav_audit` (traversal + menu/battle navigation), `texture_audit` (sprite/tile pipeline integrity), `data_audit` (encounter and instance data integrity), `layout_audit` (label fit + cursor alignment), and `visual_sweep` (deterministic screenshots with baseline diffing; `visual_sweep_update` accepts new baselines).
+- Audit scenarios: `nav_audit` (traversal + menu/battle navigation), `texture_audit` (sprite/tile pipeline integrity), `data_audit` (encounter and instance data integrity), `layout_audit` (label fit + cursor alignment), `world_consistency_audit` (logic/render/collision three-way), `ui_render_audit` (render model + pixel lint), `battle_anim` (attack animation playback), and `visual_sweep` (deterministic screenshots with baseline diffing; `visual_sweep_update` accepts new baselines).
 
 ## Common Entry Points
 

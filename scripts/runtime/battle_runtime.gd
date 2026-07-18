@@ -1,6 +1,7 @@
 extends RefCounted
 
 const BattleRules := preload("res://scripts/domain/battle_rules.gd")
+const AttackAnims := preload("res://scripts/data/attack_anims.gd")
 
 const BALL_ID := "poke_ball"
 const DEFAULT_CATCH_RATE := 45
@@ -11,6 +12,7 @@ var _catalog = null
 var _pokemon_rules = null
 var _trace = null
 var _rules = BattleRules.new()
+var _anims = AttackAnims.new()
 var _rng = RandomNumberGenerator.new()
 
 var _active = false
@@ -51,11 +53,8 @@ func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 
 
 func get_snapshot() -> Dictionary:
-	return {
-		"player_mon": _player_mon.duplicate(true),
-		"enemy_mon": _enemy_mon.duplicate(true),
-		"bag": {"poke_ball": _session.get_item_count(BALL_ID), "potion": _session.get_item_count("potion")}
-	}
+	return {"player_mon": _player_mon.duplicate(true), "enemy_mon": _enemy_mon.duplicate(true),
+		"bag": {"poke_ball": _session.get_item_count(BALL_ID), "potion": _session.get_item_count("potion")}}
 
 
 func perform_move(index: int) -> Dictionary:
@@ -68,10 +67,11 @@ func perform_move(index: int) -> Dictionary:
 		return _response("No PP left for that move.", "action")
 
 	var lines: Array = []
-	var finished = _resolve_round(index, lines)
+	var turns: Array = []
+	var finished = _resolve_round(index, lines, turns)
 	if not finished.is_empty():
-		return finished
-	return _response("\n".join(lines), "action")
+		return _with_turns(finished, turns)
+	return _with_turns(_response("\n".join(lines), "action"), turns)
 
 
 func use_pokeball() -> Dictionary:
@@ -86,17 +86,16 @@ func use_pokeball() -> Dictionary:
 	if bool(attempt.get("success", false)):
 		_rules.reset_stages(_enemy_mon)
 		var caught = _session.add_pokemon_to_party(_enemy_mon.duplicate(true))
-		var outcome = "caught" if caught else "caught_box_full"
-		var message = "Gotcha! %s was caught." % str(_enemy_mon.get("name", "Pokemon"))
-		if not caught:
-			message = "Caught %s, but your party is full." % str(_enemy_mon.get("name", "Pokemon"))
-		return _handle_victory(outcome, [message])
+		var mon_name := str(_enemy_mon.get("name", "Pokemon"))
+		var message := ("Gotcha! %s was caught." if caught else "Caught %s, but your party is full.") % mon_name
+		return _handle_victory("caught" if caught else "caught_box_full", [message])
 
 	var lines: Array = ["The wild %s broke free!" % str(_enemy_mon.get("name", "Pokemon"))]
-	var finished = _enemy_counterattack(lines)
+	var turns: Array = []
+	var finished = _enemy_counterattack(lines, turns)
 	if not finished.is_empty():
-		return finished
-	return _response("\n".join(lines), "action")
+		return _with_turns(finished, turns)
+	return _with_turns(_response("\n".join(lines), "action"), turns)
 
 
 func use_potion() -> Dictionary:
@@ -114,30 +113,33 @@ func use_potion() -> Dictionary:
 	var healed = min(POTION_HEAL, max_hp - current_hp)
 	_player_mon["current_hp"] = current_hp + healed
 	var lines: Array = ["%s recovered %d HP." % [str(_player_mon.get("name", "Pokemon")), healed]]
-	var finished = _enemy_counterattack(lines)
+	var turns: Array = []
+	var finished = _enemy_counterattack(lines, turns)
 	if not finished.is_empty():
-		return finished
-	return _response("\n".join(lines), "action")
+		return _with_turns(finished, turns)
+	return _with_turns(_response("\n".join(lines), "action"), turns)
 
 
 func run_from_battle() -> Dictionary:
 	if not _active:
 		return {}
+	if _rules.is_trapped(_player_mon): return _response("Can't escape!", "action")
 	return _end_battle("escaped", "Got away safely!")
 
 
-# One round in speed order (player wins ties), then end-of-turn status ticks.
-func _resolve_round(player_move_index: int, lines: Array) -> Dictionary:
+# One round in priority/speed order (player wins ties), then end-of-turn ticks.
+func _resolve_round(player_move_index: int, lines: Array, turns: Array) -> Dictionary:
 	var enemy_index = _rules.choose_enemy_move_index(_enemy_mon, _rng)
-	var order := ["player", "enemy"]
-	if _rules.effective_stat(_enemy_mon, "spe") > _rules.effective_stat(_player_mon, "spe"):
-		order = ["enemy", "player"]
-
+	var enemy_move: Dictionary = (_enemy_mon.get("moves", []) as Array)[enemy_index] if enemy_index >= 0 else {}
+	var player_move: Dictionary = (_player_mon.get("moves", []) as Array)[player_move_index]
+	var enemy_first: bool = _move_priority(enemy_move) > _move_priority(player_move) \
+		or (_move_priority(enemy_move) == _move_priority(player_move) \
+		and _rules.effective_stat(_enemy_mon, "spe") > _rules.effective_stat(_player_mon, "spe"))
 	var skip_side := ""
-	for side in order:
+	for side in (["enemy", "player"] if enemy_first else ["player", "enemy"]):
 		if side == skip_side:
 			continue
-		var result = _act(side, player_move_index if side == "player" else enemy_index, lines)
+		var result = _act(side, player_move_index if side == "player" else enemy_index, lines, turns)
 		if bool(result.get("flinched", false)):
 			skip_side = "enemy" if side == "player" else "player"
 		var finished = _check_knockout(lines)
@@ -146,15 +148,18 @@ func _resolve_round(player_move_index: int, lines: Array) -> Dictionary:
 	return _apply_end_of_turn(lines)
 
 
-func _enemy_counterattack(lines: Array) -> Dictionary:
-	_act("enemy", _rules.choose_enemy_move_index(_enemy_mon, _rng), lines)
+func _move_priority(move: Dictionary) -> int: return 1 if str(move.get("effect", "")) == "EFFECT_PRIORITY_HIT" else 0
+
+
+func _enemy_counterattack(lines: Array, turns: Array) -> Dictionary:
+	_act("enemy", _rules.choose_enemy_move_index(_enemy_mon, _rng), lines, turns)
 	var finished = _check_knockout(lines)
 	if not finished.is_empty():
 		return finished
 	return _apply_end_of_turn(lines)
 
 
-func _act(side: String, move_index: int, lines: Array) -> Dictionary:
+func _act(side: String, move_index: int, lines: Array, turns: Array) -> Dictionary:
 	var attacker = _player_mon if side == "player" else _enemy_mon
 	var defender = _enemy_mon if side == "player" else _player_mon
 	if move_index < 0:
@@ -163,8 +168,11 @@ func _act(side: String, move_index: int, lines: Array) -> Dictionary:
 	_spend_pp(attacker, move_index)
 	var move: Dictionary = attacker.get("moves", [])[move_index]
 	var result = _rules.execute_attack(attacker, defender, move, _rng)
-	_warn_unhandled_effect(result)
+	var effect = str(result.get("unhandled_effect", ""))
+	if not effect.is_empty() and _trace != null:
+		_trace.warning("BattleRuntime", "Unhandled move effect in battle.", {"move_id": str(result.get("move_id", "")), "effect": effect})
 	lines.append(str(result.get("message", "")))
+	turns.append(_anims.turn_for(side, result))
 	return result
 
 
@@ -195,7 +203,7 @@ func _apply_end_of_turn(lines: Array) -> Dictionary:
 		if int(tick.get("damage", 0)) <= 0:
 			continue
 		var mon_name = str(mon.get("name", "Pokemon"))
-		lines.append(_end_of_turn_line(mon_name, str(tick.get("status", ""))))
+		lines.append("%s is hurt by poison!" % mon_name if str(tick.get("status", "")) == "PSN" else "%s is hurt by its burn!" % mon_name)
 		if bool(tick.get("fainted", false)):
 			lines.append("%s fainted!" % mon_name)
 			if side == "enemy":
@@ -204,10 +212,11 @@ func _apply_end_of_turn(lines: Array) -> Dictionary:
 	return {}
 
 
-func _end_of_turn_line(mon_name: String, status: String) -> String:
-	if status == "PSN":
-		return "%s is hurt by poison!" % mon_name
-	return "%s is hurt by its burn!" % mon_name
+# Attaches the round's per-action turns so the battle view can animate them
+# before showing the resulting snapshot/message. Additive response key.
+func _with_turns(response: Dictionary, turns: Array) -> Dictionary:
+	response["turns"] = turns
+	return response
 
 
 func _handle_player_faint(lines: Array) -> Dictionary:
@@ -230,7 +239,7 @@ func _handle_victory(outcome: String, lines: Array) -> Dictionary:
 	var enemy_entry = _catalog.get_species(str(_enemy_mon.get("species_id", "")))
 	var exp_reward = _pokemon_rules.experience_yield(enemy_entry, int(_enemy_mon.get("level", 1)))
 	var species_entry = _catalog.get_species(str(_player_mon.get("species_id", "")))
-	var summary = {"levels_gained": 0, "new_level": int(_player_mon.get("level", 1)), "learned_moves": []}
+	var summary := {}
 	if not species_entry.is_empty():
 		summary = _pokemon_rules.award_experience(_player_mon, species_entry, exp_reward, Callable(_catalog, "get_move"))
 		_player_mon = summary.get("mon", _player_mon)
@@ -272,13 +281,6 @@ func _try_evolve(lines: Array) -> Dictionary:
 	_player_mon["current_hp"] = clampi(int(round(hp_ratio * float(_player_mon["max_hp"]))), 1, int(_player_mon["max_hp"]))
 	lines.append("%s evolved into %s!" % [from_name, str(_player_mon["name"])])
 	return {"from": from_id, "to": str(_player_mon["species_id"])}
-
-
-func _warn_unhandled_effect(result: Dictionary) -> void:
-	var effect = str(result.get("unhandled_effect", ""))
-	if effect.is_empty() or _trace == null:
-		return
-	_trace.warning("BattleRuntime", "Unhandled move effect in battle.", {"move_id": str(result.get("move_id", "")), "effect": effect})
 
 
 func _end_battle(outcome: String, message: String, evolved: Dictionary = {}) -> Dictionary:

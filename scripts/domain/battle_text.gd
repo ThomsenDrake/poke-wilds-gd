@@ -12,6 +12,9 @@ const STAT_DISPLAY_TEXT := {
 	"atk": "Attack", "def": "Defense", "sat": "Sp. Atk", "sdf": "Sp. Def",
 	"spe": "Speed", "accuracy": "accuracy", "evasion": "evasion",
 }
+# Result flags that mean something visible happened even without damage.
+const OUTCOME_FLAGS: PackedStringArray = ["confused", "infatuated", "trapped", "protected",
+	"self_confused", "ohko"]
 
 
 static func describe_status_infliction(status: String) -> String:
@@ -30,6 +33,8 @@ static func blocked_line(attacker_name: String, status: String) -> String:
 			return "%s is fast asleep!" % attacker_name
 		"FRZ":
 			return "%s is frozen solid!" % attacker_name
+		"INFATUATION":
+			return "%s is immobilized by love!" % attacker_name
 	return "%s couldn't move!" % attacker_name
 
 
@@ -52,12 +57,23 @@ static func attack_message(result: Dictionary, attacker_name: String, defender_n
 		lines.append("%s woke up!" % attacker_name)
 	if bool(result.get("thawed", false)):
 		lines.append("%s thawed out!" % attacker_name)
+	if bool(result.get("snapped_out", false)):
+		lines.append("%s snapped out of its confusion!" % attacker_name)
 	var blocked = str(result.get("blocked_by", ""))
 	if not blocked.is_empty():
 		lines.append(blocked_line(attacker_name, blocked))
 		return "\n".join(lines)
+	if bool(result.get("hurt_itself", false)):
+		lines.append("%s is confused!" % attacker_name)
+		lines.append("It hurt itself in its confusion!")
+		if bool(result.get("self_fainted", false)):
+			lines.append("%s fainted!" % attacker_name)
+		return "\n".join(lines)
 
 	lines.append("%s used %s!" % [attacker_name, move_name])
+	if bool(result.get("protected_target", false)):
+		lines.append("%s protected itself!" % defender_name)
+		return "\n".join(lines)
 	if not bool(result.get("hit", false)):
 		lines.append("But it missed!")
 		return "\n".join(lines)
@@ -74,6 +90,8 @@ static func attack_message(result: Dictionary, attacker_name: String, defender_n
 		elif effectiveness < 1.0:
 			lines.append("It's not very effective...")
 		lines.append("%s took %d damage." % [defender_name, damage])
+		if bool(result.get("ohko", false)):
+			lines.append("It's a one-hit KO!")
 		var hits = int(result.get("hits", 1))
 		if hits > 1:
 			lines.append("Hit %d times!" % hits)
@@ -81,19 +99,46 @@ static func attack_message(result: Dictionary, attacker_name: String, defender_n
 	var status_applied = str(result.get("status_applied", ""))
 	if not status_applied.is_empty():
 		lines.append("%s %s!" % [defender_name, describe_status_infliction(status_applied)])
+	if bool(result.get("confused", false)):
+		lines.append("%s became confused!" % defender_name)
+	if bool(result.get("infatuated", false)):
+		lines.append("%s fell in love with %s!" % [defender_name, attacker_name])
+	if bool(result.get("trapped", false)):
+		lines.append("%s is trapped!" % defender_name)
+	if not str(result.get("encored", "")).is_empty():
+		lines.append("%s received an encore!" % defender_name)
 	if bool(result.get("flinched", false)):
 		lines.append("%s flinched!" % defender_name)
 	for change_variant in result.get("stat_changes", []):
 		if change_variant is Dictionary:
 			lines.append(stat_change_line(change_variant, attacker_name, defender_name))
+	if int(result.get("restored", 0)) > 0:
+		lines.append("%s regained health!" % attacker_name)
 	if int(result.get("healed", 0)) > 0:
 		lines.append("%s absorbed some HP!" % attacker_name)
 	if int(result.get("recoil", 0)) > 0:
 		lines.append("%s is hit with recoil!" % attacker_name)
+	if bool(result.get("protected", false)):
+		lines.append("%s protected itself!" % attacker_name)
+	if bool(result.get("self_confused", false)):
+		lines.append("%s became confused due to fatigue!" % attacker_name)
 	if bool(result.get("failed", false)):
 		lines.append("But it failed!")
-	elif damage == 0 and status_applied.is_empty() and (result.get("stat_changes", []) as Array).is_empty() and effectiveness > 0.0:
+	elif _nothing_happened(result, damage, status_applied, effectiveness):
 		lines.append("But nothing happened.")
 	if bool(result.get("fainted", false)):
 		lines.append("%s fainted!" % defender_name)
 	return "\n".join(lines)
+
+
+static func _nothing_happened(result: Dictionary, damage: int, status_applied: String, effectiveness: float) -> bool:
+	if damage > 0 or not status_applied.is_empty() or effectiveness <= 0.0:
+		return false
+	if not (result.get("stat_changes", []) as Array).is_empty():
+		return false
+	if int(result.get("restored", 0)) > 0 or not str(result.get("encored", "")).is_empty():
+		return false
+	for flag in OUTCOME_FLAGS:
+		if bool(result.get(flag, false)):
+			return false
+	return true

@@ -13,6 +13,7 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
 - A field move action appears only when the species can perform it and the move is not yet unlocked; choosing it emits `field_move_requested`, closes the menu, unlocks that move's traversal gating, and emits a `field_move_used` trace.
 - The bag screen lists items with display names, counts, and descriptions. A Potion can be used on a chosen party member to heal 20 HP; unusable items report that they cannot be used here.
 - Save writes the current runtime state to `user://godot_port_save.json` in save schema v2 (party, bag, field moves, time of day, total steps); v1 saves migrate on load with defaults.
+- Runtime audio is two services: the music router (biome and battle tracks) and the cry player (species cries keyed by dex number at battle start and on faint, with a warning trace for missing files).
 - New Game resets the session with a new world seed, a starter Pokemon, a starting bag (5 Poke Balls, 3 Potions), and the clock at 10:00.
 - Closing the menu emits a save and returns control to overworld movement.
 - Transient message boxes yield to battle presentation instead of stacking over the combat UI.

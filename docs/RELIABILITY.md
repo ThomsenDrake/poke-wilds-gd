@@ -30,6 +30,7 @@ Run `biome_probe` after touching world generation, biome definitions, or the spa
 Run `biome_traverse` after touching traversal gating, biome encounter filtering, or the player avatar blocked path. It exercises biome crossing, traversal-gate blocking, and a biome-aware wild battle.
 Run `field_move` after touching the party screen, field-move unlock flow, or traversal gating. It proves a `cut`-gated tile becomes walkable after the party-screen field move fires.
 Run `world_consistency_audit` after touching world rendering, prop scatter, traversal, or draw order. It proves tile logic/render/collision agreement plus player-vs-prop spatial, z-order, and tall-grass contracts.
+Run `battle_anim` after touching the attack animation pipeline, battle turn structure, or battle audio. It plays a scripted animated move end to end and asserts the animation trace, sound, and turn resolution.
 Run `ui_render_audit` after touching any UI scene or the battle surface. It verifies expected strings, label overlap, and cursor pairs against the art-anchored render model, and (windowed only) runs the pixel lint; heuristic pixel findings emit `quarantine_finding` traces that report without failing until graduated.
 Run `overworld_step` and `wild_battle` together after touching player animation timing, battle presentation, or scene-level UI transitions. Static checks will not catch sprite-sheet frame mapping, stage-scaling drift, stacked HUD regressions, or broken battle cursor navigation.
 

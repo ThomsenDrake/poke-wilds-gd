@@ -3,6 +3,7 @@ extends Control
 signal battle_finished(outcome: String, message: String)
 
 const RuntimePath := "/root/GameRuntime"
+const AttackAnimator := preload("res://scripts/ui/attack_animator.gd")
 const STAGE_SIZE := Vector2(160.0, 144.0)
 const STAGE_PADDING := 16.0
 
@@ -14,6 +15,9 @@ var _snapshot: Dictionary = {}
 var _message := ""
 var _menu_state := "action"
 var _selection := ""
+var _animator := AttackAnimator.new()
+var _animating := false
+var _anim_generation := 0
 
 func _ready() -> void:
 	visible = false
@@ -29,7 +33,7 @@ func _notification(what: int) -> void:
 		_layout_display()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or _animating:
 		return
 	if event.is_action_pressed("move_up"):
 		_move_selection(Vector2i.UP)
@@ -48,7 +52,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _gui_input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or _animating:
 		return
 	if event is not InputEventMouseButton:
 		return
@@ -140,16 +144,48 @@ func _cancel_selection() -> void:
 func _apply_response(response: Dictionary) -> void:
 	if response.is_empty():
 		return
+	var previous_snapshot := _snapshot
 	var snapshot = response.get("snapshot", {})
 	if snapshot is Dictionary:
 		_snapshot = snapshot
 	_message = str(response.get("message", ""))
 	if bool(response.get("finished", false)):
+		_anim_generation += 1  # cancel any in-flight turn playback
+		_animating = false
 		visible = false
 		battle_finished.emit(str(response.get("outcome", "")), _message)
 		return
 	visible = bool(response.get("active", false))
-	_set_menu_state(str(response.get("menu", "action")))
+	var turns: Array = response.get("turns", [])
+	if turns.is_empty():
+		_set_menu_state(str(response.get("menu", "action")))
+		return
+	var menu := str(response.get("menu", "action"))
+	_menu_state = menu if menu in ["action", "moves", "item"] else "action"
+	_selection = _surface.first_selectable(_menu_state, _snapshot)
+	_play_turns(turns, previous_snapshot)
+
+
+# Async turn playback: the stage holds the pre-turn render while each hit
+# turn's anim plays sequentially, then the post-turn snapshot renders. Response
+# state was applied synchronously above; newer responses supersede playback.
+func _play_turns(turns: Array, previous_snapshot: Dictionary) -> void:
+	_anim_generation += 1
+	var generation := _anim_generation
+	_animating = true
+	var should_abort := func() -> bool: return generation != _anim_generation or not visible
+	_surface.render(previous_snapshot, "action", "", "")
+	var played: Array = await _animator.play_turns(turns, _surface, _surface.anim_actors(), should_abort)
+	for stats in played:
+		_runtime().emit_trace("attack_animation_played", "BattleView", {"move_id": str(stats.get("move_id", "")), "anim_key": str(stats.get("anim_key", "")),
+			"frames": int(stats.get("frames", 0)), "sound": bool(stats.get("sound", false)), "fallback": bool(stats.get("fallback", false))})
+	if generation == _anim_generation:
+		_animating = false
+		_render()
+
+
+func is_animating() -> bool:
+	return _animating
 
 func _set_menu_state(menu_state: String) -> void:
 	_menu_state = menu_state if menu_state in ["action", "moves", "item"] else "action"

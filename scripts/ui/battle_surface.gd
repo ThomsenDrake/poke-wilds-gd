@@ -90,6 +90,20 @@ func next_selection(menu_state: String, snapshot: Dictionary, current: String, d
 func option_from_point(menu_state: String, snapshot: Dictionary, point: Vector2) -> String:
 	return _layout.option_from_point(menu_state, snapshot, point)
 
+# Actor/layer handles for AttackAnimator playback: combatant sprites plus the
+# HUD groups the source metadata hides per frame (*_gone/hide tokens).
+func anim_actors() -> Dictionary:
+	return {
+		"player": _player_sprite,
+		"enemy": _enemy_sprite,
+		"layers": {
+			"player_healthbar": [_player_hud, _player_status],
+			"enemy_healthbar": [get_node("EnemyHPBar"), _enemy_name, _enemy_level, _enemy_status],
+			"player_sprite": [_player_sprite],
+			"enemy_sprite": [_enemy_sprite],
+		},
+	}
+
 func _overlay_for(menu_state: String) -> Texture2D:
 	var key := _layout.overlay_key(menu_state)
 	return _action_bg if key == "action" else _move_bg if key == "moves" else null

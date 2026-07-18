@@ -161,10 +161,12 @@ func _battle_shots() -> void:
 	await _capture("10_battle_moves.png")
 	view._selection = _baselines.damaging_move_id(_runtime())
 	view._activate_selection()
+	await _baselines.await_battle_idle(get_tree(), view)
 	await _capture("11_battle_after_attack.png")
 	if not view.visible and not _start_battle():
 		_failures.append("12_battle_items.png: battle ended and no new battle could start")
 		return
+	await _baselines.await_battle_idle(get_tree(), view)
 	view._set_menu_state("action")
 	view._selection = "item"
 	view._activate_selection()

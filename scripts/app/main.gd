@@ -2,6 +2,7 @@ extends Node2D
 
 const GameRuntimePath := "/root/GameRuntime"
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
+const CryPlayer := preload("res://scripts/runtime/cry_player.gd")
 const InputRouter := preload("res://scripts/app/input_router.gd")
 
 @onready var _world = $World
@@ -12,15 +13,20 @@ const InputRouter := preload("res://scripts/app/input_router.gd")
 @onready var _smoke_scenarios = $SmokeScenarios
 
 var _smoke_runner = SmokeScenarioRunner.new()
+var _cry_player = CryPlayer.new()
 var _input_router = InputRouter.new(Callable(self, "_toggle_menu"))
 var _in_battle = false
 var _menu_open = false
 var _suppress_close_toast = false
+var _battle_enemy_dex := 0
 
 func _ready() -> void:
 	_input_router.configure_input_map()
 	_runtime().emit_trace("boot_started", "App.Main", {"scene": "res://scenes/app/Main.tscn"})
 	_runtime().ensure_initialized()
+	# Registered next to the music router so its player enters the tree.
+	_cry_player.setup(_runtime().trace)
+	_runtime().add_child(_cry_player)
 
 	_start_menu.setup({
 		"get_species": Callable(_runtime().catalog, "get_species"),
@@ -76,6 +82,8 @@ func _on_encounter_requested(tile_position: Vector2i) -> void:
 	_player.input_enabled = false
 	_message_box.hide_message()
 	_music_router().play_battle_track("wild")
+	_battle_enemy_dex = _dex_for_species(str(wild_mon.get("species_id", "")))
+	_cry_player.play_cry(_battle_enemy_dex)
 	_battle_view.start_wild_battle(wild_mon)
 
 
@@ -86,12 +94,14 @@ func _on_battle_finished(outcome: String, message: String) -> void:
 
 	match outcome:
 		"victory":
+			_cry_player.play_cry(_battle_enemy_dex)
 			_message_box.show_message(message, 1.6)
 		"caught", "caught_box_full":
 			_message_box.show_message(message, 2.4)
 		"escaped":
 			_message_box.show_message(message, 1.2)
 		"defeat":
+			_cry_player.play_cry(_party_lead_dex())
 			_message_box.show_message(message + " You were returned to the start.", 2.4)
 		_:
 			_message_box.show_message(message, 1.8)
@@ -159,6 +169,17 @@ func _runtime() -> Node:
 
 func _music_router() -> Node:
 	return _runtime().music_router
+
+
+func _dex_for_species(species_id: String) -> int:
+	return int(_runtime().catalog.get_species(species_id).get("dex_number", 0))
+
+
+func _party_lead_dex() -> int:
+	var party: Array = _runtime().get_party_snapshot()
+	if party.is_empty():
+		return 0
+	return _dex_for_species(str(party[0].get("species_id", "")))
 
 
 # Re-requests the biome track at the player's tile. The router no-ops when that
