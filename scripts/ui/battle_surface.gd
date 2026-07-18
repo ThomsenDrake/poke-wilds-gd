@@ -70,7 +70,10 @@ func render(snapshot: Dictionary, menu_state: String, selection: String, message
 	_message_label.visible = menu_state == "action"
 	_message_label.text = message
 	_player_sprite.visible = menu_state != "moves"
-	_player_hud.visible = menu_state != "moves"
+	# Player HUD plate stays up in moves mode; name/level would clip under the side box.
+	_player_hud.visible = true
+	_player_name.visible = menu_state != "moves"
+	_player_level.visible = menu_state != "moves"
 	_glyph_covers.modulate = Color(0.973, 0.973, 0.973) if menu_state == "action" else Color(1.0, 0.996, 1.0)
 	var model = _layout.model(menu_state, snapshot)
 	match menu_state:
@@ -213,7 +216,4 @@ func _configure_theme() -> void:
 	for label in _menu_labels:
 		_apply_battle_font(label)
 
-func _apply_battle_font(label: Label) -> void:
-	label.add_theme_font_override("font", _battle_font)
-	label.add_theme_font_size_override("font_size", BATTLE_FONT_SIZE)
-	label.add_theme_color_override("font_color", Color.BLACK)
+func _apply_battle_font(label: Label) -> void: label.add_theme_font_override("font", _battle_font); label.add_theme_font_size_override("font_size", BATTLE_FONT_SIZE); label.add_theme_color_override("font_color", Color.BLACK)

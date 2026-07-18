@@ -85,6 +85,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["battle_anim_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "display_matrix": {
+        "all": ["display_matrix_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

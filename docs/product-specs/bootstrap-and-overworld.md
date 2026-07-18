@@ -54,3 +54,4 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - `field_move` finds a `cut`-gated tile, drives the party-screen field-move unlock path, and confirms the tile becomes walkable with the `field_move_used` trace.
 - `world_consistency_audit` samples tiles around spawn and proves logic/render/collision agreement, player-vs-prop spatial contracts, z-order, and tall-grass/encounter alignment.
 - `ui_render_audit` verifies battle and menu screens against the art-anchored render model (expected strings, label overlap, cursor pairs) with a windowed pixel lint whose findings are quarantine-tier.
+- `display_matrix` resizes the window across six sizes and proves the battle surface renders without scale degradation at each; `visual_sweep` applies a canonical 1152x648 window size so baselines are window-size-stable.

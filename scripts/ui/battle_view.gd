@@ -4,6 +4,7 @@ signal battle_finished(outcome: String, message: String)
 
 const RuntimePath := "/root/GameRuntime"
 const AttackAnimator := preload("res://scripts/ui/attack_animator.gd")
+const BattleTurnPlayer := preload("res://scripts/ui/battle_turn_player.gd")
 const STAGE_SIZE := Vector2(160.0, 144.0)
 const STAGE_PADDING := 16.0
 
@@ -16,8 +17,8 @@ var _message := ""
 var _menu_state := "action"
 var _selection := ""
 var _animator := AttackAnimator.new()
+var _turn_player := BattleTurnPlayer.new()
 var _animating := false
-var _anim_generation := 0
 
 func _ready() -> void:
 	visible = false
@@ -150,10 +151,14 @@ func _apply_response(response: Dictionary) -> void:
 		_snapshot = snapshot
 	_message = str(response.get("message", ""))
 	if bool(response.get("finished", false)):
-		_anim_generation += 1  # cancel any in-flight turn playback
-		_animating = false
-		visible = false
-		battle_finished.emit(str(response.get("outcome", "")), _message)
+		var finished_turns: Array = response.get("turns", [])
+		if finished_turns.is_empty():
+			_turn_player.generation += 1  # cancel any in-flight turn playback
+			_set_animating(false)
+			visible = false
+			battle_finished.emit(str(response.get("outcome", "")), _message)
+		else:
+			_turn_player.play(self, finished_turns, previous_snapshot, response)
 		return
 	visible = bool(response.get("active", false))
 	var turns: Array = response.get("turns", [])
@@ -163,29 +168,14 @@ func _apply_response(response: Dictionary) -> void:
 	var menu := str(response.get("menu", "action"))
 	_menu_state = menu if menu in ["action", "moves", "item"] else "action"
 	_selection = _surface.first_selectable(_menu_state, _snapshot)
-	_play_turns(turns, previous_snapshot)
+	_turn_player.play(self, turns, previous_snapshot)
 
 
-# Async turn playback: the stage holds the pre-turn render while each hit
-# turn's anim plays sequentially, then the post-turn snapshot renders. Response
-# state was applied synchronously above; newer responses supersede playback.
-func _play_turns(turns: Array, previous_snapshot: Dictionary) -> void:
-	_anim_generation += 1
-	var generation := _anim_generation
-	_animating = true
-	var should_abort := func() -> bool: return generation != _anim_generation or not visible
-	_surface.render(previous_snapshot, "action", "", "")
-	var played: Array = await _animator.play_turns(turns, _surface, _surface.anim_actors(), should_abort)
-	for stats in played:
-		_runtime().emit_trace("attack_animation_played", "BattleView", {"move_id": str(stats.get("move_id", "")), "anim_key": str(stats.get("anim_key", "")),
-			"frames": int(stats.get("frames", 0)), "sound": bool(stats.get("sound", false)), "fallback": bool(stats.get("fallback", false))})
-	if generation == _anim_generation:
-		_animating = false
-		_render()
+func is_animating() -> bool: return _animating
 
 
-func is_animating() -> bool:
-	return _animating
+func _set_animating(value: bool) -> void:
+	_animating = value
 
 func _set_menu_state(menu_state: String) -> void:
 	_menu_state = menu_state if menu_state in ["action", "moves", "item"] else "action"
@@ -199,7 +189,8 @@ func _layout_display() -> void:
 	var viewport_size = get_viewport_rect().size
 	var available = viewport_size - Vector2.ONE * STAGE_PADDING * 2.0
 	var scale_factor = min(available.x / STAGE_SIZE.x, available.y / STAGE_SIZE.y)
-	scale_factor = maxf(scale_factor, 0.1)
+	# Integer-snap when the stage fits: fractional scales alias the pixel font.
+	scale_factor = maxf(floorf(scale_factor), 1.0) if scale_factor >= 1.0 else maxf(scale_factor, 0.1)
 	var scaled_size = STAGE_SIZE * scale_factor
 	_display.size = scaled_size
 	_display.position = ((viewport_size - scaled_size) * 0.5).floor()

@@ -30,7 +30,7 @@ Run `biome_probe` after touching world generation, biome definitions, or the spa
 Run `biome_traverse` after touching traversal gating, biome encounter filtering, or the player avatar blocked path. It exercises biome crossing, traversal-gate blocking, and a biome-aware wild battle.
 Run `field_move` after touching the party screen, field-move unlock flow, or traversal gating. It proves a `cut`-gated tile becomes walkable after the party-screen field move fires.
 Run `world_consistency_audit` after touching world rendering, prop scatter, traversal, or draw order. It proves tile logic/render/collision agreement plus player-vs-prop spatial, z-order, and tall-grass contracts.
-Run `battle_anim` after touching the attack animation pipeline, battle turn structure, or battle audio. It plays a scripted animated move end to end and asserts the animation trace, sound, and turn resolution.
+Run `battle_anim` after touching the attack animation pipeline, battle turn structure, or battle audio. It plays a scripted animated move end to end and asserts the animation trace, sound, and turn resolution. Animations are frame-paced (deterministic at any refresh rate), and KO blows play before the battle closes.
 Run `ui_render_audit` after touching any UI scene or the battle surface. It verifies expected strings, label overlap, and cursor pairs against the art-anchored render model, and (windowed only) runs the pixel lint; heuristic pixel findings emit `quarantine_finding` traces that report without failing until graduated.
 Run `overworld_step` and `wild_battle` together after touching player animation timing, battle presentation, or scene-level UI transitions. Static checks will not catch sprite-sheet frame mapping, stage-scaling drift, stacked HUD regressions, or broken battle cursor navigation.
 
@@ -50,7 +50,9 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godot --scene res://scenes/app/Main.tscn --scenario visual_sweep_update  # accept new baselines
 ```
 
-`visual_sweep` captures a deterministic 16-shot set (fixed seed, crafted party including a strip-sprite canary species, fixed wild battle) to `.godot-smoke/shots/` and diffs it against `docs/generated/visual-baselines/` via `tools/visual_diff.py`; any shot drifting more than 0.5% of pixels fails the scenario. Run `visual_sweep_update` to accept intentional visual changes. Captures require a windowed run (editor DAP launch); headless captures are blank, and baselines are stable per-machine (resolution-dependent). The diff tool catches pixel drift against what exists — but a human or agent should still READ new shots when states are added, since baselines only guard what already exists.
+`visual_sweep` captures a deterministic 16-shot set (fixed seed, crafted party including a strip-sprite canary species, fixed wild battle) to `.godot-smoke/shots/` at a canonical 1152x648 window size (applied and restored per run) and diffs it against `docs/generated/visual-baselines/` via `tools/visual_diff.py`; any shot drifting more than 0.5% of pixels fails the scenario. Run `visual_sweep_update` to accept intentional visual changes. Captures require a windowed run (editor DAP launch); headless captures are blank. The diff tool catches pixel drift against what exists — but a human or agent should still READ new shots when states are added, since baselines only guard what already exists.
+
+`display_matrix` resizes the window across six sizes (including odd, fractional-inducing ones) and verifies the battle surface renders without scale degradation at each: a block-uniformity check (integer scales produce byte-identical pixel blocks; fractional scales break block periodicity) plus a round-trip content consistency diff. Run it after touching display/layout scaling in any UI.
 
 ## Agent vision review
 

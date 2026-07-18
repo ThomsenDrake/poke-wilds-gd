@@ -48,3 +48,9 @@ confirms the same defect.
 - Is all text inside its box, with nothing crossing borders?
 - Is the cursor vertically centered on the row it selects?
 - Are HP bars on their baked tracks, and do HP numbers show a single slash?
+
+## Display-matrix states (`matrix/<w>x<h>_battle.png`)
+
+- At EVERY window size: is the text pixel-crisp (uniform stroke widths, no
+  shimmering/uneven glyph columns), the surface centered with even margins,
+  and nothing clipped at the surface edges?

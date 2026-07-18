@@ -22,6 +22,7 @@ All runtime traces are JSONL records with `event`, `ts_msec`, `source`, and `pay
 | `battle_finished` | `BattleRuntime` | A battle ended with a final outcome payload. |
 | `attack_animation_played` | `BattleView` | A battle move animation played (source set or synthesized fallback); payload carries move_id, anim_key, frames, sound, fallback. |
 | `battle_anim_passed` | `SmokeScenarios` | The `battle_anim` scenario verified a scripted animated move plays its frame set with sound and resolves its turn. |
+| `display_matrix_passed` | `SmokeScenarios` | The `display_matrix` scenario verified battle content renders without scale degradation across a matrix of window sizes (block-uniformity plus round-trip consistency); payload carries sizes_checked and max drift percent. |
 | `save_written` | `GameRuntime` | Runtime state was written to disk. |
 | `field_move_used` | `App.Main` | A field move was used from the party screen; payload carries the move id, and traversal gating for that move is now unlocked. |
 | `field_move_scenario_passed` | `SmokeScenarios` | The `field_move` smoke scenario confirmed a field-move-gated tile became walkable after the unlock; payload carries move id, tile, and whether the move was already unlocked. |

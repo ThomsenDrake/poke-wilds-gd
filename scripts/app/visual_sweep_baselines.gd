@@ -16,6 +16,25 @@ const PYTHON_BIN := "python3"
 const MODE_COMPARE := "compare"
 const MODE_UPDATE := "update"
 
+# Canonical window size for every sweep capture so baselines stay
+# window-size-stable (captures used to follow the launch-time window size).
+const CANONICAL_WINDOW_SIZE := Vector2i(1152, 648)
+
+
+# Resizes the window to CANONICAL_WINDOW_SIZE and returns the previous size
+# for restore_window_size. Headless runs skip the resize (no window to size).
+func apply_canonical_window_size() -> Vector2i:
+	var previous := DisplayServer.window_get_size()
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.window_set_size(CANONICAL_WINDOW_SIZE)
+	return previous
+
+
+# Puts the window back to the size apply_canonical_window_size found.
+func restore_window_size(previous: Vector2i) -> void:
+	if DisplayServer.get_name() != "headless" and previous.x > 0 and previous.y > 0:
+		DisplayServer.window_set_size(previous)
+
 
 # Crafts fixed session state so every run renders identical frames: written
 # as a save payload (the dispatcher's save-guard restores the real save) and

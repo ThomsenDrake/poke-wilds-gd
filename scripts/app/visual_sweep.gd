@@ -56,6 +56,8 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	if not _baselines.craft_state(_ctx, _runner, CRAFTED_STATE):
 		push_error("Visual sweep could not craft its deterministic state; species catalog incomplete.")
 		return
+	var previous_window := _baselines.apply_canonical_window_size()
+	await _settle(5) # let the resized window present before the first capture
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var spawn_biome: String = _world().get_tile_biome(_player().tile_position)
@@ -71,6 +73,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	await _menu_shots()
 	await _battle_shots()
 	_player().encounter_chance = saved_chance
+	_baselines.restore_window_size(previous_window)
 	_finish()
 
 

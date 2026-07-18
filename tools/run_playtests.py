@@ -36,7 +36,11 @@ _spec.loader.exec_module(smoketest)
 
 SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix"]
+# Scenarios that need a real resizable window (editor-managed DAP game windows
+# reject programmatic resize) — always run as a standalone windowed subprocess
+# unless headless is forced (then the scenario skips pixel work explicitly).
+WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix"}
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -269,15 +273,20 @@ def _stop_process(proc: subprocess.Popen, sig: str) -> None:
         pass
 
 
-def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bin: str) -> dict[str, Any]:
+def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bin: str, windowed: bool = False) -> dict[str, Any]:
     started = time.monotonic()
-    result = new_result(scenario, "headless")
+    result = new_result(scenario, "windowed" if windowed else "headless")
     collector = TraceCollector()
     exceptions: list[str] = []
     # write_smoke_request truncates, so a leftover scenario.json from a crashed
     # run is overwritten rather than merged.
     request_path = smoketest.write_smoke_request(project, scenario)
-    cmd = [godot_bin, "--headless", "--path", str(project), "--quit-after", str(headless_quit_after_frames(timeout))]
+    if windowed:
+        # No --headless/--quit-after: the scenario quits the app itself; the
+        # wall-clock deadline below is the backstop.
+        cmd = [godot_bin, "--path", str(project)]
+    else:
+        cmd = [godot_bin, "--headless", "--path", str(project), "--quit-after", str(headless_quit_after_frames(timeout))]
     try:
         try:
             proc = subprocess.Popen(
@@ -414,7 +423,9 @@ def main() -> int:
 
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
-        if transport == "dap":
+        if scenario in WINDOWED_SUBPROCESS_SCENARIOS and not force_headless():
+            result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, windowed=True)
+        elif transport == "dap":
             result = run_scenario_dap(project, scenario, args.timeout, args.host, args.port)
         else:
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin)

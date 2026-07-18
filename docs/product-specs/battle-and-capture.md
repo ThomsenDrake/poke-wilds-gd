@@ -8,7 +8,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 ## Supported behavior
 
 - A wild battle can start from an encounter tile, playing the wild species' cry and the wild-battle theme.
-- Battle presentation uses a native-resolution Crystal-style battle surface that scales to the largest centered fit while preserving aspect ratio.
+- Battle presentation uses a native-resolution Crystal-style battle surface that scales to the largest INTEGER factor that fits, centered — fractional scales alias the pixel font.
 - Move turns play their source animation sets (per-frame layer scripts, sprite translations, and per-move sound) when one exists for the move — 157 of 298 catalog moves — with a synthesized lunge/flash fallback for the rest; each played animation emits an `attack_animation_played` trace.
 - The player may select one of up to four moves, use a Poke Ball, use a Potion, or run.
 - The action box uses the baked `battle_screen2.png` command text for `FIGHT`, disabled `PKMN`, `ITEM`, and `RUN`.
@@ -18,7 +18,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 - The item box lists bag items single-column, GSC-style, so long item names can no longer overlap a second column.
 - Move info text that is too wide for the baked side box's first row (`TYPE/<type>`) drops to the box's second row instead of crossing the border.
 - Both HUD name plates show the active status condition (`BRN`/`PSN`/`PAR`/`SLP`/`FRZ`) when one is applied.
-- Move mode uses `attack_screen1.png`, shows only learned moves plus `BACK`, and fills the side info box from the existing move `TYPE` and `PP current/max` snapshot data.
+- Move mode uses `attack_screen1.png`, shows only learned moves plus `BACK`, and fills the side info box from the existing move `TYPE` and `PP current/max` snapshot data; the player HP bar and numbers stay visible (the name/level plate yields to the side window), and the HUD stays up during move animations.
 - Item mode remains the current single-box layout; ball and potion counts reflect the live bag.
 - Damage follows the mainline formula with STAB, an 18-type effectiveness chart (Gen VI+, including Fairy), critical hits, accuracy/evasion and stat stages (`-6..+6`), and a burn attack penalty. Turn order uses effective speed with paralysis applied.
 - Status conditions are modeled end to end: poison and burn deal end-of-turn damage, paralysis can block movement and quarters speed, sleep lasts 1-3 turns, freeze thaws at 20% per turn. Volatile conditions are modeled too: confusion (2-5 turns, 33% self-hit), infatuation (50% immobilize against opposite gender), and partial trap (2-5 turns of residual damage that blocks escape).

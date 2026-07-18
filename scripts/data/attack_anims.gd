@@ -18,9 +18,12 @@ const FALLBACK_SOUND_PATH := "res://pokewilds/sounds/hit.ogg"
 const FALLBACK_FRAMES := 14
 const FALLBACK_LUNGE_PX := 4.0
 
+# Sprite hide/show tokens are honored (fly/dig-style disappearances). The
+# *_healthbar_gone tokens are intentionally NOT honored: the source's
+# full-screen frame composites carried their own HUD state, but this port
+# plays blank overlays, so hiding the live HUD would leave a gray track with
+# no fill for the whole animation. The HUD stays up during move usage.
 const HIDE_TOKENS := {
-	"player_healthbar_gone": "player_healthbar",
-	"enemy_healthbar_gone": "enemy_healthbar",
 	"player_sprite_gone": "player_sprite",
 	"enemy_sprite_gone": "enemy_sprite",
 	"player_sprite_hide": "player_sprite",
