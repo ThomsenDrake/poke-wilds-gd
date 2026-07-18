@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-03-06
+Last verified: 2026-07-17
 Review cadence days: 30
 Source paths: scripts/app/main.gd, scripts/runtime/game_runtime.gd, tools/check_repo_contracts.py, tools/check_architecture.py
 

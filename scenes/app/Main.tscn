@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/app/main.gd" id="1_t2ieu"]
 [ext_resource type="Script" path="res://scripts/runtime/world_view.gd" id="2_g5d62"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/MessageBox.tscn" id="4_i3c7e"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleView.tscn" id="5_o6ff5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/StartMenu.tscn" id="6_r56t4"]
+[ext_resource type="Script" path="res://scripts/app/smoke_scenarios.gd" id="7_smoke"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_t2ieu")
@@ -29,9 +30,6 @@ position = Vector2(8, 8)
 zoom = Vector2(3, 3)
 enabled = true
 
-[node name="MusicPlayer" type="AudioStreamPlayer" parent="."]
-volume_db = -8.0
-
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="MessageBox" parent="UI" instance=ExtResource("4_i3c7e")]
@@ -39,3 +37,6 @@ volume_db = -8.0
 [node name="BattleView" parent="UI" instance=ExtResource("5_o6ff5")]
 
 [node name="StartMenu" parent="UI" instance=ExtResource("6_r56t4")]
+
+[node name="SmokeScenarios" type="Node" parent="."]
+script = ExtResource("7_smoke")

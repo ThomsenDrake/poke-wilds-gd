@@ -1,19 +1,42 @@
 extends RefCounted
 
+# Mutable gameplay session: party, bag, field moves, world position, the
+# in-game clock, and the lifetime step counter.
+#
+# Save schema v2 payloads add `version`, `time_of_day_minutes`, and
+# `total_steps`. v1 payloads (no `version` key, the format written before the
+# clock existed) are still accepted; missing keys are backfilled with
+# new-game defaults. Bag item ids are the lowercase i18n keys ("poke_ball");
+# legacy ids from older saves are remapped on load (see LEGACY_ITEM_IDS).
+
+const SAVE_VERSION := 2
+const DAY_MINUTES := 1440
+const NEW_GAME_TIME_OF_DAY := 600 # 10:00
+const STARTING_BAG := {
+	"poke_ball": 5,
+	"potion": 3
+}
+const LEGACY_ITEM_IDS := {
+	"pokeball": "poke_ball",
+}
+
 var world_seed: int = 1337
 var player_tile: Vector2i = Vector2i.ZERO
 var party: Array = []
 var bag: Dictionary = {}
+var unlocked_field_moves: Dictionary = {}
+var time_of_day_minutes: int = NEW_GAME_TIME_OF_DAY
+var total_steps: int = 0
 
 
-func reset_for_new_game(new_world_seed: int, starter: Dictionary) -> void:
+func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
 	world_seed = new_world_seed
-	player_tile = Vector2i.ZERO
+	player_tile = spawn_tile
 	party.clear()
-	bag = {
-		"pokeball": 10,
-		"potion": 5
-	}
+	unlocked_field_moves.clear()
+	bag = STARTING_BAG.duplicate()
+	time_of_day_minutes = NEW_GAME_TIME_OF_DAY
+	total_steps = 0
 	if not starter.is_empty():
 		party.append(starter)
 
@@ -21,17 +44,25 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary) -> void:
 func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	world_seed = int(data.get("world_seed", 1337))
 	player_tile = Vector2i(int(data.get("player_x", 0)), int(data.get("player_y", 0)))
-	bag = data.get("bag", {"pokeball": 10, "potion": 5})
 	party = normalized_party
+	var raw_bag: Variant = data.get("bag", null)
+	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
+	time_of_day_minutes = _wrap_time(int(data.get("time_of_day_minutes", NEW_GAME_TIME_OF_DAY)))
+	total_steps = maxi(0, int(data.get("total_steps", 0)))
+	_load_unlocked_field_moves(data.get("unlocked_field_moves", []))
 
 
 func to_save_payload() -> Dictionary:
 	return {
+		"version": SAVE_VERSION,
 		"world_seed": world_seed,
 		"player_x": player_tile.x,
 		"player_y": player_tile.y,
 		"party": party,
-		"bag": bag
+		"bag": bag,
+		"time_of_day_minutes": time_of_day_minutes,
+		"total_steps": total_steps,
+		"unlocked_field_moves": unlocked_field_moves.keys()
 	}
 
 
@@ -91,21 +122,87 @@ func get_item_count(item_id: String) -> int:
 	return int(bag.get(item_id, 0))
 
 
-func consume_item(item_id: String, amount: int = 1) -> bool:
+func add_item(item_id: String, count: int = 1) -> void:
+	if item_id.is_empty() or count <= 0:
+		return
+	bag[item_id] = get_item_count(item_id) + count
+
+
+func remove_item(item_id: String, count: int = 1) -> bool:
 	var current = get_item_count(item_id)
-	if current < amount:
+	if count <= 0:
+		return true
+	if current < count:
 		return false
-	bag[item_id] = current - amount
+	if current == count:
+		bag.erase(item_id)
+	else:
+		bag[item_id] = current - count
 	return true
 
 
-func add_item(item_id: String, amount: int = 1) -> void:
-	bag[item_id] = get_item_count(item_id) + amount
+# Kept for battle_runtime; prefer remove_item for new callers.
+func consume_item(item_id: String, amount: int = 1) -> bool:
+	return remove_item(item_id, amount)
 
 
 func get_party_snapshot() -> Array:
 	return party.duplicate(true)
 
 
-func get_bag_snapshot() -> Dictionary:
-	return bag.duplicate(true)
+# Sorted [{item_id, count}] entries with count > 0, stable for UI and saves.
+func get_bag_snapshot() -> Array:
+	var item_ids = bag.keys()
+	item_ids.sort()
+	var snapshot: Array = []
+	for item_id in item_ids:
+		var count = int(bag[item_id])
+		if count > 0:
+			snapshot.append({"item_id": str(item_id), "count": count})
+	return snapshot
+
+
+func advance_time(minutes: int) -> void:
+	time_of_day_minutes = _wrap_time(time_of_day_minutes + minutes)
+
+
+func note_step_taken() -> void:
+	total_steps += 1
+
+
+func is_field_move_unlocked(move_id: String) -> bool:
+	return unlocked_field_moves.has(move_id)
+
+
+func unlock_field_move(move_id: String) -> void:
+	if move_id.is_empty():
+		return
+	unlocked_field_moves[move_id] = true
+
+
+func get_unlocked_field_moves() -> Array:
+	return unlocked_field_moves.keys()
+
+
+func _wrap_time(minutes: int) -> int:
+	return posmod(minutes, DAY_MINUTES)
+
+
+func _normalize_bag(raw: Dictionary) -> Dictionary:
+	var normalized: Dictionary = {}
+	for item_id in raw.keys():
+		var count = int(raw[item_id])
+		if count > 0 and not str(item_id).is_empty():
+			var canonical := str(LEGACY_ITEM_IDS.get(str(item_id), str(item_id)))
+			normalized[canonical] = int(normalized.get(canonical, 0)) + count
+	return normalized
+
+
+func _load_unlocked_field_moves(raw: Variant) -> void:
+	unlocked_field_moves.clear()
+	if not (raw is Array):
+		return
+	for entry in raw:
+		var move_id = str(entry)
+		if not move_id.is_empty():
+			unlocked_field_moves[move_id] = true

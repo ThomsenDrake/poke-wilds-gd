@@ -6,3 +6,6 @@
 .DS_Store
 .tmp_kris_frame_*.png
 .tmp_kris_strip.png
+
+# Python caches
+__pycache__/

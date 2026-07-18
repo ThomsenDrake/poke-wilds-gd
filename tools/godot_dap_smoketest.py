@@ -29,6 +29,50 @@ SCENARIO_REQUIREMENTS = {
         "all": ["encounter_started", "battle_finished"],
         "any": [["session_loaded", "session_created"]],
     },
+    "biome_probe": {
+        "all": ["boot_started", "boot_ready", "world_rebuilt", "biome_probe_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "biome_traverse": {
+        "all": ["boot_started", "boot_ready", "world_rebuilt", "encounter_started", "battle_finished"],
+        "any": [["biome_entered", "traversal_blocked"], ["session_loaded", "session_created"]],
+    },
+    "field_move": {
+        "all": ["boot_started", "boot_ready", "world_rebuilt", "field_move_used", "field_move_scenario_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "playtest_journey": {
+        "all": ["boot_started", "boot_ready", "playtest_journey_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "playtest_soak": {
+        "all": ["boot_started", "boot_ready", "playtest_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep": {
+        "all": ["visual_sweep_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_update": {
+        "all": ["visual_sweep_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "nav_audit": {
+        "all": ["nav_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "texture_audit": {
+        "all": ["texture_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "data_audit": {
+        "all": ["data_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "layout_audit": {
+        "all": ["layout_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-03-06
+Last verified: 2026-07-17
 Review cadence days: 30
 Source paths: README.md, AGENTS.md, ARCHITECTURE.md, docs/registry/subsystems.toml
 

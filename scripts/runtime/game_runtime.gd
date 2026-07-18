@@ -6,6 +6,9 @@ const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const BattleRuntime := preload("res://scripts/runtime/battle_runtime.gd")
+const MusicRouter := preload("res://scripts/runtime/music_router.gd")
+const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
+const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
 
 var trace = TraceLogger.new()
 var catalog = PokemonCatalog.new()
@@ -13,6 +16,9 @@ var pokemon_rules = PokemonRules.new()
 var session = SessionState.new()
 var save_store = SaveStore.new()
 var battle_runtime = BattleRuntime.new()
+var music_router = MusicRouter.new()
+var _world_gen = WorldGenerator.new()
+var _biome_encounters = BiomeEncounters.new()
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
 
@@ -21,6 +27,10 @@ func _ready() -> void:
 	_rng.randomize()
 	catalog.setup(trace)
 	battle_runtime.setup(session, catalog, pokemon_rules, trace)
+	# The router lives under this autoload so its lazily created player is in
+	# the scene tree and audible; main.gd drives it via runtime.music_router.
+	music_router.setup(trace)
+	add_child(music_router)
 
 
 func ensure_initialized() -> void:
@@ -41,11 +51,14 @@ func ensure_initialized() -> void:
 
 func new_game() -> void:
 	var starter = _build_starter()
-	session.reset_for_new_game(int(_rng.randi() & 0x7fffffff), starter)
+	var seed = int(_rng.randi() & 0x7fffffff)
+	var spawn = _world_gen.find_walkable_spawn(seed)
+	session.reset_for_new_game(seed, starter, spawn)
 	_initialized = true
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {
 		"world_seed": session.world_seed,
+		"player_tile": _tile_payload(session.player_tile),
 		"party_size": session.party.size()
 	})
 
@@ -80,6 +93,25 @@ func set_player_tile(tile_position: Vector2i) -> void:
 	session.player_tile = tile_position
 
 
+# One completed overworld step: lifetime counter plus one minute of clock time.
+func note_player_step() -> void:
+	session.note_step_taken()
+	session.advance_time(1)
+
+
+func get_time_of_day_minutes() -> int:
+	return session.time_of_day_minutes
+
+
+func is_field_move_unlocked(move_id: String) -> bool:
+	return session.is_field_move_unlocked(move_id)
+
+
+func unlock_field_move(move_id: String) -> void:
+	session.unlock_field_move(move_id)
+	save_game()
+
+
 func get_party_snapshot() -> Array:
 	return session.get_party_snapshot()
 
@@ -92,22 +124,35 @@ func set_party_lead(index: int) -> void:
 	session.set_party_lead(index)
 
 
-func generate_wild_encounter(tile_pos: Vector2i) -> Dictionary:
-	var species_id = catalog.get_random_encounter_species(_rng)
+func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
+	var species_id = _pick_encounter_species(biome)
 	var species_entry = {}
 	if not species_id.is_empty():
 		species_entry = catalog.get_species(species_id)
 	if species_entry.is_empty():
 		species_entry = _fallback_species_entry()
 		if species_entry.is_empty():
-			trace.warning("GameRuntime", "Could not build a fallback encounter species; using a synthetic battle mon.", {})
-			return _synthetic_pokemon_instance("SmokeMon", level_from_distance(tile_pos))
+			trace.warning("GameRuntime", "Species catalog is empty; skipping the wild encounter.", {"biome": biome})
+			return {}
 		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.", {
 			"fallback_species_id": str(species_entry.get("species_id", ""))
 		})
-	var distance = abs(tile_pos.x) + abs(tile_pos.y)
 	var level = level_from_distance(tile_pos)
 	return pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"))
+
+
+func _pick_encounter_species(biome: String) -> String:
+	if not biome.is_empty():
+		var filtered = _biome_encounters.filter_species_ids(catalog.species, biome)
+		if bool(filtered.get("used_fallback", false)):
+			trace.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.", {
+				"biome": biome,
+				"reason": str(filtered.get("reason", ""))
+			})
+		var ids = filtered.get("ids", [])
+		if ids is Array and not (ids as Array).is_empty():
+			return str(ids[_rng.randi_range(0, (ids as Array).size() - 1)])
+	return catalog.get_random_encounter_species(_rng)
 
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
@@ -164,7 +209,8 @@ func _build_starter() -> Dictionary:
 
 	var fallback_id = catalog.get_random_encounter_species(_rng)
 	if fallback_id.is_empty():
-		return _synthetic_pokemon_instance("StarterMon", 5)
+		trace.warning("GameRuntime", "Species catalog is empty; starting a new game without a starter.", {})
+		return {}
 	return pokemon_rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, Callable(catalog, "get_move"))
 
 
@@ -185,37 +231,3 @@ func _fallback_species_entry() -> Dictionary:
 		if species_entry is Dictionary and not (species_entry as Dictionary).is_empty():
 			return species_entry
 	return {}
-
-
-func _synthetic_pokemon_instance(name: String, level: int) -> Dictionary:
-	var stats = pokemon_rules.build_stats({
-		"hp": 45,
-		"atk": 49,
-		"def": 49,
-		"spe": 45,
-		"sat": 49,
-		"sdf": 49
-	}, clampi(level, 1, 100))
-	var max_hp = int(stats.get("hp", 1))
-	return {
-		"species_id": "SMOKE_MON",
-		"name": name,
-		"level": clampi(level, 1, 100),
-		"exp": pokemon_rules.experience_for_level(level),
-		"types": PackedStringArray(["NORMAL", "NORMAL"]),
-		"stats": stats,
-		"max_hp": max_hp,
-		"current_hp": max_hp,
-		"moves": [{
-			"move_id": "TACKLE",
-			"name": "Tackle",
-			"power": 40,
-			"accuracy": 100,
-			"type": "NORMAL",
-			"category": "PHYSICAL",
-			"max_pp": 35,
-			"pp": 35
-		}],
-		"front_path": "",
-		"back_path": ""
-	}

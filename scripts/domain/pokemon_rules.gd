@@ -1,9 +1,42 @@
 extends RefCounted
 
+const BattleStatus := preload("res://scripts/domain/battle_status.gd")
 
-func experience_for_level(level: int) -> int:
-	var clamped = clampi(level, 1, 100)
-	return clamped * clamped * clamped
+const DEFAULT_HAPPINESS := 70
+const HAPPINESS_EVOLUTION_THRESHOLD := 220
+const DEFAULT_BASE_EXP := 64
+
+
+func experience_for_level(level: int, growth_rate: String = "MEDIUM_FAST") -> int:
+	var n = clampi(level, 1, 100)
+	match normalize_growth_rate(growth_rate):
+		"FAST":
+			return 4 * n * n * n / 5
+		"SLOW":
+			return 5 * n * n * n / 4
+		"MEDIUM_SLOW":
+			return maxi(0, 6 * n * n * n / 5 - 15 * n * n + 100 * n - 140)
+		_:
+			return n * n * n
+
+
+func normalize_growth_rate(growth_rate: String) -> String:
+	var rate = growth_rate.strip_edges().to_upper()
+	if rate.begins_with("GROWTH_"):
+		rate = rate.substr("GROWTH_".length())
+	match rate:
+		"FAST", "MEDIUM_FAST", "SLOW", "MEDIUM_SLOW":
+			return rate
+		"ERRATIC", "FLUCTUATING":
+			# NOTE: approximated with MEDIUM_SLOW; the true curves are not implemented.
+			return "MEDIUM_SLOW"
+		_:
+			return "MEDIUM_FAST"
+
+
+func experience_yield(species_entry: Dictionary, defeated_level: int) -> int:
+	var base_exp = int(species_entry.get("base_exp", DEFAULT_BASE_EXP))
+	return maxi(1, base_exp * clampi(defeated_level, 1, 100) / 7)
 
 
 func build_stats(base_stats: Dictionary, level: int) -> Dictionary:
@@ -50,11 +83,14 @@ func create_pokemon_instance(species_entry: Dictionary, level: int, move_lookup:
 		"species_id": str(species_entry.get("species_id", "")),
 		"name": str(species_entry.get("display_name", "Pokemon")),
 		"level": safe_level,
-		"exp": experience_for_level(safe_level),
+		"exp": experience_for_level(safe_level, str(species_entry.get("growth_rate", "MEDIUM_FAST"))),
 		"types": species_entry.get("types", PackedStringArray(["NORMAL", "NORMAL"])),
 		"stats": stats,
 		"max_hp": max_hp,
 		"current_hp": max_hp,
+		"status": "",
+		"happiness": DEFAULT_HAPPINESS,
+		"sleep_turns": 0,
 		"moves": moves,
 		"front_path": str(species_entry.get("front_path", "")),
 		"back_path": str(species_entry.get("back_path", ""))
@@ -74,10 +110,11 @@ func build_move_set(move_ids: Array, move_lookup: Callable) -> Array:
 
 func award_experience(mon: Dictionary, species_entry: Dictionary, amount: int, move_lookup: Callable) -> Dictionary:
 	var updated_mon = mon.duplicate(true)
+	var growth_rate = str(species_entry.get("growth_rate", "MEDIUM_FAST"))
 	var old_level = int(updated_mon.get("level", 1))
-	var exp_total = int(updated_mon.get("exp", experience_for_level(old_level))) + max(0, amount)
+	var exp_total = int(updated_mon.get("exp", experience_for_level(old_level, growth_rate))) + max(0, amount)
 	var new_level = old_level
-	while new_level < 100 and exp_total >= experience_for_level(new_level + 1):
+	while new_level < 100 and exp_total >= experience_for_level(new_level + 1, growth_rate):
 		new_level += 1
 
 	var learned_moves: Array = []
@@ -105,6 +142,34 @@ func award_experience(mon: Dictionary, species_entry: Dictionary, amount: int, m
 	}
 
 
+func check_level_evolution(mon: Dictionary, get_species: Callable, context: Dictionary = {}) -> Dictionary:
+	var species_entry = _species_entry_for_mon(mon, get_species)
+	if species_entry.is_empty():
+		return {}
+	var level = int(mon.get("level", 1))
+	var happiness = int(mon.get("happiness", DEFAULT_HAPPINESS))
+	for evo in _evolution_list(species_entry):
+		var method = str(evo.get("method", "")).to_upper()
+		var target = str(evo.get("target", ""))
+		if target.is_empty():
+			continue
+		if method.begins_with("LEVEL") and level >= int(evo.get("param", 101)) and _time_requirement_met(method, context):
+			return {"target": target, "method": "LEVEL", "param": int(evo.get("param", 0))}
+		if method == "HAPPINESS" and happiness >= HAPPINESS_EVOLUTION_THRESHOLD and _time_requirement_met(str(evo.get("param", "")), context):
+			return {"target": target, "method": "HAPPINESS", "param": str(evo.get("param", ""))}
+	return {}
+
+
+func check_item_evolution(mon: Dictionary, item_id: String, get_species: Callable) -> Dictionary:
+	var species_entry = _species_entry_for_mon(mon, get_species)
+	var wanted = item_id.strip_edges().to_upper()
+	for evo in _evolution_list(species_entry):
+		var target = str(evo.get("target", ""))
+		if str(evo.get("method", "")).to_upper() == "ITEM" and not target.is_empty() and str(evo.get("param", "")).to_upper() == wanted:
+			return {"target": target, "method": "ITEM", "param": str(evo.get("param", ""))}
+	return {}
+
+
 func normalize_loaded_mon(raw_mon: Dictionary) -> Dictionary:
 	var mon = raw_mon.duplicate(true)
 	mon["level"] = int(mon.get("level", 1))
@@ -113,6 +178,13 @@ func normalize_loaded_mon(raw_mon: Dictionary) -> Dictionary:
 	mon["current_hp"] = int(mon.get("current_hp", mon["max_hp"]))
 	if mon["current_hp"] > mon["max_hp"]:
 		mon["current_hp"] = mon["max_hp"]
+
+	mon["status"] = str(mon.get("status", "")).strip_edges().to_upper()
+	if not BattleStatus.is_valid_status(mon["status"]):
+		mon["status"] = ""
+	mon["happiness"] = clampi(int(mon.get("happiness", DEFAULT_HAPPINESS)), 0, 255)
+	mon["sleep_turns"] = 0
+	mon.erase("stages")
 
 	var stats = mon.get("stats", {})
 	if stats is Dictionary:
@@ -138,6 +210,34 @@ func normalize_loaded_mon(raw_mon: Dictionary) -> Dictionary:
 			normalized_moves.append(move_data)
 	mon["moves"] = normalized_moves
 	return mon
+
+
+func _species_entry_for_mon(mon: Dictionary, get_species: Callable) -> Dictionary:
+	var species_id = str(mon.get("species_id", ""))
+	if species_id.is_empty():
+		return {}
+	var entry = get_species.call(species_id)
+	return entry if entry is Dictionary else {}
+
+
+func _evolution_list(species_entry: Dictionary) -> Array:
+	var result: Array = []
+	var evolutions = species_entry.get("evolutions", [])
+	if evolutions is Array:
+		for evo_variant in evolutions:
+			if evo_variant is Dictionary:
+				result.append(evo_variant)
+	return result
+
+
+func _time_requirement_met(requirement: String, context: Dictionary) -> bool:
+	var req = requirement.to_upper()
+	var needs_day = req.contains("DAY")
+	var needs_night = req.contains("NITE") or req.contains("NIGHT")
+	if not needs_day and not needs_night:
+		return true
+	var time_of_day = str(context.get("time_of_day", "")).to_upper()
+	return time_of_day.is_empty() or (needs_day and time_of_day == "DAY") or (needs_night and time_of_day == "NIGHT")
 
 
 func _collect_move_ids_for_level(species_entry: Dictionary, level: int) -> Array:
@@ -189,6 +289,8 @@ func _create_move_runtime_data(move_entry: Dictionary) -> Dictionary:
 		"accuracy": int(move_entry.get("accuracy", 100)),
 		"type": str(move_entry.get("type", "NORMAL")),
 		"category": str(move_entry.get("category", "PHYSICAL")),
+		"effect": str(move_entry.get("effect", "EFFECT_NORMAL_HIT")),
+		"effect_chance": int(move_entry.get("effect_chance", 0)),
 		"max_pp": max_pp,
 		"pp": max_pp
 	}

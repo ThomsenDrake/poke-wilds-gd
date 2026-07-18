@@ -15,5 +15,10 @@ func show_message(text: String, duration_seconds: float = 2.0) -> void:
 	_timer.start(max(duration_seconds, 0.1))
 
 
+func hide_message() -> void:
+	_timer.stop()
+	visible = false
+
+
 func _on_timeout() -> void:
 	visible = false

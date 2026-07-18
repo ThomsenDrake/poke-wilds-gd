@@ -1,0 +1,115 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/party_screen.gd" id="1_pscr"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu"]
+bg_color = Color(0.07, 0.08, 0.11, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.82, 0.84, 0.9, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="PartyScreen" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_pscr")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.45)
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 120.0
+offset_top = 64.0
+offset_right = 1032.0
+offset_bottom = 584.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_menu")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="HBox" type="HBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ListColumn" type="VBoxContainer" parent="Panel/Margin/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Panel/Margin/HBox/ListColumn"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "POKEMON"
+
+[node name="Rows" type="VBoxContainer" parent="Panel/Margin/HBox/ListColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="Hint" type="Label" parent="Panel/Margin/HBox/ListColumn"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Z: Actions   X: Back"
+
+[node name="SideColumn" type="VBoxContainer" parent="Panel/Margin/HBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(340, 0)
+theme_override_constants/separation = 8
+
+[node name="ActionPanel" type="PanelContainer" parent="Panel/Margin/HBox/SideColumn"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_menu")
+
+[node name="Margin" type="MarginContainer" parent="Panel/Margin/HBox/SideColumn/ActionPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="ActionList" type="ItemList" parent="Panel/Margin/HBox/SideColumn/ActionPanel/Margin"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SummaryPanel" type="PanelContainer" parent="Panel/Margin/HBox/SideColumn"]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_menu")
+
+[node name="Margin" type="MarginContainer" parent="Panel/Margin/HBox/SideColumn/SummaryPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="SummaryText" type="Label" parent="Panel/Margin/HBox/SideColumn/SummaryPanel/Margin"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "..."
+autowrap_mode = 2

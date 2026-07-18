@@ -3,205 +3,180 @@ extends Control
 signal battle_finished(outcome: String, message: String)
 
 const RuntimePath := "/root/GameRuntime"
+const STAGE_SIZE := Vector2(160.0, 144.0)
+const STAGE_PADDING := 16.0
 
-@onready var _background: TextureRect = $Backdrop/BattleBackground
-@onready var _enemy_sprite: TextureRect = $Backdrop/EnemySprite
-@onready var _player_sprite: TextureRect = $Backdrop/PlayerSprite
-@onready var _enemy_name: Label = $HUD/EnemyInfo/Margin/Name
-@onready var _enemy_hp: Label = $HUD/EnemyInfo/Margin/HP
-@onready var _player_name: Label = $HUD/PlayerInfo/Margin/Name
-@onready var _player_hp: Label = $HUD/PlayerInfo/Margin/HP
-@onready var _message_label: Label = $HUD/BottomPanel/Margin/Message
-@onready var _action_menu: HBoxContainer = $HUD/BottomPanel/Margin/ActionMenu
-@onready var _move_menu: GridContainer = $HUD/BottomPanel/Margin/MoveMenu
-@onready var _bag_menu: HBoxContainer = $HUD/BottomPanel/Margin/BagMenu
-@onready var _fight_button: Button = $HUD/BottomPanel/Margin/ActionMenu/FightButton
-@onready var _bag_button: Button = $HUD/BottomPanel/Margin/ActionMenu/BagButton
-@onready var _run_button: Button = $HUD/BottomPanel/Margin/ActionMenu/RunButton
-@onready var _move_button_0: Button = $HUD/BottomPanel/Margin/MoveMenu/MoveButton0
-@onready var _move_button_1: Button = $HUD/BottomPanel/Margin/MoveMenu/MoveButton1
-@onready var _move_button_2: Button = $HUD/BottomPanel/Margin/MoveMenu/MoveButton2
-@onready var _move_button_3: Button = $HUD/BottomPanel/Margin/MoveMenu/MoveButton3
-@onready var _move_back_button: Button = $HUD/BottomPanel/Margin/MoveMenu/MoveBackButton
-@onready var _pokeball_button: Button = $HUD/BottomPanel/Margin/BagMenu/PokeballButton
-@onready var _potion_button: Button = $HUD/BottomPanel/Margin/BagMenu/PotionButton
-@onready var _bag_back_button: Button = $HUD/BottomPanel/Margin/BagMenu/BagBackButton
+@onready var _display: TextureRect = $BattleDisplay
+@onready var _viewport: SubViewport = $BattleViewport
+@onready var _surface = $BattleViewport/BattleStage
 
+var _snapshot: Dictionary = {}
+var _message := ""
+var _menu_state := "action"
+var _selection := ""
 
 func _ready() -> void:
 	visible = false
-	_background.texture = load("res://pokewilds/battle/battle_bg1.png")
-	_fight_button.pressed.connect(_on_fight_pressed)
-	_bag_button.pressed.connect(_on_bag_pressed)
-	_run_button.pressed.connect(_on_run_pressed)
-	_move_button_0.pressed.connect(func() -> void: _on_move_pressed(0))
-	_move_button_1.pressed.connect(func() -> void: _on_move_pressed(1))
-	_move_button_2.pressed.connect(func() -> void: _on_move_pressed(2))
-	_move_button_3.pressed.connect(func() -> void: _on_move_pressed(3))
-	_move_back_button.pressed.connect(_show_action_menu)
-	_pokeball_button.pressed.connect(_on_pokeball_pressed)
-	_potion_button.pressed.connect(_on_potion_pressed)
-	_bag_back_button.pressed.connect(_show_action_menu)
+	_viewport.size = Vector2i(160, 144)
+	_viewport.handle_input_locally = false
+	_display.texture = _viewport.get_texture()
+	_display.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_layout_display()
+	_render()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_node_ready():
+		_layout_display()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event.is_action_pressed("move_up"):
+		_move_selection(Vector2i.UP)
+	elif event.is_action_pressed("move_down"):
+		_move_selection(Vector2i.DOWN)
+	elif event.is_action_pressed("move_left"):
+		_move_selection(Vector2i.LEFT)
+	elif event.is_action_pressed("move_right"):
+		_move_selection(Vector2i.RIGHT)
+	elif event.is_action_pressed("action_a"):
+		_activate_selection()
+	elif event.is_action_pressed("action_b"):
+		_cancel_selection()
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
+func _gui_input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is not InputEventMouseButton:
+		return
+	var button_event: InputEventMouseButton = event
+	if not button_event.pressed or button_event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var stage_point = _stage_point(button_event.position)
+	if stage_point == null:
+		return
+	var option = _surface.option_from_point(_menu_state, _snapshot, stage_point)
+	if option.is_empty():
+		# Clicking outside any option backs out of a submenu (no BACK row on the moves screen).
+		_cancel_selection()
+		accept_event()
+		return
+	_selection = option
+	_activate_selection()
+	accept_event()
 
 func start_wild_battle(wild_mon: Dictionary) -> void:
 	visible = true
 	_apply_response(_runtime().call("start_wild_battle", wild_mon))
 
-
 func run_smoke_turn() -> void:
-	for button_index in range(4):
-		var button = _move_button(button_index)
-		if button != null and not button.disabled:
-			_on_move_pressed(button_index)
-			return
-	_on_run_pressed()
-
+	if not visible:
+		return
+	_set_menu_state("action")
+	_selection = "fight"
+	_activate_selection()
+	if visible:
+		_activate_selection()
 
 func run_smoke_escape() -> void:
-	_on_run_pressed()
+	if not visible:
+		return
+	_set_menu_state("action")
+	_selection = "run"
+	_render()
+	_activate_selection()
 
+func _move_selection(direction: Vector2i) -> void:
+	var next = _surface.next_selection(_menu_state, _snapshot, _selection, direction)
+	if _menu_state == "moves" and (next.is_empty() or next == _selection) and direction.x != 0:
+		var vertical_fallback = Vector2i.DOWN if direction.x > 0 else Vector2i.UP
+		next = _surface.next_selection(_menu_state, _snapshot, _selection, vertical_fallback)
+	if not next.is_empty() and next != _selection:
+		_selection = next
+		_render()
 
-func _on_fight_pressed() -> void:
-	_show_move_menu()
+func _activate_selection() -> void:
+	match _menu_state:
+		"moves":
+			_activate_move()
+		"item":
+			_activate_item()
+		_:
+			_activate_action()
 
+func _activate_action() -> void:
+	match _selection:
+		"fight":
+			_set_menu_state("moves")
+		"item":
+			_set_menu_state("item")
+		"run":
+			_apply_response(_runtime().call("run_from_battle"))
 
-func _on_bag_pressed() -> void:
-	_show_bag_menu()
+func _activate_move() -> void:
+	if _selection == "back":
+		_set_menu_state("action")
+		return
+	if not _selection.begins_with("move_"):
+		return
+	_apply_response(_runtime().call("perform_battle_move", int(_selection.trim_prefix("move_"))))
 
+func _activate_item() -> void:
+	match _selection:
+		"poke_ball":
+			_apply_response(_runtime().call("use_pokeball"))
+		"potion":
+			_apply_response(_runtime().call("use_potion"))
+		"back":
+			_set_menu_state("action")
 
-func _on_run_pressed() -> void:
-	_apply_response(_runtime().call("run_from_battle"))
-
-
-func _on_move_pressed(index: int) -> void:
-	_apply_response(_runtime().call("perform_battle_move", index))
-
-
-func _on_pokeball_pressed() -> void:
-	_apply_response(_runtime().call("use_pokeball"))
-
-
-func _on_potion_pressed() -> void:
-	_apply_response(_runtime().call("use_potion"))
-
-
-func _show_action_menu() -> void:
-	_action_menu.visible = true
-	_move_menu.visible = false
-	_bag_menu.visible = false
-
-
-func _show_move_menu() -> void:
-	_action_menu.visible = false
-	_move_menu.visible = true
-	_bag_menu.visible = false
-
-
-func _show_bag_menu() -> void:
-	_action_menu.visible = false
-	_move_menu.visible = false
-	_bag_menu.visible = true
-
-
-func _set_message(text: String) -> void:
-	_message_label.text = text
-
+func _cancel_selection() -> void:
+	if _menu_state != "action":
+		_set_menu_state("action")
 
 func _apply_response(response: Dictionary) -> void:
 	if response.is_empty():
 		return
 	var snapshot = response.get("snapshot", {})
 	if snapshot is Dictionary:
-		_apply_snapshot(snapshot)
-	_set_message(str(response.get("message", "")))
-
+		_snapshot = snapshot
+	_message = str(response.get("message", ""))
 	if bool(response.get("finished", false)):
 		visible = false
-		battle_finished.emit(str(response.get("outcome", "")), str(response.get("message", "")))
+		battle_finished.emit(str(response.get("outcome", "")), _message)
 		return
-
 	visible = bool(response.get("active", false))
-	match str(response.get("menu", "action")):
-		"moves":
-			_show_move_menu()
-		"bag":
-			_show_bag_menu()
-		_:
-			_show_action_menu()
+	_set_menu_state(str(response.get("menu", "action")))
 
+func _set_menu_state(menu_state: String) -> void:
+	_menu_state = menu_state if menu_state in ["action", "moves", "item"] else "action"
+	_selection = _surface.first_selectable(_menu_state, _snapshot)
+	_render()
 
-func _apply_snapshot(snapshot: Dictionary) -> void:
-	var player_mon = snapshot.get("player_mon", {})
-	var enemy_mon = snapshot.get("enemy_mon", {})
-	var bag = snapshot.get("bag", {})
+func _render() -> void:
+	_surface.render(_snapshot, _menu_state, _selection, _message)
 
-	_enemy_name.text = "%s Lv.%d" % [str(enemy_mon.get("name", "?")), int(enemy_mon.get("level", 1))]
-	_enemy_hp.text = "HP %d/%d" % [int(enemy_mon.get("current_hp", 0)), int(enemy_mon.get("max_hp", 1))]
-	_player_name.text = "%s Lv.%d" % [str(player_mon.get("name", "?")), int(player_mon.get("level", 1))]
-	_player_hp.text = "HP %d/%d" % [int(player_mon.get("current_hp", 0)), int(player_mon.get("max_hp", 1))]
-	_enemy_sprite.texture = _load_pokemon_frame(str(enemy_mon.get("front_path", "")))
-	_player_sprite.texture = _load_pokemon_frame(str(player_mon.get("back_path", "")))
-	_refresh_move_buttons(player_mon.get("moves", []))
-	_refresh_bag_buttons(bag)
+func _layout_display() -> void:
+	var viewport_size = get_viewport_rect().size
+	var available = viewport_size - Vector2.ONE * STAGE_PADDING * 2.0
+	var scale_factor = min(available.x / STAGE_SIZE.x, available.y / STAGE_SIZE.y)
+	scale_factor = maxf(scale_factor, 0.1)
+	var scaled_size = STAGE_SIZE * scale_factor
+	_display.size = scaled_size
+	_display.position = ((viewport_size - scaled_size) * 0.5).floor()
 
-
-func _refresh_move_buttons(moves: Array) -> void:
-	for i in range(4):
-		var button = _move_button(i)
-		if i < moves.size():
-			var move = moves[i]
-			var move_name = str(move.get("name", move.get("move_id", "Move")))
-			var pp = int(move.get("pp", 0))
-			var max_pp = int(move.get("max_pp", 0))
-			button.text = "%s (%d/%d)" % [move_name, pp, max_pp]
-			button.disabled = pp <= 0
-		else:
-			button.text = "-"
-			button.disabled = true
-
-
-func _refresh_bag_buttons(bag: Dictionary) -> void:
-	var pokeballs = int(bag.get("pokeball", 0))
-	var potions = int(bag.get("potion", 0))
-	_pokeball_button.text = "Poke Ball x%d" % pokeballs
-	_potion_button.text = "Potion x%d" % potions
-	_pokeball_button.disabled = pokeballs <= 0
-	_potion_button.disabled = potions <= 0
-
-
-func _move_button(index: int) -> Button:
-	match index:
-		0:
-			return _move_button_0
-		1:
-			return _move_button_1
-		2:
-			return _move_button_2
-		3:
-			return _move_button_3
-		_:
-			return null
-
-
-func _load_pokemon_frame(path: String) -> Texture2D:
-	var fallback_path = "res://pokewilds/pokemon/not_found.png"
-	if path.is_empty() or not ResourceLoader.exists(path):
-		return load(fallback_path)
-	var texture = load(path)
-	if texture == null or texture is not Texture2D:
-		return load(fallback_path)
-
-	var tex2d: Texture2D = texture
-	var width = tex2d.get_width()
-	var height = tex2d.get_height()
-	if height > width:
-		var frame = AtlasTexture.new()
-		frame.atlas = tex2d
-		frame.region = Rect2(0, 0, width, width)
-		return frame
-	return tex2d
-
+func _stage_point(screen_point: Vector2):
+	var display_rect = Rect2(_display.position, _display.size)
+	if not display_rect.has_point(screen_point):
+		return null
+	var local_point = screen_point - display_rect.position
+	return Vector2(
+		STAGE_SIZE.x * (local_point.x / maxf(display_rect.size.x, 1.0)),
+		STAGE_SIZE.y * (local_point.y / maxf(display_rect.size.y, 1.0))
+	)
 
 func _runtime() -> Node:
 	return get_node(RuntimePath)

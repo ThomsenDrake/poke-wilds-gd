@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-03-06
+Last verified: 2026-07-17
 Review cadence days: 45
-Source paths: pokewilds/pokemon/pokemon, pokewilds/pokemon/moves.asm, pokewilds/pokemon/spec_phys_lookup.txt, pokewilds/i18n
+Source paths: pokewilds/pokemon/pokemon, pokewilds/pokemon/moves.asm, pokewilds/pokemon/spec_phys_lookup.txt, pokewilds/i18n, pokewilds/tiles, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd
 
 # Source Assets
 
@@ -19,8 +19,8 @@ The checked-in `pokewilds/` subtree is treated as an imported source-data and co
 
 - `pokewilds/music/*.ogg`
 - `pokewilds/player/kris-walking.png`
-- `pokewilds/battle/battle_bg1.png`
 - battle sprites and world tiles under `pokewilds/pokemon/` and `pokewilds/tiles/`
+- biome base and prop tiles under `pokewilds/tiles/` (water, sand, grass, savanna, desert, swamp, cave, ice, lava, mountain, trees, cacti, flowers, rocks) referenced by `scripts/domain/biome_defs.gd`
 
 ## Working rule
 

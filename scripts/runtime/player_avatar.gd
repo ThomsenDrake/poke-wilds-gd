@@ -2,7 +2,7 @@ extends Node2D
 
 signal tile_changed(tile_position: Vector2i)
 signal encounter_requested(tile_position: Vector2i)
-signal blocked(step_direction: Vector2i)
+signal blocked(reason: String, tile: Vector2i)
 
 const TILE_SIZE := 16
 const ACTION_MOVE_UP := "move_up"
@@ -10,6 +10,10 @@ const ACTION_MOVE_DOWN := "move_down"
 const ACTION_MOVE_LEFT := "move_left"
 const ACTION_MOVE_RIGHT := "move_right"
 const ACTION_RUN := "run"
+const WALK_ANIMATION_FPS := 12.5
+const WALK_SHEET_PATH := "res://pokewilds/player/ben-walking.png"
+const RUN_SHEET_PATH := "res://pokewilds/player/ben-running.png"
+const LEGACY_WALK_SHEET_PATH := "res://pokewilds/player/kris-walking.png"
 
 @export var start_tile = Vector2i(0, 0)
 @export var walk_step_seconds = 0.16
@@ -98,7 +102,7 @@ func _try_start_step(step_direction: Vector2i) -> void:
 	_facing = step_direction
 	var next_tile = tile_position + step_direction
 	if not world.is_tile_walkable(next_tile):
-		blocked.emit(step_direction)
+		blocked.emit(_block_reason_for(next_tile), next_tile)
 		_set_sprite_state(_facing, false)
 		return
 
@@ -122,9 +126,13 @@ func _update_movement(delta: float) -> void:
 	position = _move_to
 	tile_position = _target_tile
 	_moving = false
-	_set_sprite_state(_facing, false)
 	tile_changed.emit(tile_position)
 	_try_trigger_encounter()
+	var next_direction = _read_step_direction()
+	if input_enabled and _can_step(next_direction):
+		_try_start_step(next_direction)
+		return
+	_set_sprite_state(_facing, false)
 
 
 func _try_trigger_encounter() -> void:
@@ -137,8 +145,23 @@ func _try_trigger_encounter() -> void:
 		encounter_requested.emit(tile_position)
 
 
+func _block_reason_for(next_tile: Vector2i) -> String:
+	if world != null and world.has_method("get_traversal_block_reason"):
+		var reason = world.get_traversal_block_reason(next_tile)
+		if not reason.is_empty():
+			return reason
+	return "Can't move there."
+
+func _can_step(step_direction: Vector2i) -> bool:
+	if world == null or step_direction == Vector2i.ZERO:
+		return false
+	return world.is_tile_walkable(tile_position + step_direction)
+
+
 func _set_sprite_state(direction: Vector2i, moving: bool) -> void:
-	var animation_name = _direction_to_animation(direction)
+	var animation_name := String(_direction_to_animation(direction))
+	if moving and _move_running:
+		animation_name = "run_" + animation_name
 	if _sprite.animation != animation_name:
 		_sprite.animation = animation_name
 	if moving:
@@ -160,23 +183,39 @@ func _direction_to_animation(direction: Vector2i) -> StringName:
 
 
 func _setup_sprite_frames() -> void:
-	var sheet: Texture2D = load("res://pokewilds/player/kris-walking.png")
+	# Both sheets are one row of eight 16x16 frames: idle down/up/left/right
+	# (0-3) then stride down/up/left/right (4-7), so walk and run share the
+	# same frame map with an animation-name prefix.
+	var walk_sheet: Texture2D = load(WALK_SHEET_PATH)
+	if walk_sheet == null:
+		walk_sheet = load(LEGACY_WALK_SHEET_PATH)
+	if walk_sheet == null:
+		return
+	var run_sheet: Texture2D = load(RUN_SHEET_PATH)
+	if run_sheet == null:
+		run_sheet = walk_sheet
+
 	var frames = SpriteFrames.new()
+	_add_sheet_animations(frames, walk_sheet, "")
+	_add_sheet_animations(frames, run_sheet, "run_")
+	_sprite.sprite_frames = frames
+
+
+func _add_sheet_animations(frames: SpriteFrames, sheet: Texture2D, prefix: String) -> void:
 	var frame_map = {
 		"down": [0, 4],
 		"up": [1, 5],
-		"left": [2, 3],
-		"right": [6, 7]
+		"left": [2, 6],
+		"right": [3, 7]
 	}
 
 	for animation_name in frame_map.keys():
-		frames.add_animation(animation_name)
-		frames.set_animation_speed(animation_name, 8.0)
-		frames.set_animation_loop(animation_name, true)
+		var full_name := prefix + str(animation_name)
+		frames.add_animation(full_name)
+		frames.set_animation_speed(full_name, WALK_ANIMATION_FPS)
+		frames.set_animation_loop(full_name, true)
 		for frame_index in frame_map[animation_name]:
 			var frame = AtlasTexture.new()
 			frame.atlas = sheet
 			frame.region = Rect2(frame_index * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE)
-			frames.add_frame(animation_name, frame)
-
-	_sprite.sprite_frames = frames
+			frames.add_frame(full_name, frame)

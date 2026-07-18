@@ -4,15 +4,21 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario boot",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario overworld_step",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_probe",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_traverse",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario field_move",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
+  "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed"]
 quality_bucket = "bootstrap"
 
 [[subsystems]]
@@ -43,7 +49,10 @@ status = "active"
 layer = "runtime"
 code_paths = [
   "scripts/runtime/world_view.gd",
+  "scripts/runtime/tile_texture_cache.gd",
   "scripts/runtime/player_avatar.gd",
+  "scripts/domain/biome_defs.gd",
+  "scripts/domain/biome_encounters.gd",
   "scripts/domain/world_generator.gd",
 ]
 scene_paths = []
@@ -51,15 +60,20 @@ spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario overworld_step",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_probe",
 ]
-required_trace_events = ["world_rebuilt"]
+required_trace_events = ["world_rebuilt", "biome_entered"]
 quality_bucket = "world"
 
 [[subsystems]]
 name = "pokemon_data"
 status = "active"
 layer = "data"
-code_paths = ["scripts/data/pokemon_catalog.gd"]
+code_paths = [
+  "scripts/data/pokemon_catalog.gd",
+  "scripts/data/species_file_parser.gd",
+  "scripts/data/move_file_parser.gd",
+]
 scene_paths = []
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -90,11 +104,17 @@ layer = "runtime"
 code_paths = [
   "scripts/runtime/battle_runtime.gd",
   "scripts/domain/battle_rules.gd",
+  "scripts/domain/battle_status.gd",
+  "scripts/domain/battle_text.gd",
+  "scripts/domain/type_chart.gd",
+  "scripts/ui/battle_surface_layout.gd",
+  "scripts/ui/battle_surface.gd",
   "scripts/ui/battle_view.gd",
 ]
 scene_paths = ["scenes/ui/BattleView.tscn"]
 spec_doc = "docs/product-specs/battle-and-capture.md"
 validation_commands = [
+  "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
 ]
@@ -108,10 +128,15 @@ layer = "ui"
 code_paths = [
   "scripts/ui/start_menu.gd",
   "scripts/ui/message_box.gd",
+  "scripts/ui/party_rows.gd",
+  "scripts/ui/party_screen.gd",
+  "scripts/ui/bag_screen.gd",
 ]
 scene_paths = [
   "scenes/ui/StartMenu.tscn",
   "scenes/ui/MessageBox.tscn",
+  "scenes/ui/PartyScreen.tscn",
+  "scenes/ui/BagScreen.tscn",
 ]
 spec_doc = "docs/product-specs/menu-and-save.md"
 validation_commands = [
