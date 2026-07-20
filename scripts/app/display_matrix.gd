@@ -24,6 +24,7 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweep := preload("res://scripts/app/visual_sweep.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
+const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 
 const WINDOW_SIZES := [[1152, 648], [1024, 600], [800, 600], [640, 480], [438, 383], [1290, 768]]
 const SETTLE_FRAMES := 5
@@ -33,6 +34,7 @@ const MATRIX_DIR := "res://.godot-smoke/shots/matrix"
 
 var _ctx: Dictionary = {}
 var _baselines = VisualSweepBaselines.new()
+var _snap = SnapshotCapture.new()
 var _failures: Array = []
 var _max_drift := 0.0
 
@@ -71,6 +73,7 @@ func run(ctx: Dictionary) -> void:
 func _check_size(width: int, height: int) -> void:
 	DisplayServer.window_set_size(Vector2i(width, height))
 	await _settle(SETTLE_FRAMES)
+	await _snap.guard_readback() # ADDED after the settle: all viewports finished updating
 	var label := "%dx%d" % [width, height]
 	var actual := DisplayServer.window_get_size()
 	if absi(actual.x - width) > 2 or absi(actual.y - height) > 2:

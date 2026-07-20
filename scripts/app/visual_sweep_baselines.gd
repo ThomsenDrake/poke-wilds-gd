@@ -83,8 +83,9 @@ func damaging_move_id(runtime) -> String:
 
 
 # Runs the reconcile and reports: push_error per drift/error and no trace on
-# failure, one visual_sweep_passed trace on success.
-func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float) -> void:
+# failure, one visual_sweep_passed trace on success (carries the canonical
+# window size and the sweep's duplicate-check count alongside the diff).
+func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float, dup_checked: int = 0) -> void:
 	var result: Dictionary = reconcile(shots, base_dir, mode, threshold_pct)
 	if not bool(result.get("ok", false)):
 		var per_shot: Dictionary = result.get("per_shot", {})
@@ -103,7 +104,9 @@ func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct
 		"updated": result.get("updated", []),
 		"pruned": result.get("pruned", []),
 		"threshold_pct": threshold_pct,
-		"base_dir": base_dir
+		"base_dir": base_dir,
+		"window": [CANONICAL_WINDOW_SIZE.x, CANONICAL_WINDOW_SIZE.y],
+		"dup_checked": dup_checked
 	})
 
 

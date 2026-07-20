@@ -6,6 +6,14 @@ scenarios run through the DAP flow (reusing the client from
 godot_dap_smoketest.py); otherwise the runner falls back to launching the
 Godot binary headless and parsing trace lines from stdout. Set
 PLAYTEST_FORCE_HEADLESS=1 to force the headless path even when DAP is up.
+
+Transport honesty: under PLAYTEST_FORCE_HEADLESS the windowed-only scenarios
+(smoketest.WINDOWED_ONLY_SCENARIOS) are reported skipped-with-reason — never
+failed — because captures need a real window and renderer; the exit code stays
+0 when only transport-skips occurred. The report carries stamps (head_sha from
+git plus godot_version/window/renderer harvested from snapshot_captured trace
+payloads; null when unavailable, never faked) so a later verifier can refuse
+stale reports.
 """
 
 from __future__ import annotations
@@ -35,12 +43,14 @@ smoketest = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(smoketest)
 
 SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
+# The windowed scenario sets and the force-headless semantics are
+# single-sourced in the sibling smoke harness (see the note there).
+WINDOWED_SUBPROCESS_SCENARIOS = smoketest.WINDOWED_SUBPROCESS_SCENARIOS
+WINDOWED_ONLY_SCENARIOS = smoketest.WINDOWED_ONLY_SCENARIOS
+FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
+force_headless = smoketest.force_headless
 
 PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow"]
-# Scenarios that need a real resizable window (editor-managed DAP game windows
-# reject programmatic resize) — always run as a standalone windowed subprocess
-# unless headless is forced (then the scenario skips pixel work explicitly).
-WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update"}
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -56,7 +66,6 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 6006
 DEFAULT_TIMEOUT = 90.0
 DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
-FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error")
 CONNECT_TIMEOUT_S = 3.0
 NO_RESPONSE_GRACE_S = 10.0
@@ -65,12 +74,13 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class TraceCollector:
-    """Accumulates events, warnings, and the *_passed payload from trace records."""
+    """Accumulates events, warnings, the *_passed payload, and snapshot stamps."""
 
     def __init__(self) -> None:
         self.events: set[str] = set()
         self.warnings: list[dict[str, Any]] = []
         self.passed_payload: Any = None
+        self.snapshot_payloads: list[dict[str, Any]] = []
 
     def add(self, trace: dict[str, Any]) -> None:
         event = str(trace.get("event", ""))
@@ -88,8 +98,29 @@ class TraceCollector:
                     "payload": payload,
                 }
             )
+        if event == "snapshot_captured":
+            self.snapshot_payloads.append(payload)
         if event.endswith("_passed"):
             self.passed_payload = payload
+
+
+def project_stamp(payloads: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Project the last snapshot_captured payload into report-stamp fields.
+
+    Headless runs never emit snapshot_captured, so an empty list yields None
+    and the report records nulls — stamps are harvested, never faked.
+    """
+    if not payloads:
+        return None
+    payload = payloads[-1]
+    window = payload.get("window")
+    if not (isinstance(window, (list, tuple)) and len(window) == 2):
+        window = None
+    return {
+        "godot_version": payload.get("godot_version"),
+        "window": window,
+        "renderer": payload.get("renderer"),
+    }
 
 
 def clean_line(line: str) -> str:
@@ -133,6 +164,7 @@ def finalize(
     result["exceptions"] = exceptions
     result["warnings"] = collector.warnings
     result["passed_payload"] = collector.passed_payload
+    result["stamp"] = project_stamp(collector.snapshot_payloads)
     result["duration_s"] = round(time.monotonic() - started, 2)
     result["ok"] = not exceptions and not result["missing_all"] and not result["missing_any"]
     return result
@@ -365,20 +397,68 @@ def dap_endpoint_open(host: str, port: int) -> bool:
         return False
 
 
-def force_headless() -> bool:
-    return os.environ.get(FORCE_HEADLESS_ENV, "").lower() not in ("", "0", "false", "no", "off")
-
-
 def select_transport(host: str, port: int) -> str:
     if force_headless():
         return "headless"
     return "dap" if dap_endpoint_open(host, port) else "headless"
 
 
+def skip_windowed_scenario(scenario: str) -> dict[str, Any]:
+    """Transport honesty: a windowed-only scenario asked to run headless is a
+    skip-with-reason (ok=True), never a failure for missing pass events."""
+    result = new_result(scenario, "skipped-headless")
+    result["ok"] = True
+    result["skipped_reason"] = smoketest.windowed_skip_reason()
+    return result
+
+
+def git_head_sha(project: Path) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(project),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    sha = proc.stdout.strip()
+    return sha if proc.returncode == 0 and sha else None
+
+
+def first_stamp(results: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for result in results:
+        if result.get("stamp"):
+            return result["stamp"]
+    return None
+
+
+def sweep_stale_results(project: Path, run_start: float) -> int:
+    """Delete result-*.json older than this run so stale reds cannot
+    contradict the fresh report."""
+    smoke_dir = project / ".godot-smoke"
+    if not smoke_dir.is_dir():
+        return 0
+    removed = 0
+    for path in smoke_dir.glob("result-*.json"):
+        try:
+            if path.stat().st_mtime < run_start:
+                path.unlink()
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
 def print_row(result: dict[str, Any]) -> None:
+    if result["transport"] == "skipped-headless":
+        status = "SKIP"
+    else:
+        status = "PASS" if result["ok"] else "FAIL"
     print(
-        f"{result['scenario']:<18} {result['transport']:<9} {result['duration_s']:>7.2f} "
-        f"{'PASS' if result['ok'] else 'FAIL':<6} {len(result['events_seen']):>6} "
+        f"{result['scenario']:<18} {result['transport']:<16} {result['duration_s']:>7.2f} "
+        f"{status:<6} {len(result['events_seen']):>6} "
         f"{len(result['warnings']):>5} {len(result['exceptions']):>4}"
     )
 
@@ -410,20 +490,41 @@ def main() -> int:
             scenarios += SMOKE_SCENARIOS
     report_path = Path(args.report).expanduser() if args.report else project / ".godot-smoke" / "playtest-report.json"
 
+    run_start = time.time()
+
     transport = select_transport(args.host, args.port)
-    if transport == "headless" and not Path(args.godot_bin).exists():
+    # The Godot binary is only needed when at least one selected scenario will
+    # actually launch it. An all-transport-skip selection (every scenario
+    # windowed-only under PLAYTEST_FORCE_HEADLESS) resolves to
+    # skip_windowed_scenario() in the loop and never launches Godot, so it must
+    # stay exit 0 per the transport-honesty contract rather than fail on a
+    # missing binary.
+    needs_binary = transport == "headless" and any(
+        not (scenario in WINDOWED_ONLY_SCENARIOS and force_headless())
+        for scenario in scenarios
+    )
+    if needs_binary and not Path(args.godot_bin).exists():
         print(f"error: headless transport selected but the Godot binary is missing: {args.godot_bin}", file=sys.stderr)
         return 2
+
+    # Sweep stale results only after the run has confirmed it will proceed (the
+    # missing-binary gate above is the sole pre-loop abort), so an aborting run
+    # never deletes prior result-*.json evidence without writing a fresh report.
+    swept = sweep_stale_results(project, run_start)
 
     forced = " (forced by $%s)" % FORCE_HEADLESS_ENV if transport == "headless" and force_headless() else ""
     print(f"project:   {project}")
     print(f"transport: {transport}{forced}")
     print(f"scenarios: {', '.join(scenarios)}")
-    print(f"{'scenario':<18} {'transport':<9} {'dur_s':>7} {'result':<6} {'events':>6} {'warn':>5} {'exc':>4}")
+    if swept:
+        print(f"swept:     {swept} stale result-*.json")
+    print(f"{'scenario':<18} {'transport':<16} {'dur_s':>7} {'result':<6} {'events':>6} {'warn':>5} {'exc':>4}")
 
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
-        if scenario in WINDOWED_SUBPROCESS_SCENARIOS and not force_headless():
+        if scenario in WINDOWED_ONLY_SCENARIOS and force_headless():
+            result = skip_windowed_scenario(scenario)
+        elif scenario in WINDOWED_SUBPROCESS_SCENARIOS and not force_headless():
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, windowed=True)
         elif transport == "dap":
             result = run_scenario_dap(project, scenario, args.timeout, args.host, args.port)
@@ -444,16 +545,39 @@ def main() -> int:
             for exception in result["exceptions"][:5]:
                 print(f"  {name}: exception: {exception}")
 
+    skipped = sum(1 for result in results if result["transport"] == "skipped-headless")
     summary = {
         "ok": not failed,
         "total": len(results),
         "passed": len(results) - len(failed),
         "failed": len(failed),
+        "skipped_headless": skipped,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+    # Report stamps: head_sha always from git; godot_version/window/renderer
+    # harvested from snapshot_captured traces — null when no windowed capture
+    # ran (e.g. headless-only runs), never faked. head_sha is the freshness
+    # hook a later verify_all.py can refuse stale reports with.
+    stamp = first_stamp(results) or {}
+    report = {
+        "head_sha": git_head_sha(project),
+        "godot_version": stamp.get("godot_version"),
+        "window": stamp.get("window"),
+        "renderer": stamp.get("renderer"),
+        "summary": summary,
+        "scenarios": results,
+    }
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps({"summary": summary, "scenarios": results}, indent=2), encoding="utf-8")
-    print(f"\nsummary: {summary['passed']}/{summary['total']} passed, {summary['failed']} failed")
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if skipped:
+        line = f"\nsummary: {summary['passed']}/{summary['total']} ({skipped} skipped-headless)"
+        if summary["failed"]:
+            line += f", {summary['failed']} failed"
+        print(line)
+    else:
+        print(f"\nsummary: {summary['passed']}/{summary['total']} passed, {summary['failed']} failed")
+    print(f"stamps:  head={report['head_sha'] or 'unknown'} godot={report['godot_version'] or 'unknown'} "
+          f"window={report['window']} renderer={report['renderer'] or 'unknown'}")
     print(f"report:  {report_path}")
     return 0 if summary["ok"] else 1
 

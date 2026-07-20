@@ -2,27 +2,23 @@ extends Node
 
 # Deterministic visual-regression sweep dispatched from SmokeScenarios: drives
 # the live scene through overworld, biome, time-of-day, menu, and battle
-# states, captures the root viewport per state, then reconciles the captures
-# against committed baselines (docs/generated/visual-baselines) via
-# VisualSweepBaselines + tools/visual_diff.py. Session state is crafted
-# before the first shot (fixed seed, spawn tile, noon clock, fixed party,
-# forced wild species, seeded battle RNG) so captures are byte-stable across
-# runs on the same machine. Mode comes from the scenario options: "compare"
-# (visual_sweep) fails on drift, "update" (visual_sweep_update) rewrites
-# baselines; missing baselines force an update pass (auto_update flag).
-# visual_sweep_passed is emitted only after an in-threshold compare or an
-# update pass; on mismatch both files stay on disk and nothing is emitted.
+# states, captures per state through SnapshotCapture (readback guard + validity
+# oracle + duplicate hook), and reconciles against committed baselines via
+# VisualSweepBaselines + tools/visual_diff.py. Session state is crafted before
+# the first shot (fixed seed, spawn tile, noon clock, fixed party, forced wild
+# species, seeded battle RNG) so captures are byte-stable across runs. Mode:
+# "compare" fails on drift, "update" (or missing baselines) rewrites them;
+# visual_sweep_passed lands only after an in-threshold compare or update pass.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
+const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 
-const MIN_SHOT_BYTES := 5120
 const WALK_STEPS := 4
 const MAX_BIOME_SHOTS := 5
 const BIOME_SCAN_RADIUS := 40
 const BATTLE_SHOTS := ["09_battle.png", "10_battle_moves.png", "11_battle_after_attack.png", "12_battle_items.png"]
-# Determinism contract: change these only together with a baseline update.
-# DECIDUEYE front.png is a 13-frame strip: a sprite-loader regression canary.
+# Determinism contract: change only with a baseline update; DECIDUEYE's 13-frame strip front.png is the sprite-loader regression canary.
 const CRAFTED_STATE := {
 	"world_seed": 20260717,
 	"time_of_day": 720,
@@ -37,6 +33,7 @@ const DEFAULT_THRESHOLD_PCT := 0.5
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
 var _baselines = VisualSweepBaselines.new()
+var _captures = SnapshotCapture.new()
 var _base_dir := ""
 var _mode := VisualSweepBaselines.MODE_COMPARE
 var _threshold_pct := DEFAULT_THRESHOLD_PCT
@@ -77,25 +74,14 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_finish()
 
 
-# Two idle frames let the renderer present the new state before the readback.
-# The message box is hidden first so toast timing never enters a capture.
+# Toast hidden + two settle frames first; SnapshotCapture ADDS its frame_post_draw guard inside capture(), never as a substitute.
 func _capture(filename: String) -> void:
 	_message_box().hide_message()
 	await _settle(2)
-	var path := "%s/%s" % [_base_dir, filename]
-	var image := get_viewport().get_texture().get_image()
-	if image == null or image.is_empty():
-		_failures.append("%s: viewport image unavailable" % filename)
-		return
-	if image.save_png(path) != OK:
-		_failures.append("%s: save_png failed" % filename)
-		return
-	var file := FileAccess.open(path, FileAccess.READ)
-	var size := -1 if file == null else file.get_length()
-	if file != null:
-		file.close()
-	if size < MIN_SHOT_BYTES:
-		_failures.append("%s: undersized (%d bytes)" % [filename, size])
+	var result: Dictionary = await _captures.capture(_runtime(), get_viewport(), filename,
+		{"save_path": "%s/%s" % [_base_dir, filename]})
+	if not result.ok:
+		_failures.append("%s: %s (%s)" % [filename, result.kind, result.detail])
 		return
 	_shots.append(filename)
 
@@ -179,8 +165,7 @@ func _battle_shots() -> void:
 		await _settle(2)
 
 
-# Forces a fixed wild species (strip-sprite canary) and reseeds the battle
-# RNG so damage rolls, enemy move picks, and message lines are reproducible.
+# Forces a fixed wild species (strip-sprite canary) and reseeds the battle RNG so damage rolls, move picks, and messages are reproducible.
 func _start_battle() -> bool:
 	var runtime = _runtime()
 	runtime.battle_runtime._rng.seed = BATTLE_RNG_SEED
@@ -201,7 +186,7 @@ func _finish() -> void:
 	if not _failures.is_empty():
 		push_error("Visual sweep failed captures: %s" % "; ".join(PackedStringArray(_failures)))
 		return
-	_baselines.report(_runtime(), _shots, _base_dir, _mode, _threshold_pct)
+	_baselines.report(_runtime(), _shots, _base_dir, _mode, _threshold_pct, _captures.dup_checked)
 
 
 func _call(key: String, args: Array = []) -> void:

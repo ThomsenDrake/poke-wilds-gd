@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-07-17
+Last verified: 2026-07-20
 Review cadence days: 21
-Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scenarios.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/runtime/music_router.gd, scripts/domain/world_generator.gd, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd
+Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scenarios.gd, scripts/app/snapshot_capture.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/runtime/music_router.gd, scripts/domain/world_generator.gd, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd
 
 # Boot And Overworld
 
@@ -45,6 +45,12 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - Cancel / run: `X`
 - Start menu: `Enter`
 
+## Capture contract
+
+- Windowed screenshot captures in `visual_sweep`, `ui_render_audit`, and `display_matrix` delegate to `scripts/app/snapshot_capture.gd` (subsystem `vision_fidelity`; see [vision-fidelity.md](vision-fidelity.md)) for a `RenderingServer.frame_post_draw` readback guard (always ADDED AFTER each scenario's existing settle waits, never a substitute), a validity oracle (minimum PNG size, luminance floor, uniform-color and magenta-frame checks), and a root-viewport-crop fallback when the battle SubViewport readback is magenta/stale (Godot 4.6 regression #115402).
+- Valid captures emit `snapshot_captured`; invalid captures emit a quarantine-tier `capture_invalid` warning trace classified `transport` (headless display) or `regression` (windowed, including all magenta frames). `visual_sweep` still fails red on an invalid capture in a windowed run; `ui_render_audit` findings stay quarantine-tier.
+- Under `PLAYTEST_FORCE_HEADLESS=1`, windowed-only scenarios are reported skipped-with-reason instead of failed; the playtest report is stamped with `head_sha` plus `godot_version`/`window`/`renderer` harvested from `snapshot_captured` traces (null when no windowed capture ran).
+
 ## Smoke validation
 
 - `boot` proves the app reaches a ready state and rebuilds the world.
@@ -54,4 +60,4 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/smoke_scena
 - `field_move` finds a `cut`-gated tile, drives the party-screen field-move unlock path, and confirms the tile becomes walkable with the `field_move_used` trace.
 - `world_consistency_audit` samples tiles around spawn and proves logic/render/collision agreement, player-vs-prop spatial contracts, z-order, and tall-grass/encounter alignment.
 - `ui_render_audit` verifies battle and menu screens against the art-anchored render model (expected strings, label overlap, cursor pairs) with a windowed pixel lint whose findings are quarantine-tier.
-- `display_matrix` resizes the window across six sizes and proves the battle surface renders without scale degradation at each; `visual_sweep` applies a canonical 1152x648 window size so baselines are window-size-stable.
+- `display_matrix` resizes the window across six sizes and proves the battle surface renders without scale degradation at each; `visual_sweep` applies a canonical 1152x648 window size so baselines are window-size-stable. All three capture through the capture contract above but at different depths: `visual_sweep` runs the full pipeline, so every shot emits `snapshot_captured` or a quarantine-tier `capture_invalid`; `ui_render_audit`'s pixel half runs the guard plus oracle and emits `capture_invalid` only on an invalid verdict (a valid pixel-half shot emits no per-shot trace); `display_matrix` adopts the guard alone. `visual_sweep_passed` carries the canonical `window` plus `dup_checked`.

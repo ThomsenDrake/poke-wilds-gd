@@ -10,12 +10,14 @@ extends Node
 # until GRADUATED flips true.
 
 const UiRenderModel := preload("res://scripts/app/ui_render_model.gd")
+const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 
 const GRADUATED := false
 const POS_TOLERANCE := 1.5
 const BOUNDS_TOLERANCE := 1.0
 
 var _ctx: Dictionary = {}
+var _snap = SnapshotCapture.new()
 var _failures: Array = []
 var _states_checked := 0
 var _labels_checked := 0
@@ -173,14 +175,28 @@ func _bag_names(catalog) -> Array:
 
 # Pixel half: windowed only (headless skips; captures need a real renderer).
 # Captures the battle SubViewport texture directly, so regions map 1:1 at
-# stage scale. Findings route to quarantine traces and evidence crops, never
-# to failures, until GRADUATED flips true.
+# stage scale; the readback guard is ADDED after the settle (never a
+# substitute: the SubViewport only redraws while visible). Magenta/stale
+# frames (Godot 4.6 #115402) fall back to a root-viewport crop of the battle
+# display resized back to the 160x144 stage so run_lint's display contract
+# holds. Findings route to quarantine traces, never to failures, until
+# GRADUATED flips true.
 func _pixel_half(state: String, model: Dictionary) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
 	await _settle(2)
+	await _snap.guard_readback()
 	var subvp: SubViewport = _battle_view().get_node("BattleViewport")
 	var image := subvp.get_texture().get_image()
+	var verdict := _snap.classify(image, -1)
+	if verdict.kind == "magenta":
+		_snap.trace_invalid(_runtime(), state, verdict, "root_viewport_crop fallback engaged")
+		image = _snap.crop_battle_display(get_viewport(), _battle_view())
+		if not image.is_empty():
+			image.resize(160, 144, Image.INTERPOLATE_NEAREST)
+	elif not verdict.kind.is_empty():
+		_snap.trace_invalid(_runtime(), state, verdict, "")
+		return # known-invalid frame (blank/uniform): lint findings against it would be noise
 	if image == null or image.is_empty():
 		return
 	var display := Rect2(Vector2.ZERO, Vector2(image.get_size()))

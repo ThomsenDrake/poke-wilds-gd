@@ -5,12 +5,41 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import socket
 import sys
 import time
 from typing import Any
+
+FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
+
+# Scenarios that need a real resizable window (editor-managed DAP game windows
+# reject programmatic resize) — the playtest runner launches them as standalone
+# windowed subprocesses. Single-sourced here; run_playtests.py imports it.
+WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update"}
+
+# The windowed-only subset: these have no in-engine headless fallback, so under
+# PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
+# exit 0 instead of failing them for missing pass events (transport honesty —
+# captures need a real window and renderer). display_matrix is deliberately NOT
+# here: it self-skips its pixel work in-engine when headless
+# (display_matrix.gd:44-47) and still emits display_matrix_passed, so it stays
+# runnable under force-headless.
+WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update"}
+
+
+def force_headless() -> bool:
+    return os.environ.get(FORCE_HEADLESS_ENV, "").lower() not in ("", "0", "false", "no", "off")
+
+
+def windowed_skip_reason() -> str:
+    return (
+        f"windowed-only scenario skipped under {FORCE_HEADLESS_ENV} "
+        "(captures need a real window and renderer)"
+    )
+
 
 SCENARIO_REQUIREMENTS = {
     "boot": {
@@ -183,9 +212,27 @@ def main() -> int:
     args = parser.parse_args()
 
     project_path = Path(args.project).expanduser().resolve()
-    request_path = write_smoke_request(project_path, args.scenario)
     result_file = Path(args.result_file) if args.result_file else project_path / ".godot-smoke" / f"result-{args.scenario}.json"
 
+    # Transport honesty: a windowed-only scenario asked to run under
+    # PLAYTEST_FORCE_HEADLESS is a skip-with-reason (exit 0), never red.
+    if force_headless() and args.scenario in WINDOWED_ONLY_SCENARIOS:
+        reason = windowed_skip_reason()
+        print(f"SKIP: {args.scenario}: {reason}")
+        summary = {
+            "scenario": args.scenario,
+            "events_seen": [],
+            "missing_all": [],
+            "missing_any": [],
+            "had_exception": False,
+            "ok": True,
+            "skipped_reason": reason,
+        }
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+        result_file.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+        return 0
+
+    request_path = write_smoke_request(project_path, args.scenario)
     had_exception = False
     events_seen: set[str] = set()
     seq = 1

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 
@@ -22,6 +23,28 @@ from legibility_lib import (
     trace_event_docs,
     trace_literals,
 )
+
+
+def report_stamp_issues(root: Path) -> list[str]:
+    """Validate the playtest-report stamp schema (freshness-refusal hook).
+
+    Presence-only: when .godot-smoke/playtest-report.json exists it must carry
+    the head_sha and godot_version keys. Null values are allowed for fields
+    only windowed runs can supply; an absent report is not an issue.
+    """
+    report_path = root / ".godot-smoke" / "playtest-report.json"
+    if not report_path.exists():
+        return []
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return [f"playtest-report.json is unreadable: {exc}"]
+    if not isinstance(report, dict):
+        return ["playtest-report.json is missing required stamp keys: head_sha, godot_version"]
+    missing = [key for key in ("head_sha", "godot_version") if key not in report]
+    if missing:
+        return [f"playtest-report.json is missing required stamp keys: {', '.join(missing)}"]
+    return []
 
 
 def run(root: Path | None = None) -> list[str]:
@@ -102,6 +125,8 @@ def run(root: Path | None = None) -> list[str]:
         for target in internal_links(path):
             if not resolve_link(path, target, root).exists():
                 issues.append(f"Broken internal link in {rel}: {target}")
+
+    issues.extend(report_stamp_issues(root))
 
     return issues
 

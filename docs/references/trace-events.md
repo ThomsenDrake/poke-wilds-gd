@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-07-17
+Last verified: 2026-07-20
 Review cadence days: 21
-Source paths: scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/battle_runtime.gd, scripts/runtime/world_view.gd, scripts/app/main.gd, scripts/app/smoke_scenarios.gd
+Source paths: scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/battle_runtime.gd, scripts/runtime/world_view.gd, scripts/app/main.gd, scripts/app/smoke_scenarios.gd, scripts/app/snapshot_capture.gd
 # Trace Events
 
 All runtime traces are JSONL records with `event`, `ts_msec`, `source`, and `payload`.
@@ -36,5 +36,7 @@ All runtime traces are JSONL records with `event`, `ts_msec`, `source`, and `pay
 | `world_consistency_audit_passed` | `SmokeScenarios` | The `world_consistency_audit` scenario verified tile logic/render/collision agreement plus spatial, z-order, and tall-grass contracts around spawn; payload carries tiles_checked, movement_checked, spatial_checked, failures. |
 | `ui_render_audit_passed` | `SmokeScenarios` | The `ui_render_audit` scenario verified expected strings, label overlap, and cursor pairs against the art-anchored render model across battle and menu states; payload carries states_checked, labels_checked, cursors_checked, quarantined. |
 | `quarantine_finding` | `SmokeScenarios` | A quarantined heuristic pixel check reported a possible visual defect; payload carries state, kind (`low_ink`/`forbidden_ink`/`garble`/`lint_unavailable`), and region. Never fails a scenario until graduated. |
-| `visual_sweep_passed` | `SmokeScenarios` | The `visual_sweep` scenario captured its deterministic screenshot set and matched baselines within threshold (or updated them in update mode); payload carries shots, compared, mismatched, max drift percent, and mode. |
+| `snapshot_captured` | `App.SnapshotCapture` | A windowed capture passed the validity oracle; payload carries shot, shot_seq, ts_msec, trace_cursor (join key into user://logs/agent_trace.jsonl — the record lands at cursor+1), window [w, h], renderer, and godot_version. sidecar_path is reserved for Slice 3 and absent from Slice 1 payloads. |
+| `capture_invalid` | `App.SnapshotCapture` | A capture failed the validity oracle or a duplicate pair differed; payload carries shot, kind (blank/uniform/magenta/undersize/headless/nondeterministic_pair), classification (transport/regression — magenta is always regression), luminance (0.0-1.0), and detail with the identified cause. Warning tier: never fails a scenario on its own. |
+| `visual_sweep_passed` | `SmokeScenarios` | The `visual_sweep` scenario captured its deterministic screenshot set and matched baselines within threshold (or updated them in update mode); payload carries shots, compared, mismatched, max drift percent, mode, window, and dup_checked. |
 | `warning` | multiple | Non-fatal warnings worth surfacing to agents. |

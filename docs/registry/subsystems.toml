@@ -165,3 +165,20 @@ validation_commands = [
 ]
 required_trace_events = ["field_move_used", "harvest_flow_passed"]
 quality_bucket = "harvest"
+
+[[subsystems]]
+name = "vision_fidelity"
+status = "active"
+layer = "app"
+code_paths = ["scripts/app/snapshot_capture.gd"]
+scene_paths = []
+spec_doc = "docs/product-specs/vision-fidelity.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario ui_render_audit",
+  "python3 tools/run_playtests.py",
+]
+required_trace_events = ["snapshot_captured", "capture_invalid"]
+quality_bucket = "vision"
