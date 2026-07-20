@@ -89,6 +89,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["display_matrix_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "harvest_flow": {
+        "all": ["harvest_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

@@ -28,7 +28,8 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 
 Run `biome_probe` after touching world generation, biome definitions, or the spawn/reachability logic. It asserts determinism, ring progression, navigable spawn, and reachability invariants in a single trace.
 Run `biome_traverse` after touching traversal gating, biome encounter filtering, or the player avatar blocked path. It exercises biome crossing, traversal-gate blocking, and a biome-aware wild battle.
-Run `field_move` after touching the party screen, field-move unlock flow, or traversal gating. It proves a `cut`-gated tile becomes walkable after the party-screen field move fires.
+Run `field_move` after touching the party screen, harvest resolution, or traversal gating. It proves a `cut`-blocked tile clears and stays walkable after a save round-trip.
+Run `harvest_flow` after touching the harvest resolver, world overrides, or save schema. It proves capability refusals, cut/dig/smash yields, and override persistence.
 Run `world_consistency_audit` after touching world rendering, prop scatter, traversal, or draw order. It proves tile logic/render/collision agreement plus player-vs-prop spatial, z-order, and tall-grass contracts.
 Run `battle_anim` after touching the attack animation pipeline, battle turn structure, or battle audio. It plays a scripted animated move end to end and asserts the animation trace, sound, and turn resolution. Animations are frame-paced (deterministic at any refresh rate), and KO blows play before the battle closes.
 Run `ui_render_audit` after touching any UI scene or the battle surface. It verifies expected strings, label overlap, and cursor pairs against the art-anchored render model, and (windowed only) runs the pixel lint; heuristic pixel findings emit `quarantine_finding` traces that report without failing until graduated.

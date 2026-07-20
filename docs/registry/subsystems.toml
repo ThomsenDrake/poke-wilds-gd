@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -18,7 +18,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed"]
 quality_bucket = "bootstrap"
 
 [[subsystems]]
@@ -55,6 +55,7 @@ code_paths = [
   "scripts/domain/biome_defs.gd",
   "scripts/domain/biome_encounters.gd",
   "scripts/domain/world_generator.gd",
+  "scripts/domain/world_overrides.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
@@ -150,3 +151,17 @@ validation_commands = [
 ]
 required_trace_events = ["menu_opened", "menu_closed", "save_written"]
 quality_bucket = "ui"
+
+[[subsystems]]
+name = "harvest_loop"
+status = "active"
+layer = "runtime"
+code_paths = ["scripts/runtime/harvest_resolver.gd", "scripts/domain/field_moves.gd"]
+scene_paths = []
+spec_doc = "docs/product-specs/harvest-and-mutation.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario harvest_flow",
+]
+required_trace_events = ["field_move_used", "harvest_flow_passed"]
+quality_bucket = "harvest"

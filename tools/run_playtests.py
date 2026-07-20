@@ -36,11 +36,11 @@ _spec.loader.exec_module(smoketest)
 
 SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow"]
 # Scenarios that need a real resizable window (editor-managed DAP game windows
 # reject programmatic resize) — always run as a standalone windowed subprocess
 # unless headless is forced (then the scenario skips pixel work explicitly).
-WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix"}
+WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update"}
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",

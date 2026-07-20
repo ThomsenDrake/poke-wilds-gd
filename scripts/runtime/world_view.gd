@@ -40,6 +40,9 @@ func _ready() -> void:
 	_canvas_modulate.name = "DayNightModulate"
 	add_child(_canvas_modulate)
 	set_time_of_day(TIME_OF_DAY_DEFAULT)
+	var runtime := _runtime_or_null()
+	if runtime != null:
+		runtime.world_overridden.connect(_on_world_overridden)
 	rebuild(world_seed)
 
 
@@ -77,13 +80,14 @@ func is_tile_walkable(map_pos: Vector2i) -> bool:
 	var tile = _get_tile_data(map_pos)
 	if bool(tile.get("walkable", false)):
 		return true
-	var field_move = str(tile.get("requires_field_move", ""))
-	if field_move.is_empty():
+	# Surf is the only traversal gate that opens passively, via party
+	# capability; cut/smash-gated tiles open only by being cleared.
+	if str(tile.get("requires_field_move", "")) != "surf":
 		return false
 	var runtime = _runtime_or_null()
 	if runtime == null:
 		return false
-	return runtime.is_field_move_unlocked(field_move)
+	return runtime.party_has_field_move_ability("surf")
 
 
 func is_encounter_tile(map_pos: Vector2i) -> bool:
@@ -94,8 +98,21 @@ func get_tile_biome(map_pos: Vector2i) -> String:
 	return str(_get_tile_data(map_pos).get("biome", ""))
 
 
+# Traversal block reason shown when the player bumps this tile. Gated tiles
+# get a hint: harvestable gates (cut/smash) name the clearing move, water
+# points at a SURF-capable party member.
 func get_traversal_block_reason(map_pos: Vector2i) -> String:
-	return str(_get_tile_data(map_pos).get("block_reason", ""))
+	var tile := _get_tile_data(map_pos)
+	var reason := str(tile.get("block_reason", ""))
+	var gate := str(tile.get("requires_field_move", ""))
+	var hint := ""
+	if gate == "surf":
+		hint = "A SURF-capable Pokemon could cross."
+	elif gate == "cut" or gate == "smash":
+		hint = "It could be %s." % gate.to_upper()
+	if hint.is_empty():
+		return reason
+	return reason + " " + hint if not reason.is_empty() else hint
 
 
 func tile_requires_field_move(map_pos: Vector2i) -> String:
@@ -166,9 +183,34 @@ func _time_of_day_color(minutes: int) -> Color:
 func rebuild(seed_value: int) -> void:
 	world_seed = seed_value
 	_generator.setup(world_seed)
+	# The runtime owns the canonical override map; mirror it so rendering and
+	# traversal see harvested tiles. Clear first: stale entries must never leak
+	# across seeds or a New Game (setup() alone keeps the old map).
+	_generator.clear_overrides()
+	var runtime := _runtime_or_null()
+	if runtime != null:
+		_generator.apply_overrides(runtime.world_overrides_for_save())
 	_tile_cache.clear()
 	_last_biome = ""
 	_clear_rendered_nodes()
+
+
+# Live mutation sync: the runtime just stamped an override on this tile, so
+# mirror the map, drop the tile's cached data, and re-render it in place when
+# it sits inside the synced window (the ground texture too — dug tiles lose
+# their tall-grass overlay). Off-window tiles refresh on the next sync_visible.
+func _on_world_overridden(tile: Vector2i) -> void:
+	var runtime := _runtime_or_null()
+	if runtime == null:
+		return
+	_generator.apply_overrides(runtime.world_overrides_for_save())
+	_tile_cache.erase(tile)
+	var ground: Sprite2D = _ground_nodes.get(tile, null)
+	if ground == null and not _prop_nodes.has(tile):
+		return
+	if ground != null:
+		ground.texture = _texture_cache.base_texture(_get_tile_data(tile))
+	_ensure_tile_nodes(tile)
 
 
 func _get_tile_data(map_pos: Vector2i) -> Dictionary:

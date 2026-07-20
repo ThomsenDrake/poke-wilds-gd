@@ -3,9 +3,10 @@ extends RefCounted
 # App-layer input routing extracted from main.gd so the scene script stays
 # under its line budget. Owns the InputMap action set — movement, confirm/
 # cancel (action_a/action_b), run modifier, and the start/menu toggle — plus
-# the per-frame poll that forwards "start" to Main's menu handler. Movement
-# and confirm/cancel reach their consumers (player avatar, UI screens)
-# directly through these actions; only the menu toggle is routed here.
+# the per-frame polls that forward "start" to Main's menu handler and
+# "action_a" to Main's context action. Movement and confirm/cancel reach
+# their other consumers (player avatar, UI screens) directly through these
+# actions; only the menu toggle and context action are routed here.
 
 const ACTION_BINDINGS := {
 	"move_up": [Key.KEY_UP, Key.KEY_W],
@@ -19,10 +20,14 @@ const ACTION_BINDINGS := {
 }
 
 var _on_menu_toggle: Callable
+var _on_context_action: Callable
 
 
-func _init(on_menu_toggle: Callable) -> void:
+# The context action callable is optional so single-argument construction
+# (menu toggle only) keeps working.
+func _init(on_menu_toggle: Callable, on_context_action: Callable = Callable()) -> void:
 	_on_menu_toggle = on_menu_toggle
+	_on_context_action = on_context_action
 
 
 # Idempotent: existing actions and key events are left untouched.
@@ -36,6 +41,16 @@ func configure_input_map() -> void:
 func poll_menu_toggle() -> void:
 	if Input.is_action_just_pressed("start"):
 		_on_menu_toggle.call()
+
+
+# Called from Main._process with Main's overworld-idle state (not in a menu,
+# battle, or step animation) so the context route can only fire while the
+# player is free to act in the overworld.
+func poll_context_action(overworld_idle: bool) -> void:
+	if not overworld_idle or not _on_context_action.is_valid():
+		return
+	if Input.is_action_just_pressed("action_a"):
+		_on_context_action.call()
 
 
 func _ensure_action(action_name: StringName, keys: Array) -> void:

@@ -7,8 +7,9 @@ extends Node
 # logic, the rendered scene textures, and the collision/movement answers must
 # agree. Spatial halves (z-order, player rect) live in world_spatial_audit.gd.
 # Expectations anchor to source art and the model's own solid-prop knowledge,
-# never to the code under test. Field moves are locked for determinism and
-# encounters muted. Save guard: the dispatcher.
+# never to the code under test. The override extension stamps one real cut,
+# then cross-checks every overridden tile across logic/render/collision.
+# Encounters are muted. Save guard: the dispatcher.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
@@ -47,14 +48,11 @@ func run(ctx: Dictionary) -> void:
 	var center: Vector2i = _player().tile_position
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
-	var locks := _runner.snapshot_field_move_locks(_runtime())
-	for move_id in locks:
-		_runner.set_field_move_unlocked(_runtime(), move_id, false)
 	await _audit_tiles(center)
+	await _audit_overridden_tiles(center)
 	var z_result: Dictionary = _spatial.audit_z_order(_world(), _player(), _runtime(), center, _runner)
 	_failures.append_array(z_result["failures"])
 	_spatial_checked += int(z_result["checked"])
-	_runner.restore_field_move_locks(_runtime(), locks)
 	_player().encounter_chance = saved_chance
 	if _failures.is_empty():
 		_runtime().emit_trace("world_consistency_audit_passed", "SmokeScenarios", {
@@ -85,6 +83,41 @@ func _audit_tiles(center: Vector2i) -> void:
 			await _check_movement_probe(tile)
 			if _failures.size() > MAX_FAILURES:
 				return
+
+
+# Mutation-lane extension: stamps one real override through the resolver (a
+# cut-capable party on a tree), then cross-checks every tile in
+# overrides_for_save() across logic (mutated, walkable, no prop, no block
+# reason), render (no prop sprite, matching ground), and collision (step in).
+func _audit_overridden_tiles(center: Vector2i) -> void:
+	var party_before: Array = _runner.swap_party(_runtime(), ["BULBASAUR"])
+	var found := _runner.find_harvest_target(_world(), center, SAMPLE_RADIUS, "cut")
+	if found.is_empty():
+		_failures.append({"kind": "override_target_missing", "note": "no cut target within %d tiles" % SAMPLE_RADIUS})
+	elif not bool(_runtime().harvest_tile(found["tile"]).get("ok", false)):
+		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_harvest_refused"})
+	elif not _runtime().world_overrides_for_save().has("%d,%d" % [found["tile"].x, found["tile"].y]):
+		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_not_saved"})
+	_runner.restore_party(_runtime(), party_before)
+	var overridden: Array = []
+	for key in _runtime().world_overrides_for_save().keys():
+		var parts := str(key).split(",")
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			overridden.append(Vector2i(parts[0].to_int(), parts[1].to_int()))
+	for tile in overridden:
+		_tiles_checked += 1
+		var logic: Dictionary = _world().get_tile_logic(tile)
+		if not bool(logic.get("mutated", false)) or not bool(logic.get("walkable", false)) or not str(logic.get("prop_path", "")).is_empty():
+			_failures.append({"tile": [tile.x, tile.y], "kind": "override_logic_disagree"})
+		elif not str(logic.get("block_reason", "")).is_empty() or not _world().get_traversal_block_reason(tile).is_empty():
+			_failures.append({"tile": [tile.x, tile.y], "kind": "override_block_reason"})
+	for tile in _runner.even_samples(overridden, SAMPLES_PER_CATEGORY):
+		_world().sync_visible(tile)
+		if _world().get_tile_prop_texture(tile) != null:
+			_failures.append({"tile": [tile.x, tile.y], "kind": "override_prop_rendered"})
+		if not _textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(_world().get_tile_render_data(tile))):
+			_failures.append({"tile": [tile.x, tile.y], "kind": "override_base_mismatch"})
+		await _check_movement_probe(tile)
 
 
 func _tile_category(logic: Dictionary) -> String:

@@ -3,9 +3,11 @@ extends Node
 # Navigation-audit scenario dispatched from SmokeScenarios: proves traversal,
 # battle-menu, and start-menu navigation contracts against the live scene.
 # Traversal samples tiles in expanding rings and drives real smoke_steps
-# (blocked tiles must reject with a reason, walkable tiles must accept, and a
-# field-move gate must reject while locked and accept after unlock). The
-# battle contract lives in nav_audit_battle.gd; the menu contract walks the
+# (blocked tiles must reject with a reason, walkable tiles must accept); the
+# gate contract is party-capability based: a cut gate rejects even a
+# cut-capable party until the resolver clears the tile, and a surf gate opens
+# passively for a surf-capable party but stays shut without one. The battle
+# contract lives in nav_audit_battle.gd; the menu contract walks the
 # entry list and both sub-screens. One nav_audit_passed trace on success;
 # push_error with specifics otherwise. Save backup/restore is the
 # dispatcher's job, so this file holds no save-guard logic.
@@ -72,37 +74,56 @@ func _audit_traversal() -> void:
 		_failures.append("traversal: only %d tiles testable within %d rings" % [_traversal_checked, SCAN_RADIUS])
 
 
-# Locks every field move so gates stay scannable even from an unlocked save,
-# proves one gated tile rejects locked and accepts unlocked, then restores.
+# Proves both gate contracts with crafted parties (restored after): the cut
+# gate rejects a cut-capable party until the resolver clears the tile, and
+# the surf gate rejects a magikarp party but accepts a gyarados one. The surf
+# pair is scanned under the non-surf party or water reads walkable and hides.
 func _audit_gated_tile(center: Vector2i) -> void:
-	var unlocked_before := _runner.snapshot_field_move_locks(_runtime())
-	for move_id in unlocked_before:
-		_runner.set_field_move_unlocked(_runtime(), move_id, false)
-	var pair := _runner.find_gated_pair(_world(), center, GATED_SCAN_RADIUS)
-	if pair.is_empty():
-		_failures.append("traversal: no field-move-gated tile within %d rings" % GATED_SCAN_RADIUS)
+	var party_before: Array = _runner.swap_party(_runtime(), ["MAGIKARP"])
+	var cut_pair := _runner.find_gated_pair(_world(), center, GATED_SCAN_RADIUS, "cut")
+	var surf_pair := _runner.find_gated_pair(_world(), center, GATED_SCAN_RADIUS, "surf")
+	if cut_pair.is_empty():
+		_failures.append("traversal: no cut-gated tile within %d rings" % GATED_SCAN_RADIUS)
 	else:
-		var move_id: String = pair["field_move"]
-		var step_dir: Vector2i = -pair["direction"] # pair's direction points gate -> stand tile
-		_runner.teleport_player(_world(), _player(), _runtime(), pair["from_tile"])
-		await _settle_movement()
-		_block_reason = ""
-		var stepped: bool = _player().smoke_step(step_dir)
-		if stepped:
-			await _player().tile_changed
-		var rejected: bool = not stepped and not _block_reason.is_empty()
-		_runtime().unlock_field_move(move_id)
-		var accepted := false
-		if _world().is_tile_walkable(pair["gated_tile"]) and _player().smoke_step(step_dir):
-			await _player().tile_changed
-			accepted = _player().tile_position == pair["gated_tile"]
-		if not rejected:
-			_failures.append("traversal: %s gate at %s did not reject while locked" % [move_id, str(pair["gated_tile"])])
-		elif not accepted:
-			_failures.append("traversal: %s gate at %s stayed blocked after unlock" % [move_id, str(pair["gated_tile"])])
+		_runner.swap_party(_runtime(), ["BULBASAUR"])
+		var before := await _probe_gate_step(cut_pair)
+		if bool(before["accepted"]) or str(before["reason"]).is_empty():
+			_failures.append("traversal: cut gate at %s did not reject before clearing" % str(cut_pair["gated_tile"]))
+		elif not bool(_runtime().harvest_tile(cut_pair["gated_tile"]).get("ok", false)):
+			_failures.append("traversal: resolver refused to cut %s" % str(cut_pair["gated_tile"]))
+		else:
+			var after := await _probe_gate_step(cut_pair)
+			if bool(after["accepted"]):
+				_traversal_checked += 1
+			else:
+				_failures.append("traversal: cut gate at %s stayed blocked after clearing" % str(cut_pair["gated_tile"]))
+	if surf_pair.is_empty():
+		_failures.append("traversal: no surf-gated tile within %d rings" % GATED_SCAN_RADIUS)
+	else:
+		_runner.swap_party(_runtime(), ["MAGIKARP"])
+		var shut := await _probe_gate_step(surf_pair)
+		_runner.swap_party(_runtime(), ["GYARADOS"])
+		var open := await _probe_gate_step(surf_pair)
+		if bool(shut["accepted"]) or str(shut["reason"]).is_empty():
+			_failures.append("traversal: surf gate at %s did not reject without a surf-capable party" % str(surf_pair["gated_tile"]))
+		elif not bool(open["accepted"]):
+			_failures.append("traversal: surf gate at %s stayed shut with a surf-capable party" % str(surf_pair["gated_tile"]))
 		else:
 			_traversal_checked += 1
-	_runner.restore_field_move_locks(_runtime(), unlocked_before)
+	_runner.restore_party(_runtime(), party_before)
+
+
+# Drives one step from the pair's stand tile toward the gated tile and reports
+# {"accepted", "reason"}; reason is the block text when the step is rejected.
+func _probe_gate_step(pair: Dictionary) -> Dictionary:
+	_runner.teleport_player(_world(), _player(), _runtime(), pair["from_tile"])
+	await _settle_movement()
+	_block_reason = ""
+	var accepted := false
+	if _player().smoke_step(-pair["direction"]):
+		await _player().tile_changed
+		accepted = _player().tile_position == pair["gated_tile"]
+	return {"accepted": accepted, "reason": _block_reason}
 
 
 func _check_blocked_tile(entry: Dictionary) -> void:

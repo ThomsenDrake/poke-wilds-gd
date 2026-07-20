@@ -13,6 +13,7 @@ const SCENARIOS := {
 	"ui_render_audit": [preload("res://scripts/app/ui_render_audit.gd"), "run", []],
 	"battle_anim": [preload("res://scripts/app/battle_anim_scenario.gd"), "run", []],
 	"display_matrix": [preload("res://scripts/app/display_matrix.gd"), "run", []],
+	"harvest_flow": [preload("res://scripts/app/harvest_flow_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
 }

@@ -79,35 +79,39 @@ func _scenario_wild_battle() -> void:
 	await _run_smoke_battle(wild_mon)
 
 
+# Clearing semantics: drives the resolver through the party-screen FIELD MOVE
+# path on a faced tree (blocked -> cleared) and proves the save round-trip.
 func _scenario_field_move() -> void:
 	await get_tree().create_timer(0.2).timeout
 	var fail := ""
-	var found = _runner.find_field_move_tile(_world(), _player().tile_position, 20, "cut")
+	var found := _runner.find_harvest_target(_world(), _player().tile_position, 40, "cut")
 	if found.is_empty():
-		fail = "no cut-gated tile within 20 tiles of the player"
+		fail = "no cut-harvestable tile within 40 tiles of the player"
 	var tile: Vector2i = found.get("tile", Vector2i.ZERO)
-	var pre_unlocked = _runtime().is_field_move_unlocked("cut")
-	var log_cursor = _runner.trace_log_line_count()
-	if fail.is_empty() and not pre_unlocked and _world().is_tile_walkable(tile):
-		fail = "cut-gated tile was already walkable before unlocking"
+	var party_before: Array = _runner.swap_party(_runtime(), ["BULBASAUR"])
+	var log_cursor := _runner.trace_log_line_count()
 	if fail.is_empty():
+		_runner.teleport_player(_world(), _player(), _runtime(), found["from_tile"])
+		var was_blocked: bool = not _player().smoke_step(found["direction"]) # also faces the tree
 		_call("field_move", ["cut"])
 		await get_tree().create_timer(0.2).timeout
-		if not _runtime().is_field_move_unlocked("cut"):
-			fail = "cut stayed locked after the menu handler ran"
+		if not was_blocked:
+			fail = "cut-gated tile accepted a step before clearing"
 		elif not _world().is_tile_walkable(tile):
-			fail = "cut-gated tile stayed blocked after unlocking"
+			fail = "cut-gated tile stayed blocked after the resolver ran"
 		elif not _runner.trace_log_has_since("field_move_used", log_cursor, {"move_id": "cut"}):
-			fail = "menu handler emitted no field_move_used trace"
+			fail = "resolver emitted no field_move_used trace"
+	var save_ok := false
 	if fail.is_empty():
-		_runtime().emit_trace("field_move_scenario_passed", "SmokeScenarios", {
-			"move_id": "cut",
-			"tile": [tile.x, tile.y],
-			"pre_unlocked": pre_unlocked
-		})
+		_runner.save_and_reload(_world(), _runtime())
+		save_ok = _world().is_tile_walkable(tile) and bool(_world().get_tile_logic(tile).get("mutated", false))
+		if not save_ok:
+			fail = "cleared tile did not survive the save round-trip"
+	_runner.restore_party(_runtime(), party_before)
+	if fail.is_empty():
+		_runtime().emit_trace("field_move_scenario_passed", "SmokeScenarios", {"move_id": "cut", "tile": [tile.x, tile.y], "yield": "log", "save_ok": save_ok})
 	else:
 		_runtime().warn("SmokeScenarios", "Field move smoke scenario failed: %s." % fail, {"tile": [tile.x, tile.y]})
-	await get_tree().create_timer(0.2).timeout
 
 
 func _scenario_biome_probe() -> void:

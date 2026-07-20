@@ -1,15 +1,16 @@
 extends RefCounted
 
-# Mutable gameplay session: party, bag, field moves, world position, the
-# in-game clock, and the lifetime step counter.
+# Mutable gameplay session: party, bag, world position, the in-game clock,
+# and the lifetime step counter.
 #
-# Save schema v2 payloads add `version`, `time_of_day_minutes`, and
-# `total_steps`. v1 payloads (no `version` key, the format written before the
-# clock existed) are still accepted; missing keys are backfilled with
+# Save schema v3 adds `world_overrides` (threaded in by GameRuntime from the
+# world generator) and drops the v2 `unlocked_field_moves` key: field-move
+# capability is derived from the party now, so the legacy key is ignored on
+# load. v1/v2 payloads are still accepted; missing keys are backfilled with
 # new-game defaults. Bag item ids are the lowercase i18n keys ("poke_ball");
 # legacy ids from older saves are remapped on load (see LEGACY_ITEM_IDS).
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const DAY_MINUTES := 1440
 const NEW_GAME_TIME_OF_DAY := 600 # 10:00
 const STARTING_BAG := {
@@ -49,10 +50,12 @@ func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
 	time_of_day_minutes = _wrap_time(int(data.get("time_of_day_minutes", NEW_GAME_TIME_OF_DAY)))
 	total_steps = maxi(0, int(data.get("total_steps", 0)))
-	_load_unlocked_field_moves(data.get("unlocked_field_moves", []))
+	# v3 ignores the legacy `unlocked_field_moves` key; the dict below stays
+	# only as audit scratch space (smoke_scenario_runner pokes it directly).
+	unlocked_field_moves.clear()
 
 
-func to_save_payload() -> Dictionary:
+func to_save_payload(world_overrides: Dictionary = {}) -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"world_seed": world_seed,
@@ -62,7 +65,7 @@ func to_save_payload() -> Dictionary:
 		"bag": bag,
 		"time_of_day_minutes": time_of_day_minutes,
 		"total_steps": total_steps,
-		"unlocked_field_moves": unlocked_field_moves.keys()
+		"world_overrides": world_overrides
 	}
 
 
@@ -170,16 +173,8 @@ func note_step_taken() -> void:
 	total_steps += 1
 
 
-func is_field_move_unlocked(move_id: String) -> bool:
-	return unlocked_field_moves.has(move_id)
-
-
-func unlock_field_move(move_id: String) -> void:
-	if move_id.is_empty():
-		return
-	unlocked_field_moves[move_id] = true
-
-
+# Audit scratch accessor: smoke_scenario_runner snapshots/restores gate locks
+# by poking unlocked_field_moves directly; there is no stored unlock model.
 func get_unlocked_field_moves() -> Array:
 	return unlocked_field_moves.keys()
 
@@ -196,13 +191,3 @@ func _normalize_bag(raw: Dictionary) -> Dictionary:
 			var canonical := str(LEGACY_ITEM_IDS.get(str(item_id), str(item_id)))
 			normalized[canonical] = int(normalized.get(canonical, 0)) + count
 	return normalized
-
-
-func _load_unlocked_field_moves(raw: Variant) -> void:
-	unlocked_field_moves.clear()
-	if not (raw is Array):
-		return
-	for entry in raw:
-		var move_id = str(entry)
-		if not move_id.is_empty():
-			unlocked_field_moves[move_id] = true

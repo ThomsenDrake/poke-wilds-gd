@@ -9,22 +9,23 @@ extends Control
 #   get_party_snapshot() -> Array       get_bag_snapshot() -> Array
 #   get_party_member(i) -> Dictionary   set_party_member(i, mon)
 #   remove_item(item_id, count) -> bool set_party_lead(index)
-#   is_field_move_unlocked(move_id) -> bool
 #   save_game() / new_game()
 # Keys with no fallback (screens degrade gracefully when absent):
 #   get_species(species_id) -> Dictionary  -> hides FIELD MOVE actions + EXP line
 #   get_item(item_id) -> Dictionary        -> bag falls back to raw item ids
 #   get_field_move_name(move_id) -> String -> field moves show their raw slug
 #   experience_for_level(level, growth) -> int -> summary omits the EXP line
+#
+# field_move_requested carries the move id plus the party index of the mon the
+# player picked; main.gd resolves the action through the harvest resolver.
 
 signal closed
 signal game_reset
-signal field_move_requested(move_id: String)
+signal field_move_requested(move_id: String, mon_index: int)
 
 const RUNTIME_METHODS := {
 	"get_party_snapshot": "get_party_snapshot",
 	"set_party_lead": "set_party_lead",
-	"is_field_move_unlocked": "is_field_move_unlocked",
 	"save_game": "save_game",
 	"new_game": "new_game",
 }
@@ -140,8 +141,11 @@ func _on_submenu_closed() -> void:
 		_menu_panel.visible = true
 
 
+# The party screen's own signal carries only the move id, so the selected
+# party index is read back from the screen (party_screen.gd is not part of
+# this workstream; its _selected holds the row the player confirmed on).
 func _on_field_move_requested(move_id: String) -> void:
-	field_move_requested.emit(move_id)
+	field_move_requested.emit(move_id, int(_party_screen.get("_selected")))
 	hide_menu()
 
 

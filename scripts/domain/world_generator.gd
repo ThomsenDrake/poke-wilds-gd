@@ -1,6 +1,7 @@
 extends RefCounted
 
 const BiomeDefs := preload("res://scripts/domain/biome_defs.gd")
+const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const TILE_SIZE := 16
 const ROCK_PROP_PATH := "res://pokewilds/rock_small1.png"
 const SPAWN_SEARCH_RADIUS := 24
@@ -18,6 +19,7 @@ var _tall_grass_noise: FastNoiseLite
 var _biome_noise: FastNoiseLite
 var _defs: Dictionary = {}
 var _textures: Dictionary = {}
+var _overrides: Dictionary = {}
 
 
 func setup(seed_value: int) -> void:
@@ -91,7 +93,7 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 		block_reason = "A rocky cliff blocks the way."
 		field_move = "smash"
 
-	return {
+	var logic := {
 		"biome": biome,
 		"walkable": walkable,
 		"encounter": encounter,
@@ -104,6 +106,21 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 		"tall_grass_path": tall_grass_path,
 		"tall_grass_key_color": tall_grass_key
 	}
+	# Overrides apply last, at this single boundary; an empty map keeps base generation byte-identical.
+	return logic if not _overrides.has(map_pos) else WorldOverrides.apply(logic, _overrides[map_pos])
+
+
+func add_override(tile: Vector2i, kind: String, by: String, step: int) -> bool:
+	return WorldOverrides.put(_overrides, tile, WorldOverrides.make_entry(kind, by, step))
+
+func apply_overrides(saved: Dictionary) -> void:
+	WorldOverrides.merge_save(_overrides, saved)
+
+func overrides_for_save() -> Dictionary:
+	return WorldOverrides.to_save(_overrides)
+
+func clear_overrides() -> void:
+	_overrides.clear()
 
 
 func get_tile(map_pos: Vector2i) -> Dictionary:
@@ -244,10 +261,7 @@ func _invariant_sample_positions() -> Array:
 
 
 func _biome_in(biome: String, allowed: Array) -> bool:
-	for entry in allowed:
-		if str(entry) == biome:
-			return true
-	return false
+	return allowed.has(biome)
 
 
 func _pick_biome(map_pos: Vector2i, elevation: float) -> String:
@@ -275,8 +289,7 @@ func _ring_candidates(distance: int) -> Array:
 func _pick_prop(map_pos: Vector2i, props: Array) -> Variant:
 	for i in range(props.size()):
 		var prop: Dictionary = props[i]
-		var roll = _coord_noise(map_pos.x, map_pos.y, 101 + i * 7)
-		if roll < float(prop["chance"]):
+		if _coord_noise(map_pos.x, map_pos.y, 101 + i * 7) < float(prop["chance"]):
 			return prop
 	return null
 

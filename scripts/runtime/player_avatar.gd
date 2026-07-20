@@ -85,6 +85,18 @@ func world_rect() -> Rect2:
 	return Rect2(position, Vector2(TILE_SIZE, TILE_SIZE))
 
 
+# The tile the avatar currently faces: its own tile plus the facing vector.
+# Main's context action (harvest) targets this tile.
+func facing_tile() -> Vector2i:
+	return tile_position + _facing
+
+
+# True while a step animation is in flight. Main gates the context action on
+# this so Z cannot fire mid-step with a stale faced tile.
+func is_moving() -> bool:
+	return _moving
+
+
 func _process(delta: float) -> void:
 	if not input_enabled:
 		_set_sprite_state(_facing, false)

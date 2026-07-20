@@ -14,7 +14,7 @@ const InputRouter := preload("res://scripts/app/input_router.gd")
 
 var _smoke_runner = SmokeScenarioRunner.new()
 var _cry_player = CryPlayer.new()
-var _input_router = InputRouter.new(Callable(self, "_toggle_menu"))
+var _input_router = InputRouter.new(Callable(self, "_toggle_menu"), Callable(self, "_on_context_action"))
 var _in_battle = false
 var _menu_open = false
 var _suppress_close_toast = false
@@ -47,6 +47,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_input_router.poll_menu_toggle()
+	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving())
 
 
 func _on_player_tile_changed(tile_position: Vector2i) -> void:
@@ -130,11 +131,18 @@ func _on_menu_closed() -> void:
 		_message_box.show_message("Saved.", 0.8)
 
 
-func _on_field_move_requested(move_id: String) -> void:
+# Party-screen FIELD MOVE: the chosen mon enforces its own capability.
+func _on_field_move_requested(_move_id: String, mon_index: int = -1) -> void:
 	_suppress_close_toast = _menu_open
-	_runtime().unlock_field_move(move_id)
-	_runtime().emit_trace("field_move_used", "App.Main", {"move_id": move_id})
-	_message_box.show_message("The way is clear!", 1.6)
+	var party: Array = _runtime().get_party_snapshot()
+	var mon: Dictionary = party[mon_index] if mon_index >= 0 and mon_index < party.size() else {}
+	var result: Dictionary = _runtime().harvest_tile(_player.facing_tile(), mon)
+	_message_box.show_message(str(result.get("message", "")), 1.6)
+
+
+func _on_context_action() -> void:
+	var result: Dictionary = _runtime().harvest_tile(_player.facing_tile())
+	_message_box.show_message(str(result.get("message", "")), 1.6)
 
 
 func _on_game_reset() -> void:

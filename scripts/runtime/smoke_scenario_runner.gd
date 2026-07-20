@@ -8,6 +8,7 @@ extends RefCounted
 # scenarios never clobber the player's real save.
 
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
+const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
 
 const REQUEST_PATH := "res://.godot-smoke/scenario.json"
 const TRACE_LOG_PATH := "user://logs/agent_trace.jsonl"
@@ -74,26 +75,23 @@ func restore_save() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_BACKUP_PATH))
 
 
-# Snapshots the unlocked field moves so restore_field_move_locks can later
-# return SessionState to exactly this set (nav audits lock gates on purpose).
-func snapshot_field_move_locks(runtime) -> Array:
-	return runtime.session.get_unlocked_field_moves()
+# Party-state crafting for capability-driven audits (the stored-unlock model
+# is gone): builds a fresh party from species ids and swaps it into the
+# session, returning the previous party for restore_party. Unknown species ids
+# are skipped, so callers should assert the capability they crafted for.
+func swap_party(runtime, species_ids: Array, level: int = 10) -> Array:
+	var previous: Array = runtime.session.party
+	var party: Array = []
+	for species_id in species_ids:
+		var entry: Dictionary = runtime.catalog.get_species(str(species_id))
+		if not entry.is_empty():
+			party.append(runtime.pokemon_rules.create_pokemon_instance(entry, level, Callable(runtime.catalog, "get_move")))
+	runtime.session.party = party
+	return previous
 
 
-func restore_field_move_locks(runtime, unlocked: Array) -> void:
-	for move_id in runtime.session.get_unlocked_field_moves():
-		set_field_move_unlocked(runtime, move_id, false)
-	for move_id in unlocked:
-		set_field_move_unlocked(runtime, move_id, true)
-
-
-# Directly pokes SessionState's unlocked_field_moves; the runtime only exposes
-# unlock, but audits must test the locked side of a gate and restore it after.
-func set_field_move_unlocked(runtime, move_id: String, unlocked: bool) -> void:
-	if unlocked:
-		runtime.session.unlocked_field_moves[move_id] = true
-	else:
-		runtime.session.unlocked_field_moves.erase(move_id)
+func restore_party(runtime, previous: Array) -> void:
+	runtime.session.party = previous
 
 
 # Nearest tile gated by the given field move, scanned ring by ring outward
@@ -106,7 +104,10 @@ func find_field_move_tile(world, center: Vector2i, radius: int, move_id: String)
 	return {}
 
 
-func find_gated_pair(world, center: Vector2i, radius: int) -> Dictionary:
+# First blocked, field-move-gated tile with a walkable neighbor to stand on,
+# shaped {"from_tile", "direction", "gated_tile", "field_move"}; direction
+# points gate -> stand tile. move_id optionally pins one gate ("cut"/"surf").
+func find_gated_pair(world, center: Vector2i, radius: int, move_id: String = "") -> Dictionary:
 	var directions = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 	for dy in range(-radius, radius + 1):
 		for dx in range(-radius, radius + 1):
@@ -116,10 +117,29 @@ func find_gated_pair(world, center: Vector2i, radius: int) -> Dictionary:
 			var field_move = world.tile_requires_field_move(tile)
 			if field_move.is_empty():
 				continue
+			if not move_id.is_empty() and field_move != move_id:
+				continue
 			for direction in directions:
 				var neighbor = tile + direction
 				if world.is_tile_walkable(neighbor):
 					return {"from_tile": neighbor, "direction": direction, "gated_tile": tile, "field_move": field_move}
+	return {}
+
+
+# Nearest tile whose resolver action (cut/dig/smash) matches, with a stand
+# spot to face it from: {"tile", "from_tile", "direction"}; {} when the bound
+# holds nothing. biome optionally pins the tile's biome (dig targets PLAINS).
+func find_harvest_target(world, center: Vector2i, radius: int, action: String, biome: String = "") -> Dictionary:
+	for ring in range(0, radius + 1):
+		for tile in ring_around(center, ring):
+			var logic: Dictionary = world.get_tile_logic(tile)
+			if HarvestResolver.action_for_tile(logic) != action:
+				continue
+			if not biome.is_empty() and str(logic.get("biome", "")) != biome:
+				continue
+			var spot := stand_spot(world, tile)
+			if not spot.is_empty():
+				return {"tile": tile, "from_tile": spot["from_tile"], "direction": spot["direction"]}
 	return {}
 
 
@@ -225,7 +245,17 @@ func resync_player_tile(world, player, runtime) -> void:
 		teleport_player(world, player, runtime, runtime.get_player_tile())
 
 
-# Line count of the JSONL trace log; capture before an action to scope
+# Writes the save, reloads it through the runtime apply path, and rebuilds the
+# view from the session seed; returns the loaded payload for assertions.
+func save_and_reload(world, runtime) -> Dictionary:
+	runtime.save_game()
+	var payload: Dictionary = runtime.save_store.load_payload()
+	runtime._apply_loaded_payload(payload)
+	world.rebuild(runtime.get_world_seed())
+	return payload
+
+
+# Snapshots the line count of the JSONL trace log; capture before an action to scope
 # trace_log_has_since to records the action itself produced.
 func trace_log_line_count() -> int:
 	return _trace_log_lines().size()
@@ -260,8 +290,12 @@ func _trace_log_lines() -> PackedStringArray:
 func _payload_matches(payload: Variant, expected: Dictionary) -> bool:
 	if not (payload is Dictionary):
 		return expected.is_empty()
-	for key in expected.keys():
-		if (payload as Dictionary).get(key) != expected[key]:
+	# The log is parsed back from JSON, which floats every number, and Array
+	# equality is type-strict; round-tripping the expectation through JSON
+	# normalizes its number types so plain equality works again.
+	var normalized: Dictionary = JSON.parse_string(JSON.stringify(expected))
+	for key in normalized.keys():
+		if (payload as Dictionary).get(key) != normalized[key]:
 			return false
 	return true
 

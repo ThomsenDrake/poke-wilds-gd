@@ -35,6 +35,7 @@ Anything else is a structural violation.
 - `pokemon_data`: source-data parsing and species/move catalogs.
 - `pokemon_progression`: Pokemon stat, move, and EXP rules.
 - `battle_loop`: battle runtime, battle rules, and battle UI.
+- `harvest_loop`: harvest resolver and world-mutation yields.
 - `menu_ui`: start menu and message box presentation.
 
 ## Mechanical Invariants
