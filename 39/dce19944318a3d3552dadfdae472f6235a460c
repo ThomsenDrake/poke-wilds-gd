@@ -1,0 +1,91 @@
+docs/QUALITY_SCORE.md
+  s_d600d8bb60a355::t_138db065307000 2,12,20
+docs/RELIABILITY.md
+  s_d72a04f81cfaa1::t_8b8937686cc9ed 2,47-50,58-60
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_8237c2c8e4b53f::t_c75aa71a1e5f14 1-280
+docs/product-specs/index.md
+  s_d600d8bb60a355::t_0242dee48c6f14 2,12
+docs/registry/subsystems.toml
+  s_d600d8bb60a355::t_805b181c1387c6 168-184
+docs/superpowers/plans/2026-07-20-agent-legibility-and-vision-verification.md
+  s_87cab39511af13::t_c4d2585901b1b1 1-224
+scripts/app/display_matrix.gd
+  s_74d5f9cb317a69::t_2f6051a245e2e2 27,37,76
+scripts/app/snapshot_capture.gd
+  s_d72a04f81cfaa1::t_a3674c3b780eaf 1-197
+scripts/app/ui_render_audit.gd
+  s_d72a04f81cfaa1::t_04fe37c34fecd2 13,20,178-183,188,191-199
+scripts/app/visual_sweep.gd
+  s_d72a04f81cfaa1::t_258607f1d9c2e5 5-11,15,21,36,77,81-84,168,189
+scripts/app/visual_sweep_baselines.gd
+  s_d23626aeead373::t_fabc80d6e951a2 86-88,107-109
+tools/check_repo_contracts.py
+  s_74d5f9cb317a69::t_2d9ca455ea8b7c 3,28-49,129-130
+tools/godot_dap_smoketest.py
+  s_d72a04f81cfaa1::t_8a1b8f67e61a23 8,16-43,217-235
+docs/product-specs/bootstrap-and-overworld.md
+  s_d72a04f81cfaa1::t_274f5b229ef3f9 2,4,48-53,63
+docs/product-specs/vision-fidelity.md
+  s_d72a04f81cfaa1::t_57382d72001764 1-81
+docs/references/trace-events.md
+  s_d72a04f81cfaa1::t_d4631a9326aadd 2,4,39-41
+tools/run_playtests.py
+  s_d72a04f81cfaa1::t_332090e71a8bb0 9-16,46-51,77,83,101-102,107-125,167,406-453,455-458,460-461,493-494,496-506,510-514,519-521,525-527,548,554,557-569,571-580
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "39dce19944318a3d3552dadfdae472f6235a460c",
+  "prompts": {},
+  "sessions": {
+    "s_74d5f9cb317a69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae830b495a96115f1",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_87cab39511af13": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ada3c9755eaf2643b",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_d23626aeead373": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9765037a9a7bfa34",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_d600d8bb60a355": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a66c0bc2e2a6f8117",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_d72a04f81cfaa1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a53f9b6f31323b838",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
