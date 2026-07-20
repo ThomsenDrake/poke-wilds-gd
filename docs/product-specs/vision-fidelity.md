@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-07-20
 Review cadence days: 21
-Source paths: scripts/app/snapshot_capture.gd, scripts/app/visual_sweep.gd, scripts/app/visual_sweep_baselines.gd, scripts/app/ui_render_audit.gd, scripts/app/display_matrix.gd, tools/run_playtests.py, tools/godot_dap_smoketest.py
+Source paths: scripts/app/snapshot_capture.gd, scripts/app/visual_sweep.gd, scripts/app/visual_sweep_baselines.gd, scripts/app/ui_render_audit.gd, scripts/app/display_matrix.gd, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/determinism_verify.py, project.godot
 
 # Vision Fidelity
 
@@ -72,6 +72,57 @@ The enemy canary in the battle shots is DECIDUEYE's front sprite: `front.png` is
 - Node rect (layout math, verified from scene + code): `EnemySprite` draws that 56x56 frame at stage rect `(96, 8, 56, 56)` inside the 160x144 `BattleViewport` (`scenes/ui/BattleView.tscn`). At the canonical 1152x648 window, `battle_view.gd` picks integer scale `floor(min((1152-32)/160, (648-32)/144)) = 4`, giving `BattleDisplay` rect `(256, 36, 640, 576)` and canary display rect `(640, 68, 224, 224)` = 50,176 px ≈ 6.72% of the 746,496-px frame. This replaces the unverified "~16x16 sprite = 0.034% of the frame" assumption cited in the plan docs (docs/superpowers/plans/2026-07-20-agent-legibility-and-vision-verification.md) by ~200x.
 - Measured ink rect (verified 2026-07-20 against the committed baseline `docs/generated/visual-baselines/09_battle.png` and re-verified the same day by the windowed-verification pass against a fresh windowed capture — bit-identical to the baseline — using the `tools/visual_diff.py` stdlib decoder): frame 0 of `front.png` carries 2057 opaque pixels (all alpha 255, 7 distinct colors) with a native ink bbox of `(0, 0, 54, 56)` (2px transparent right margin). All 2057 opaque sprite pixels match the capture inside `(640, 68, 224, 224)` — 100.00% at per-channel tolerance 8, every match an exact uniform 4x4 block, confirming integer scale 4 at offset `(640, 68)`. The sprite ink therefore occupies display rect `(640, 68, 216, 224)` = 48,384 px ≈ 6.48% of the frame (node rect 50,176 px ≈ 6.72%); the ink itself is 2057×4² = 32,912 px ≈ 4.41% on screen. The battle background fills the remaining node-rect pixels, so the canary signal is the sprite ink, not whole-rect opacity. Either way the true on-screen footprint is ~6.5-6.7% — roughly 200x the unverified 0.034% assumption.
 - Gate catchability: the global 0.5% gate is 3,732 px at 1152x648. A wholesale canary change (sprite swapped, blanked, or strip-loader regression) alters the 32,912 ink px = 4.41% of the frame — ~9x over the gate, comfortably CAUGHT (a whole-node-rect change would be ~13x over). The unverified 0.034% assumption (~254 px, a 16x16 sprite) sat BELOW the gate and would have been MISSED — the measurement flips the canary from "gate-blind" to "gate-visible".
+
+## Determinism knobs (Slice 2, verify-first)
+
+The game scales MANUALLY in two independent places — `battle_view.gd` `_layout_display()` computes an integer scale `k = floor(min((w-32)/160, (h-32)/144))` for the 160x144 battle SubViewport (Nearest-forced upsample), and the overworld camera zooms 3x over 16px tiles — with NO engine stretch (`display/window/stretch/mode` is `disabled`; `project.godot` carries no `[display]` section). The verify-first gate confirmed this before pinning anything that could fight it. Two knobs are pinned in the existing `[rendering]` section of `project.godot` (exact keys as written):
+
+| Project setting key | Pinned value | Engine default (4.6.1, measured via `property_get_revert` on the pinned binary) | Effect |
+| --- | --- | --- | --- |
+| `rendering/anti_aliasing/quality/msaa_2d` | `0` | `0` (disabled) | Documents the already-disabled 2D MSAA so a future editor toggle cannot silently add per-sample blending to pixel art. Zero rendering delta by construction. |
+| `rendering/2d/snap/snap_2d_transforms_to_pixel` | `true` | `false` | Quantizes 2D transforms to screen pixels at sampling time: the overworld walk lerp (`player_avatar.gd` position lerp, no camera smoothing) and any fractional camera position land on integer pixel offsets instead of smearing tile edges through the inherited Linear canvas filter. `rendering/2d/snap/snap_2d_vertices_to_pixel` stays at its default `false` (not pinned). |
+
+`tools/determinism_verify.py pins` asserts both pins are present with these values AND that the rejected candidate pins below stay absent; it is the permanent verify-first aid (absorbed by `verify_all.py` when it lands).
+
+### Verify-first evidence (measured 2026-07-20; Godot 4.6.1-stable official, forward_plus, canonical 1152x648 window)
+
+Decision rule: adopt candidate-full ONLY if the DECIDUEYE canary and 7px battle fonts render identical-or-crisper across ALL 16 shots AND `display_matrix` stays green across all 6 sizes AND 2/2 consecutive windowed sweeps are bit-identical; otherwise adopt safe-subset. Three configs were measured windowed (`python3 tools/run_playtests.py --scenario visual_sweep`/`visual_sweep_update` transport; artifacts in `/tmp/slice2-evidence/`):
+
+| Config | Consecutive sweeps | vs committed baselines | DECIDUEYE canary rect (640,68,224,224), shots 09-12 | Battle fonts (09_battle, stage-native 160x144) | display_matrix (6 sizes incl. odd 438x383) | Decision |
+| --- | --- | --- | --- | --- | --- | --- |
+| untouched (sanity) | — | 16/16 byte-identical, max drift 0.0% | — | distinct RGB 155, ink 3313 px, fringe 2731 px | — | baseline |
+| **safe-subset** (the two pins above) | 2/2 bit-identical, all 16 shots | 16/16 byte-identical, max drift 0.0% | 100% 4x4-block-uniform: 3136/3136 blocks, 0 smear, 0 off-grid transitions (4008 x-transitions) | identical to sanity (distinct 155 / ink 3313 / fringe 2731) | PASS, 6/6 sizes, max drift 0.0, all matrix frames 100% block-uniform | **ADOPTED** |
+| candidate-full (safe subset + `rendering/textures/canvas_textures/default_texture_filter=0` [Nearest (value 0, same numbering as the runtime CanvasItem.TEXTURE_FILTER enum)] + `display/window/stretch/mode="viewport"` / `scale_mode="integer"`) | 2/2 bit-identical, all 16 shots (still deterministic) | 12/16 changed, max drift 57.73%; `visual_sweep` compare FAILS the 0.5% gate | still 100% block-uniform, 0 off-grid | identical | PASS, 6/6 sizes, max drift 0.0 | **REJECTED** |
+
+Candidate-full per-shot delta vs committed baselines (changed pixels / pct): 01_overworld_spawn 328,889 / 44.06%; 02_overworld_walked 296,733 / 39.75%; 03_biome_desert 324,631 / 43.49%; 03_biome_forest 344,774 / 46.19%; 03_biome_plains 321,008 / 43.00%; 03_biome_sand 258,605 / 34.64%; 03_biome_savanna 430,923 / 57.73%; 04_night 214,851 / 28.78%; 05_dawn 301,740 / 40.42%; 06_menu 156,001 / 20.90%; 07_party_screen 99,305 / 13.30%; 08_bag_screen 99,305 / 13.30%. Battle shots 09-12 unchanged (0 px): battle art is `TEXTURE_FILTER_NEAREST`-forced in code on every art node (`battle_surface.gd:61-62`, `battle_view.gd:28`, `attack_animator.gd:138`) and drawn 1:1 inside the 160x144 SubViewport, so the project default filter never touches battle sprites or the size-7 battle font (rendered at 1:1, then integer-upscaled by the Nearest-forced `BattleDisplay`).
+
+Rejection rationale (candidate-full):
+1. NOT identical-or-crisper across all 16 shots: the Nearest default filter re-renders overworld tiles — the inherited Linear filter blends tile texels at camera zoom 3x even at pixel-exact rest positions, and Nearest yields crisp 3x3 blocks, changing 34-58% of overworld pixels — and shifts the root-UI default-theme panels/backgrounds (shots 06-08) by 13-21%. The overworld is re-rendered, not identical.
+2. `visual_sweep` compare FAILS under candidate-full (12 shots over the 0.5% gate): adoption would force regeneration of 12 baselines and change the shipped product look. That is a visible product change requiring owner sign-off, not a silent determinism pin, and the stretch pin carried an explicit high-rejection-risk flag — `[display]` stretch layers OS-level scaling UNDER both manual scaling paths (`_layout_display` reads `get_viewport_rect()`, which stretch freezes at the base size) = double-scaling by construction.
+3. The adoption bar's first clause fails, so the rule resolves to "otherwise adopt safe-subset." The rejection is purely about CHANGED PIXELS: candidate-full was deterministic (2/2 bit-identical) and display_matrix stayed green, so there is no instability or double-scaling breakage on the tested sizes — recorded with evidence per exit criterion 6.
+
+Visible-change record (exit criterion 4): the adopted config is byte-identical to all 16 committed baselines — a zero-delta triptych (`tools/determinism_verify.py cmp` reports 16/16 identical against the post-pin sweep; `tools/visual_diff.py` max drift 0.0%). There is NO visible product change and no owner sign-off is required. Because every frame is byte-identical, baseline regeneration was a no-op: the 16 committed PNGs and their tracked `.png.import` sidecars are untouched, and the headless `--import` pass had nothing to re-import. Under the adopted config the variance budget tightens to the measured noise floor: zero (2/2 consecutive windowed sweeps byte-identical on all 16 shots).
+
+When pins force regeneration: ANY `project.godot` rendering/display key change (these pins, a future filter or stretch change), a Godot binary bump, or a driver/renderer change invalidates the baselines — they are driver-specific pixels (MoltenVK/Vulkan on this Mac vs the `d3d12` driver pin on Windows). Re-run the verify-first gate (`tools/determinism_verify.py pins` + a windowed sweep vs baselines) BEFORE committing new pins, then regenerate via the procedure in [RELIABILITY.md](../RELIABILITY.md). The Slice 1 report stamps (`head_sha`, `godot_version`, `window`, `renderer`, schema-checked by `check_repo_contracts.py`) record baseline provenance: baselines captured under a different binary or config must not be diffed. Mechanical refuse-on-mismatch lands with `tools/verify_all.py` (Workstream L.1); until then the rule is human/agent-enforced policy.
+
+### Owner sign-off record (exit criterion 4, embedded at Integrate 2026-07-20)
+
+**NO VISIBLE PRODUCT CHANGE — OWNER SIGN-OFF NOT REQUIRED (zero-delta triptych).**
+
+Config adopted: safe-subset — `rendering/2d/snap/snap_2d_transforms_to_pixel=true` + `rendering/anti_aliasing/quality/msaa_2d=0` (both under `[rendering]` in `project.godot`; working tree already in this state, diff verified to contain ONLY these two pins).
+
+Evidence of zero visible change:
+- All 16 baselines regenerated via windowed `visual_sweep_update` (`visual_sweep_passed`, mode=update, 16/16 updated, pruned=[], max_drift_pct 0.0; stamps head=39dce19944318a3d3552dadfdae472f6235a460c, godot=4.6.1-stable (official), window=[1152,648], renderer=forward_plus) and every regenerated PNG is SHA-256 byte-identical to its committed baseline and to git HEAD (`git diff HEAD -- docs/generated/visual-baselines` = 0 files).
+- Old-vs-new per-shot: 16/16 byte_identical=True, 0 changed pixels at tolerance 0 AND 0 at tolerance 8. Zero changed shots.
+- Zero-delta triptychs (old | new | 32x-amplified diff; all diff panels pure black): `/tmp/slice2-evidence/triptychs/` (16 files, `<shot>_triptych.png`).
+- Canary block-uniformity old==new: 100% 4x4-block-uniform, 0 off-grid transitions, all edge runs multiples of 4 (no sub-pixel smear); 7px font metrics old==new.
+- Post-regen stability: 2/2 consecutive windowed `visual_sweep` runs PASS with max_drift_pct 0.0 (compared=16, mismatched=[]); run1 == run2 == committed baselines byte-for-byte; bonus `PLAYTEST_CAPTURE_DUPCHECK=1` run: dup_checked=16, mismatched=[], drift 0.0 (intra-run noise floor zero).
+- `display_matrix`: `display_matrix_passed`, 6 sizes incl. odd 438x383, max_drift_pct 0.0 (<=1.0% threshold).
+- Static gates all green: check_change_contract (silent — project.godot is not .gd/.tscn), check_repo_contracts, check_architecture, check_quality_docs (all exit 0).
+
+Candidate-full (Nearest default filter `rendering/textures/canvas_textures/default_texture_filter=0` + `display/window/stretch/mode="viewport"` + `scale_mode="integer"`) REJECTED with evidence (exit criterion 6): deterministic and display_matrix-green, but changed 12/16 shots by up to 57.7% (overworld tiles re-rendered Linear->Nearest at camera zoom 3x; root-UI default-theme panels 13-21%; only the 4 Nearest-forced battle shots byte-identical), failing the 'identical-or-crisper across ALL 16 shots' adoption bar and `visual_sweep` compare; adoption would force 12-baseline regeneration and a visible product change requiring owner sign-off. The stretch pin carried the explicit HIGH-REJECTION-RISK / 'shrink path is the expected outcome' flag. Rejection evidence: `/tmp/slice2-evidence/SUMMARY.md`, candidate-full.json, cand-run1/, cand-run2/, safe-matrix/.
+
+Baseline regeneration under the chosen config was a byte-no-op (verified, not assumed); the 16 committed baselines remain correct; nothing else in `docs/generated` changed. Evidence bundle: `/tmp/slice2-evidence/BUILD_BASELINES_EVIDENCE.md`.
 
 ## Smoke validation
 

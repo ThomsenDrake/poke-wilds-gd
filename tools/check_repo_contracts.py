@@ -29,8 +29,9 @@ def report_stamp_issues(root: Path) -> list[str]:
     """Validate the playtest-report stamp schema (freshness-refusal hook).
 
     Presence-only: when .godot-smoke/playtest-report.json exists it must carry
-    the head_sha and godot_version keys. Null values are allowed for fields
-    only windowed runs can supply; an absent report is not an issue.
+    the head_sha, godot_version, window, and renderer keys. Null values are
+    allowed for fields only windowed runs can supply; an absent report is not
+    an issue.
     """
     report_path = root / ".godot-smoke" / "playtest-report.json"
     if not report_path.exists():
@@ -40,8 +41,8 @@ def report_stamp_issues(root: Path) -> list[str]:
     except (OSError, ValueError) as exc:
         return [f"playtest-report.json is unreadable: {exc}"]
     if not isinstance(report, dict):
-        return ["playtest-report.json is missing required stamp keys: head_sha, godot_version"]
-    missing = [key for key in ("head_sha", "godot_version") if key not in report]
+        return ["playtest-report.json is missing required stamp keys: head_sha, godot_version, window, renderer"]
+    missing = [key for key in ("head_sha", "godot_version", "window", "renderer") if key not in report]
     if missing:
         return [f"playtest-report.json is missing required stamp keys: {', '.join(missing)}"]
     return []
