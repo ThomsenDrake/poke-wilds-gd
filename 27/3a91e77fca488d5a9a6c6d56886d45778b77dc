@@ -1,0 +1,39 @@
+docs/QUALITY_SCORE.md
+  s_851e856d566a96::t_4c431a24860b78 12,20
+docs/registry/subsystems.toml
+  s_851e856d566a96::t_d6f16812143816 179-180
+project.godot
+  s_564ec8ed250626::t_e75a68ff045fa6 28-29
+tools/determinism_verify.py
+  s_851e856d566a96::t_afe906de4e1c7e 1-179
+docs/RELIABILITY.md
+  s_851e856d566a96::t_5c01108d582575 4,49,64-67
+docs/product-specs/vision-fidelity.md
+  s_851e856d566a96::t_50a80936ee7fd6 4,76-126
+tools/check_repo_contracts.py
+  s_851e856d566a96::t_8151de4ba9da8c 32-34,44-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "273a91e77fca488d5a9a6c6d56886d45778b77dc",
+  "prompts": {},
+  "sessions": {
+    "s_564ec8ed250626": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a743b471c45fa1b86",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_851e856d566a96": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a24beb14640457f7f",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
