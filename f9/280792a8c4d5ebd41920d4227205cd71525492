@@ -1,0 +1,153 @@
+docs/QUALITY_SCORE.md
+  s_1cdc87d0108dbe::t_8897b33031c783 12,20
+docs/RELIABILITY.md
+  s_317c8d92de295b::t_98a2882cc2e586 4,49,60-69,74
+docs/generated/visual-baselines/01_overworld_spawn.png.sidecar.json
+  s_5bd3f50e88d250::t_7028a88278065c 1
+docs/generated/visual-baselines/02_overworld_walked.png.sidecar.json
+  s_5bd3f50e88d250::t_eeb3cdbdecc2e8 1
+docs/generated/visual-baselines/03_biome_desert.png.sidecar.json
+  s_5bd3f50e88d250::t_4d680978ea125b 1
+docs/generated/visual-baselines/03_biome_forest.png.sidecar.json
+  s_5bd3f50e88d250::t_6b448cf6b568bc 1
+docs/generated/visual-baselines/03_biome_plains.png.sidecar.json
+  s_5bd3f50e88d250::t_c02a42926d0d63 1
+docs/generated/visual-baselines/03_biome_sand.png.sidecar.json
+  s_5bd3f50e88d250::t_035eb912a8b435 1
+docs/generated/visual-baselines/03_biome_savanna.png.sidecar.json
+  s_5bd3f50e88d250::t_5c7839b56b3fef 1
+docs/generated/visual-baselines/04_night.png.sidecar.json
+  s_5bd3f50e88d250::t_cfa45a43f1627a 1
+docs/generated/visual-baselines/05_dawn.png.sidecar.json
+  s_5bd3f50e88d250::t_f3cc4728bf845c 1
+docs/generated/visual-baselines/06_menu.png.sidecar.json
+  s_5bd3f50e88d250::t_efcd3fcb3f9f21 1
+docs/generated/visual-baselines/07_party_screen.png.sidecar.json
+  s_5bd3f50e88d250::t_a1e33771b78cb1 1
+docs/generated/visual-baselines/08_bag_screen.png.sidecar.json
+  s_5bd3f50e88d250::t_35ef91a5d1f2ba 1
+docs/generated/visual-baselines/09_battle.png.sidecar.json
+  s_5bd3f50e88d250::t_b6c77db20d8e1b 1
+docs/generated/visual-baselines/10_battle_moves.png.sidecar.json
+  s_5bd3f50e88d250::t_96cb5ab79c94d8 1
+docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json
+  s_5bd3f50e88d250::t_73e82d5a1e0531 1
+docs/generated/visual-baselines/12_battle_items.png.sidecar.json
+  s_5bd3f50e88d250::t_f9bf25e64b7a7c 1
+docs/product-specs/bootstrap-and-overworld.md
+  s_1cdc87d0108dbe::t_da077f988bdfa5 4,52,64
+docs/product-specs/vision-fidelity.md
+  s_facd1756e49425::t_2710b0962eb9a6 4,13-15,61,63,67-95,158
+docs/references/snapshot-sidecar.md
+  s_facd1756e49425::t_3e06ae7ff4b867 1-68
+docs/references/trace-events.md
+  s_facd1756e49425::t_50633e7ff50f9e 38-39,41
+docs/registry/subsystems.toml
+  s_1cdc87d0108dbe::t_d068a2c4300d5f 173,181
+docs/superpowers/plans/2026-07-20-agent-legibility-and-vision-verification.md
+  s_8237c2c8e4b53f::t_446d5bdb56b4ec 146
+scripts/app/render_introspection.gd
+  s_57288460b29fc1::t_7cb6082bc0b9a9 1-217
+scripts/app/render_introspection.gd.uid
+  s_facd1756e49425::t_3e07ce54facd22 1
+scripts/app/snapshot_capture.gd
+  s_57288460b29fc1::t_ff103281f3d956 11-12,15,27,65-69,96-103,106-107,109,112,118-119,124-134
+scripts/app/snapshot_capture.gd.uid
+  s_32c730bb5f5986::t_939075b7c96d00 1
+scripts/app/visual_sweep.gd
+  s_57288460b29fc1::t_7eb244489f915d 16,35,48-50,86,88,195
+scripts/app/visual_sweep_baselines.gd
+  s_facd1756e49425::t_80094427cdf868 10-11,89-91,112-114,144,150,173-176,185,187-189
+tools/check_repo_contracts.py
+  s_facd1756e49425::t_cfe90e0c3db289 3-4,53-205,286-288
+tools/godot_dap_smoketest.py
+  s_facd1756e49425::t_9596e48063ee65 7,204-248,359
+tools/png_canvas.py
+  s_8cf03ba423dea8::t_c873f667809139 1-157
+tools/run_playtests.py
+  s_facd1756e49425::t_43cfc1f0eec4e7 466-533,602,616-622
+tools/visual_explain.py
+  s_facd1756e49425::t_4c44a4e4a57190 1-221
+tools/visual_region_diff.py
+  s_facd1756e49425::t_71e50d77ca789a 1-441
+scripts/app/harvest_flow_scenario.gd.uid
+  s_facd1756e49425::t_a7f55449a9dae4 1
+scripts/domain/field_moves.gd.uid
+  s_facd1756e49425::t_b7276395b13cae 1
+scripts/domain/world_overrides.gd.uid
+  s_facd1756e49425::t_5006b6da8f9744 1
+scripts/runtime/harvest_resolver.gd.uid
+  s_facd1756e49425::t_581deaa0a98027 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "f9280792a8c4d5ebd41920d4227205cd71525492",
+  "prompts": {},
+  "sessions": {
+    "s_1cdc87d0108dbe": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a8a90544ee1962cb2",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_317c8d92de295b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ac3934e5e923089f1",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_32c730bb5f5986": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad1ddf1e65d3c4675",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_57288460b29fc1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a29c6af2d6f330fdf",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_5bd3f50e88d250": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a25a40191fdb9c6be",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8cf03ba423dea8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a091c88094eda0dee",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_facd1756e49425": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a0fada3cf25d53076",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
