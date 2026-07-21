@@ -5,6 +5,8 @@ Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SC
 
 # Vision Fidelity & Agent Legibility
 
+> **Status note (2026-07-21):** Workstream L.1 has **LANDED** — `tools/verify_all.py` exists and absorbs the steps (S1–S10) and refusals (R1–R6) described below. Every present-tense reference to `verify_all.py` as "(absent today)" / "when it lands" / "once L.1 lands" in this plan is historical (written before L.1 landed) and is now superseded; see `docs/RELIABILITY.md` § Local gate for the current mechanic.
+
 ## Goal
 
 Deepen an AI agent's **legibility** into (a) Godot 4.6.1 itself and (b) this port's *running* game, so the local playtest suite gains **fidelity** and catches bugs more reliably — concretely through **additional vision checks** and **structured observation of the running game**. The suite already captures well; what it cannot do today is (1) see small, localized regressions under its one global pixel gate, (2) *explain* a failing diff, or (3) read the live game's semantic state alongside a screenshot. This plan closes all three.
@@ -35,7 +37,7 @@ Verified against Godot 4.6 sources and against this checkout (HEAD `cf323a6`, 20
 
 ## Relationship to the active plans
 
-- **`pokewilds-feature-completion.md` Workstream L** is the home of this work. This plan **implements** L.2 (transport honesty), L.3 (artifact freshness / HEAD stamping), L.4 (`tools/vision_review.py`), and L.5 (graduate the pixel lint), and produces the building blocks L.1 (`verify_all.py`) absorbs when it lands. It does **not** touch L.6 (bot coverage) or L.7 (scenario backlog). It **references, not duplicates,** Phase 0.7 (the `--verbose` ObjectDB leak oracle — `--headless --quit` exits with zero leak warnings): that check belongs to Phase 0.
+- **`pokewilds-feature-completion.md` Workstream L** is the home of this work. This plan **implements** L.2 (transport honesty), L.3 (artifact freshness / HEAD stamping), L.4 (`tools/vision_review.py`), and L.5 (graduate the pixel lint), and produces the building blocks L.1 (`verify_all.py`) absorbs (LANDED — `tools/verify_all.py`). It does **not** touch L.6 (bot coverage) or L.7 (scenario backlog). It **references, not duplicates,** Phase 0.7 (the `--verbose` ObjectDB leak oracle — `--headless --quit` exits with zero leak warnings): that check belongs to Phase 0.
 - **`harness-engineering-reorientation.md`** stays active and orthogonal (legibility/harness health); this plan shares its doc contract.
 - **Oracle design spec** (`docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md`): this plan fulfills its Lane-4 "structured findings file on every sweep whose shots change" criterion and its success criterion that "the rubric catches at least one seeded visual defect that all coded oracles miss in a validation pass," and respects its graduation rule (a heuristic flips only after staying clean across repeated real runs).
 
@@ -194,7 +196,7 @@ Sequenced so **honest captures come first** (everything else stands on them), th
 
 ## Integration with Workstream L (extend, never duplicate)
 
-- **L.1 `verify_all.py`** (absent today): this plan's checks (capture-validity, region gates, glyph oracle, contrast, Lane-4 invocation) are the steps `verify_all.py` absorbs when it lands; nothing here depends on it.
+- **L.1 `verify_all.py`** (LANDED — `tools/verify_all.py`; "absent today" was true only when this plan was written): this plan's checks (capture-validity, region gates, glyph oracle, contrast, Lane-4 invocation) are the steps `verify_all.py` absorbs; nothing here depends on it.
 - **L.2 transport honesty**: implemented by Slice 1 (skip-with-reason + `capture_invalid` classification → `19/19 (1 skipped-headless)`).
 - **L.3 artifact freshness / HEAD stamping**: implemented by Slice 1 (HEAD/Godot/renderer stamps + stale `result-*.json` sweep; renderer/adapter via sidecar `capture_env`, no `main.gd` edits) and hardened by Slice 3 sidecar stamps; `verify_all.py` refuses a report older than HEAD.
 - **L.4 Lane-4 automation**: implemented by Slice 5 (`tools/vision_review.py`, the exact file L.4 names).
@@ -215,7 +217,7 @@ Sequenced so **honest captures come first** (everything else stands on them), th
 | **Determinism pins are a visible product change**; `project.godot` has no `[display]` section (manual scaling) | Verify-first gate + owner sign-off; safe subset first; if Nearest/integer-scale fights the manual path, shrink to snapping + stamps. |
 | **Line-budget fragility** (`visual_sweep` 219, `ui_render_audit` 202, `main` 219, `smoke_scenarios` 219, runner 305) | Grow **none**: `visual_sweep` shrinks via delegation; `main.gd` untouched (collectors take the ctx dict); the runner is not edited in the critical path (the only future edit is the deferred endpoint). |
 | **Driver-dependent pixels** (d3d12 on Windows vs Vulkan/MoltenVK on this Mac) | Stamp-and-refuse-on-mismatch enforced **before** region gates ship, so cross-machine runs never produce mystery diffs that look like regressions. |
-| **`verify_all.py` absent + Phase 0.7 concurrent** | New checks are `verify_all.py` steps when L.1 lands; the `--verbose` leak oracle stays Phase 0.7 (referenced, not claimed here). |
+| **`verify_all.py` absent + Phase 0.7 concurrent** (RESOLVED — `tools/verify_all.py` LANDED) | New checks are `verify_all.py` steps (now absorbed); the `--verbose` leak oracle stays Phase 0.7 (referenced, not claimed here). |
 | **Process**: all three design stances were delivered; judges scored Introspection-first vs Vision-first in detail (the minimal-incremental digest was truncated during judging) | Minimal-incremental components (transport honesty, HEAD stamping, thin deterministic default reviewer, zero new runtime surface) are grafted into the synthesis; no standalone comparison was lost. |
 
 ## Exit criteria
@@ -225,7 +227,7 @@ The initiative is done when the repo's definition of done holds **and**:
 - With the current codebase clean, the full suite stays green and **two consecutive windowed sweeps are bit-identical** on all 16 shots (or every nonzero delta has a `capture_nondeterminism` trace with an identified cause).
 - Re-introducing a **seeded** canary strip-bleed (1-frame offset) and a deleted battle label turns the suite **red via the region gates** with no per-bug assertion written (validation pass, then reverted) — the oracle spec's "no new assertions for that specific bug" bar.
 - `PLAYTEST_FORCE_HEADLESS=1` reports `19/19 (1 skipped-headless)` and is never red on transport.
-- `playtest-report.json` carries HEAD sha + Godot 4.6.1 + renderer; `verify_all.py` (once L.1 lands) refuses a report older than HEAD.
+- `playtest-report.json` carries HEAD sha + Godot 4.6.1 + renderer; `verify_all.py` (LANDED) refuses a report older than HEAD.
 - Lane 4 produces `.godot-smoke/vision-review.json` on **every** sweep whose shots change; **100%** of findings cite and intersect a sidecar region; the rubric + grounding catches **≥1 seeded visual defect all coded oracles miss**, as a `quarantine_finding`.
 - The pixel lint is graduated **per state** (`GRADUATED_STATES`) after 5 clean windowed runs + glyph-oracle agreement; the glyph oracle's raster-equivalence proof is on file.
 - Every new trace event is in `trace-events.md` and the owning subsystem's `required_trace_events`; `check_repo_contracts` + `check_architecture` + `check_change_contract` + `check_quality_docs` all green; QUALITY_SCORE/RELIABILITY/tech-debt-tracker co-modified per slice.

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-17
+Last verified: 2026-07-21
 Review cadence days: 14
 Source paths: scripts/runtime/battle_runtime.gd, scripts/data/pokemon_catalog.gd, scripts/app/main.gd, scripts/app/smoke_scenarios.gd, scripts/domain/world_generator.gd, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd
 
@@ -19,6 +19,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/data/pokemon_catalog.gd
 
 ## Resolved this cycle
 
+- One-command local gate (Workstream L.1): `tools/verify_all.py` closes the standing "verify_all.py absent / one-command local gate missing" gap. It ORCHESTRATES (never forks) the four static gates, the determinism pins/canary, the transport-honest headless full suite, the windowed pixel lanes (`ui_render_audit` + `visual_sweep`), and the legibility report in one run-all command, and MECHANIZES the refuse-on-mismatch + freshness refusals that were "human/agent-enforced policy until verify_all" — R1 report `head_sha`==git HEAD, R3 windowed `godot_version`/`renderer`/`window` vs the baseline capture_env + canonical 1152x648 window, R4/R5 windowed entries present with correct transport (`ui_render_audit` not headless), R6 `vision-review.json` freshness via `review_is_fresh`. Four honest exit codes (0 GREEN / 1 STEP_FAILURE / 2 REFUSAL / 3 TOOL_ERROR — a transport skip is never a failure, a stale/mismatched report is a refusal, a missing binary is a tool error); `--skip-windowed` reports the pixel lanes SKIP, never PASS. Documented as the pre-push ritual in RELIABILITY.md § Local gate and AGENTS.md; stays a LOCAL ritual (CI lint/contract-only, unchanged).
 - Removed the synthetic `SMOKE_MON` fallback: the catalog reliably loads 954 species, and an empty catalog now skips encounters with a `warning` trace instead of fabricating a Pokemon.
 - Battle mechanics replaced the simplified damage math with mainline formulas: 18-type effectiveness chart, stat stages, status effects, capture formula with catch rates, growth-curve EXP, and level/item/happiness evolution.
 - Encounter tables are species-level, parsed from source `wilds_data.asm` spawn biomes with a source-token alias map; type-based matching remains the fallback.

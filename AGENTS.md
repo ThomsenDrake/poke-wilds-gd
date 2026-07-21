@@ -22,6 +22,8 @@ Use this file as the table of contents, not the encyclopedia.
 ## Canonical Commands
 
 ```bash
+python3 tools/verify_all.py                  # THE pre-push local gate: static + determinism + full suite + windowed pixel lanes + legibility + refuse-on-mismatch/freshness (details: docs/RELIABILITY.md § Local gate)
+python3 tools/verify_all.py --skip-windowed  # display-less environments: windowed lanes reported SKIP, never PASS (honest headless path)
 python3 tools/check_repo_contracts.py
 python3 tools/check_architecture.py
 python3 tools/check_change_contract.py
@@ -41,6 +43,7 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 
 ## Validation Expectations
 
+- Run `python3 tools/verify_all.py` as the pre-push local gate (`--skip-windowed` on a display-less machine); it orchestrates the static gates, determinism, the full playtest suite, the windowed pixel lanes, legibility, and the refuse-on-mismatch/freshness checks in one run, and stays a LOCAL ritual (CI is lint/contract-only). See `docs/RELIABILITY.md` § Local gate.
 - Static checks must pass before asking for review.
 - Use the DAP smoke runner for runtime validation when the Godot editor is listening on `127.0.0.1:6006`.
 - Scenario coverage currently starts with `boot`, `overworld_step`, `menu_save`, and `wild_battle`, plus `biome_probe`, `biome_traverse`, and `field_move`.
