@@ -1,0 +1,116 @@
+docs/references/snapshot-sidecar.md
+  s_8237c2c8e4b53f::t_51514a22387550 68
+docs/product-specs/vision-fidelity.md
+  s_8237c2c8e4b53f::t_2746ac0cb8ed53 248
+  s_8237c2c8e4b53f::t_9cacdcf792e4a3 273
+  s_8237c2c8e4b53f::t_81db615d22f1fb 67
+  s_8237c2c8e4b53f::t_44212e83c617c9 296
+docs/references/vision-review-rubric.md
+  s_8237c2c8e4b53f::t_537f64bc70a95c 230
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_12a6b70904e250 8-18,20-41,43-45,47-52,54-61,63-65,67-72,74
+  s_8237c2c8e4b53f::t_9a5982d482b708 19
+  s_8237c2c8e4b53f::t_f35b5e66bf0714 66
+  s_8237c2c8e4b53f::t_98b19fc2835ffb 143
+  s_8237c2c8e4b53f::t_92e91de8153269 4
+  s_8237c2c8e4b53f::t_d1fa8d413b07a9 73
+  s_8237c2c8e4b53f::t_d97156f61ed761 53
+  s_8237c2c8e4b53f::t_aac62c0f92e9c2 46
+  s_8237c2c8e4b53f::t_c9ee3918876624 62
+  s_8237c2c8e4b53f::t_a70643134be444 42
+AGENTS.md
+  s_8237c2c8e4b53f::t_dc8e59766b6d91 46
+  s_8237c2c8e4b53f::t_b85f5f532de051 25-26
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_8237c2c8e4b53f::t_d18a7b9ed61146 51
+  s_8237c2c8e4b53f::t_48cbd964fb7756 219
+  s_8237c2c8e4b53f::t_32f469867e1f36 221
+  s_8237c2c8e4b53f::t_b258534bd03661 222
+  s_8237c2c8e4b53f::t_6c258cc4135598 220
+  s_8237c2c8e4b53f::t_21c8bad9e3cf2d 263
+  s_8237c2c8e4b53f::t_22813ef2a31051 282
+  s_8237c2c8e4b53f::t_826c2ff3d3fcda 33
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_63edd2971410e5 20
+  s_8237c2c8e4b53f::t_b71aac56437a12 12
+tools/verify_all.py
+  s_8237c2c8e4b53f::t_7acff690ca6845 326
+  s_8237c2c8e4b53f::t_0eb976a2fa168a 215,221-225
+  s_8237c2c8e4b53f::t_1f0d1228a12f47 244-246,664
+  s_8237c2c8e4b53f::t_62ad12b09a8c75 167-168
+  s_8237c2c8e4b53f::t_ef540533bee6f2 384-385
+  s_8237c2c8e4b53f::t_92ac5e5d28461d 66
+  s_8237c2c8e4b53f::t_7e5e5192430e10 258,303,548-577
+  s_8237c2c8e4b53f::t_65012b8c96c7ed 139-143
+  s_8237c2c8e4b53f::t_7b6286821248cb 671
+  s_8237c2c8e4b53f::t_214bcecad37cfe 687
+  s_8237c2c8e4b53f::t_1feb08b2ed96f6 335,394-488,501-545
+  s_8237c2c8e4b53f::t_aa3a6adb836c4d 311-323,336-368
+  s_8237c2c8e4b53f::t_17bbd91a3dd000 672-682
+  s_8237c2c8e4b53f::t_c249870055d5d2 489-500
+  s_8237c2c8e4b53f::t_07e6115d24a257 28-32
+  s_8237c2c8e4b53f::t_9975e4a2a8afb6 152
+  s_8237c2c8e4b53f::t_073ef9f6729331 621-638
+  s_8237c2c8e4b53f::t_280a636f18641b 216-220
+  s_8237c2c8e4b53f::t_39e5a6023701f0 68-72
+  s_8237c2c8e4b53f::t_c5e7e21187dac5 289-290
+  s_8237c2c8e4b53f::t_f345a95f7c96da 206-214
+  s_8237c2c8e4b53f::t_b31e4bfc66017d 35
+  s_8237c2c8e4b53f::t_9a66cd97498b45 25-27
+  s_8237c2c8e4b53f::t_76ce4ad70879ac 33-34
+  s_8237c2c8e4b53f::t_b48622faff11eb 36-38,63-65
+  s_8237c2c8e4b53f::t_ae8a1fd1281c4c 67
+  s_8237c2c8e4b53f::t_20138bf634d8ef 73-75,136-138
+  s_8237c2c8e4b53f::t_ccd441e71d96b7 144-146,149-151
+  s_8237c2c8e4b53f::t_85956f7a3e9080 153-155,164-166
+  s_8237c2c8e4b53f::t_2bc56ae4029f81 169-171,203-205
+  s_8237c2c8e4b53f::t_6e818efc58ea97 226-228,241-243
+  s_8237c2c8e4b53f::t_093e13fc799ee9 247-249,255-257
+  s_8237c2c8e4b53f::t_b6e23ba095da0b 259-261,286-288
+  s_8237c2c8e4b53f::t_13f3d506096960 291-293,300-302
+  s_8237c2c8e4b53f::t_4f77b1a1c18bbc 304-306,308-310
+  s_8237c2c8e4b53f::t_000e3684c43fd2 324-325
+  s_8237c2c8e4b53f::t_f2172458b6a8d2 327-329,332-334
+  s_8237c2c8e4b53f::t_7f73ca9b9754ae 369-371,381-383
+  s_8237c2c8e4b53f::t_a83c1c765fc99d 386-388,391-393
+  s_8237c2c8e4b53f::t_2de992c11d8599 546-547
+  s_8237c2c8e4b53f::t_750ca35fc6b068 578-580,618-620
+  s_8237c2c8e4b53f::t_1b9379ccdf3195 639-641,661-663
+  s_8237c2c8e4b53f::t_d95a0756baa2d4 665-670
+  s_8237c2c8e4b53f::t_13bb8ded1a3474 683-686
+  s_8237c2c8e4b53f::t_1a105f918267a7 688-690
+  s_172824d87ed26a::t_ffc5002ce5c712 1-24,39-62,76-135,147-148,156-163,172-202,229-240,250-254,262-285,294-299,307,330-331,372-380,389-390,581-617,642-660,691-737
+docs/tech-debt-tracker.md
+  s_8237c2c8e4b53f::t_afdfa7af131880 2
+  s_8237c2c8e4b53f::t_fdb435a1bec006 22
+docs/superpowers/plans/2026-07-20-agent-legibility-and-vision-verification.md
+  s_8237c2c8e4b53f::t_3df4196e4996d7 220
+  s_8237c2c8e4b53f::t_60b9bfff57da9b 8-9
+  s_8237c2c8e4b53f::t_386af11735687a 199
+  s_8237c2c8e4b53f::t_3043cbb2fe8740 230
+  s_8237c2c8e4b53f::t_0c507918d5b9a7 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "a2bd74d62aac93bc1956b5522b74c8f5d51f525b",
+  "prompts": {},
+  "sessions": {
+    "s_172824d87ed26a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a667fb3bb43f24cc9",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
