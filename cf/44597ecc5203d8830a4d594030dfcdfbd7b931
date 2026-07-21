@@ -1,0 +1,171 @@
+scripts/ui/attack_animator.gd
+  s_8237c2c8e4b53f::t_ccc26e2df5b41c 152-157
+docs/product-specs/battle-and-capture.md
+  s_8237c2c8e4b53f::t_5ff15e5895ced2 30
+  s_8237c2c8e4b53f::t_70f946192bc330 36
+  s_8237c2c8e4b53f::t_d1281e1409738a 12
+  s_8237c2c8e4b53f::t_cbc51c5da713f7 26
+  s_8237c2c8e4b53f::t_9f8209b75536b2 41
+  s_8237c2c8e4b53f::t_8eb1d6912ce6d4 34
+  s_8237c2c8e4b53f::t_70d54e15522f2e 2
+tools/run_playtests.py
+  s_8237c2c8e4b53f::t_1b2b2384096a27 70
+  s_8237c2c8e4b53f::t_ffaa5fff8429ce 17-24
+scripts/runtime/session_state.gd
+  s_8237c2c8e4b53f::t_2b6b1091a75d78 30-34
+  s_8237c2c8e4b53f::t_cc2a69f648268c 230-241
+  s_8237c2c8e4b53f::t_17ed7fb150be85 12-15
+  s_8237c2c8e4b53f::t_89ac5f878a1046 45-46
+  s_8237c2c8e4b53f::t_07d2010c14df71 82-85
+  s_8237c2c8e4b53f::t_5699450d3066fa 162-164
+  s_8237c2c8e4b53f::t_1e93f329f46fd4 126-149
+  s_8237c2c8e4b53f::t_1ce549489dc1c9 59-61
+scripts/ui/start_menu.gd
+  s_8237c2c8e4b53f::t_d0051996bacc1a 65-68
+  s_8237c2c8e4b53f::t_c5a3b2f13347d5 136-137,144
+  s_8237c2c8e4b53f::t_838c16ed663bac 4-7,10-13,20,28-29,54,93,103-106,129,133-135,138-143,145-153,166-167
+  s_8237c2c8e4b53f::t_64d337428868a9 91-92
+  s_8237c2c8e4b53f::t_008401a637336a 90
+scripts/app/phase0_scenarios.gd
+  s_8237c2c8e4b53f::t_c47209b93e704a 3-5
+  s_8237c2c8e4b53f::t_076a8f21972bf2 120
+  s_8237c2c8e4b53f::t_ff1fcb8d381e83 218
+  s_8237c2c8e4b53f::t_018520db95e8bd 111
+  s_8237c2c8e4b53f::t_a4c6f011c1b641 86
+  s_8237c2c8e4b53f::t_e787474af14756 1,7-8,10-19,25,27-64,66-77,81,84-85,87-110,112-114,117-119,121-180,184-194,199-202,205-214,216-217,219-220
+  s_8237c2c8e4b53f::t_035b2fde05845e 78-80,82-83
+  s_8237c2c8e4b53f::t_6c69f36a4d4c86 181-183
+  s_8237c2c8e4b53f::t_05e80e9bc63590 115-116
+  s_8237c2c8e4b53f::t_1b704c50a9914d 215
+  s_8237c2c8e4b53f::t_64d386d642ba49 65,195-198,203-204
+  s_8237c2c8e4b53f::t_bd9b5bce13d07c 2,6
+  s_8237c2c8e4b53f::t_a99cf850321dc4 9,20-24,26
+docs/product-specs/bootstrap-and-overworld.md
+  s_8237c2c8e4b53f::t_b8305c800ffdeb 2,4
+  s_8237c2c8e4b53f::t_e5fe43d9a1f1b8 27
+  s_8237c2c8e4b53f::t_4a038dd2ab03e4 62
+  s_8237c2c8e4b53f::t_576b99b40fbe41 58-59
+  s_8237c2c8e4b53f::t_1447b89ce6843c 45
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_f804d151fbe976 94,100
+  s_8237c2c8e4b53f::t_cce893d95e5ba1 102
+  s_8237c2c8e4b53f::t_7a4bb395c98760 199
+scripts/runtime/battle_runtime.gd
+  s_8237c2c8e4b53f::t_03e53900d641a7 90-95
+scripts/runtime/save_store.gd
+  s_8237c2c8e4b53f::t_1402608f8bcd8f 57
+  s_8237c2c8e4b53f::t_f7889d86cc44cd 98-118
+  s_8237c2c8e4b53f::t_fa98212d5c01dc 68-70
+  s_8237c2c8e4b53f::t_83b389d04abaa8 14-20
+  s_8237c2c8e4b53f::t_76c028cb567708 47,53
+  s_8237c2c8e4b53f::t_9a045ef47c1c44 28-33
+  s_8237c2c8e4b53f::t_24906e6fb300b9 4-13,21-22,25,41,43,52,54-56,58-64,71-72,77-83,87-97,119-131,133,136-140
+.gitignore
+  s_8237c2c8e4b53f::t_2e2e5b3f6c8ab7 12-16
+docs/registry/subsystems.toml
+  s_8237c2c8e4b53f::t_079462305ad138 128
+  s_8237c2c8e4b53f::t_1d7a8cde0f83f5 7
+  s_8237c2c8e4b53f::t_98b0ef20bf3963 18,22
+  s_8237c2c8e4b53f::t_04ef1a51199206 45
+  s_8237c2c8e4b53f::t_a2eba3670baceb 153
+scripts/app/input_router.gd
+  s_8237c2c8e4b53f::t_4467506ed96c6b 17-26
+docs/tech-debt-tracker.md
+  s_8237c2c8e4b53f::t_0f23348bb6dfa6 20-22
+  s_8237c2c8e4b53f::t_e2cafcca13f065 10
+  s_8237c2c8e4b53f::t_881f470990b55b 37
+scripts/ui/party_screen.gd
+  s_8237c2c8e4b53f::t_dd559f941bfa09 178-179
+  s_8237c2c8e4b53f::t_2988ca682301de 127-130
+  s_8237c2c8e4b53f::t_a37dc972102511 4-8
+  s_8237c2c8e4b53f::t_27ea7f7e95fa7a 159-163
+README.md
+  s_8237c2c8e4b53f::t_dfdc4548068885 7-11
+  s_8237c2c8e4b53f::t_3e9df065b31c73 22
+  s_8237c2c8e4b53f::t_dd9941a54e8bc5 27
+scripts/app/smoke_scenarios.gd
+  s_8237c2c8e4b53f::t_5dabf5fa5b603f 185-187,195-197
+  s_8237c2c8e4b53f::t_0a88e1a2b0f0f6 184
+  s_8237c2c8e4b53f::t_ef3291ca876cfa 12
+  s_8237c2c8e4b53f::t_57bc5492e7dc1d 29-36,46-50,52-54,56-58,64,66,68,70-75,77-80,98-100,105,116,118,154,157-158,188-194,198-199,201-202
+  s_8237c2c8e4b53f::t_75fe6f0623f7dd 61
+  s_8237c2c8e4b53f::t_c27e7cf67e45c0 67
+  s_8237c2c8e4b53f::t_041eac905326bd 200
+  s_8237c2c8e4b53f::t_faaf1d5e9b983e 25-26
+  s_8237c2c8e4b53f::t_a0a687e68ae544 55
+scripts/runtime/world_view.gd
+  s_8237c2c8e4b53f::t_58a72822bceccd 30
+  s_8237c2c8e4b53f::t_4f8e4e6adc7e7f 72
+  s_8237c2c8e4b53f::t_1680f7d6680c03 264-273
+scripts/runtime/smoke_scenario_runner.gd
+  s_8237c2c8e4b53f::t_c994ad503d566b 182
+  s_8237c2c8e4b53f::t_a41f48ee343388 51-52
+  s_8237c2c8e4b53f::t_1096575ca3b4a0 280
+  s_8237c2c8e4b53f::t_01e0fc234c201b 308-309
+  s_8237c2c8e4b53f::t_7934a4f352a969 235
+  s_8237c2c8e4b53f::t_a0da76121ac2bd 244-246
+  s_8237c2c8e4b53f::t_b423affb62d376 73-74
+  s_8237c2c8e4b53f::t_61bbb243da43f9 100-101
+  s_8237c2c8e4b53f::t_6a36b83118fc72 146
+  s_8237c2c8e4b53f::t_f531e1ec3f7ae9 137
+  s_8237c2c8e4b53f::t_9ffe48aa316c0c 263
+  s_8237c2c8e4b53f::t_0d5c884b9c8937 271
+  s_8237c2c8e4b53f::t_f27bdeae166c3f 212
+  s_8237c2c8e4b53f::t_3e686247e45d89 32
+  s_8237c2c8e4b53f::t_cf6ae1b51e1f29 3-5
+  s_8237c2c8e4b53f::t_bade6cf4a79d48 121-122
+  s_8237c2c8e4b53f::t_2173e5f3bf1a43 247-262,264-270,272-275
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_5f279bba196d9a 4
+  s_8237c2c8e4b53f::t_86501ccf4f7436 54-55
+  s_8237c2c8e4b53f::t_d1212ff1a4a9dd 57
+  s_8237c2c8e4b53f::t_f9d2f8c484bfc9 45
+  s_8237c2c8e4b53f::t_e62423ca0ecfc8 44,46-53,56
+scripts/runtime/cry_player.gd
+  s_8237c2c8e4b53f::t_4b31e6aa228bbe 27-31
+  s_8237c2c8e4b53f::t_e57acf2aaac517 57-64
+scripts/runtime/game_runtime.gd
+  s_8237c2c8e4b53f::t_4e8024b1fce430 126-145
+  s_8237c2c8e4b53f::t_270cdafe750dbe 36
+  s_8237c2c8e4b53f::t_f778db06c0aeeb 49,51,53-54,56-58
+  s_8237c2c8e4b53f::t_6b248299bb1a54 55
+scripts/app/phase0_scenarios.gd.uid
+  s_8237c2c8e4b53f::t_40eedf1152a033 1
+scripts/ui/message_box.gd
+  s_8237c2c8e4b53f::t_56b7c734e1744a 3-11,15-16,24-28,34-46,48,53-68,70-74
+.editorconfig
+  s_8237c2c8e4b53f::t_2177e5991e5bc4 5-11
+scripts/runtime/music_router.gd
+  s_8237c2c8e4b53f::t_4a136581794daa 95-103
+  s_8237c2c8e4b53f::t_779bde67bcc884 62-68
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_147cbe2a87dadb 15
+  s_8237c2c8e4b53f::t_fce4721672559a 13
+  s_8237c2c8e4b53f::t_b8678011c055be 18
+tools/godot_dap_smoketest.py
+  s_8237c2c8e4b53f::t_8f98650babc6d5 74-77
+  s_8237c2c8e4b53f::t_e2d43542f3ba85 59
+docs/product-specs/menu-and-save.md
+  s_8237c2c8e4b53f::t_61b9391c487c0a 15
+  s_8237c2c8e4b53f::t_974e2341d0fa2d 2
+  s_8237c2c8e4b53f::t_32a2ab1db54c53 17
+  s_8237c2c8e4b53f::t_524b4840fb2996 23
+  s_8237c2c8e4b53f::t_43f298d97fddf5 12
+  s_8237c2c8e4b53f::t_9189d482343bba 24-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "cf44597ecc5203d8830a4d594030dfcdfbd7b931",
+  "prompts": {},
+  "sessions": {
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
