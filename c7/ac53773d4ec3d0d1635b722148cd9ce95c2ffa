@@ -1,0 +1,87 @@
+tools/cvd_sim.py
+  s_8237c2c8e4b53f::t_64abbd80bf16e7 4-9
+  s_8237c2c8e4b53f::t_290b5e89298b1d 1-3
+  s_8237c2c8e4b53f::t_a9d94a38d7de87 10-12
+  s_8237c2c8e4b53f::t_1b6ffb2fb29e48 13-213
+tools/generate_legibility_report.py
+  s_8237c2c8e4b53f::t_04ae58d98b0f8a 60-62
+  s_8237c2c8e4b53f::t_ff786c71b04418 57-59
+  s_8237c2c8e4b53f::t_303aed19e63850 63-65
+  s_8237c2c8e4b53f::t_8c33ff6208977a 4-5,13-56,66-103,113-114,121-123,129-130,145-147
+docs/generated/legibility-report.md
+  s_8237c2c8e4b53f::t_2809404c9522ae 2,4,8-11,15,24-98
+scripts/app/text_oracle.gd
+  s_8237c2c8e4b53f::t_6134f0723e4382 94-97
+  s_8237c2c8e4b53f::t_ed1098ac0e43d5 26
+  s_8237c2c8e4b53f::t_628bbd269bd296 71
+  s_8237c2c8e4b53f::t_1b8dbdc0a06ebe 16
+  s_8237c2c8e4b53f::t_8b26cbc4bdbfe8 13-15
+  s_8237c2c8e4b53f::t_ed16f14ab00155 17-19,23-25
+  s_8237c2c8e4b53f::t_f8aad00948536e 27-29,68-70
+  s_8237c2c8e4b53f::t_afb4abe6f3fb92 72-74,91-93
+  s_8237c2c8e4b53f::t_75e160bb2b649b 98-100
+  s_8237c2c8e4b53f::t_32402402209f86 1-12,20-22,30-67,75-90,101-220
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_44d83b753fc7fc 38
+  s_8237c2c8e4b53f::t_e33b031738d358 39
+  s_8237c2c8e4b53f::t_85335492b2224d 4
+docs/product-specs/vision-fidelity.md
+  s_8237c2c8e4b53f::t_8ea67cc6d7fb85 189
+  s_8237c2c8e4b53f::t_5ca3cd83c476c9 156
+  s_8237c2c8e4b53f::t_3a2b412f3fe703 128
+  s_8237c2c8e4b53f::t_28d937f24e4cfa 125-127
+  s_8237c2c8e4b53f::t_e5072763afa911 129-131,153-155
+  s_8237c2c8e4b53f::t_6e06b408e87366 157-159,186-188
+  s_8237c2c8e4b53f::t_f8a09cee2c8ec1 190-192
+  s_8237c2c8e4b53f::t_699cb5ae8541c7 4,15,97-124,132-152,160-185,193-194,257
+scripts/app/text_oracle.gd.uid
+  s_8237c2c8e4b53f::t_6bbbc570780750 1
+scripts/app/ui_render_audit.gd
+  s_8237c2c8e4b53f::t_25900148fa2f64 64
+  s_8237c2c8e4b53f::t_e1a7dc571b1211 65-67
+  s_8237c2c8e4b53f::t_f4c9839aa387ab 4-6,10,12-16,31,182-183,203-204,206-209
+docs/QUALITY_SCORE.md
+  s_60b9acfcb98940::t_a36f35494c1ea2 12,20
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_fa633e94eced16 4,35,78-89
+docs/product-specs/bootstrap-and-overworld.md
+  s_60b9acfcb98940::t_d55ae9904958ee 51,63
+docs/registry/subsystems.toml
+  s_60b9acfcb98940::t_f9ac0368b11820 173,182,187
+tools/contrast_check.py
+  s_8237c2c8e4b53f::t_a7d193db19bf29 1-222
+tools/run_playtests.py
+  s_a9c4373bfc6a08::t_38b208b15d6ab9 534-600,670,688-692
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "c7ac53773d4ec3d0d1635b722148cd9ce95c2ffa",
+  "prompts": {},
+  "sessions": {
+    "s_60b9acfcb98940": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a3417a1bdad4e2df6",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_a9c4373bfc6a08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a2531ed26ffd62f60",
+        "model": "unknown"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
