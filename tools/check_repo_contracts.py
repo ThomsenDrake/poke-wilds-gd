@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import importlib.util
 import json
 from pathlib import Path
 import sys
@@ -46,6 +48,159 @@ def report_stamp_issues(root: Path) -> list[str]:
     if missing:
         return [f"playtest-report.json is missing required stamp keys: {', '.join(missing)}"]
     return []
+
+
+BASELINE_DIR = "docs/generated/visual-baselines"
+SIDECAR_SUFFIX = ".sidecar.json"
+CORE_TOOLS_DIR = "tools"
+# Third-party modules permitted in core tools. Deliberately EMPTY: the optional
+# vision extra (a future Lane-4 image-model pass) stays a SEPARATE non-core tool
+# so the core verification tooling never needs a pip install.
+THIRD_PARTY_EXEMPTIONS: set[str] = set()
+
+
+def _is_battle_shot(stem: str) -> bool:
+    """Shot naming convention is NN_name; battle shots are pinned to 09-12."""
+    digits = ""
+    for ch in stem:
+        if ch.isdigit():
+            digits += ch
+        else:
+            break
+    return bool(digits) and 9 <= int(digits) <= 12
+
+
+def region_coverage_issues(root: Path) -> list[str]:
+    """Every committed baseline PNG must have a well-formed sibling sidecar with
+    region entries (incl. canary_rect); battle shots (09-12) need a non-empty
+    canary_rect and non-empty labels.
+
+    Enforcement is progressive: the full "every baseline has a sidecar" rule only
+    arms once the baseline dir contains at least one sidecar. That keeps the
+    pre-feature tree (baselines committed before the sidecar writer +
+    visual_sweep_update regeneration landed) from being a false red, while a
+    PARTIAL sidecar set -- the real desync this guard exists to catch -- fails
+    immediately.
+    """
+    baseline_dir = root / BASELINE_DIR
+    if not baseline_dir.is_dir():
+        return []
+    baselines = sorted(baseline_dir.glob("*.png"))
+    if not baselines:
+        return []
+    have_any_sidecar = any(baseline_dir.glob("*.png" + SIDECAR_SUFFIX))
+    issues: list[str] = []
+    for png in baselines:
+        sidecar_name = png.name + SIDECAR_SUFFIX
+        sidecar_path = baseline_dir / sidecar_name
+        if not sidecar_path.exists():
+            if have_any_sidecar:
+                issues.append(
+                    f"Baseline {png.name} has no sibling {sidecar_name} (sidecars are "
+                    "partially committed — run visual_sweep_update to regenerate)")
+            continue
+        try:
+            data = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            issues.append(f"Baseline sidecar {sidecar_name} is unreadable: {exc}")
+            continue
+        if not isinstance(data, dict):
+            issues.append(f"Baseline sidecar {sidecar_name} is not a JSON object")
+            continue
+        for key in ("expected_regions", "canary_rect"):
+            if key not in data:
+                issues.append(f"Baseline sidecar {sidecar_name} is missing region key `{key}`")
+        if _is_battle_shot(png.stem):
+            canary = data.get("canary_rect")
+            if not (isinstance(canary, list) and len(canary) == 4 and any(canary)):
+                issues.append(f"Battle baseline sidecar {sidecar_name} must have a non-empty canary_rect")
+            labels = data.get("labels")
+            if not (isinstance(labels, list) and labels):
+                issues.append(f"Battle baseline sidecar {sidecar_name} must have non-empty labels")
+    return issues
+
+
+def _check_import(tool_name: str, top: str, local_modules: set[str], issues: list[str]) -> None:
+    if top in local_modules or top in THIRD_PARTY_EXEMPTIONS:
+        return
+    if top not in sys.stdlib_module_names:
+        issues.append(
+            f"Core tool {tool_name} imports third-party module `{top}` (core tools are stdlib-only)")
+
+
+def core_tools_stdlib_issues(root: Path) -> list[str]:
+    """Core tools must be stdlib-only (no third-party imports). Local sibling
+    tools (imported via importlib or a bare `from x import`) are whitelisted by
+    filename; every other top-level module must be in sys.stdlib_module_names."""
+    tools_dir = root / CORE_TOOLS_DIR
+    if not tools_dir.is_dir():
+        return []
+    local_modules = {path.stem for path in tools_dir.glob("*.py")}
+    issues: list[str] = []
+    for tool in sorted(tools_dir.glob("*.py")):
+        try:
+            tree = ast.parse(tool.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            issues.append(f"Core tool {tool.name} is unparseable: {exc}")
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    _check_import(tool.name, alias.name.split(".")[0], local_modules, issues)
+            elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
+                _check_import(tool.name, node.module.split(".")[0], local_modules, issues)
+    return issues
+
+
+def _load_tool(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# Fixed 4-pixel RGBA fixture: p0 red +100, p1 red +5, p2 red+blue +200 (two
+# channels on ONE pixel, so the index SET must count it once), p3 unchanged.
+_SYNC_BUF_A = bytes([10, 10, 10, 255, 50, 50, 50, 255, 20, 20, 20, 255, 5, 5, 5, 255])
+_SYNC_BUF_B = bytes([110, 10, 10, 255, 55, 50, 50, 255, 220, 20, 220, 255, 5, 5, 5, 255])
+# Tolerance -> expected changed-pixel count for the fixture above.
+_SYNC_EXPECTED = {0: 3, 1: 3, 8: 2, 255: 0}
+
+
+def region_diff_backstop_sync_issues(root: Path) -> list[str]:
+    """Pin the region diff's verbatim changed-pixel builder to visual_diff's
+    untouched original. `visual_region_diff.changed_pixel_set` is a line-for-line
+    copy of `visual_diff.changed_pixel_count` (returning the index SET instead of
+    its length); nothing else ties the two together, so a future change to
+    visual_diff's per-channel/tolerance semantics would make the recomputed
+    global backstop silently disagree with the in-engine number. Run both on a
+    fixed fixture and assert len(set) == count at every tolerance the gate uses.
+    """
+    tools_dir = root / CORE_TOOLS_DIR
+    visual_diff_path = tools_dir / "visual_diff.py"
+    region_diff_path = tools_dir / "visual_region_diff.py"
+    if not visual_diff_path.exists() or not region_diff_path.exists():
+        return []
+    try:
+        visual_diff = _load_tool("visual_diff", visual_diff_path)
+        region_diff = _load_tool("visual_region_diff", region_diff_path)
+    except Exception as exc:  # a load failure is a contract failure, not a skip
+        return [f"cannot load the diff tools for the backstop sync check: {exc}"]
+    issues: list[str] = []
+    for tolerance, expected in _SYNC_EXPECTED.items():
+        count = visual_diff.changed_pixel_count(_SYNC_BUF_A, _SYNC_BUF_B, tolerance)
+        set_size = len(region_diff.changed_pixel_set(_SYNC_BUF_A, _SYNC_BUF_B, tolerance))
+        if count != expected:
+            issues.append(
+                f"visual_diff.changed_pixel_count fixture drift at tolerance {tolerance}: "
+                f"got {count}, expected {expected} (fixture no longer exercises the builder)")
+        if set_size != count:
+            issues.append(
+                f"region diff backstop desync at tolerance {tolerance}: "
+                f"len(changed_pixel_set) == {set_size} but changed_pixel_count == {count}")
+    return issues
 
 
 def run(root: Path | None = None) -> list[str]:
@@ -128,6 +283,9 @@ def run(root: Path | None = None) -> list[str]:
                 issues.append(f"Broken internal link in {rel}: {target}")
 
     issues.extend(report_stamp_issues(root))
+    issues.extend(region_coverage_issues(root))
+    issues.extend(core_tools_stdlib_issues(root))
+    issues.extend(region_diff_backstop_sync_issues(root))
 
     return issues
 

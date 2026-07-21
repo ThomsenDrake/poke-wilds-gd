@@ -463,6 +463,74 @@ def print_row(result: dict[str, Any]) -> None:
     )
 
 
+_REGION_DIFF_PATH = Path(__file__).resolve().with_name("visual_region_diff.py")
+_region_diff_module: Any = None
+
+
+def _load_region_diff() -> Any:
+    """Lazy importlib load of the region diff (same pattern as the smoke harness
+    import above); loaded once, only when a visual_sweep compare actually runs."""
+    global _region_diff_module
+    if _region_diff_module is None:
+        spec = importlib.util.spec_from_file_location("visual_region_diff", _REGION_DIFF_PATH)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"cannot load visual_region_diff from {_REGION_DIFF_PATH}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _region_diff_module = module
+    return _region_diff_module
+
+
+def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
+    """Runner-recorded explainable region gate for the visual_sweep scenario.
+
+    visual_diff.py's in-engine global gate (0.5% / tolerance 8, exit 0/1/2) stays
+    the untouched backstop; this post-step layers the per-region verdict on top,
+    joining committed baseline sidecars against the fresh shots. Invocation-point
+    decision: the verdict fields are recorded into the scenario entry of
+    playtest-report.json -- NEVER the JSONL trace, because the engine never runs
+    the region diff. Red-tier region failures flip result["ok"] so the run exits
+    nonzero; non-red drift lands in region_quarantine (kind region_drift, or
+    sidecar_absent when a baseline sidecar is locally missing and the shot's gate
+    degrades to the global backstop) without
+    failing the run. Skipped on transport-skip and in update mode (baselines were
+    just rewritten, so the compare is trivially green).
+    """
+    if result.get("scenario") != "visual_sweep":
+        return
+    if result.get("transport") == "skipped-headless":
+        return  # transport honesty: nothing was captured to gate
+    payload = result.get("passed_payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    if payload.get("mode") == "update" or payload.get("auto_update"):
+        return
+    try:
+        verdict = _load_region_diff().run_region_diff(
+            project / ".godot-smoke" / "shots",
+            project / "docs" / "generated" / "visual-baselines",
+            project / ".godot-smoke" / "region-diff",
+        )
+    except Exception as exc:  # a broken region tool must not silently pass
+        result.setdefault("exceptions", []).append(f"region diff failed: {exc}")
+        result["ok"] = False
+        return
+    result["region_failures"] = verdict["region_failures"]
+    result["region_quarantine"] = verdict["quarantine"]
+    result["clusters_explained"] = verdict["clusters_explained"]
+    result["clusters_unexplained"] = verdict["clusters_unexplained"]
+    result["region_artifacts"] = verdict["artifacts"]
+    result["region_global_backstop"] = verdict["global_backstop"]
+    # sidecar_paths arrive on the in-engine visual_sweep_passed payload; echo them
+    # onto the scenario entry so the report's region section is self-describing.
+    result["sidecar_paths"] = payload.get("sidecar_paths", [])
+    if verdict["errors"]:
+        result.setdefault("exceptions", []).extend(f"region diff: {e}" for e in verdict["errors"])
+        result["ok"] = False
+    if verdict["region_failures"]:
+        result["ok"] = False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-smoke", action="store_true", help="also run the 7 smoke scenarios")
@@ -531,6 +599,7 @@ def main() -> int:
         else:
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin)
         results.append(result)
+        apply_region_gate(project, result)
         print_row(result)
 
     failed = [result for result in results if not result["ok"]]
@@ -544,6 +613,13 @@ def main() -> int:
                 print(f"  {name}: missing alternative group: {' | '.join(group)}")
             for exception in result["exceptions"][:5]:
                 print(f"  {name}: exception: {exception}")
+            for failure in result.get("region_failures", [])[:8]:
+                print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
+            for finding in result.get("region_quarantine", [])[:4]:
+                print(f"  {name}: quarantine [{finding['kind']}] {finding['shot']}: {finding['detail']}")
+            if result.get("clusters_unexplained"):
+                print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
+                      "(see region-diff/clusters.json — guards false closure)")
 
     skipped = sum(1 for result in results if result["transport"] == "skipped-headless")
     summary = {

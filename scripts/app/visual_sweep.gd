@@ -13,6 +13,7 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
+const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 
 const WALK_STEPS := 4
 const MAX_BIOME_SHOTS := 5
@@ -31,6 +32,7 @@ const BATTLE_RNG_SEED := 20260717
 const DEFAULT_THRESHOLD_PCT := 0.5
 
 var _ctx: Dictionary = {}
+var _crafted: Dictionary = {} # determinism contract recorded into every sidecar
 var _runner = SmokeScenarioRunner.new()
 var _baselines = VisualSweepBaselines.new()
 var _captures = SnapshotCapture.new()
@@ -43,6 +45,9 @@ var _failures: Array = []
 
 func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_ctx = ctx
+	_crafted = CRAFTED_STATE.duplicate(true)
+	_crafted["battle_rng_seed"] = BATTLE_RNG_SEED
+	_crafted["wild"] = [WILD_SPECIES, WILD_LEVEL]
 	_mode = str(options.get("mode", VisualSweepBaselines.MODE_COMPARE))
 	_threshold_pct = float(options.get("threshold_pct", DEFAULT_THRESHOLD_PCT))
 	_base_dir = _baselines.resolve_shot_dir()
@@ -78,8 +83,9 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 func _capture(filename: String) -> void:
 	_message_box().hide_message()
 	await _settle(2)
+	var metadata: Dictionary = RenderIntrospection.collect(_ctx, filename, _crafted)
 	var result: Dictionary = await _captures.capture(_runtime(), get_viewport(), filename,
-		{"save_path": "%s/%s" % [_base_dir, filename]})
+		{"save_path": "%s/%s" % [_base_dir, filename], "metadata": metadata})
 	if not result.ok:
 		_failures.append("%s: %s (%s)" % [filename, result.kind, result.detail])
 		return
@@ -186,7 +192,7 @@ func _finish() -> void:
 	if not _failures.is_empty():
 		push_error("Visual sweep failed captures: %s" % "; ".join(PackedStringArray(_failures)))
 		return
-	_baselines.report(_runtime(), _shots, _base_dir, _mode, _threshold_pct, _captures.dup_checked)
+	_baselines.report(_runtime(), _shots, _base_dir, _mode, _threshold_pct, _captures.dup_checked, _captures.invalid)
 
 
 func _call(key: String, args: Array = []) -> void:

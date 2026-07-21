@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -200,6 +201,51 @@ def result_summary(scenario: str, events: set[str], had_exception: bool) -> dict
     }
 
 
+def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]) -> dict[str, Any]:
+    """Mirror of run_playtests.apply_region_gate for the DAP transport.
+
+    The canonical region gate lives in run_playtests.py (the windowed-subprocess
+    transport); DAP is currently down. This mirror closes that documented gap so a
+    revived DAP path cannot pass visual_sweep event-only (SCENARIO_REQUIREMENTS
+    all=["visual_sweep_passed"]) without the explainable region gate. It is a
+    no-op for every other scenario and under force-headless, loads the region diff
+    lazily (run_playtests' import of this module is unaffected), and records the
+    verdict into the result file only; red-tier failures flip ok.
+    """
+    if scenario != "visual_sweep" or force_headless():
+        return summary
+    try:
+        spec = importlib.util.spec_from_file_location(
+            "visual_region_diff", Path(__file__).resolve().with_name("visual_region_diff.py"))
+        if spec is None or spec.loader is None:
+            raise RuntimeError("cannot locate visual_region_diff.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        verdict = module.run_region_diff(
+            project_path / ".godot-smoke" / "shots",
+            project_path / "docs" / "generated" / "visual-baselines",
+            project_path / ".godot-smoke" / "region-diff",
+        )
+    except Exception as exc:  # a broken region tool must not silently pass
+        summary["had_exception"] = True
+        summary["ok"] = False
+        summary["region_error"] = str(exc)
+        return summary
+    summary["region_failures"] = verdict["region_failures"]
+    summary["region_quarantine"] = verdict["quarantine"]
+    summary["clusters_explained"] = verdict["clusters_explained"]
+    summary["clusters_unexplained"] = verdict["clusters_unexplained"]
+    summary["region_artifacts"] = verdict["artifacts"]
+    summary["region_global_backstop"] = verdict["global_backstop"]
+    if verdict["errors"]:
+        summary["had_exception"] = True
+        summary["ok"] = False
+        summary["region_errors"] = verdict["errors"]
+    if verdict["region_failures"]:
+        summary["ok"] = False
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
@@ -310,6 +356,7 @@ def main() -> int:
             request_path.unlink()
 
     summary = result_summary(args.scenario, events_seen, had_exception)
+    summary = apply_region_step(project_path, args.scenario, summary)
     result_file.parent.mkdir(parents=True, exist_ok=True)
     result_file.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 

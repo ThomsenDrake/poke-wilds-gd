@@ -170,7 +170,7 @@ quality_bucket = "harvest"
 name = "vision_fidelity"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/snapshot_capture.gd"]
+code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd"]
 scene_paths = []
 spec_doc = "docs/product-specs/vision-fidelity.md"
 validation_commands = [
@@ -178,6 +178,7 @@ validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/determinism_verify.py pins",
   "python3 tools/determinism_verify.py canary --shot docs/generated/visual-baselines/09_battle.png",
+  "python3 tools/visual_region_diff.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario ui_render_audit",
   "python3 tools/run_playtests.py",

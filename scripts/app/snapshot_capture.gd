@@ -8,10 +8,11 @@ extends RefCounted
 # #115402 SubViewport signature, fixed only in 4.7 — with transport-vs-
 # regression classification); and an opt-in duplicate-capture hook whose
 # nonzero deltas emit a quarantine-tier nondeterministic_pair trace.
-# capture() keeps a metadata-dict hook reserved for Slice 3's sidecar writer;
-# Slice 1 writes no sidecars.
+# Slice 3: non-empty options.metadata makes capture() inject the capture-side
+# fields and write the canonical <shot>.sidecar.json next to the PNG.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
+const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 
 const MIN_SHOT_BYTES := 5120      # PNG bytes; below => undersize (only when a save_path wrote one)
 const LUMINANCE_FLOOR := 0.01     # Rec.709 mean luminance (0-1); below => blank
@@ -23,6 +24,7 @@ const DUPCHECK_ENV := "PLAYTEST_CAPTURE_DUPCHECK"
 
 var shot_seq := 0     # 1-based per instance; capture order within one sweep
 var dup_checked := 0  # duplicate checks performed (feeds visual_sweep_passed)
+var invalid := 0      # invalid captures seen, kind != "" (feeds visual_sweep_passed)
 
 # Fires after all viewports finished updating; callers await their settles FIRST.
 func guard_readback() -> void:
@@ -60,12 +62,11 @@ func trace_invalid(runtime: Node, shot: String, verdict: Dictionary, extra_detai
 		"kind": str(verdict.get("kind", "")), "classification": str(verdict.get("classification", "")),
 		"luminance": float(verdict.get("luminance", 0.0)), "detail": detail})
 
-# Full pipeline: guard -> trace_cursor (join key, sampled before the readback)
-# -> readback -> optional PNG write -> classify -> snapshot_captured plus the
-# duplicate hook when valid, capture_invalid when not. options: save_path
-# ("" = no PNG write), shot_seq (default ++shot_seq), dup_check (default
-# false), metadata (RESERVED for Slice 3 sidecars; carried through, unused
-# now). The caller owns the returned image.
+# Full pipeline: guard -> trace_cursor (join key, sampled before readback) ->
+# readback -> optional PNG write -> classify -> on valid, sidecar write (when
+# metadata non-empty) + snapshot_captured (record lands at cursor+1); on
+# invalid, capture_invalid. options: save_path / shot_seq / dup_check /
+# metadata (sidecar content; capture injects the capture-side fields).
 func capture(runtime: Node, viewport: Viewport, shot: String, options: Dictionary = {}) -> Dictionary:
 	var metadata := {}
 	if options.get("metadata", {}) is Dictionary:
@@ -92,22 +93,44 @@ func capture(runtime: Node, viewport: Viewport, shot: String, options: Dictionar
 	if save_err != OK and str(verdict.get("kind", "")) == "":
 		verdict = {"kind": "undersize", "classification": "transport" if DisplayServer.get_name() == "headless" else "regression", "luminance": 0.0, "detail": "save_png failed (err %d); no PNG written" % save_err}
 	var kind := str(verdict.get("kind", ""))
+	var sidecar_path := ""
+	if kind == "" and not save_path.is_empty() and not metadata.is_empty():
+		metadata.merge({"shot": shot, "shot_seq": seq, "ts_msec": ts, "trace_cursor": trace_cursor,
+			"window": [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y],
+			"palettes": RenderIntrospection.palettes_from_image(image, metadata.get("palette_regions", {})),
+			"validity": {"luminance": float(verdict.get("luminance", 0.0)), "uniform": false, "bytes": png_bytes}}, true)
+		metadata.erase("palette_regions")
+		sidecar_path = _write_sidecar(save_path, metadata)
 	var result := {"ok": kind == "", "image": image, "kind": kind, "bytes": png_bytes,
 		"classification": str(verdict.get("classification", "")), "luminance": float(verdict.get("luminance", 0.0)),
-		"shot_seq": seq, "trace_cursor": trace_cursor, "detail": str(verdict.get("detail", "")), "metadata": metadata}
+		"shot_seq": seq, "trace_cursor": trace_cursor, "detail": str(verdict.get("detail", "")),
+		"metadata": metadata, "sidecar_path": sidecar_path}
 	if kind != "":
+		invalid += 1
 		trace_invalid(runtime, shot, verdict, "")
 		return result
-	# Godot 4.6.1 has no RenderingServer.get_current_renderer() (verified); the
+	# No RenderingServer.get_current_renderer() in 4.6.1 (verified); the
 	# project setting resolves per platform and names the active method.
 	runtime.emit_trace("snapshot_captured", "App.SnapshotCapture", {"shot": shot, "shot_seq": seq,
 		"ts_msec": ts, "trace_cursor": trace_cursor,
 		"window": [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y],
 		"renderer": str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "")),
-		"godot_version": str(Engine.get_version_info().get("string", ""))})
+		"godot_version": str(Engine.get_version_info().get("string", "")),
+		"sidecar_path": sidecar_path})
 	if _dup_check_on(options):
 		await _duplicate_check(runtime, viewport, shot, image, result["luminance"])
 	return result
+
+# Canonical sidecar next to the PNG: JSON.stringify sorts keys recursively by
+# default (verified on 4.6.1), compact, no trailing newline; ints upstream.
+func _write_sidecar(save_path: String, metadata: Dictionary) -> String:
+	var path := save_path + RenderIntrospection.SIDECAR_SUFFIX
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return ""
+	file.store_string(JSON.stringify(metadata))
+	file.close()
+	return path
 
 # Root-viewport crop fallback for the battle SubViewport (#115402 stale/
 # magenta readback): same geometry as display_matrix's _display_crop —

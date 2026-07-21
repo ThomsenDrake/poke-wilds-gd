@@ -7,6 +7,8 @@ extends RefCounted
 # in compare mode so the scenario and CI share one diff implementation. Kept
 # tree-free; the sweep node owns scene driving and capture timing.
 
+const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
+
 const PREFERRED_SHOT_DIR := "res://.godot-smoke/shots"
 const FALLBACK_SHOT_DIR := "user://visual_shots"
 const BASELINE_DIR := "res://docs/generated/visual-baselines"
@@ -84,8 +86,9 @@ func damaging_move_id(runtime) -> String:
 
 # Runs the reconcile and reports: push_error per drift/error and no trace on
 # failure, one visual_sweep_passed trace on success (carries the canonical
-# window size and the sweep's duplicate-check count alongside the diff).
-func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float, dup_checked: int = 0) -> void:
+# window size, the sweep's duplicate-check + invalid-capture counts, and the
+# per-shot sidecar paths alongside the diff).
+func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float, dup_checked: int = 0, invalid: int = 0) -> void:
 	var result: Dictionary = reconcile(shots, base_dir, mode, threshold_pct)
 	if not bool(result.get("ok", false)):
 		var per_shot: Dictionary = result.get("per_shot", {})
@@ -106,7 +109,9 @@ func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct
 		"threshold_pct": threshold_pct,
 		"base_dir": base_dir,
 		"window": [CANONICAL_WINDOW_SIZE.x, CANONICAL_WINDOW_SIZE.y],
-		"dup_checked": dup_checked
+		"dup_checked": dup_checked,
+		"invalid_captures": invalid,
+		"sidecar_paths": shots.map(func(shot_name): return "%s/%s%s" % [base_dir, shot_name, RenderIntrospection.SIDECAR_SUFFIX])
 	})
 
 
@@ -136,13 +141,13 @@ func resolve_shot_dir() -> String:
 	return ""
 
 
-# Removes stale PNGs so only this run's captures get diffed and copied.
+# Removes stale PNGs + sidecars so only this run's captures get diffed/copied.
 func clear_shots(shot_dir: String) -> void:
 	var dir := DirAccess.open(ProjectSettings.globalize_path(shot_dir))
 	if dir == null:
 		return
 	for filename in dir.get_files():
-		if filename.ends_with(".png"):
+		if filename.ends_with(".png") or filename.ends_with(RenderIntrospection.SIDECAR_SUFFIX):
 			dir.remove(filename)
 
 
@@ -165,6 +170,10 @@ func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dic
 			ProjectSettings.globalize_path("%s/%s" % [BASELINE_DIR, shot_name]))
 		if err != OK:
 			return {"ok": false, "errors": ["could not copy %s into the baseline directory (err %d)" % [shot_name, err]]}
+		# A captured shot always wrote a sidecar, so a copy failure would advance
+		# the PNG but strand a stale sidecar — fail rather than pass on a desync.
+		if not RenderIntrospection.copy_sidecar(shot_dir, shot_name, BASELINE_DIR):
+			return {"ok": false, "errors": ["could not copy the sidecar for %s into the baseline directory (PNG/sidecar desync)" % shot_name]}
 		updated.append(shot_name)
 	var pruned: Array = []
 	var dir := DirAccess.open(ProjectSettings.globalize_path(BASELINE_DIR))
@@ -173,15 +182,11 @@ func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dic
 			if filename.ends_with(".png") and not shots.has(filename):
 				dir.remove(filename)
 				pruned.append(filename)
+	pruned.append_array(RenderIntrospection.prune_sidecars(BASELINE_DIR, shots))
 	return {
-		"ok": true,
-		"mode": MODE_UPDATE,
-		"auto_update": auto_update,
-		"updated": updated,
-		"pruned": pruned,
-		"compared": 0,
-		"mismatched": [],
-		"max_drift_pct": 0.0
+		"ok": true, "mode": MODE_UPDATE, "auto_update": auto_update,
+		"updated": updated, "pruned": pruned, "compared": 0,
+		"mismatched": [], "max_drift_pct": 0.0
 	}
 
 
