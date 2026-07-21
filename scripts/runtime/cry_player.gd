@@ -24,6 +24,11 @@ static func cry_path_for_dex(dex_number: int) -> String:
 
 
 func play_cry(dex_number: int) -> void:
+	# Headless has no audio device; a cry playing at process exit leaks the OGG
+	# stream (the mixer thread holds it past the ResourceCache sweep). Gate
+	# before create/play so headless battle scenarios stay leak-free.
+	if DisplayServer.get_name() == "headless":
+		return
 	var cry_path := cry_path_for_dex(dex_number)
 	if not ResourceLoader.exists(cry_path):
 		_warn("Cry file is missing; skipping playback.", {"dex_number": dex_number, "path": cry_path})
@@ -47,6 +52,14 @@ func play_cry(dex_number: int) -> void:
 func stop() -> void:
 	if _player != null and is_instance_valid(_player):
 		_player.stop()
+
+
+func _exit_tree() -> void:
+	# Defense-in-depth for windowed exit: stop playback and drop the stream so
+	# the mixer thread releases the OGG reference chain.
+	if _player != null and is_instance_valid(_player):
+		_player.stop()
+		_player.stream = null
 
 
 func _ensure_player() -> AudioStreamPlayer:

@@ -9,11 +9,11 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const PlaytestScenarios := preload("res://scripts/app/playtest_scenarios.gd")
 const QaScenarios := preload("res://scripts/app/qa_scenarios.gd")
+const Phase0Scenarios := preload("res://scripts/app/phase0_scenarios.gd")
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
 var _playtests: Node = null
-
 
 func run(scenario: String, ctx: Dictionary) -> void:
 	_ctx = ctx
@@ -22,26 +22,18 @@ func run(scenario: String, ctx: Dictionary) -> void:
 		_runner.backup_save()
 	if QaScenarios.handles(scenario):
 		await QaScenarios.run(scenario, self, _ctx)
+	elif Phase0Scenarios.handles(scenario):
+		await Phase0Scenarios.run(scenario, self, _ctx)
 	else:
 		match scenario:
-			"boot":
-				await get_tree().create_timer(0.4).timeout
-			"overworld_step":
-				await _scenario_overworld_step()
-			"menu_save":
-				await _scenario_menu_save()
-			"wild_battle":
-				await _scenario_wild_battle()
-			"biome_probe":
-				await _scenario_biome_probe()
-			"biome_traverse":
-				await _scenario_biome_traverse()
-			"field_move":
-				await _scenario_field_move()
-			"playtest_journey":
-				await _playtest_scenarios().run_journey(_ctx)
-			"playtest_soak":
-				await _playtest_scenarios().run_soak(_ctx)
+			"boot": await get_tree().create_timer(0.4).timeout
+			"overworld_step": await _scenario_overworld_step()
+			"menu_save": await _scenario_menu_save()
+			"biome_probe": await _scenario_biome_probe()
+			"biome_traverse": await _scenario_biome_traverse()
+			"field_move": await _scenario_field_move()
+			"playtest_journey": await _playtest_scenarios().run_journey(_ctx)
+			"playtest_soak": await _playtest_scenarios().run_soak(_ctx)
 			_:
 				_runtime().warn("SmokeScenarios", "Unknown smoke scenario requested.", {"scenario": scenario})
 				await get_tree().create_timer(0.2).timeout
@@ -49,35 +41,43 @@ func run(scenario: String, ctx: Dictionary) -> void:
 		_runner.restore_save()
 	get_tree().quit()
 
-
 func _scenario_overworld_step() -> void:
 	await get_tree().create_timer(0.2).timeout
-	var direction = _runner.find_safe_step_direction(_world(), _player(), _runtime())
-	if direction == Vector2i.ZERO:
-		_runtime().warn("SmokeScenarios", "Smoke scenario could not find a safe overworld step.", {})
-	elif _player().smoke_step(direction):
+	var steps := 0
+	for _i in range(5):
+		var direction = _runner.find_safe_step_direction(_world(), _player(), _runtime())
+		if direction == Vector2i.ZERO or not _player().smoke_step(direction):
+			break
 		await _player().tile_changed
+		steps += 1
+	if steps == 0:
+		_runtime().warn("SmokeScenarios", "Smoke scenario could not find a safe overworld step.", {})
+	# After N steps the tile cache must not outgrow the synced window.
+	var cache_cap := (2 * int(_world().half_width_tiles) + 1) * (2 * int(_world().half_height_tiles) + 1)
+	if _world()._tile_cache.size() > cache_cap:
+		_runtime().warn("SmokeScenarios", "Tile cache outgrew the visible window.", {"cache": _world()._tile_cache.size(), "cap": cache_cap})
 	await get_tree().create_timer(0.2).timeout
 
-
+# NEW GAME: confirm box opens; X cancels with menu + game intact; Z confirms.
 func _scenario_menu_save() -> void:
 	await get_tree().create_timer(0.2).timeout
+	var cursor := _runner.trace_log_line_count()
 	_call("toggle_menu")
+	for _i in range(3):
+		_press("move_down")
+	_press("action_a")
 	await get_tree().create_timer(0.2).timeout
-	_start_menu().perform_save()
+	var fail := _check("", _message_box().is_confirming() and _start_menu().visible, "confirm box did not open")
+	_press("action_b")
+	fail = _check(fail, not _message_box().is_confirming() and _start_menu().visible, "cancel left the confirm up or closed the menu")
+	fail = _check(fail, not _runner.trace_log_has_since("session_created", cursor), "cancel reset the game anyway")
+	_press("action_a")
+	_press("action_a")
 	await get_tree().create_timer(0.2).timeout
-	_start_menu().hide_menu()
-	await get_tree().create_timer(0.2).timeout
-
-
-func _scenario_wild_battle() -> void:
-	await get_tree().create_timer(0.2).timeout
-	var wild_mon = _runtime().generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
-	if wild_mon.is_empty():
-		_runtime().warn("SmokeScenarios", "Smoke scenario could not create a wild encounter.", {})
-		return
-	await _run_smoke_battle(wild_mon)
-
+	fail = _check(fail, not _start_menu().visible and not _message_box().is_confirming(), "menu or confirm box stayed open after the reset")
+	fail = _check(fail, _runner.trace_log_has_since("session_created", cursor), "confirming never started a new game")
+	if not fail.is_empty():
+		_runtime().warn("SmokeScenarios", "Menu save smoke scenario failed: %s." % fail, {})
 
 # Clearing semantics: drives the resolver through the party-screen FIELD MOVE
 # path on a faced tree (blocked -> cleared) and proves the save round-trip.
@@ -95,41 +95,28 @@ func _scenario_field_move() -> void:
 		var was_blocked: bool = not _player().smoke_step(found["direction"]) # also faces the tree
 		_call("field_move", ["cut"])
 		await get_tree().create_timer(0.2).timeout
-		if not was_blocked:
-			fail = "cut-gated tile accepted a step before clearing"
-		elif not _world().is_tile_walkable(tile):
-			fail = "cut-gated tile stayed blocked after the resolver ran"
-		elif not _runner.trace_log_has_since("field_move_used", log_cursor, {"move_id": "cut"}):
-			fail = "resolver emitted no field_move_used trace"
+		fail = _check(fail, was_blocked, "cut-gated tile accepted a step before clearing")
+		fail = _check(fail, _world().is_tile_walkable(tile), "cut-gated tile stayed blocked after the resolver ran")
+		fail = _check(fail, _runner.trace_log_has_since("field_move_used", log_cursor, {"move_id": "cut"}), "resolver emitted no field_move_used trace")
 	var save_ok := false
 	if fail.is_empty():
 		_runner.save_and_reload(_world(), _runtime())
 		save_ok = _world().is_tile_walkable(tile) and bool(_world().get_tile_logic(tile).get("mutated", false))
-		if not save_ok:
-			fail = "cleared tile did not survive the save round-trip"
+		fail = _check(fail, save_ok, "cleared tile did not survive the save round-trip")
 	_runner.restore_party(_runtime(), party_before)
 	if fail.is_empty():
 		_runtime().emit_trace("field_move_scenario_passed", "SmokeScenarios", {"move_id": "cut", "tile": [tile.x, tile.y], "yield": "log", "save_ok": save_ok})
 	else:
 		_runtime().warn("SmokeScenarios", "Field move smoke scenario failed: %s." % fail, {"tile": [tile.x, tile.y]})
 
-
 func _scenario_biome_probe() -> void:
 	await get_tree().create_timer(0.2).timeout
 	var result = _world().validate_world_invariants()
 	if bool(result.get("ok", false)):
-		_runtime().emit_trace("biome_probe_passed", "SmokeScenarios", {
-			"seed": int(result.get("seed", 0)),
-			"spawn": result.get("spawn", []),
-			"reachable": int(result.get("reachable", 0))
-		})
+		_runtime().emit_trace("biome_probe_passed", "SmokeScenarios", {"seed": int(result.get("seed", 0)), "spawn": result.get("spawn", []), "reachable": int(result.get("reachable", 0))})
 	else:
-		_runtime().warn("SmokeScenarios", "Biome probe failed invariants.", {
-			"seed": int(result.get("seed", 0)),
-			"failures": result.get("failures", [])
-		})
+		_runtime().warn("SmokeScenarios", "Biome probe failed invariants.", {"seed": int(result.get("seed", 0)), "failures": result.get("failures", [])})
 	await get_tree().create_timer(0.2).timeout
-
 
 func _scenario_biome_traverse() -> void:
 	await get_tree().create_timer(0.2).timeout
@@ -145,7 +132,6 @@ func _scenario_biome_traverse() -> void:
 		return
 	await _run_smoke_battle(wild_mon)
 
-
 func _run_smoke_battle(wild_mon: Dictionary) -> void:
 	_call("set_battle", [true])
 	_message_box().hide_message()
@@ -158,7 +144,6 @@ func _run_smoke_battle(wild_mon: Dictionary) -> void:
 		_battle_view().run_smoke_escape()
 		await get_tree().create_timer(0.2).timeout
 
-
 func _walk_until_biome_change(start_biome: String, max_steps: int) -> bool:
 	var player = _player()
 	var saved_encounter = player.encounter_chance
@@ -166,17 +151,14 @@ func _walk_until_biome_change(start_biome: String, max_steps: int) -> bool:
 	var crossed = false
 	for _step in range(max_steps):
 		var direction = _runner.find_walkable_step_direction(_world(), player.tile_position)
-		if direction == Vector2i.ZERO:
-			break
-		if not player.smoke_step(direction):
+		if direction == Vector2i.ZERO or not player.smoke_step(direction):
 			break
 		await player.tile_changed
-		if _world().get_tile_biome(player.tile_position) != start_biome:
-			crossed = true
+		crossed = _world().get_tile_biome(player.tile_position) != start_biome
+		if crossed:
 			break
 	player.encounter_chance = saved_encounter
 	return crossed
-
 
 func _force_biome_crossing(start_biome: String) -> void:
 	var center = _player().tile_position
@@ -186,7 +168,6 @@ func _force_biome_crossing(start_biome: String) -> void:
 				_runner.teleport_player(_world(), _player(), _runtime(), tile)
 				return
 
-
 func _trigger_traversal_gate() -> void:
 	var pair = _runner.find_gated_pair(_world(), _player().tile_position, 20)
 	if pair.is_empty():
@@ -195,12 +176,30 @@ func _trigger_traversal_gate() -> void:
 	_runner.teleport_player(_world(), _player(), _runtime(), pair["from_tile"])
 	_player().smoke_step(pair["direction"])
 
-
 func _call(key: String, args: Array = []) -> void:
 	var callable: Callable = _ctx.get(key, Callable())
 	if callable.is_valid():
 		callable.callv(args)
 
+# Injects a real press + release through the player-facing _unhandled_input path.
+# The release must be a duplicate: re-parsing the same event object in one
+# frame is rejected by the engine (and the queued press would read the later
+# released state).
+func _press(action: String) -> void:
+	for template in InputMap.action_get_events(action):
+		if template is InputEventKey:
+			var event := InputEventKey.new()
+			event.physical_keycode = (template as InputEventKey).physical_keycode
+			event.pressed = true
+			Input.parse_input_event(event)
+			var release := event.duplicate()
+			release.pressed = false
+			Input.parse_input_event(release)
+			return
+
+# First-failure latch: reports the first broken check without aborting later ones.
+func _check(fail: String, ok: bool, message: String) -> String:
+	return fail if not fail.is_empty() or ok else message
 
 # Lazily hosts the playtest entrypoints as a child so they can await the tree.
 func _playtest_scenarios() -> Node:
@@ -208,7 +207,6 @@ func _playtest_scenarios() -> Node:
 		_playtests = PlaytestScenarios.new()
 		add_child(_playtests)
 	return _playtests
-
 
 func _world() -> Node: return _ctx["world"]
 func _player() -> Node: return _ctx["player"]

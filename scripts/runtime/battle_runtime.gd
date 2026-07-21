@@ -87,7 +87,12 @@ func use_pokeball() -> Dictionary:
 		_rules.reset_stages(_enemy_mon)
 		var caught = _session.add_pokemon_to_party(_enemy_mon.duplicate(true))
 		var mon_name := str(_enemy_mon.get("name", "Pokemon"))
-		var message := ("Gotcha! %s was caught." if caught else "Caught %s, but your party is full.") % mon_name
+		if not caught: # full party: relocate to the campsite hold, never lose (defect 0.1)
+			_session.relocate_to_campsite(_enemy_mon.duplicate(true))
+			if _trace != null:
+				_trace.emit_event("mon_relocated", "BattleRuntime", {"species_id": str(_enemy_mon.get("species_id", "")),
+					"name": mon_name, "level": int(_enemy_mon.get("level", 1)), "campsite": [_session.campsite_tile.x, _session.campsite_tile.y]})
+		var message := ("Gotcha! %s was caught." if caught else "Caught %s, but your party is full. It was relocated to your campsite.") % mon_name
 		return _handle_victory("caught" if caught else "caught_box_full", [message])
 
 	var lines: Array = ["The wild %s broke free!" % str(_enemy_mon.get("name", "Pokemon"))]
@@ -146,10 +151,7 @@ func _resolve_round(player_move_index: int, lines: Array, turns: Array) -> Dicti
 		if not finished.is_empty():
 			return finished
 	return _apply_end_of_turn(lines)
-
-
 func _move_priority(move: Dictionary) -> int: return 1 if str(move.get("effect", "")) == "EFFECT_PRIORITY_HIT" else 0
-
 
 func _enemy_counterattack(lines: Array, turns: Array) -> Dictionary:
 	_act("enemy", _rules.choose_enemy_move_index(_enemy_mon, _rng), lines, turns)
@@ -175,7 +177,6 @@ func _act(side: String, move_index: int, lines: Array, turns: Array) -> Dictiona
 	turns.append(_anims.turn_for(side, result))
 	return result
 
-
 func _spend_pp(mon: Dictionary, move_index: int) -> void:
 	var moves = mon.get("moves", [])
 	if move_index < 0 or move_index >= moves.size():
@@ -184,7 +185,6 @@ func _spend_pp(mon: Dictionary, move_index: int) -> void:
 	move["pp"] = maxi(0, int(move.get("pp", 0)) - 1)
 	moves[move_index] = move
 	mon["moves"] = moves
-
 
 func _check_knockout(lines: Array) -> Dictionary:
 	if int(_enemy_mon.get("current_hp", 0)) <= 0:

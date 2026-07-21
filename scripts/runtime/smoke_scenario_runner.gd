@@ -1,11 +1,8 @@
 extends RefCounted
 
-# Smoke-harness support: consumes the requested scenario file and hosts the
-# world-scan / trace-log probe helpers shared by scripts/app/smoke_scenarios.gd
-# so that file stays under its app-layer line budget. All helpers are pure
-# queries or simple node pokes; scenario flow (timers, signal awaits) stays in
-# the scenario node. Also owns the save backup/restore guard so smoke
-# scenarios never clobber the player's real save.
+# Smoke-harness support: scenario-request consumption, the world-scan / trace-log
+# probe helpers shared by scripts/app/smoke_scenarios.gd, and the save backup/
+# restore guard so scenarios never clobber the player's real save.
 
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
@@ -32,8 +29,7 @@ func consume_requested_scenario() -> String:
 	return ""
 
 
-# Copies the real save aside so a scenario can write freely; restore_save()
-# must run on every exit path. Rearms the guard, so repeat calls stay safe.
+# Copies the real save aside so a scenario can write freely; restore_save() puts it back.
 func backup_save() -> void:
 	_had_save = false
 	_backup_armed = true
@@ -52,9 +48,8 @@ func backup_save() -> void:
 	_had_save = true
 
 
-# Puts the original save back (or deletes the scenario-created save when none
-# existed beforehand) and always removes the backup sibling. No-ops unless
-# backup_save() armed the guard, so back-to-back calls stay safe.
+# Restores the original save (or deletes a scenario-created one when none existed)
+# and removes the backup sibling; no-ops unless backup_save() armed the guard.
 func restore_save() -> void:
 	if not _backup_armed:
 		return
@@ -75,10 +70,8 @@ func restore_save() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_BACKUP_PATH))
 
 
-# Party-state crafting for capability-driven audits (the stored-unlock model
-# is gone): builds a fresh party from species ids and swaps it into the
-# session, returning the previous party for restore_party. Unknown species ids
-# are skipped, so callers should assert the capability they crafted for.
+# Party crafting for capability audits: builds a fresh party from species ids
+# and swaps it in, returning the previous party for restore_party (unknown ids skipped).
 func swap_party(runtime, species_ids: Array, level: int = 10) -> Array:
 	var previous: Array = runtime.session.party
 	var party: Array = []
@@ -104,9 +97,8 @@ func find_field_move_tile(world, center: Vector2i, radius: int, move_id: String)
 	return {}
 
 
-# First blocked, field-move-gated tile with a walkable neighbor to stand on,
-# shaped {"from_tile", "direction", "gated_tile", "field_move"}; direction
-# points gate -> stand tile. move_id optionally pins one gate ("cut"/"surf").
+# First blocked, field-move-gated tile with a walkable stand neighbor, shaped
+# {"from_tile", "direction", "gated_tile", "field_move"}; move_id pins one gate.
 func find_gated_pair(world, center: Vector2i, radius: int, move_id: String = "") -> Dictionary:
 	var directions = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 	for dy in range(-radius, radius + 1):
@@ -126,9 +118,8 @@ func find_gated_pair(world, center: Vector2i, radius: int, move_id: String = "")
 	return {}
 
 
-# Nearest tile whose resolver action (cut/dig/smash) matches, with a stand
-# spot to face it from: {"tile", "from_tile", "direction"}; {} when the bound
-# holds nothing. biome optionally pins the tile's biome (dig targets PLAINS).
+# Nearest tile whose resolver action (cut/dig/smash) matches, with a stand spot:
+# {"tile", "from_tile", "direction"}; biome pins the tile's biome ({} when empty).
 func find_harvest_target(world, center: Vector2i, radius: int, action: String, biome: String = "") -> Dictionary:
 	for ring in range(0, radius + 1):
 		for tile in ring_around(center, ring):
@@ -143,8 +134,7 @@ func find_harvest_target(world, center: Vector2i, radius: int, action: String, b
 	return {}
 
 
-# First walkable neighbor of tile plus the step direction into it, shaped
-# {"from_tile": Vector2i, "direction": Vector2i}; {} when tile is landlocked.
+# First walkable neighbor of tile plus the step into it: {"from_tile", "direction"}; {} when landlocked.
 func stand_spot(world, tile: Vector2i) -> Dictionary:
 	for direction in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 		var neighbor = tile + direction
@@ -153,8 +143,7 @@ func stand_spot(world, tile: Vector2i) -> Dictionary:
 	return {}
 
 
-# Tops up every party member's move PP so battle audits can always activate
-# move row 0 regardless of the loaded save's state (heal_party_full is HP only).
+# Tops up every party member's move PP so battle audits can always activate move row 0.
 func refill_party_pp(runtime) -> void:
 	var party: Array = runtime.get_party_snapshot()
 	for i in range(party.size()):
@@ -190,8 +179,7 @@ func spent_move_rows(before: Array, after: Array) -> Array:
 	return rows
 
 
-# Prefers a non-encounter walkable neighbor of the player's tile; falls back
-# to teleporting to the origin so the overworld_step scenario never soft-locks.
+# Prefers a non-encounter walkable neighbor; falls back to the origin so overworld_step never soft-locks.
 func find_safe_step_direction(world, player, runtime) -> Vector2i:
 	for origin in [player.tile_position, Vector2i.ZERO]:
 		if origin != player.tile_position:
@@ -221,8 +209,7 @@ func ring_around(center: Vector2i, radius: int) -> Array:
 	return tiles
 
 
-# Deterministic spread of up to cap entries from a larger scan result, so ring
-# audits cover the whole radius instead of testing one cluster.
+# Deterministic spread of up to cap entries from a larger scan, so ring audits cover the whole radius.
 func even_samples(entries: Array, cap: int) -> Array:
 	if entries.size() <= cap:
 		return entries
@@ -245,8 +232,7 @@ func resync_player_tile(world, player, runtime) -> void:
 		teleport_player(world, player, runtime, runtime.get_player_tile())
 
 
-# Writes the save, reloads it through the runtime apply path, and rebuilds the
-# view from the session seed; returns the loaded payload for assertions.
+# Writes the save, reloads it through the runtime apply path, and rebuilds the view.
 func save_and_reload(world, runtime) -> Dictionary:
 	runtime.save_game()
 	var payload: Dictionary = runtime.save_store.load_payload()
@@ -255,14 +241,43 @@ func save_and_reload(world, runtime) -> Dictionary:
 	return payload
 
 
-# Snapshots the line count of the JSONL trace log; capture before an action to scope
-# trace_log_has_since to records the action itself produced.
+# Save-recovery audits for save_migration: (0.3) an unparseable save loads empty,
+# is preserved as .corrupt.bak, and traces a warning-tier save_recovery; (0.1) a
+# populated campsite hold + non-spawn anchor round-trips save/load intact. "" = pass.
+func assert_save_recovery(runtime, cursor: int) -> String:
+	var file = FileAccess.open(SaveStore.SAVE_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string("{ not parseable json ")
+		file.close()
+	var refused: Dictionary = runtime.save_store.load_payload()
+	if not (refused.is_empty() and FileAccess.file_exists(SaveStore.SAVE_PATH + ".corrupt.bak") and trace_log_has_since("warning", cursor, {"reason": "corrupt"})):
+		return "corrupt save was not recovered non-destructively"
+	var session = runtime.session
+	var ids: Array = runtime.catalog.species.keys()
+	if ids.is_empty():
+		return "no catalog species for the campsite round-trip"
+	var mon: Dictionary = runtime.pokemon_rules.create_pokemon_instance(runtime.catalog.get_species(str(ids[0])), 8, Callable(runtime.catalog, "get_move"))
+	session.party = [mon.duplicate(true)]
+	session.campsite_pokemon = [mon.duplicate(true)]
+	session.campsite_tile = session.player_tile + Vector2i(3, -2)
+	var anchor: Vector2i = session.campsite_tile
+	runtime.save_game()
+	var held: Array = session.get_campsite_pokemon() if runtime._apply_loaded_payload(runtime.save_store.load_payload()) else []
+	var got: Dictionary = held[0] if held.size() == 1 else {}
+	var want_moves: Array = mon.get("moves", [])
+	var got_moves: Array = got.get("moves", [])
+	var want_id := "" if want_moves.is_empty() else str((want_moves[0] as Dictionary).get("move_id", ""))
+	var got_id := "" if got_moves.is_empty() else str((got_moves[0] as Dictionary).get("move_id", ""))
+	var ok: bool = session.campsite_tile == anchor and str(got.get("species_id", "")) == str(mon.get("species_id", "")) and int(got.get("level", 0)) == 8 and got_id == want_id
+	return "" if ok else "campsite hold did not survive the save round-trip"
+
+
+# Line count of the JSONL trace log; capture before an action to scope trace_log_has_since.
 func trace_log_line_count() -> int:
 	return _trace_log_lines().size()
 
 
-# True when a trace emitted at or after from_line matches the event name and
-# its payload contains every key/value of payload_match.
+# True when a trace at/after from_line matches the event name and every key/value of payload_match.
 func trace_log_has_since(event_name: String, from_line: int, payload_match: Dictionary = {}) -> bool:
 	var lines = _trace_log_lines()
 	for index in range(maxi(from_line, 0), lines.size()):
@@ -290,9 +305,8 @@ func _trace_log_lines() -> PackedStringArray:
 func _payload_matches(payload: Variant, expected: Dictionary) -> bool:
 	if not (payload is Dictionary):
 		return expected.is_empty()
-	# The log is parsed back from JSON, which floats every number, and Array
-	# equality is type-strict; round-tripping the expectation through JSON
-	# normalizes its number types so plain equality works again.
+	# The log is parsed back from JSON (which floats every number) and Array equality
+	# is type-strict, so round-trip the expectation through JSON to normalize types.
 	var normalized: Dictionary = JSON.parse_string(JSON.stringify(expected))
 	for key in normalized.keys():
 		if (payload as Dictionary).get(key) != normalized[key]:

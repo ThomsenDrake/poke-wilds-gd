@@ -9,3 +9,8 @@
 
 # Python caches
 __pycache__/
+
+# Stray root screenshots from manual play (do NOT delete the user files; just untrack).
+# NOTE: the filename uses a narrow no-break space (U+202F) before "PM" — matched exactly here.
+Screenshot 2026-07-18 at 4.12.58 PM.png
+Screenshot 2026-07-18 at 4.12.58 PM.png.import

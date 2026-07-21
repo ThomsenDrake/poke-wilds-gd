@@ -2,3 +2,10 @@ root = true
 
 [*]
 charset = utf-8
+insert_final_newline = true
+
+# GDScript is tab-indented (matches the Godot editor default and every
+# checked-in script). Keep the indentation config aligned so editors do not
+# silently re-indent .gd files to spaces.
+[*.gd]
+indent_style = tab

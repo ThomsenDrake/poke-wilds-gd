@@ -27,7 +27,7 @@ const TIME_OF_DAY_KEYFRAMES := [
 
 var _generator = WorldGenerator.new()
 var _texture_cache = TileTextureCache.new()
-var _tile_cache: Dictionary = {}
+var _tile_cache: Dictionary = {} # bounded to the synced window (_evict_tile_cache)
 var _ground_nodes: Dictionary = {}
 var _prop_nodes: Dictionary = {}
 var _last_biome := ""
@@ -69,6 +69,7 @@ func sync_visible(center_tile: Vector2i) -> void:
 			active_tiles[tile] = true
 			_ensure_tile_nodes(tile)
 	_cleanup_inactive_nodes(active_tiles)
+	_evict_tile_cache(active_tiles)
 	_emit_biome_entered(center_tile)
 
 
@@ -258,6 +259,16 @@ func _cleanup_inactive_nodes(active_tiles: Dictionary) -> void:
 		if not active_tiles.has(tile):
 			_prop_nodes[tile].queue_free()
 			_prop_nodes.erase(tile)
+
+
+# Tile data cache eviction: runs AFTER the node cleanup (never mid-pass) and
+# bounds _tile_cache to the synced window, so out-of-window entries from older
+# windows or off-window audit queries are reclaimed on the very next sync.
+# Without it the cache grows by a window-edge per step, unbounded.
+func _evict_tile_cache(active_tiles: Dictionary) -> void:
+	for tile in _tile_cache.keys():
+		if not active_tiles.has(tile):
+			_tile_cache.erase(tile)
 
 
 func _clear_rendered_nodes() -> void:

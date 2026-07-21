@@ -33,6 +33,7 @@ var _initialized = false
 func _ready() -> void:
 	_rng.randomize()
 	catalog.setup(trace)
+	save_store.setup(trace)
 	battle_runtime.setup(session, catalog, pokemon_rules, trace)
 	# The router lives under this autoload so its lazily created player is in
 	# the scene tree and audible; main.gd drives it via runtime.music_router.
@@ -43,17 +44,18 @@ func _ready() -> void:
 func ensure_initialized() -> void:
 	if _initialized:
 		return
-
 	catalog.load_all()
 	var payload = save_store.load_payload()
-	if payload.is_empty() or not _apply_loaded_payload(payload):
-		new_game()
-	else:
+	if not payload.is_empty() and _apply_loaded_payload(payload):
 		trace.emit_event("session_loaded", "GameRuntime", {
-			"party_size": session.party.size(),
-			"player_tile": _tile_payload(session.player_tile)
-		})
+			"party_size": session.party.size(), "player_tile": _tile_payload(session.player_tile)})
 		_initialized = true
+		return
+	# A parsed-but-unapplicable save (empty/non-Dictionary party) still holds
+	# player data; preserve it (refusal .bak mirror) before new_game() clobbers it.
+	if not payload.is_empty():
+		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store.preserve_save(".unusable.bak")})
+	new_game()
 
 
 func new_game() -> void:
@@ -121,14 +123,26 @@ func party_has_field_move_ability(move_id: String) -> bool:
 	return false
 
 
-# DEPRECATED: mid-migration shim for unlock-era callers; reads party capability.
-func is_field_move_unlocked(move_id: String) -> bool:
-	return party_has_field_move_ability(move_id)
+# Campsite hold (Phase 0 defect 0.1): a capture with a full party relocates
+# the mon to the player's last campsite (session.campsite_tile) instead of
+# losing it; it waits there until retrieved from the party screen.
+func get_campsite_pokemon() -> Array:
+	return session.get_campsite_pokemon()
 
 
-# DEPRECATED: no-op mid-migration shim; capability comes from the party now.
-func unlock_field_move(_move_id: String) -> void:
-	pass
+# Pulls the held mon at `index` from the campsite back into the party. The
+# party-screen RETRIEVE row is the only caller and renders only when the
+# party has room (< 6). Traces the handoff (mirror of mon_relocated).
+func retrieve_campsite_mon(index: int) -> Dictionary:
+	var mon: Dictionary = session.retrieve_campsite_mon(index)
+	if mon.is_empty():
+		return mon
+	session.party.append(mon)
+	emit_trace("mon_retrieved", "GameRuntime", {"species_id": str(mon.get("species_id", "")),
+		"name": str(mon.get("name", "")), "level": int(mon.get("level", 1)),
+		"campsite": [session.campsite_tile.x, session.campsite_tile.y],
+		"party_size": session.party.size()})
+	return mon
 
 
 # Harvests one faced tile through the shared resolver (spec section 3):

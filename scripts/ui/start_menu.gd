@@ -1,26 +1,23 @@
 extends Control
 
 # Start menu loop: entry list (POKEMON, BAG, SAVE, NEW GAME, CLOSE) hosting the
-# party and bag screens as child scenes. Menu-level trace events stay in
-# main.gd (menu_opened/menu_closed) and GameRuntime (save_written).
+# party and bag screens as child scenes. NEW GAME routes through the MessageBox
+# sibling's yes/no confirm (Z: Yes / X: No) before the reset, and the menu
+# closes on the reset. Menu-level trace events stay in main.gd
+# (menu_opened/menu_closed) and GameRuntime (save_written).
 #
 # Injected context: main.gd may call setup() with a Dictionary of Callables.
-# Keys backed by the runtime fall back to /root/GameRuntime automatically:
-#   get_party_snapshot() -> Array       get_bag_snapshot() -> Array
-#   get_party_member(i) -> Dictionary   set_party_member(i, mon)
-#   remove_item(item_id, count) -> bool set_party_lead(index)
-#   save_game() / new_game()
-# Keys with no fallback (screens degrade gracefully when absent):
-#   get_species(species_id) -> Dictionary  -> hides FIELD MOVE actions + EXP line
-#   get_item(item_id) -> Dictionary        -> bag falls back to raw item ids
-#   get_field_move_name(move_id) -> String -> field moves show their raw slug
-#   experience_for_level(level, growth) -> int -> summary omits the EXP line
+# Runtime-backed keys (party/bag accessors, save_game, new_game, campsite
+# hold/retrieve) fall back to /root/GameRuntime automatically; the no-fallback
+# keys (get_species, get_item, get_field_move_name, experience_for_level)
+# degrade the screens gracefully when absent.
 #
 # field_move_requested carries the move id plus the party index of the mon the
 # player picked; main.gd resolves the action through the harvest resolver.
 
 signal closed
 signal game_reset
+signal new_game_requested
 signal field_move_requested(move_id: String, mon_index: int)
 
 const RUNTIME_METHODS := {
@@ -28,6 +25,8 @@ const RUNTIME_METHODS := {
 	"set_party_lead": "set_party_lead",
 	"save_game": "save_game",
 	"new_game": "new_game",
+	"get_campsite_pokemon": "get_campsite_pokemon",
+	"retrieve_campsite_mon": "retrieve_campsite_mon",
 }
 
 const SESSION_METHODS := {
@@ -52,7 +51,7 @@ const ENTRY_CLOSE := 4
 
 var _raw_context: Dictionary = {}
 var _context: Dictionary = {}
-
+var _awaiting_confirm := false
 
 func _ready() -> void:
 	visible = false
@@ -63,8 +62,11 @@ func _ready() -> void:
 	_party_screen.closed.connect(_on_submenu_closed)
 	_bag_screen.closed.connect(_on_submenu_closed)
 	_party_screen.field_move_requested.connect(_on_field_move_requested)
+	var confirm_box := get_node_or_null("../MessageBox")
+	if confirm_box != null and confirm_box.has_signal("confirmed"):
+		confirm_box.connect("confirmed", _on_new_game_confirmed)
+		confirm_box.connect("cancelled", _on_new_game_cancelled)
 	setup(_raw_context)
-
 
 func setup(context: Dictionary) -> void:
 	_raw_context = context.duplicate()
@@ -72,7 +74,6 @@ func setup(context: Dictionary) -> void:
 	if is_node_ready():
 		_party_screen.setup(_context)
 		_bag_screen.setup(_context)
-
 
 func show_menu() -> void:
 	visible = true
@@ -83,22 +84,26 @@ func show_menu() -> void:
 	_entries.select(0)
 	_entries.ensure_current_is_visible()
 
-
 func hide_menu() -> void:
 	if not visible:
 		return
+	var confirm_box := get_node_or_null("../MessageBox")
+	if confirm_box != null and confirm_box.call("is_confirming"):
+		confirm_box.call("hide_message") # drop a pending confirm; toasts survive
+	_awaiting_confirm = false
 	_party_screen.close_screen()
 	_bag_screen.close_screen()
 	visible = false
 	closed.emit()
 
-
 func perform_save() -> void:
 	_call_context("save_game")
 
-
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or _submenu_open():
+	# While a New Game confirm is pending this menu must not touch Z/X: it is
+	# the LAST UI child, so it receives unhandled input BEFORE the MessageBox
+	# sibling that owns the confirm answer and would otherwise starve it.
+	if not visible or _submenu_open() or _awaiting_confirm:
 		return
 	if event.is_action_pressed("move_up"):
 		_move_selection(-1)
@@ -112,7 +117,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 
-
 func _activate_entry(index: int) -> void:
 	match index:
 		ENTRY_POKEMON:
@@ -122,11 +126,31 @@ func _activate_entry(index: int) -> void:
 		ENTRY_SAVE:
 			perform_save()
 		ENTRY_NEW_GAME:
-			_call_context("new_game")
-			game_reset.emit()
+			_begin_new_game_confirm()
 		ENTRY_CLOSE:
 			hide_menu()
 
+# NEW GAME is destructive, so it first asks through the MessageBox sibling's
+# confirm; the menu closes on confirm (main.gd resyncs the world on game_reset).
+func _begin_new_game_confirm() -> void:
+	var confirm_box := get_node_or_null("../MessageBox")
+	if confirm_box == null or not confirm_box.has_method("show_confirm"):
+		var runtime := _runtime()
+		if runtime != null:
+			runtime.warn("StartMenu", "Confirm box is missing; NEW GAME was refused.", {})
+		return
+	_awaiting_confirm = true
+	new_game_requested.emit()
+	confirm_box.call("show_confirm", "Start a new game? Your current save will be erased.")
+
+func _on_new_game_confirmed() -> void:
+	_awaiting_confirm = false
+	_call_context("new_game")
+	hide_menu()
+	game_reset.emit()
+
+func _on_new_game_cancelled() -> void:
+	_awaiting_confirm = false
 
 # Submenus draw their own full-rect dim; hiding ours avoids a doubled overlay.
 func _open_submenu(screen: Control) -> void:
@@ -134,40 +158,32 @@ func _open_submenu(screen: Control) -> void:
 	_menu_panel.visible = false
 	screen.open_screen()
 
-
 func _on_submenu_closed() -> void:
 	if visible:
 		_dim.visible = true
 		_menu_panel.visible = true
 
-
-# The party screen's own signal carries only the move id, so the selected
-# party index is read back from the screen (party_screen.gd is not part of
-# this workstream; its _selected holds the row the player confirmed on).
+# The party screen's own signal carries only the move id, so the selected party
+# index is read back from the screen (its _selected holds the confirmed row).
 func _on_field_move_requested(move_id: String) -> void:
 	field_move_requested.emit(move_id, int(_party_screen.get("_selected")))
 	hide_menu()
-
 
 func _move_selection(direction: int) -> void:
 	var next := wrapi(_selected_entry() + direction, 0, ENTRIES.size())
 	_entries.select(next)
 	_entries.ensure_current_is_visible()
 
-
 func _selected_entry() -> int:
 	var selected := _entries.get_selected_items()
 	return int(selected[0]) if not selected.is_empty() else 0
 
-
 func _submenu_open() -> bool:
 	return _party_screen.visible or _bag_screen.visible
-
 
 func _on_entry_clicked(index: int, _at_position: Vector2, _mouse_button_index: int) -> void:
 	_entries.select(index)
 	_activate_entry(index)
-
 
 func _resolve_context(context: Dictionary) -> Dictionary:
 	var resolved := context.duplicate()
@@ -182,24 +198,20 @@ func _resolve_context(context: Dictionary) -> Dictionary:
 			resolved[key] = _node_accessor(runtime.get("session"), SESSION_METHODS[key])
 	return resolved
 
-
 func _context_accessor(context: Dictionary, key: String) -> Callable:
 	var value: Variant = context.get(key, Callable())
 	return value if value is Callable else Callable()
-
 
 func _node_accessor(target: Variant, method: String) -> Callable:
 	if target is Object and (target as Object).has_method(method):
 		return Callable(target, method)
 	return Callable()
 
-
 func _call_context(key: String, args: Array = []) -> Variant:
 	var accessor := _context_accessor(_context, key)
 	if not accessor.is_valid():
 		return null
 	return accessor.callv(args)
-
 
 func _runtime() -> Node:
 	return get_node_or_null("/root/GameRuntime")

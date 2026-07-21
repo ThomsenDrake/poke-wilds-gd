@@ -9,6 +9,10 @@ extends RefCounted
 # load. v1/v2 payloads are still accepted; missing keys are backfilled with
 # new-game defaults. Bag item ids are the lowercase i18n keys ("poke_ball");
 # legacy ids from older saves are remapped on load (see LEGACY_ITEM_IDS).
+# v3 also carries campsite_x/campsite_y/campsite_pokemon (additive keys): the
+# non-losing hold for full-party captures, retrievable from the party screen.
+
+const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 
 const SAVE_VERSION := 3
 const DAY_MINUTES := 1440
@@ -23,6 +27,11 @@ const LEGACY_ITEM_IDS := {
 
 var world_seed: int = 1337
 var player_tile: Vector2i = Vector2i.ZERO
+# Non-losing overflow hold: a capture with a full party relocates the mon to
+# the player's last campsite (the anchor defaults to spawn until Phase 2 rest
+# sites) instead of losing it. Phase 0 hold + retrieval, not Phase 3 boxes.
+var campsite_tile: Vector2i = Vector2i.ZERO
+var campsite_pokemon: Array = []
 var party: Array = []
 var bag: Dictionary = {}
 var unlocked_field_moves: Dictionary = {}
@@ -33,6 +42,8 @@ var total_steps: int = 0
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
 	world_seed = new_world_seed
 	player_tile = spawn_tile
+	campsite_tile = spawn_tile
+	campsite_pokemon.clear()
 	party.clear()
 	unlocked_field_moves.clear()
 	bag = STARTING_BAG.duplicate()
@@ -45,6 +56,9 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	world_seed = int(data.get("world_seed", 1337))
 	player_tile = Vector2i(int(data.get("player_x", 0)), int(data.get("player_y", 0)))
+	# Absent campsite keys (v1/v2/pre-hold v3 saves) anchor to the player tile.
+	campsite_tile = Vector2i(int(data.get("campsite_x", player_tile.x)), int(data.get("campsite_y", player_tile.y)))
+	campsite_pokemon = _normalize_campsite(data.get("campsite_pokemon", []))
 	party = normalized_party
 	var raw_bag: Variant = data.get("bag", null)
 	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
@@ -65,7 +79,10 @@ func to_save_payload(world_overrides: Dictionary = {}) -> Dictionary:
 		"bag": bag,
 		"time_of_day_minutes": time_of_day_minutes,
 		"total_steps": total_steps,
-		"world_overrides": world_overrides
+		"world_overrides": world_overrides,
+		"campsite_x": campsite_tile.x,
+		"campsite_y": campsite_tile.y,
+		"campsite_pokemon": campsite_pokemon
 	}
 
 
@@ -106,6 +123,30 @@ func add_pokemon_to_party(mon: Dictionary) -> bool:
 	return true
 
 
+# --- Campsite hold (non-losing overflow for full-party captures) -------------
+
+func relocate_to_campsite(mon: Dictionary) -> void:
+	if not mon.is_empty():
+		campsite_pokemon.append(mon)
+
+
+func get_campsite_pokemon() -> Array:
+	return campsite_pokemon.duplicate(true)
+
+
+# Pops the held mon at index ({} when out of bounds) for party re-insertion.
+func retrieve_campsite_mon(index: int) -> Dictionary:
+	if index < 0 or index >= campsite_pokemon.size():
+		return {}
+	var mon: Dictionary = campsite_pokemon[index]
+	campsite_pokemon.remove_at(index)
+	return mon
+
+
+func campsite_count() -> int:
+	return campsite_pokemon.size()
+
+
 func set_party_lead(index: int) -> void:
 	if index <= 0 or index >= party.size():
 		return
@@ -118,6 +159,9 @@ func heal_party_full() -> void:
 	for i in range(party.size()):
 		var mon = party[i]
 		mon["current_hp"] = int(mon.get("max_hp", 1))
+		# Blackout heal (defect 0.5): restore HP AND clear status/sleep_turns.
+		mon["status"] = ""
+		mon["sleep_turns"] = 0
 		party[i] = mon
 
 
@@ -181,6 +225,18 @@ func get_unlocked_field_moves() -> Array:
 
 func _wrap_time(minutes: int) -> int:
 	return posmod(minutes, DAY_MINUTES)
+
+
+# The same normalization the runtime applies to a loaded party, run here so
+# campsite-held mons stay legal without a GameRuntime round-trip.
+func _normalize_campsite(raw: Variant) -> Array:
+	var normalized: Array = []
+	if raw is Array:
+		var rules = PokemonRules.new()
+		for mon in raw:
+			if mon is Dictionary and not (mon as Dictionary).is_empty():
+				normalized.append(rules.normalize_loaded_mon(mon))
+	return normalized
 
 
 func _normalize_bag(raw: Dictionary) -> Dictionary:

@@ -14,6 +14,14 @@ failed — because captures need a real window and renderer; the exit code stays
 git plus godot_version/window/renderer harvested from snapshot_captured trace
 payloads; null when unavailable, never faked) so a later verifier can refuse
 stale reports.
+
+Concurrency: run this harness (and therefore verify_all.py, which orchestrates
+it) with EXACTLY ONE writer against a given project at a time. Concurrent runs
+collide on shared state — the per-scenario request file the app reads and
+deletes at boot (res://.godot-smoke/scenario.json) and the appended trace log
+(user://logs/agent_trace.jsonl that several scenarios assert against) — so a
+second harness can consume another writer's request and produce intermittent
+scenario failures that pass in isolation. Serialize pre-push gate runs.
 """
 
 from __future__ import annotations
@@ -59,6 +67,7 @@ SMOKE_SCENARIOS = [
     "biome_probe",
     "biome_traverse",
     "field_move",
+    "save_migration",
     "visual_sweep",
 ]
 DEFAULT_SCENE = "res://scenes/app/Main.tscn"

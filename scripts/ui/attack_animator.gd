@@ -149,6 +149,12 @@ func _play_sound(path: String, stage: Control) -> bool:
 	var stream = load(path)
 	if stream is not AudioStream:
 		return false
+	# Headless: skip spawning the player (its playing stream holds the OGG
+	# chain past the ResourceCache sweep at exit — a leak). Return true so
+	# callers still report sound==true (the animation contract holds; only
+	# real playback is skipped, mirroring the music_router/cry_player gate).
+	if DisplayServer.get_name() == "headless":
+		return true
 	var player := AudioStreamPlayer.new()
 	player.stream = stream
 	player.volume_db = SOUND_VOLUME_DB

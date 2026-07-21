@@ -14,6 +14,16 @@ const ACTION_BINDINGS := {
 	"move_left": [Key.KEY_LEFT, Key.KEY_A],
 	"move_right": [Key.KEY_RIGHT, Key.KEY_D],
 	"action_a": [Key.KEY_Z],
+	# X is deliberately shared between two actions in mutually exclusive input
+	# contexts: `action_b` (cancel) is consumed ONLY by UI screens (start menu,
+	# party/bag, battle) through _unhandled_input + set_input_as_handled, and
+	# only while a screen is visible; `run` is polled ONLY during overworld
+	# movement (player_avatar reads is_action_pressed while input_enabled). In
+	# the overworld no UI consumes action_b (hidden screens return early); in
+	# menus/battles the avatar is not moving (input_enabled = false). UI screens
+	# read action_b via is_action_just_pressed, so holding X to run cannot
+	# spuriously cancel a freshly opened menu. The shared physical key never
+	# collides, so no rebind is needed.
 	"action_b": [Key.KEY_X],
 	"run": [Key.KEY_X],
 	"start": [Key.KEY_ENTER],

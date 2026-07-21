@@ -56,7 +56,7 @@ SCENARIO_REQUIREMENTS = {
         "any": [["session_loaded", "session_created"]],
     },
     "wild_battle": {
-        "all": ["encounter_started", "battle_finished"],
+        "all": ["encounter_started", "battle_finished", "wild_battle_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     "biome_probe": {
@@ -69,6 +69,10 @@ SCENARIO_REQUIREMENTS = {
     },
     "field_move": {
         "all": ["boot_started", "boot_ready", "world_rebuilt", "field_move_used", "field_move_scenario_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "save_migration": {
+        "all": ["boot_started", "boot_ready", "save_migration_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     "playtest_journey": {

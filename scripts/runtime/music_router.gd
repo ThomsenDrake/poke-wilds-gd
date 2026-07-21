@@ -59,6 +59,13 @@ func play_battle_track(kind: String = DEFAULT_BATTLE_KIND) -> void:
 
 
 func play_track_path(track_path: String) -> void:
+	# Headless has no audio device; playing there is pointless and is what
+	# leaks the OGG stream (an AudioStreamPlayer still playing at process exit
+	# keeps the AudioServer mixer thread holding the stream past the
+	# ResourceCache sweep). Gate before create/play so the boot diagnostic and
+	# every headless scenario run stay leak-free.
+	if DisplayServer.get_name() == "headless":
+		return
 	if not ResourceLoader.exists(track_path):
 		_warn("Music track is missing; skipping playback.", {"path": track_path})
 		return
@@ -83,6 +90,15 @@ func stop() -> void:
 	var player = _ensure_player()
 	if player != null:
 		player.stop()
+
+
+func _exit_tree() -> void:
+	# Defense-in-depth for windowed exit: stop playback and drop the stream so
+	# the mixer thread releases the OGG reference chain. (Alone this does not
+	# fix a frame-1 --quit — the headless gate above is the acceptance fix.)
+	if _owned_player != null and is_instance_valid(_owned_player):
+		_owned_player.stop()
+		_owned_player.stream = null
 
 
 func _ensure_player() -> AudioStreamPlayer:

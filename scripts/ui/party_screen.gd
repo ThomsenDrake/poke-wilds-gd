@@ -1,9 +1,11 @@
 extends Control
 
 # Party screen: d-pad list of party members; confirming opens an action menu
-# (SWAP LEAD / SUMMARY / FIELD MOVE / CANCEL), SUMMARY shows a compact stats
-# panel. FIELD MOVE emits field_move_requested and closes so the app layer can
-# apply it. Data comes from the injected context (see start_menu.gd).
+# (SWAP LEAD / SUMMARY / FIELD MOVE / RETRIEVE / CANCEL), SUMMARY shows a
+# compact stats panel. FIELD MOVE emits field_move_requested and closes so the
+# app layer can apply it. RETRIEVE appears only while the campsite hold is
+# non-empty and the party has room, and pulls the oldest held mon into the
+# party. Data comes from the injected context (see start_menu.gd).
 
 signal closed
 signal field_move_requested(move_id: String)
@@ -122,6 +124,10 @@ func _open_actions() -> void:
 	_actions = [{"id": "swap", "label": "SWAP LEAD"}, {"id": "summary", "label": "SUMMARY"}]
 	for move_id in _eligible_field_moves(_party[_selected]):
 		_actions.append({"id": "field_move", "label": "FIELD: %s" % _field_move_name(move_id), "move_id": move_id})
+	var held: Variant = _call_context("get_campsite_pokemon")
+	if held is Array and not (held as Array).is_empty() and _party.size() < 6:
+		var oldest: Dictionary = (held as Array)[0] if (held as Array)[0] is Dictionary else {}
+		_actions.append({"id": "retrieve", "label": "RETRIEVE: %s" % str(oldest.get("name", "?"))})
 	_actions.append({"id": "cancel", "label": "CANCEL"})
 	_action_list.clear()
 	for action in _actions:
@@ -150,6 +156,11 @@ func _activate_action() -> void:
 		"field_move":
 			close_screen()
 			field_move_requested.emit(str(action.get("move_id", "")))
+		"retrieve":
+			_call_context("retrieve_campsite_mon", [0])
+			_refresh_party()
+			_rebuild_rows()
+			_show_panel("list")
 		_:
 			_show_panel("list")
 
@@ -164,13 +175,12 @@ func _eligible_field_moves(mon: Dictionary) -> Array:
 	var flags: Variant = (species as Dictionary).get("field_moves", {})
 	if flags is not Dictionary:
 		return move_ids
-	var is_unlocked: Callable = _context.get("is_field_move_unlocked", Callable())
+	# The stored-unlock model is gone; capability comes from the mon's species
+	# flags, so every flagged move the mon has is offered.
 	var ids := (flags as Dictionary).keys()
 	ids.sort()
 	for id_variant in ids:
 		if int((flags as Dictionary)[id_variant]) != 1:
-			continue
-		if is_unlocked.is_valid() and bool(is_unlocked.call(str(id_variant))):
 			continue
 		move_ids.append(str(id_variant))
 	return move_ids

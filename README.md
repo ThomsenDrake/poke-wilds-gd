@@ -4,10 +4,11 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 
 ## Current slice
 
-- Boot into an overworld scene backed by seeded procedural terrain.
-- Move on a tile grid, trigger wild encounters in grass, and save player position.
-- Start a wild battle, use moves, throw Poke Balls, use Potions, gain EXP, and level up.
-- Open the start menu to inspect the party, swap the lead slot, save, or start a new run.
+- Boot into an overworld scene backed by seeded procedural terrain with progressive biomes (rarer biomes farther from a navigable, reachability-proven spawn).
+- Move on a tile grid, trigger wild encounters in grass, and harvest trees, cacti, swamp trees, snow trees, and rock cliffs with party-capable field moves — cleared tiles mutate the world permanently (save schema v3 world overrides).
+- Start a wild battle, use moves (per-move source animation sets where they exist, a synthesized lunge/flash fallback otherwise), throw Poke Balls, use Potions, gain EXP, level up, and evolve. A full-party capture is non-losing: the overflow Pokemon is held at your campsite and retrieved from the party screen.
+- Open the start menu to inspect the party (swap lead, summary, field moves, campsite retrieve) and the bag (use items), save (atomic temp+rename writes), or start a new run (confirm-gated through a message box).
+- Validate the whole slice with one command: `python3 tools/verify_all.py` — the local gate that orchestrates the static checks, determinism pins, the transport-honest headless playtest/smoke suite, the windowed pixel lanes (`ui_render_audit` + `visual_sweep`), and the legibility report.
 - Load source data from the checked-in `pokewilds/` asset and data subtree.
 
 ## Start Here
@@ -18,11 +19,12 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 - Product specs: [docs/product-specs/index.md](docs/product-specs/index.md)
 - Reliability commands: [docs/RELIABILITY.md](docs/RELIABILITY.md)
 - Quality scorecard: [docs/QUALITY_SCORE.md](docs/QUALITY_SCORE.md)
-- Active execution plan: [docs/exec-plans/active/harness-engineering-reorientation.md](docs/exec-plans/active/harness-engineering-reorientation.md)
+- Active execution plans: [docs/exec-plans/active/harness-engineering-reorientation.md](docs/exec-plans/active/harness-engineering-reorientation.md) and [docs/exec-plans/active/pokewilds-feature-completion.md](docs/exec-plans/active/pokewilds-feature-completion.md)
 
 ## Canonical Commands
 
 ```bash
+python3 tools/verify_all.py            # the one-command local gate (static gates + determinism + headless suite + windowed lanes + legibility)
 python3 tools/check_repo_contracts.py
 python3 tools/check_architecture.py
 python3 tools/check_change_contract.py

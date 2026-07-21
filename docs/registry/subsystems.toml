@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -15,10 +15,11 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_probe",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_traverse",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario field_move",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_migration",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed"]
 quality_bucket = "bootstrap"
 
 [[subsystems]]
@@ -41,7 +42,7 @@ validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
 ]
-required_trace_events = ["session_loaded", "session_created", "save_written", "warning"]
+required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
 
 [[subsystems]]
@@ -124,7 +125,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario battle_anim",
 ]
-required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played"]
+required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played", "mon_relocated"]
 quality_bucket = "battle"
 
 [[subsystems]]
@@ -149,7 +150,7 @@ validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
 ]
-required_trace_events = ["menu_opened", "menu_closed", "save_written"]
+required_trace_events = ["menu_opened", "menu_closed", "save_written", "mon_retrieved"]
 quality_bucket = "ui"
 
 [[subsystems]]
