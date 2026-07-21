@@ -170,7 +170,7 @@ quality_bucket = "harvest"
 name = "vision_fidelity"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/text_oracle.gd"]
+code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py"]
 scene_paths = []
 spec_doc = "docs/product-specs/vision-fidelity.md"
 validation_commands = [
@@ -180,6 +180,8 @@ validation_commands = [
   "python3 tools/determinism_verify.py canary --shot docs/generated/visual-baselines/09_battle.png",
   "python3 tools/visual_region_diff.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines",
   "python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines",
+  # OPTIONAL corroboration step (quarantine-tier, never a gate; needs `uv sync --extra vision`, skips cleanly without it):
+  "python3 tools/vision_metrics.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --out .godot-smoke/vision-metrics.json",
   "python3 tools/generate_legibility_report.py --output .godot-smoke/legibility-report.md",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario ui_render_audit",

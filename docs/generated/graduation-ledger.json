@@ -1,0 +1,626 @@
+{
+  "calibration": {
+    "cadence": "weekly, aligned to the legibility-garden workflow (Mon 14:00 UTC); a trend needs >=2 cycles",
+    "cycles": [
+      {
+        "confirmed": 0,
+        "cycle": 1,
+        "date": "2026-07-21",
+        "graduated_reds": 0,
+        "graduated_states": [
+          "battle_action",
+          "battle_item",
+          "battle_message",
+          "battle_moves"
+        ],
+        "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+        "notes": "Cycle 1 baseline recorded 2026-07-21 at 7b733946b2ad73930cda0d9d3a4e05a73ec3a37c. A two-cycle TREND requires the next legibility-garden cycle (weekly, Mon 14:00 UTC); none is claimed from a single cycle. Seeded-proof plants (exit criterion 4, temporary, reverted \u2014 documented as proof, NOT counted as organic statistics): (1) +1px MOVE_ANCHOR shift in ui_render_model.gd (battle_moves, graduated) => scenario RED via the graduated gate (ui_render_audit_passed in missing_all, 54 glyph_mismatch quarantine_finding traces (trace session start_line 27446, findings lines 27452-27505; no ui_render_audit_passed/text_oracle_passed fired), zero per-bug assertions); (2) same +1px anchor-shift class on ITEM_ANCHOR with battle_item temporarily un-flipped => GREEN, 30 battle_item glyph_mismatch quarantine findings (trace session start_line 27509, findings lines 27515-27544), _failures empty, ui_render_audit_passed fired with quarantined=30; (3) post-flip clean run => GREEN, both pass events, recorded as run 6 (streak 6/5); ui_render_model.gd reverted byte-identical to HEAD (git diff empty).",
+        "precision": null,
+        "quarantine_total": 0,
+        "real_defects": 0,
+        "recall": null,
+        "window_run_ids": [
+          1,
+          6
+        ]
+      }
+    ]
+  },
+  "exit4_proof": {
+    "criterion": "exit criterion 4 (post-flip): a seeded defect in a GRADUATED state fails the scenario RED via the graduated gate; the same defect class in a NON-graduated state stays quarantine-only; clean runs stay green; the perturbation is reverted byte-identical. Recorded as PROOF, never counted as organic statistics (graduated_reds/confirmed/precision/recall exclude these plants).",
+    "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+    "plants": [
+      {
+        "expected": "scenario RED via the graduated gate: ui_render_audit_passed in missing_all, no per-bug assertion",
+        "finding_line_range": [
+          27452,
+          27505
+        ],
+        "graduated_at_plant_time": true,
+        "kinds": {
+          "battle_moves/glyph_mismatch": 54
+        },
+        "perturbation": "+1px MOVE_ANCHOR shift in ui_render_model.gd (temporary, reverted)",
+        "plant": 1,
+        "quarantine_finding_count": 54,
+        "result": "RED \u2014 both pass events absent (54 glyph mismatches routed to _failures by the graduated gate)",
+        "session": {
+          "boot_ts_msec": 612,
+          "end_line": 27508,
+          "start_line": 27446
+        },
+        "state": "battle_moves",
+        "text_oracle_passed": null,
+        "ui_render_audit_passed": null
+      },
+      {
+        "expected": "GREEN quarantine-only: _failures empty, ui_render_audit_passed fired, quarantine_finding traces only",
+        "finding_line_range": [
+          27515,
+          27544
+        ],
+        "graduated_at_plant_time": false,
+        "kinds": {
+          "battle_item/glyph_mismatch": 30
+        },
+        "perturbation": "+1px ITEM_ANCHOR shift in ui_render_model.gd with battle_item temporarily un-flipped (temporary, reverted)",
+        "plant": 2,
+        "quarantine_finding_count": 30,
+        "result": "GREEN quarantine \u2014 ui_render_audit_passed fired with quarantined=30 (text_oracle_passed withheld: 30 glyph mismatches), _failures empty",
+        "session": {
+          "boot_ts_msec": 571,
+          "end_line": 27548,
+          "start_line": 27509
+        },
+        "state": "battle_item",
+        "text_oracle_passed": null,
+        "ui_render_audit_passed": {
+          "cursors_checked": 15,
+          "labels_checked": 78,
+          "quarantined": 30,
+          "states_checked": 7
+        }
+      }
+    ],
+    "post_flip_clean_run_id": 6,
+    "post_flip_clean_session": {
+      "boot_ts_msec": 605,
+      "end_line": 27559,
+      "start_line": 27549
+    },
+    "recorded_at": "2026-07-21T17:02:16+00:00",
+    "revert_proof": "ui_render_model.gd and scripts/ui/battle_surface*.gd byte-identical to HEAD (git diff empty); the only scripts/ change in the tree is the GRADUATED_STATES flip in ui_render_audit.gd",
+    "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+  },
+  "flips": [
+    {
+      "at_head": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "basis": "glyph template match",
+      "evidence_run_ids": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "flip_diff": "scripts/app/ui_render_audit.gd GRADUATED_STATES[battle_moves] false->true (in-place, 0 added lines)",
+      "flipped_at": "2026-07-21T16:04:33Z",
+      "judgment": null,
+      "mode": "anchor",
+      "state": "battle_moves"
+    },
+    {
+      "at_head": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "basis": "glyph template match",
+      "evidence_run_ids": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "flip_diff": "scripts/app/ui_render_audit.gd GRADUATED_STATES[battle_item] false->true (in-place, 0 added lines)",
+      "flipped_at": "2026-07-21T16:04:33Z",
+      "judgment": null,
+      "mode": "anchor",
+      "state": "battle_item"
+    },
+    {
+      "at_head": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "basis": "lint cleanliness on ACTION_ROWS (garble/low_ink/forbidden_ink)",
+      "evidence_run_ids": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "flip_diff": "scripts/app/ui_render_audit.gd GRADUATED_STATES[battle_action] false->true (in-place, 0 added lines)",
+      "flipped_at": "2026-07-21T16:04:33Z",
+      "judgment": null,
+      "mode": "lint",
+      "state": "battle_action"
+    },
+    {
+      "at_head": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "basis": "lint cleanliness; glyph match excluded by design",
+      "evidence_run_ids": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "flip_diff": "scripts/app/ui_render_audit.gd GRADUATED_STATES[battle_message] false->true (in-place, 0 added lines)",
+      "flipped_at": "2026-07-21T16:04:33Z",
+      "judgment": "BOX mode: the message string's exact pen is engine-owned \u2014 BattleView.tscn MessageLabel at (8,103) vs model MSG_INTERIOR box at (7,104), a ~1px placement fringe; that fringe is why white-bg glyph template match is excluded for battle_message by design (text_oracle.check skips non-anchor glyphs). Lint cleanliness (low_ink/forbidden_ink/garble) on the state's ACTION_ROWS + forbidden rects over the recorded 5-run window (runs 1-5, HEAD 7b733946, zero findings, text_oracle_passed on every entry) is accepted as sufficient evidence for graduation. The deferral option was considered and rejected: the streak is complete at 5/5 with the engine pinning stable at the measured offset across all five runs.",
+      "mode": "box",
+      "state": "battle_message"
+    }
+  ],
+  "runs": [
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 1,
+      "ok": true,
+      "recorded_at": "2026-07-21T15:59:13+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T15:59:13.106336+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 612,
+        "end_line": 27401,
+        "start_line": 27391,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 2,
+      "ok": true,
+      "recorded_at": "2026-07-21T15:59:24+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T15:59:24.755077+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 553,
+        "end_line": 27412,
+        "start_line": 27402,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 3,
+      "ok": true,
+      "recorded_at": "2026-07-21T15:59:54+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T15:59:54.247376+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 598,
+        "end_line": 27423,
+        "start_line": 27413,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 4,
+      "ok": true,
+      "recorded_at": "2026-07-21T16:00:05+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T16:00:05.844112+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 554,
+        "end_line": 27434,
+        "start_line": 27424,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 5,
+      "ok": true,
+      "recorded_at": "2026-07-21T16:00:17+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T16:00:17.586535+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 554,
+        "end_line": 27445,
+        "start_line": 27435,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 6,
+      "ok": true,
+      "recorded_at": "2026-07-21T16:07:03+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T16:07:03.080124+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 605,
+        "end_line": 27559,
+        "start_line": 27549,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    },
+    {
+      "anomalies": [],
+      "capture_invalid_count": 0,
+      "eligible": true,
+      "head_sha": "7b733946b2ad73930cda0d9d3a4e05a73ec3a37c",
+      "id": 7,
+      "ok": true,
+      "recorded_at": "2026-07-21T17:03:11+00:00",
+      "report_ref": {
+        "generated_at": "2026-07-21T17:02:57.481900+00:00",
+        "path": ".godot-smoke/playtest-report.json"
+      },
+      "scenario": "ui_render_audit",
+      "session": {
+        "boot_ts_msec": 740,
+        "end_line": 28206,
+        "start_line": 28196,
+        "trace_path": "/Users/drakethomsen-mai/Library/Application Support/Godot/app_userdata/PokeWilds-Godot/logs/agent_trace.jsonl"
+      },
+      "stamps": {
+        "godot_version": null,
+        "renderer": null,
+        "window": null
+      },
+      "states": {
+        "battle_action": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_item": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_message": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        },
+        "battle_moves": {
+          "clean": true,
+          "findings": 0,
+          "kinds": [],
+          "sample": []
+        }
+      },
+      "text_oracle_passed": {
+        "T_glyph": 1,
+        "T_str": 2,
+        "glyphs_checked": 77,
+        "states_checked": 4,
+        "strings_checked": 7
+      },
+      "transport": "dap",
+      "ui_render_audit_passed": {
+        "cursors_checked": 15,
+        "labels_checked": 78,
+        "quarantined": 0,
+        "states_checked": 7
+      }
+    }
+  ],
+  "schema": "graduation-ledger/1",
+  "states": [
+    "battle_action",
+    "battle_message",
+    "battle_moves",
+    "battle_item"
+  ],
+  "threshold": 5
+}

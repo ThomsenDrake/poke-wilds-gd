@@ -54,9 +54,18 @@ BASELINE_DIR = "docs/generated/visual-baselines"
 SIDECAR_SUFFIX = ".sidecar.json"
 CORE_TOOLS_DIR = "tools"
 # Third-party modules permitted in core tools. Deliberately EMPTY: the optional
-# vision extra (a future Lane-4 image-model pass) stays a SEPARATE non-core tool
-# so the core verification tooling never needs a pip install.
+# vision extra stays a SEPARATE non-core tool (see OPTIONAL_TOOL_EXEMPTIONS
+# below) so the core verification tooling never needs a pip install. Keeping
+# this set empty is a PINNED INVARIANT — a module-level third-party allowlist
+# would defeat the leak guard in _check_import.
 THIRD_PARTY_EXEMPTIONS: set[str] = set()
+
+# Optional non-core tools exempt from the stdlib-only rule — the documented
+# registry of exempt optional tools. vision_metrics.py is the ONE entry: the
+# pyproject [project.optional-dependencies] vision = ["scikit-image"] extra.
+# It degrades gracefully when scikit-image is absent (SKIMAGE_AVAILABLE guard)
+# and NEVER gates CI. Core tools remain stdlib-only; add no other names here.
+OPTIONAL_TOOL_EXEMPTIONS: set[str] = {"vision_metrics.py"}
 
 
 def _is_battle_shot(stem: str) -> bool:
@@ -121,7 +130,17 @@ def region_coverage_issues(root: Path) -> list[str]:
 
 
 def _check_import(tool_name: str, top: str, local_modules: set[str], issues: list[str]) -> None:
-    if top in local_modules or top in THIRD_PARTY_EXEMPTIONS:
+    if top in THIRD_PARTY_EXEMPTIONS:
+        return
+    if top in local_modules:
+        # HARDENING: the local-sibling whitelist above would otherwise let a
+        # core tool write `import vision_metrics` and smuggle the scikit-image
+        # extra into the core path. A non-exempt core tool importing an exempt
+        # optional tool's stem is therefore an issue, making the file-scoped
+        # exemption auditable and leak-proof.
+        if top + ".py" in OPTIONAL_TOOL_EXEMPTIONS and tool_name not in OPTIONAL_TOOL_EXEMPTIONS:
+            issues.append(
+                f"Core tool {tool_name} imports optional extra tool `{top}` (extras must not leak into core tools)")
         return
     if top not in sys.stdlib_module_names:
         issues.append(
@@ -131,13 +150,17 @@ def _check_import(tool_name: str, top: str, local_modules: set[str], issues: lis
 def core_tools_stdlib_issues(root: Path) -> list[str]:
     """Core tools must be stdlib-only (no third-party imports). Local sibling
     tools (imported via importlib or a bare `from x import`) are whitelisted by
-    filename; every other top-level module must be in sys.stdlib_module_names."""
+    filename; every other top-level module must be in sys.stdlib_module_names.
+    Tools named in OPTIONAL_TOOL_EXEMPTIONS are the documented optional extras
+    and are skipped entirely — their third-party imports are their own."""
     tools_dir = root / CORE_TOOLS_DIR
     if not tools_dir.is_dir():
         return []
     local_modules = {path.stem for path in tools_dir.glob("*.py")}
     issues: list[str] = []
     for tool in sorted(tools_dir.glob("*.py")):
+        if tool.name in OPTIONAL_TOOL_EXEMPTIONS:
+            continue  # documented optional extra (pyproject vision = [scikit-image])
         try:
             tree = ast.parse(tool.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:

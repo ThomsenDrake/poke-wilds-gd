@@ -15,6 +15,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/data/pokemon_catalog.gd
 - Deprecated shims `is_field_move_unlocked`/`unlock_field_move` remain in `game_runtime.gd`; nothing calls them since the harvest rework — delete on the next runtime touch.
 - Replace remaining dictionary-heavy runtime contracts with more explicit typed boundaries once the gameplay slice stabilizes.
 - Add subsystem entries and specs immediately when new systems such as NPCs, PC storage, or building are introduced.
+- Slice 6 DoD #7 (legibility/vision plan): the four optional verification spikes stay DEFERRED, explicitly off the critical path — Movie Writer PNG-burst motion lane, DAP `godot/put_msg` bridge, ScriptBacktrace (#91006) structured error frames, and the live NDJSON-over-TCP introspection endpoint ("built ONLY IF in-process sidecars prove insufficient" — they have not). Status recorded in docs/superpowers/plans/2026-07-20-agent-legibility-and-vision-verification.md; adopt each behind its own registry entry only if ever needed; none gates CI. (The box-mode `battle_message` judgment was documented at flip time, so no deferral there.)
 
 ## Resolved this cycle
 

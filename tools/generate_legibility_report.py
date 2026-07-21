@@ -13,6 +13,8 @@ import check_repo_contracts
 from legibility_lib import repo_root
 
 BASELINE_DIR = repo_root() / "docs" / "generated" / "visual-baselines"
+GRADUATION_LEDGER = repo_root() / "docs" / "generated" / "graduation-ledger.json"
+VISION_METRICS_JSON = repo_root() / ".godot-smoke" / "vision-metrics.json"
 
 
 def _load_tool(name: str):
@@ -103,6 +105,72 @@ def cvd_section() -> tuple[list[str], int]:
     return lines, len(findings)
 
 
+def graduation_section() -> list[str]:
+    """Graduation & calibration rendered from the TRACKED ledger (docs/generated/
+    graduation-ledger.json). The garden workflow has no Godot and no user:// trace
+    log, so it only RENDERS the committed snapshot; `record`/`calibration` run
+    locally (see RELIABILITY.md § Graduation ledger). Missing/unreadable ledger
+    degrades to a note, never an error. These rows are advisory text and never
+    count as findings (the Legibility Debt issue regex matches only this report's
+    first "- Total findings: N" line)."""
+    ledger = _load_tool("graduation_ledger")
+    if ledger is None:
+        return ["## Graduation & calibration", "",
+                "Skipped: graduation_ledger tool unavailable.", ""]
+    return ledger.render_section(GRADUATION_LEDGER)
+
+
+def ssim_section() -> list[str]:
+    """Optional vision-extra corroboration (tools/vision_metrics.py, the scikit-image
+    extra). QUARANTINE-TIER FOREVER, never a gate: SSIM windowing averages over
+    8-16px windows, which dilutes exactly the sprite-scale (1-frame strip offset)
+    and glyph-scale (1-2px XOR) defects the coded oracles catch at exact pixels —
+    it is corroboration/localization heat only. Reads the locally generated
+    .godot-smoke/vision-metrics.json when present; a broken or absent extra degrades
+    to a skip note via the _load_tool Exception-swallowing pattern, never crashes.
+    CI-safe by construction: the garden workflow has neither fresh shots nor
+    scikit-image, so this section always renders a note there."""
+    lines = ["## SSIM corroboration (optional, quarantine-forever)", ""]
+    vm = _load_tool("vision_metrics")
+    if not VISION_METRICS_JSON.exists():
+        reason = ("vision extra not installed (opt in with `uv sync --extra vision`, then "
+                  "`uv run python3 tools/vision_metrics.py`)" if vm is None
+                  else "no fresh .godot-smoke/vision-metrics.json (run tools/vision_metrics.py "
+                  "locally after a windowed visual_sweep)")
+        lines.append(f"Skipped: {reason}. SSIM windowing dilutes sprite/glyph-scale defects — "
+                     "advisory localization only, never a gate.")
+        lines.append("")
+        return lines
+    try:
+        doc = json.loads(VISION_METRICS_JSON.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        lines.append("Skipped: .godot-smoke/vision-metrics.json is unreadable (quarantine-forever, never a gate).")
+        lines.append("")
+        return lines
+    if doc.get("skipped") is True:
+        lines.append(f"Skipped: {doc.get('reason', 'vision extra unavailable')} (quarantine-forever, never a gate).")
+        lines.append("")
+        return lines
+    findings = doc.get("findings") or []
+    lines.append(f"Advisory localization only (quarantine-forever, never a gate); pairs compared: "
+                 f"{doc.get('pairs', '?')}. Windows below the mean-SSIM floor are corroboration heat, "
+                 "not a verdict — the coded oracles decide at exact pixels.")
+    lines.append("")
+    if not findings:
+        lines.append("No ssim_divergence findings (byte-identical pairs are skipped).")
+    else:
+        lines.append(f"ssim_divergence windows: {len(findings)} (advisory, quarantine-forever)")
+        for finding in findings[:24]:
+            lines.append("- {shot}: mean_ssim {mean_ssim} (min window {min_window_ssim}) "
+                         "region {region}".format(
+                             shot=finding.get("shot", "?"),
+                             mean_ssim=finding.get("mean_ssim", "?"),
+                             min_window_ssim=finding.get("min_window_ssim", "?"),
+                             region=finding.get("region", [])))
+    lines.append("")
+    return lines
+
+
 def generate(output_path: Path) -> int:
     checks = {
         "repo_contracts": check_repo_contracts.run(),
@@ -112,6 +180,8 @@ def generate(output_path: Path) -> int:
     findings = sum(len(items) for items in checks.values())
     contrast_lines, contrast_low = contrast_section()
     cvd_lines, cvd_collapses = cvd_section()
+    graduation_lines = graduation_section()
+    ssim_lines = ssim_section()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
 
     lines = [
@@ -120,7 +190,7 @@ def generate(output_path: Path) -> int:
         "Review cadence days: 7",
         "Source paths: tools/generate_legibility_report.py, tools/check_repo_contracts.py, "
         "tools/check_architecture.py, tools/check_quality_docs.py, tools/contrast_check.py, "
-        "tools/cvd_sim.py",
+        "tools/cvd_sim.py, tools/graduation_ledger.py, tools/vision_metrics.py",
         "",
         "# Legibility Report",
         "",
@@ -144,6 +214,8 @@ def generate(output_path: Path) -> int:
 
     lines.extend(contrast_lines)
     lines.extend(cvd_lines)
+    lines.extend(graduation_lines)
+    lines.extend(ssim_lines)
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
     return findings

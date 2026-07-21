@@ -11,9 +11,9 @@ const TextOracle := preload("res://scripts/app/text_oracle.gd")
 
 # Per-state pixel-half graduation: true routes a state's glyph/lint findings to coded RED
 # (_failures), false quarantine-only. Only battle_* keys exist; menu/party/bag (default theme
-# font 12/14/20, different raster, no proof, no pixel half) can never graduate. moves/item
-# (anchor, exact-pen) flip first after a clean streak; all false at Slice-4 landing.
-const GRADUATED_STATES := {"battle_action": false, "battle_message": false, "battle_moves": false, "battle_item": false}
+# font 12/14/20, different raster, no proof, no pixel half) can never graduate: no menu keys.
+# All four battle states flipped at Slice 6 on 5 clean ledger runs 1-5 at HEAD 7b733946 (evidence + box judgment: docs/generated/graduation-ledger.json flips[]).
+const GRADUATED_STATES := {"battle_action": true, "battle_message": true, "battle_moves": true, "battle_item": true}
 const POS_TOLERANCE := 1.5
 const BOUNDS_TOLERANCE := 1.0
 
