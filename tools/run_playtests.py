@@ -598,6 +598,116 @@ def apply_contrast_cvd(project: Path, result: dict[str, Any]) -> None:
         result["ok"] = False
 
 
+def _record_vision_review(result: dict[str, Any], doc: dict[str, Any], review_path: Path) -> dict[str, Any]:
+    """Merge a freshly-written vision-review doc into the scenario entry.
+
+    Every emitted finding becomes a kind=vision_review quarantine entry (it already
+    carries its finding_id join key for the Slice-6 graduation ledger); findings are
+    report-tier and never flip ok. vision_review_written {path, shots_reviewed,
+    shots_changed, findings, grounded, dropped, reviewer} is the Slice-1-plan report
+    field: shots_reviewed counts the shots COVERED by the review manifest (every
+    baselined shot, changed or not — the manifest is the freshness authority), while
+    shots_changed counts the subset whose fresh bytes differed from baseline (the
+    shots actually re-reviewed)."""
+    grounding = doc.get("grounding") if isinstance(doc.get("grounding"), dict) else {}
+    reviewer = doc.get("reviewer") if isinstance(doc.get("reviewer"), dict) else {}
+    manifest = doc.get("manifest") if isinstance(doc.get("manifest"), dict) else {}
+    covered = manifest.get("shots_covered") or []
+    covered_list = covered if isinstance(covered, list) else []
+    quarantine: list[dict[str, Any]] = []
+    for shot_entry in doc.get("shots", []) or []:
+        if not isinstance(shot_entry, dict):
+            continue
+        for finding in shot_entry.get("findings", []) or []:
+            if isinstance(finding, dict):
+                quarantine.append({**finding, "kind": "vision_review"})
+    written = {
+        "path": str(review_path),
+        "shots_reviewed": len(covered_list),
+        "shots_changed": sum(1 for e in covered_list if isinstance(e, dict) and e.get("changed")),
+        "findings": int(grounding.get("emitted", 0) or 0),
+        "grounded": int(grounding.get("grounded", 0) or 0),
+        "dropped": int(grounding.get("dropped", 0) or 0),
+        "reviewer": reviewer.get("kind"),
+    }
+    result["vision_review_written"] = written
+    result["vision_review_quarantine"] = quarantine
+    notes = list(doc.get("warnings", []) or []) + list(reviewer.get("notes", []) or [])
+    if notes:
+        result["vision_review_warnings"] = notes
+    return written
+
+
+def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
+    """Runner-recorded Lane-4 vision review for the visual_sweep scenario.
+
+    Mirrors apply_region_gate/apply_contrast_cvd's invocation-point decision:
+    verdicts are recorded onto the scenario entry of playtest-report.json -- NEVER
+    the JSONL trace -- as a quarantine-section kind vision_review (report-tier,
+    never flips result['ok']; Lane 4 is quarantine-tier). The post-step regenerates
+    .godot-smoke/vision-review.json on EVERY visual_sweep compare run (even 0 changed
+    shots -- full manifest, zero findings), so any sweep whose shots change has a
+    current file and the manifest is the complete freshness authority. The default
+    reviewer is deterministic (no model); --reviewer-cmd is a plugin handled inside
+    tools/vision_review.py. Only a tool ERROR (bad PNG decode, unwritable output)
+    fails red via the exception path (fail-closed); dropped/ungrounded findings are
+    counted, never errors. Skipped on transport-skip and in update mode; a
+    transport-skipped run that leaves a stale review file on disk REFUSES it (warn,
+    not recorded, never red). It runs after apply_region_gate so region-diff's
+    clusters.json exists; if that step erred, vision_review degrades to
+    sidecar-delta-only findings with a recorded warning rather than crashing."""
+    if result.get("scenario") != "visual_sweep":
+        return
+    shots_dir = project / ".godot-smoke" / "shots"
+    baseline_dir = project / "docs" / "generated" / "visual-baselines"
+    output_dir = project / ".godot-smoke"
+    review_path = output_dir / "vision-review.json"
+    if result.get("transport") == "skipped-headless":
+        # Transport honesty: nothing was captured, so no review is attempted. Record
+        # null so the report is explicit that no review was written (the skip reason
+        # is already on the scenario entry); then, if a previous run left a review
+        # file that no longer matches the shots on disk, refuse it (warn only, never
+        # red) so a later verifier cannot trust a stale review. An unreadable/
+        # unverifiable file is treated as stale.
+        result["vision_review_written"] = None
+        if review_path.exists():
+            stale = True
+            try:
+                existing = json.loads(review_path.read_text(encoding="utf-8"))
+                stale = not _load_tool_module("vision_review").review_is_fresh(existing, shots_dir, baseline_dir)
+            except Exception:
+                stale = True
+            if stale:
+                print("  visual_sweep: refusing stale vision-review.json (transport-skipped; not recorded)")
+        return
+    payload = result.get("passed_payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    if payload.get("mode") == "update" or payload.get("auto_update"):
+        result["vision_review_written"] = None  # baselines just rewritten; compare trivially green
+        return
+    try:
+        vision_review = _load_tool_module("vision_review")
+        doc = vision_review.run_vision_review(
+            shots_dir, baseline_dir, output_dir,
+            clusters_path=output_dir / "region-diff" / "clusters.json")
+    except Exception as exc:  # a broken review tool must not silently pass
+        result.setdefault("exceptions", []).append(f"vision review failed: {exc}")
+        result["ok"] = False
+        return
+    # Defense in depth: the file was just regenerated, so it must be fresh; a
+    # mismatch here indicates a broken manifest. Refuse (warn, not recorded), never
+    # red -- staleness is quarantine-tier, the next sweep regenerates.
+    if not isinstance(doc, dict) or not vision_review.review_is_fresh(doc, shots_dir, baseline_dir):
+        print("  visual_sweep: refusing vision-review.json (manifest does not match current shots; not recorded)")
+        return
+    written = _record_vision_review(result, doc, review_path)
+    print(f"  visual_sweep: vision-review {written['findings']} finding(s) "
+          f"({written['grounded']} grounded, {written['dropped']} dropped), "
+          f"{written['shots_changed']} changed of {written['shots_reviewed']} covered shot(s), "
+          f"reviewer={written['reviewer']}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-smoke", action="store_true", help="also run the 7 smoke scenarios")
@@ -668,6 +778,7 @@ def main() -> int:
         results.append(result)
         apply_region_gate(project, result)
         apply_contrast_cvd(project, result)
+        apply_vision_review(project, result)
         print_row(result)
 
     failed = [result for result in results if not result["ok"]]
@@ -690,6 +801,9 @@ def main() -> int:
                       f"\"{finding.get('label_text', '')}\" ratio {finding.get('ratio')} < {finding.get('need')}")
             for finding in result.get("cvd_findings", [])[:4]:
                 print(f"  {name}: cvd_collapse [{finding.get('deficiency')}] {finding.get('source')}: {finding.get('pair')}")
+            for finding in result.get("vision_review_quarantine", [])[:4]:
+                print(f"  {name}: vision_review [{finding.get('class', '')}] {finding.get('shot', '')} "
+                      f"{finding.get('region_id', '')}: {finding.get('note', '')}")
             if result.get("clusters_unexplained"):
                 print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
                       "(see region-diff/clusters.json — guards false closure)")

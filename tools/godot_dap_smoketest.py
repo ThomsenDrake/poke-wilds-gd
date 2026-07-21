@@ -246,6 +246,18 @@ def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]
     return summary
 
 
+# Follow-up (transport divergence): the QUARANTINE-TIER visual_sweep post-steps are
+# intentionally NOT mirrored here -- Slice-4's apply_contrast_cvd and Slice-5's
+# apply_vision_review both live only in run_playtests.py. apply_region_step exists
+# because red-tier region failures can flip ok, so a revived DAP path must not skip
+# them; contrast/CVD and Lane-4 vision-review findings are report-tier quarantine
+# evidence that never flips ok, so skipping them on a (currently down) DAP path
+# cannot hide a failure. DAP is down at landing; when it is revived, mirror
+# apply_contrast_cvd and apply_vision_review here so a revived DAP visual_sweep
+# produces the same quarantine evidence and .godot-smoke/vision-review.json as the
+# windowed-subprocess transport.
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
