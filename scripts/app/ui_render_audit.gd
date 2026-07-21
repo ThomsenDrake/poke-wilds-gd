@@ -1,18 +1,19 @@
 extends Node
 
 # Lane 2 of the autonomous oracle suite (spec: docs/superpowers/specs/
-# 2026-07-18-autonomous-playtesting-oracles-design.md). Renders the live
-# battle surface and menu screens with worst-case catalog data and checks the
-# scene tree against UiRenderModel expectations: expected strings sit at their
-# modeled positions, no two labels' text ink intersects, cursors sit on their
-# rows, and labels stay onstage. Windowed runs add the pixel half via
-# tools/visual_lint.py; findings stay quarantined (traces only, never red)
-# until GRADUATED flips true.
+# 2026-07-18-autonomous-playtesting-oracles-design.md). Renders the live battle/menu
+# screens with worst-case catalog data and checks the scene tree against UiRenderModel
+# expectations. Windowed runs add the pixel half, routed per GRADUATED_STATES.
 
 const UiRenderModel := preload("res://scripts/app/ui_render_model.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
+const TextOracle := preload("res://scripts/app/text_oracle.gd")
 
-const GRADUATED := false
+# Per-state pixel-half graduation: true routes a state's glyph/lint findings to coded RED
+# (_failures), false quarantine-only. Only battle_* keys exist; menu/party/bag (default theme
+# font 12/14/20, different raster, no proof, no pixel half) can never graduate. moves/item
+# (anchor, exact-pen) flip first after a clean streak; all false at Slice-4 landing.
+const GRADUATED_STATES := {"battle_action": false, "battle_message": false, "battle_moves": false, "battle_item": false}
 const POS_TOLERANCE := 1.5
 const BOUNDS_TOLERANCE := 1.0
 
@@ -27,6 +28,7 @@ var _quarantined := 0
 
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
+	TextOracle.reset_stats()
 	await _settle(2)
 	var catalog = _runtime().get("catalog")
 	var snapshot: Dictionary = UiRenderModel.worst_snapshot(catalog)
@@ -59,6 +61,10 @@ func _audit_battle(snapshot: Dictionary) -> void:
 		_check_labels(spec[0], labels, UiRenderModel.STAGE)
 		_check_pairs(spec[0], stage, model, spec[2])
 		await _pixel_half(spec[0], model)
+	if TextOracle.states_checked == specs.size() and TextOracle.glyphs_checked > 0 and TextOracle.glyph_mismatches == 0:  # coded pass: every spec verification-complete, >0 glyphs, 0 mismatch
+		_runtime().emit_trace("text_oracle_passed", "SmokeScenarios", {"states_checked": TextOracle.states_checked,
+			"strings_checked": TextOracle.strings_checked, "glyphs_checked": TextOracle.glyphs_checked,
+			"T_str": TextOracle.T_STR, "T_glyph": TextOracle.T_GLYPH})
 	_battle_view().visible = was_visible
 
 
@@ -173,14 +179,8 @@ func _bag_names(catalog) -> Array:
 	return names
 
 
-# Pixel half: windowed only (headless skips; captures need a real renderer).
-# Captures the battle SubViewport texture directly, so regions map 1:1 at
-# stage scale; the readback guard is ADDED after the settle (never a
-# substitute: the SubViewport only redraws while visible). Magenta/stale
-# frames (Godot 4.6 #115402) fall back to a root-viewport crop of the battle
-# display resized back to the 160x144 stage so run_lint's display contract
-# holds. Findings route to quarantine traces, never to failures, until
-# GRADUATED flips true.
+# Pixel half (windowed only; headless skips): capture the battle SubViewport 1:1; a magenta/stale
+# frame (Godot 4.6 #115402) falls back to a 160x144 root-viewport crop; glyph/ink match delegates to TextOracle, findings route per GRADUATED_STATES.
 func _pixel_half(state: String, model: Dictionary) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -200,12 +200,13 @@ func _pixel_half(state: String, model: Dictionary) -> void:
 	if image == null or image.is_empty():
 		return
 	var display := Rect2(Vector2.ZERO, Vector2(image.get_size()))
-	for finding in UiRenderModel.run_lint(state, model, image, display):
+	await TextOracle.collect(self, state, model)
+	for finding in TextOracle.pixel_findings(state, model, image, display):
 		_quarantined += 1
-		_runtime().emit_trace("quarantine_finding", "SmokeScenarios",
-			{"state": state, "kind": str(finding.get("kind", "")), "region": finding.get("region", [])})
-		if GRADUATED:
-			_failures.append({"state": state, "kind": "lint_%s" % str(finding.get("kind", "")), "region": finding.get("region", [])})
+		_runtime().emit_trace("quarantine_finding", "SmokeScenarios", {"state": state, "text": finding.get("text", ""),
+			"kind": str(finding.get("kind", "")), "region": finding.get("region", []), "glyph_index": finding.get("glyph_index", -1)})
+		if GRADUATED_STATES.get(state, false):
+			_failures.append({"state": state, "kind": str(finding.get("kind", "")), "region": finding.get("region", [])})
 
 
 func _settle(frames: int) -> void:

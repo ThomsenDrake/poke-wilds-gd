@@ -531,6 +531,73 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
         result["ok"] = False
 
 
+_TOOL_MODULES: dict[str, Any] = {}
+
+
+def _load_tool_module(name: str) -> Any:
+    """Lazy importlib load of a sibling tool, cached (same pattern as
+    _load_region_diff); loaded only when the visual_sweep post-step runs."""
+    if name not in _TOOL_MODULES:
+        path = Path(__file__).resolve().with_name(f"{name}.py")
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"cannot load {name} from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _TOOL_MODULES[name] = module
+    return _TOOL_MODULES[name]
+
+
+# Slice-4 landing: the WCAG contrast check is deterministic (3-run proof on
+# file) but its findings ship quarantine-tier; flip this True once the clean-run
+# history graduates contrast_low to coded red. cvd_collapse NEVER graduates.
+CONTRAST_GRADUATED = False
+
+
+def apply_contrast_cvd(project: Path, result: dict[str, Any]) -> None:
+    """Runner-recorded WCAG contrast + CVD evidence for the visual_sweep scenario.
+
+    Mirrors apply_region_gate's invocation-point decision: verdicts are recorded
+    onto the scenario entry of playtest-report.json -- NEVER the JSONL trace --
+    as quarantine-section kinds contrast_low / cvd_collapse. Contrast runs on the
+    FRESH shots + fresh sidecar label rects, able to catch text-over-battle-effect
+    contrast loss the committed baseline cannot show once a mid-effect shot is
+    captured (visual_sweep's current states are static -- none mid-effect); CVD
+    simulates the fresh canary palettes plus the hardcoded HP-bar triple. Routing at landing:
+    contrast_low flips result['ok'] only when CONTRAST_GRADUATED (not yet);
+    cvd_collapse never flips it (accessibility evidence, quarantine-forever).
+    Skipped on transport-skip and in update mode (baselines just rewritten).
+    """
+    if result.get("scenario") != "visual_sweep":
+        return
+    if result.get("transport") == "skipped-headless":
+        return
+    payload = result.get("passed_payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    if payload.get("mode") == "update" or payload.get("auto_update"):
+        return
+    shots_dir = project / ".godot-smoke" / "shots"
+    try:
+        contrast_verdict = _load_tool_module("contrast_check").run_contrast(shots_dir)
+        cvd_verdict = _load_tool_module("cvd_sim").run_cvd(shots_dir)
+    except Exception as exc:  # a broken tool must not silently pass
+        result.setdefault("exceptions", []).append(f"contrast/cvd check failed: {exc}")
+        result["ok"] = False
+        return
+    result["contrast_findings"] = contrast_verdict["findings"]
+    result["contrast_images_checked"] = contrast_verdict.get("images_checked", 0)
+    result["cvd_findings"] = cvd_verdict["findings"]
+    if contrast_verdict.get("errors"):
+        result.setdefault("exceptions", []).extend(f"contrast: {e}" for e in contrast_verdict["errors"])
+        result["ok"] = False
+    if cvd_verdict.get("errors"):
+        result.setdefault("exceptions", []).extend(f"cvd: {e}" for e in cvd_verdict["errors"])
+        result["ok"] = False
+    if CONTRAST_GRADUATED and result["contrast_findings"]:
+        result["ok"] = False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-smoke", action="store_true", help="also run the 7 smoke scenarios")
@@ -600,6 +667,7 @@ def main() -> int:
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin)
         results.append(result)
         apply_region_gate(project, result)
+        apply_contrast_cvd(project, result)
         print_row(result)
 
     failed = [result for result in results if not result["ok"]]
@@ -617,6 +685,11 @@ def main() -> int:
                 print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
             for finding in result.get("region_quarantine", [])[:4]:
                 print(f"  {name}: quarantine [{finding['kind']}] {finding['shot']}: {finding['detail']}")
+            for finding in result.get("contrast_findings", [])[:4]:
+                print(f"  {name}: contrast_low {finding.get('shot', '')}: "
+                      f"\"{finding.get('label_text', '')}\" ratio {finding.get('ratio')} < {finding.get('need')}")
+            for finding in result.get("cvd_findings", [])[:4]:
+                print(f"  {name}: cvd_collapse [{finding.get('deficiency')}] {finding.get('source')}: {finding.get('pair')}")
             if result.get("clusters_unexplained"):
                 print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
                       "(see region-diff/clusters.json — guards false closure)")
