@@ -1,0 +1,142 @@
+# Source-art anchor registry — the single source of art-truth for programmatic
+# nodes that overlay baked res://pokewilds/** art (G1 of the vision-fidelity
+# systemic fix; spec: docs/product-specs/vision-fidelity.md § Source-art anchor
+# registry). One [[anchors]] table per programmatic-on-baked element.
+#
+# WHY THIS FILE EXISTS: the 11 stage-px HP-bar escape (fixed at HEAD cf44597) was
+# uncatchable because every automated check class was SELF-REFERENTIAL — truth was
+# the code's own output or a human transcription of it. An anchor's stage_rect is
+# instead a pure integer function of the SOURCE-ART BYTES (re-derived at check
+# time by tools/art_geometry.py via the suite's own stdlib decoder
+# tools/visual_diff.decode_png_rgba), so the code under test can never influence
+# its own oracle. art_sha256 is the anti-fossilization pin: pokewilds/ is a
+# submodule whose contents are not individually tracked here, so the sha is the
+# art-change enforcement — mismatch => RED "art changed under the registry;
+# re-derive deliberately".
+#
+# CONSUMERS (all land via the code builders; this file is the data they read):
+#   - tools/art_geometry.py        — load_registry() / load_scenes() / derive_rect()
+#   - tools/check_art_anchors.py   — static RED gate (folded into check_repo_contracts.run)
+#   - tools/run_playtests.py       — apply_anchor_gate (baseline-regeneration refusal)
+#
+# DERIVATION TIERS:
+#   dark-run     — mechanically re-derived: per scan-row in row_ys, maximal runs
+#                  of luminance < lum_max with length >= min_run; bbox across rows.
+#   dark-cluster — mechanically re-derived: connected dark components (lum < lum_max,
+#                  area >= min_area) within a search window; bbox of the components.
+#   attested     — human feature choice, sha-pinned + cadence-re-verified (by/date/
+#                  rationale/reverify_by REQUIRED). The WEAKEST tier — never the
+#                  lazy default. The freshness gate asserts the sha + reverify_by.
+#
+# NODE NAMING: `nodes` are STAGE-RELATIVE PATHS — the draw_order node id produced
+# by render_introspection's recursive battle collection (a direct child of the
+# stage is its bare name; a nested node is Parent/Child, e.g. PlayerHUD/PlayerHPBar).
+# This is the SAME identifier the live-respect gate looks up in the sidecar
+# draw_order and the completeness scan computes from the .tscn, so one name serves
+# all three consumers.
+#
+# stage_rect is in the 160x144 STAGE-px space — the SAME space as sidecar
+# draw_order rects — so live-respect compares with NO stage->display mapping (an
+# exact integer comparison; at stage scale an 11px offset is enormous).
+
+schema_version = 1
+
+# ---------------------------------------------------------------------------
+# Scenes whose Control subtree overlays baked art. The node inventory under
+# `stage` is scanned MECHANICALLY (every overlay-typed descendant), so a node
+# ADDED to a declared art scene is caught without anyone naming it; `waive`
+# documents nodes deliberately not art-anchored. Un-anchored, un-waived nodes are
+# a COUNTED ADVISORY (the mechanized pilot _review coverage row), never a wave of
+# false reds — the full rule arms once >=1 anchor exists.
+# ---------------------------------------------------------------------------
+[[scenes]]
+scene = "scenes/ui/BattleView.tscn"
+stage = "BattleViewport/BattleStage"   # Control holding the baked-art TextureRects (BattleBackground/BattleOverlay)
+overlay_types = ["ColorRect", "Label"]
+# stage-relative node paths NOT art-anchored, each a dynamic-content node:
+# the HP-ratio fills have a DYNAMIC width (HP%), so an equality anchor would
+# false-fire whenever HP < 100%; their correct invariant is containment within
+# the track (a future containment-typed anchor), not rect equality.
+waive = [
+  "EnemyHPBar/Fill",
+  "PlayerHUD/PlayerHPBar/Fill",
+]
+
+# ---------------------------------------------------------------------------
+# Entries #1/#2 — the HP-bar tracks (bar-track). DARK-RUN, verified on committed
+# art bytes with the suite's own decoder: per-row dark runs (lum<95, min_run>=20)
+# at y18/y21 span x32..79 and y74/y77 span x96..143, giving exactly
+# (32,18,48,4) / (96,74,48,4) — and DETERMINISTICALLY EXCLUDING the misaligned
+# 43/107 positions the suite was green-on for 3+ days. Baseline-independent:
+# fires on a fresh checkout with zero baselines.
+# ---------------------------------------------------------------------------
+
+[[anchors]]
+id = "battle/enemy_hp_track"
+scene = "scenes/ui/BattleView.tscn"
+nodes = ["EnemyHPBar"]
+element_kind = "bar-track"
+source_art = "pokewilds/battle/battle_screen2.png"
+art_sha256 = "54d3919e2860b188828e543b326eaaab6297defee8e74a2b8c2b0e533464fc66"
+stage_rect = [32, 18, 48, 4]
+tol_px = 1
+derivation = "dark-run"
+# G1->G2 bridge field, LOAD-BEARING: each value is the rubric question FINGERPRINT
+# (the content-based join key in vision_review.QUESTION_ANSWERERS) that this anchor
+# mechanically answers via the KIND_ART_ANCHOR self-tag. check_art_anchors RED-fires
+# if a label is not a live KIND_ART_ANCHOR fingerprint for this anchor's shot group,
+# so the claim cannot drift from the enforced answerer map (a rubric reword RED-fires
+# both rubric_inventory_issues AND this field, never one side unnoticed).
+answers_questions = ["hp bars on their baked tracks"]
+
+[anchors.derivation_params]
+lum_max = 95
+row_ys = [18, 21]
+min_run = 20
+
+[anchors.attestation]
+# Provenance for a dark-run anchor is the recompute itself; this block records the
+# seeding attestation (optional for non-attested tiers, kept for auditability).
+by = "drakethomsen-mai"
+date = "2026-07-22"
+rationale = "Dark-run scan of battle_screen2.png reproduces the fixed EnemyHPBar stage rect (32,18,48,4) and excludes the misaligned x43; verified on committed art bytes via tools/visual_diff.decode_png_rgba."
+reverify_by = "2026-10-22"
+
+[[anchors]]
+id = "battle/player_hp_track"
+scene = "scenes/ui/BattleView.tscn"
+nodes = ["PlayerHUD/PlayerHPBar"]   # nested under PlayerHUD; needs the recursive draw_order collection
+element_kind = "bar-track"
+source_art = "pokewilds/battle/battle_screen2.png"
+art_sha256 = "54d3919e2860b188828e543b326eaaab6297defee8e74a2b8c2b0e533464fc66"
+stage_rect = [96, 74, 48, 4]
+tol_px = 1
+derivation = "dark-run"
+answers_questions = ["hp bars on their baked tracks"]   # load-bearing (see enemy_hp_track)
+
+[anchors.derivation_params]
+lum_max = 95
+row_ys = [74, 77]
+min_run = 20
+
+[anchors.attestation]
+by = "drakethomsen-mai"
+date = "2026-07-22"
+rationale = "Dark-run scan of battle_screen2.png reproduces the fixed PlayerHPBar stage rect (96,74,48,4) and excludes the misaligned x107; verified on committed art bytes via tools/visual_diff.decode_png_rgba."
+reverify_by = "2026-10-22"
+
+# ---------------------------------------------------------------------------
+# NEXT REGISTRY GROWTH (documented, not seeded — see vision-fidelity.md §
+# Source-art anchor registry "growth path"): the rest of the battle HUD plate
+# cluster needs anchor SEMANTICS the current equality gate does not yet express:
+#   - HP-number plate + name/level labels + message-box interior: containment /
+#     home-rect semantics (the dynamic string lives in catalog truth; only its
+#     home rect is anchored). Attested-with-sha, migrated from ui_render_art.gd
+#     (MSG_INTERIOR etc.) so provenance moves from the comment into the check.
+#   - glyph covers over the baked ':L' / '/' plates: dark-cluster derivation, but
+#     the covers are RUNTIME-created ColorRects (battle_surface_layout.gd), not
+#     scene nodes — anchoring them needs the runtime to name them into draw_order.
+#   - HP-ratio fills: containment-within-track (above).
+# Each ships when its derivation/semantics lands + a plant proves it; un-anchored
+# overlay nodes are a counted advisory until then (never faked as covered).
+# ---------------------------------------------------------------------------

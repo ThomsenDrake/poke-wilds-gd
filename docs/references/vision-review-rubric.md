@@ -1,11 +1,11 @@
 Status: current
-Last verified: 2026-07-21
+Last verified: 2026-07-22
 Review cadence days: 21
-Source paths: scripts/app/world_consistency_audit.gd, scripts/app/ui_render_audit.gd, tools/vision_review.py, .godot-smoke/shots
+Source paths: scripts/app/world_consistency_audit.gd, scripts/app/ui_render_audit.gd, tools/vision_review.py, tools/vlm_reviewer.py, docs/registry/art-anchors.toml, .godot-smoke/shots
 
 # Vision Review Rubric
 
-After any `visual_sweep` run whose shots change, `tools/vision_review.py` auto-produces `.godot-smoke/vision-review.json` — the Lane-4 structured findings file (oracle spec: `docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md` § Lane 4). Its DEFAULT REVIEWER is a deterministic in-process sidecar-consistency checker — no model, CI-safe, byte-stable findings per seed; a model or human reviewer plugs in via `--reviewer-cmd` (§ Lane-4 automation). The questions below are the rubric every reviewer answers for each shot's state group; any "no" is a finding.
+After any `visual_sweep` run whose shots change, `tools/vision_review.py` auto-produces `.godot-smoke/vision-review.json` — the Lane-4 structured findings file (oracle spec: `docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md` § Lane 4). Its DEFAULT REVIEWER is a deterministic in-process sidecar-consistency checker — no model, CI-safe, byte-stable findings per seed; a model or human reviewer plugs in via `--reviewer-cmd` (§ Lane-4 automation). The model-reviewer lane is PLUGGED IN AND DEMONSTRATED: `tools/vlm_reviewer.py` (§ Reviewer parameters) implements the socket and is wired into the runner post-step as an OPT-IN (`VISION_REVIEWER_CMD`, default unset ⇒ the deterministic lane; CI never sets it), and answers the judgment and non-baked-UI questions no coded class can express. The first positive model-answered manifest is LIVE-VERIFIED — "Qwen 3.8" (hosted `qwen3.8-max-preview` via the user's token-plan MaaS endpoint, `DASHSCOPE_API_KEY` env-only) answered all 19 rubric questions across all 5 shot groups (`reviewer_kinds_ran` includes `model-qwen3-vl`, 19/19 answered, 0 findings on the aligned tree, exit 0); local `ollama pull qwen3-vl:8b` is the offline FALLBACK (this box has no model pulled). When the model is positively unavailable (no key, server down, not pulled, per-call timeout) the lane degrades to the deterministic pass with the reason recorded (exit 0) and its model-only questions below are counted UNANSWERED — honest, never faked. The art-anchor layer (§ Grounding contract, `anchor:<id>`) carries geometric truth — the two mechanisms TARGET G1 (no source-art anchor; mechanical, proven by plant) and G2 (no rubric answerer; mechanism landed and wired, model-answered demonstration LIVE-VERIFIED) as one slice, and the G1↔G2 bridge is now CODE: `tools/vision_review.py` reads the registry into `anchor:<id>` regions and its `anchor_drift` class (reviewer_kind `deterministic-art-anchor`) answers the HP-bar track-geometry question whenever a changed battle shot is reviewed — the recursive battle draw_order collection (render_introspection.gd) exposes the nested `PlayerHUD/PlayerHPBar` so BOTH bars are live-verifiable. The questions below are the rubric every reviewer answers for each shot's state group; any "no" is a finding.
 
 Findings are quarantine-tier: reported, never failing, unless a coded oracle independently confirms the same defect. Only tool ERRORS (bad PNG decode, reviewer subprocess timeout/non-zero/invalid JSON, unwritable output) fail the run red (fail-closed). Every emitted finding MUST be grounded — cite a sidecar region id and intersect its bbox (§ Grounding contract); ungrounded reviewer output is dropped and counted, never emitted.
 
@@ -24,6 +24,8 @@ Every reviewer — model plugin or deterministic default — runs under a fixed 
 | `runs` | `1` | The deterministic default runs ONCE — votes are meaningless when the reviewer is a pure function of its inputs. The n=2/shuffle parameters are recorded (the interface is honored) but not spent. |
 
 The deterministic default is grounded by construction; model reviewers are held to the same grounding enforcement after they return (§ Grounding contract — enforcement is the gate, not a lint).
+
+The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-answered manifest is LIVE-VERIFIED on hosted `qwen3.8-max-preview` — 19/19 rubric questions answered, exit 0 — with local `ollama` `qwen3-vl:8b` as the offline fallback, this box having none pulled; full runtime + offline behavior in [RELIABILITY.md](../RELIABILITY.md) § Agent vision review) by `tools/vlm_reviewer.py`, which HONORS this contract wrapper-side (the pipeline calls a plugin once and trusts it to spend the vote, so the wrapper enforces it): temperature 0; n=2 = two separate `/api/chat` calls (Ollama has no `n` field) intersected for unanimity (a finding survives only if BOTH passes emit the same class+region_id); before/after Set-of-Mark order shuffled per pass under a recorded seed. HONEST RECORDING: at strict temperature 0 the two calls are identical greedy decodes, so `reviewer_meta.vote_semantics` records n=2 as a DETERMINISM/REPRO GUARD, NOT an independent vote; `VLM_INDEPENDENT_VOTE=1` (or `--independent-vote`) switches to temperature 0.2 + two distinct seeds for a genuine two-sample vote (off by default). The model is never asked for `bbox` — it cites a `region_id` and the wrapper sets `bbox` to that region's rect (the pipeline owns geometry). Model findings are QUARANTINE-FOREVER and are never promoted to red; only byte-derived `anchor:<id>` findings graduate (§ Grounding contract). A model pass that is positively unavailable (server down, model not pulled, timeout) records the reason in `reviewer_meta` and degrades to the deterministic pass with exit 0 — coverage never depends on the model running.
 
 ## Overworld states (`01_`, `02_`, `03_biome_*`)
 
@@ -61,6 +63,10 @@ The deterministic default is grounded by construction; model reviewers are held 
 - Is all text inside its box, with nothing crossing borders?
 - Is the cursor vertically centered on the row it selects?
 - Are HP bars on their baked tracks, and do HP numbers show a single slash?
+  (needs: deterministic-art-anchor answers the track GEOMETRY — each anchored bar's
+  live draw_order rect is compared byte-side to its art-anchors.toml stage_rect within
+  tol_px whenever a changed battle shot is reviewed; model-qwen3-vl keeps the
+  single-slash number JUDGMENT)
 
 ## Display-matrix states (`matrix/<w>x<h>_battle.png`)
 
@@ -88,8 +94,9 @@ All rects are DISPLAY-px except `draw:*` (stage px, mapped at grounding time):
 | `string:<TEXT>` | `expected_regions.strings` entries matched by text | Union of that text's entry rects | Anchor strings are unique per shot (PECK / RAZOR LEAF / SYNTHESIS, POKE BALL x5 / POTION x3 / BACK); the box-mode dup `'35'` shares one box rect (harmless) |
 | `label:<i>` | `labels[i]` by ARRAY INDEX | That label's `display_rect` | Deterministic `UiRenderModel.visible_labels` traversal; disambiguates duplicate texts (the two `'DECIDUEYE'` on 09); the payload carries the text |
 | `cursor:<id>` | `cursor_pairs` entry by id | Cursor cell ∪ row ∪ live (ANY of the three counts) | Ids: fight / pkmn / item / run, move_0..3, poke_ball / potion / back; the row is groundable for citation even though it is deliberately NOT a diff mask; an id present with `live []` is still citable (fresh cursor cell + row + baseline live remain) |
-| `draw:<node>` | `draw_order` entries by node name | Stage rect mapped stage→display | Mapping: the documented `battle_view` layout formula `k = floor(min((w-32)/160, (h-32)/144))`, centered in `window`; runtime-cross-checked (the mapped `draw:Cursor` rect must equal the `cursor_pairs` live rect whenever the cursor is visible). Ungroundable when the rect is `[]` (ALL overworld nodes: World/GroundLayer, World/PropLayer, Player carry rect [] with only y_sort/order semantics) or `draw_order` is `[]` (all menu shots) |
+| `draw:<node>` | `draw_order` entries by node id | Stage rect mapped stage→display | Node ids are STAGE-RELATIVE PATHS — the recursive battle collection names a nested node `Parent/Child` (e.g. `draw:PlayerHUD/PlayerHPBar`); a direct child keeps its bare name. Mapping: the documented `battle_view` layout formula `k = floor(min((w-32)/160, (h-32)/144))`, centered in `window`; runtime-cross-checked (the mapped `draw:Cursor` rect must equal the `cursor_pairs` live rect whenever the cursor is visible). Ungroundable when the rect is `[]` (ALL overworld nodes: World/GroundLayer, World/PropLayer, Player carry rect [] with only y_sort/order semantics) or `draw_order` is `[]` (all menu shots) |
 | `palette:canary` | `palettes.canary` | `canary_rect` (the scan covers the canary interior) | `palette:hud` has NO rect in the sidecar (the `palette_regions` intermediate is converted and dropped) → UNgroundable → context only, never findings |
+| `anchor:<id>` | `art-anchors.toml` `[[anchors]]` by id | The anchor's `stage_rect` mapped stage→display via the single `_stage_to_display` home | The FIRST region whose rect is ART-TRUTH, not sidecar/code-output (the G1↔G2 bridge, IMPLEMENTED in `tools/vision_review.py`). Sourced from [art-anchors.toml](../registry/art-anchors.toml) via `art_geometry` (`load_registry` + `rects_close`); the `anchor_drift` class (reviewer_kind `deterministic-art-anchor`, quarantine-tier, graduating per-anchor) compares each anchored node's LIVE `draw_order` stage rect to the anchor `stage_rect` within the registry `tol_px` — drift emits a finding grounded by construction (bbox = the enclosing rect of the live mapped rect ∪ the registered anchor rect, so it intersects the anchor rect for drifts of any magnitude); a node absent from `draw_order` is counted UNVERIFIED in a warning, never a finding — and VLM fidelity findings on art features ground here through the existing `rects_overlap`. Seeded: `anchor:battle/enemy_hp_track` (32,18,48,4), `anchor:battle/player_hp_track` (96,74,48,4) — battle only |
 
 Per-shot-kind coverage (verified from the committed sidecars):
 
@@ -200,7 +207,7 @@ For each shot whose fresh PNG bytes differ from its baseline bytes (`visual_regi
 
 1. `before.png` / `after.png` — raw byte COPIES of the baseline + fresh frames (native 1152x648; no re-encode).
 2. `crop_NNN_<tag>.png` — NATIVE-RESOLUTION crops (capped full frames hide small diffs — the point of the crops): one base|fresh twin per `clusters.json` cluster (cluster bbox + 8px padding, clamped to frame, 4px gap, panels labeled via `png_canvas.text`), built with `visual_diff.decode_png_rgba` + `png_canvas` blit/box/text; region crops for grounded findings are added post-review as each finding's `evidence_crop` (cited region rect + padding, base|fresh twin).
-3. `som_before.png` / `som_after.png` — Set-of-Mark overlays (arXiv 2310.11441): full-frame copies with EVERY groundable region outlined (1px box, color per kind: canary red, string/ink/label amber, cursor cyan, draw gray, palette:canary magenta) plus a NUMBER at each box (`png_canvas` 3x5 font); numbering is deterministic (kind priority then region-id), and the number→region_id legend ships in the reviewer's stdin JSON (`som_legend`), not pixels-only. SoM frames require a decode→blit of 746,496 px (pure-Python loop, ~1-2 s/frame; bounded — only changed shots get SoM; never downscale SoM, since capped frames are the exact failure mode).
+3. `som_before.png` / `som_after.png` — Set-of-Mark overlays (arXiv 2310.11441): full-frame copies with EVERY groundable region outlined (1px box, color per kind: canary red, string/ink/label amber, cursor cyan, anchor green, draw gray, palette:canary magenta) plus a NUMBER at each box (`png_canvas` 3x5 font); numbering is deterministic (kind priority then region-id), and the number→region_id legend ships in the reviewer's stdin JSON (`som_legend`), not pixels-only. SoM frames require a decode→blit of 746,496 px (pure-Python loop, ~1-2 s/frame; bounded — only changed shots get SoM; never downscale SoM, since capped frames are the exact failure mode).
 4. `expected_strings.json` — the expected-strings manifest: fresh sidecar `expected_regions.strings` + `labels[]` (text, region, mode, avoid).
 5. `rubric.txt` — this rubric's section for the shot's state group (prefix map: 01-03 overworld, 04-05 day/night, 06-08 menu, 09-12 battle, matrix/ display-matrix).
 6. `context.json` — shot kind, crafted_state, window, clusters summary (bbox + changed + tier + sentence), the computed sidecar delta list, the region table (id → {kind, rects, source sidecar}), and the number→region_id `som_legend` (the same dict that ships in the stdin JSON).
@@ -218,12 +225,13 @@ In-process, no model, CI-safe: a pure function of sidecar + clusters bytes → b
 | `label_text_changed` | Same index, text differs | `label:<i>` |
 | `cursor_missing` / `cursor_moved` / `cursor_appeared` | `cursor_pairs` matched by id: live rect→[] / moved / []→rect | `cursor:<id>`, bbox = the enclosing rect of the pair's BASELINE cursor cell ∪ row ∪ live (`cursor_missing`) or the live rect (moved: baseline; appeared: fresh) — the validation plant produces exactly `cursor_missing` on move_0, bbox [404,448,128,36] |
 | `draw_order_changed` | Node sequence, z, or y_sort order delta | `draw:<node>` ONLY when the rect is groundable, else ungroundable-context count |
+| `anchor_drift` | Live `draw_order` rect of an anchored node off its `art-anchors.toml` `stage_rect` by more than `tol_px` (stage-to-stage compare; a node absent from `draw_order` is counted UNVERIFIED in a warning, never a finding) | `anchor:<id>`, bbox = the enclosing rect of the live rect mapped stage→display ∪ the registered anchor rect (contains the anchor rect, so it intersects by construction for drifts of any magnitude — a live-rect-only bbox would stop intersecting once the drift reaches the bar width); reviewer_kind `deterministic-art-anchor`; self-tags into the coverage ledger even on a zero-drift pass |
 | `palette_dropped` | Baseline `palettes.canary` − fresh non-empty | `palette:canary` (bbox canary_rect); hud deltas never emit (ungroundable) |
 | `canary_rect_changed` | Canary rect delta | `canary` |
 | `expected_region_changed` | Ink/string rect-list deltas | `ink:<i>` / `string:<TEXT>` |
-| `cluster_unexplained` | ONE finding per `clusters.json` cluster with `explained == false` | bbox = cluster bbox; region_id = MOST-SPECIFIC groundable region intersecting the bbox, priority cursor-live > string > label > ink > canary > draw (smallest mapped rect) > palette:canary; intersects NOTHING → not emitted, counted as `ungroundable_clusters` (explicit queue preserved) |
+| `cluster_unexplained` | ONE finding per `clusters.json` cluster with `explained == false` | bbox = cluster bbox; region_id = MOST-SPECIFIC groundable region intersecting the bbox, priority cursor-live > string > label > ink > anchor > canary > draw (smallest mapped rect) > palette:canary; intersects NOTHING → not emitted, counted as `ungroundable_clusters` (explicit queue preserved) |
 
-Deterministic severity/confidence map: sidecar deltas medium/high, canary + palette high/high, clusters low/medium. It emits NOTHING for byte-identical shots and NOTHING groundable for overworld/menu shots lacking regions — the coverage gap is counted, not faked.
+Deterministic severity/confidence map: sidecar deltas medium/high, canary + palette + anchor drift high/high, clusters low/medium. It emits NOTHING for byte-identical shots and NOTHING groundable for overworld/menu shots lacking regions — the coverage gap is counted, not faked.
 
 ### Staleness (shot-hash manifest)
 
@@ -250,3 +258,53 @@ Why EVERY coded oracle is silent (measured geometry from the committed baseline 
 Why the DEFAULT deterministic reviewer catches it: fresh `cursor_pairs[move_0].live = []` vs baseline `[404,452,32,32]` → a `cursor_missing` finding citing `cursor:move_0` (the id is present in BOTH sidecars; bbox = the enclosing rect of the pair's baseline cursor cell ∪ row ∪ live, [404,448,128,36], grounded on the cursor cell [404,452,16,16] it intersects); `evidence_crop` = the base|fresh native twin of the cited region showing the arrow gone; the explanation quotes the battle question above — "Is the cursor vertically centered on the row it selects?" (presence precondition) — a defect class NO coded oracle implements (`cursor_pairs` exists in the coded layer ONLY as a diff mask, which is precisely what blinds every pixel gate to it — Lane 4's unique value). Recorded as a `quarantine_finding`-class entry kind `vision_review` in the report + a vision-review.json finding with `finding_id`.
 
 REVERT + PROOF: `git checkout -- scripts/ui/battle_surface.gd` (the file is not otherwise co-modified in Slice 5) → `git diff -- scripts/ui/battle_surface.gd` empty; the post-revert windowed sweep's fresh sidecar is byte-identical to the baseline sidecar modulo {ts_msec, trace_cursor} (canonical byte-stability, Slice-3 evidence). Validation commands (windowed, 600000 ms timeout, never concurrent): `python3 tools/run_playtests.py --scenario visual_sweep` then `--scenario ui_render_audit` then `--scenario layout_audit` under the plant; assert run green + zero coded findings on shot 10 + exactly the `cursor_missing` vision_review finding grounded on `cursor:move_0`; plus a mock-reviewer drop-and-count run (exit stays 0, drops counted).
+
+## Rubric coverage semantics
+
+The mechanized version of the pilot's RETIRED `_review` coverage-gap pseudo-row (implemented in `tools/vision_review.py`): instead of a fake finding, "the rubric's art-fidelity questions were answered" is a checkable, freshness-gated, HONESTLY-COUNTED fact. `parse_rubric_questions` parses the per-shot-group `## ` sections above into a stable inventory (the SAME heading markers the bundle excerpter uses, so the ledger and the per-shot rubric excerpt never disagree); `QUESTION_ANSWERERS` declares which reviewer KIND can answer each question; and the manifest's `rubric_coverage` block (schema `rubric-coverage/1`) records, per shot-group, which kinds ran a fresh pass and which questions are therefore answered.
+
+- **Stable question ids.** `question_id = "q1-"` + the first 8 hex of sha256 over the canonical (whitespace-collapsed) question text — stable across REORDERING; REWORDING rotates the id (surfaced as an UNASSIGNED question, never a silent loss), and a brand-new question nobody mapped is likewise counted. (The `vr1-` `finding_id` convention applied to questions.)
+- **Answered predicate.** A question is `answered` iff a CAPABLE reviewer kind RAN this pass (`_kinds_that_ran`: the configured reviewer plus every kind that self-tagged an emitted finding or a returned answer — a composite VLM/art-anchor wrapper self-tags, so its coverage registers without any pipeline change), OR a returned `answers[]` entry addressed its id.
+- **Unanswered is a first-class COUNTED state** — never faked as answered, never red (advisory-loud). A shot-group with unanswered questions emits a `rubric_coverage_gap [<group>]: N of M rubric question(s) have no fresh reviewer pass (needs [...])` line that rides the manifest `warnings[]`, the legibility report, and `verify_all`'s WARN surface (degrading under `--skip-windowed` like R6). Overworld reports its reason as "no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions" — the honest, mechanized form of the pilot's "overworld y-sort has no pixel canary" note.
+- **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, display_matrix 1 (19 total) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
+- **Freshness.** `rubric_coverage` rides the sha256 manifest, so `review_is_fresh` covers it; the lane-4 staleness refusal (§ Staleness) applies unchanged.
+
+### Answerers table (`QUESTION_ANSWERERS`)
+
+Matching is by CONTENT (a distinctive lowercase fingerprint substring of the canonical question text), so the join is robust to reordering and a reword breaks its fingerprint → unassigned (counted). Reviewer kinds: `deterministic-sidecar-consistency` (the default), `deterministic-art-anchor` (the art-anchor drift class), `model-qwen3-vl` (Qwen3-VL).
+
+| Shot group | Question fingerprint | Capable reviewer kinds |
+| --- | --- | --- |
+| battle | cursor vertically centered | deterministic-sidecar-consistency, model-qwen3-vl |
+| battle | name plates read fully | deterministic-sidecar-consistency, model-qwen3-vl |
+| battle | hp bars on their baked tracks | deterministic-art-anchor, model-qwen3-vl |
+| battle | single clean frame | model-qwen3-vl |
+| battle | text inside its box | model-qwen3-vl |
+| overworld | biome read as its intended terrain | model-qwen3-vl |
+| overworld | props sit on their tiles | model-qwen3-vl |
+| overworld | render behind tall prop canopies | model-qwen3-vl |
+| overworld | tall-grass patches visibly distinct | model-qwen3-vl |
+| overworld | untextured solid-color | model-qwen3-vl |
+| overworld | player sprite intact | model-qwen3-vl |
+| day_night | tint plausibly | model-qwen3-vl |
+| day_night | hint bar | model-qwen3-vl |
+| menu | uniformly dimmed | model-qwen3-vl |
+| menu | panels framed and readable | model-qwen3-vl |
+| menu | every row align its name | model-qwen3-vl |
+| menu | hp bars visible and color-graded | model-qwen3-vl |
+| menu | clipped, overlapping, or escaping | model-qwen3-vl |
+| display_matrix | every window size | model-qwen3-vl |
+
+Consequence: the deterministic sidecar-consistency reviewer answers ONLY the two battle questions its classes mechanically implement; the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the 13 judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to. Offline (no model run), those 13 are counted UNANSWERED with reason, never faked.
+
+### `answers[]` contract (additive `--reviewer-cmd` seam)
+
+A `--reviewer-cmd` plugin may ANSWER rubric questions explicitly by returning `answers` alongside `findings`:
+
+```json
+{"findings": [...], "answers": [{"question_id": "q1-<hex8>", "verdict": "yes|no",
+  "region_id": "anchor:battle/enemy_hp_track", "bbox": [128, 108, 192, 16],
+  "note": "...", "reviewer_kind": "model-qwen3-vl"}]}
+```
+
+`_validate_answer` validates/repairs each answer (`verdict ∈ {yes, no}`, `question_id` a non-empty `q1-` id; `region_id` + `bbox` optional). A verdict-`no` answer that cites a resolvable region becomes a quarantine finding via the existing `_mk` path (reviewer_kind carried through); an answer without a resolvable region is COUNTED, never a finding; a malformed `answers` field is a TOOL ERROR (never a silent drop), and dropped invalid answers are counted in the coverage warnings. The deterministic lanes need not emit explicit answers — their coverage registers because a capable kind RAN (§ Answered predicate).

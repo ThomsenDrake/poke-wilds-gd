@@ -1,0 +1,48 @@
+{
+  "schema": "miss-postmortem/1",
+  "note": "Tracked canonical-JSON ledger; a deliberate human/agent ritual, NEVER a runner post-step (mirrors graduation-ledger.json). Counts are COMPUTED from entries, never narrated. Refuse-on-unreadable: a present-but-corrupt ledger is a hard error, never reset to empty. The both-directions check_repo_contracts backstop is IMPLEMENTED (tools/check_repo_contracts.py miss_postmortem_issues, folded into run; incompleteness advisories on stderr): every entry's mechanism_added MUST resolve to a landed artifact (each named repo path exists; each named art-anchor id is in the registry) and every executed plant's revert_scope sha256 pins MUST still match the tree — the pins are recorded at the byte-identical revert, so the check is position-independent (it holds mid-slice as well as post-commit, where a live git status would false-red on unrelated in-flight edits). Entry #1's plant EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable, 1152x648, forward_plus); the run artifacts are machine-local (.godot-smoke is gitignored: proof-class1-compare.json first-break, proof-class1-update-refusal.json regen-under-break RED, proof-class1-revert-compare.json post-revert GREEN, proof-vlm-plugin-degrade.json opt-in reviewer degrade) — the DURABLE proof is the revert_scope pins below plus the backstop that holds them.",
+  "entries": [
+    {
+      "id": "miss-001-hp-bar-11px",
+      "date": "2026-07-22",
+      "head_sha": "cf44597ecc5203d8830a4d594030dfcdfbd7b931",
+      "instance": {
+        "description": "Programmatic HP bars (EnemyHPBar/PlayerHPBar ColorRects in scenes/ui/BattleView.tscn) were misaligned +11 stage-px from the baked GSC tracks: enemy at x43 (track x32), player at x107 (track x96). The committed baseline sidecar (fd7d0925e0aed24c9cb0f04526a3368717dfac72, 2026-07-18) froze the wrong draw_order EnemyHPBar rect [43,18,48,4] and the suite stayed GREEN against it for 3+ days. Every automated check class was self-referential: truth was the code's own output or a human transcription of it, so nothing could see an overlay sitting off the art feature it belongs on.",
+        "shots": ["09_battle.png", "10_battle_moves.png", "11_battle_after_attack.png", "12_battle_items.png"],
+        "perturbation": "Fix: EnemyHPBar offset_left 43->32 and PlayerHPBar offset_left 107->96 (-11 stage px each), then visual_sweep_update regenerated exactly the four battle baselines 09-12 (overworld/menu baselines byte-identical)."
+      },
+      "missing_anchor_class": "SA",
+      "classes_silent": [
+        {"class": "pixel baseline + global 0.5% gate (visual_diff.py)", "anchor_kind": "CO", "why_silent": "The wrong render WAS the baseline; delta 0."},
+        {"class": "visual_region_diff red tiers", "anchor_kind": "CO", "why_silent": "No clusters vs its own baseline; the bar moved WITH the baseline."},
+        {"class": "Lane-4 deterministic sidecar-consistency reviewer", "anchor_kind": "CO", "why_silent": "draw_order delta checks z/y_sort/presence only, never rects; baseline and fresh sidecars both carried the code's [43,18,...]."},
+        {"class": "ui_render_model / ui_render_art", "anchor_kind": "HM", "why_silent": "HP bars were never modeled — no bar rect in the ACTION_*/MOVE_*/ITEM_* constants."},
+        {"class": "text_oracle glyph XOR", "anchor_kind": "CO", "why_silent": "HP numbers are not ANCHOR strings; the glyph oracle matches anchor-mode strings only."},
+        {"class": "layout_audit", "anchor_kind": "CO", "why_silent": "Checks name/level overlap only; consumes the layout model, not art."},
+        {"class": "contrast_check (WCAG)", "anchor_kind": "XS", "why_silent": "Label rects unchanged; a translation changes no contrast ratio."},
+        {"class": "cvd_sim (Machado 2009)", "anchor_kind": "XS", "why_silent": "Palettes unchanged; position-independent."},
+        {"class": "display_matrix", "anchor_kind": "CO", "why_silent": "Self-consistent scale replication at every window size; the offset replicates cleanly."},
+        {"class": "rubric line 63 'Are HP bars on their baked tracks...?'", "anchor_kind": "EA", "why_silent": "Asked by the rubric, answered by NO agent — the model-reviewer lane was designed but never populated."}
+      ],
+      "mechanism_added": "SA anchor class: docs/registry/art-anchors.toml entries battle/enemy_hp_track + battle/player_hp_track (dark-run stage_rects (32,18,48,4)/(96,74,48,4) re-derived from battle_screen2.png bytes); tools/art_geometry.py derive_rect; tools/check_art_anchors.py art_anchor_issues folded into check_repo_contracts.run (RED static gate); anchor_drift class in tools/vision_review.py default_reviewer (quarantine-tier, art:<id> regions); tools/run_playtests.py apply_anchor_gate baseline-regeneration refusal — active for BOTH visual_sweep and visual_sweep_update via VISUAL_SWEEP_SCENARIOS (a guard on the compare name alone leaves the refusal branch unreachable, which the plant's first pass exposed and fixed), plus the VISION_REVIEWER_CMD opt-in wiring of the --reviewer-cmd socket into apply_vision_review; EA answerer: tools/vlm_reviewer.py (reviewer_kind model-qwen3-vl, composite degrade, kinds_ran contract) populating the socket for the battle 'hp bars on their baked tracks' question — opt-in in the runner (default unset ⇒ deterministic lane), the first model-answered manifest pending a qwen3-vl pull; protocol backstop: tools/check_repo_contracts.py miss_postmortem_issues (both-directions, folded into run) resolving this mechanism_added to landed artifacts and holding this plant's revert_scope. All resolve to landed artifacts in this slice.",
+      "plant": {
+        "perturbation": "CLASS-LEVEL: re-break EnemyHPBar/PlayerHPBar offsets to 43/107 WITHOUT regenerating baselines (any overlay off its art anchor), run every lane; then ALSO regenerate baselines under the break (--scenario visual_sweep_update) and re-run. Both bars are broken; only the enemy anchor can fire live-respect today — PlayerHUD/PlayerHPBar is nested and not yet exposed in the sidecar draw_order (recursive collection pending), so the player anchor is recorded UNVERIFIABLE, never silently passed.",
+        "executed": true,
+        "mechanism_caught": true,
+        "classes_silent_confirmed": true,
+        "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode — machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar — and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole — regenerated baselines were. REGEN-UNDER-BREAK (update mode — machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap — prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole).",
+        "revert_scope": {
+          "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
+          "docs/generated/visual-baselines/09_battle.png.sidecar.json": "efe412b8732cd4b55a81a7801770cc205bac27529ffc7b033eed6f8a747b1fbc",
+          "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
+          "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "e4171dfd4399f2cce27f148dbe5d7d44a3fd1d0deb5b19e2c75fe72253927bc5",
+          "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
+          "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "3ff58f35fed81c460ea12ae48291ae97d22b0f6835a96485a61d88949e811e4c",
+          "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
+          "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "681592aab5301d1168924cd6733ee732f2f2973febdd5f4ecf8020eb1c4ea5c0"
+        }
+      },
+      "plants_recorded_but_excluded_from_stats": true
+    }
+  ]
+}

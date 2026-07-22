@@ -15,6 +15,8 @@ from legibility_lib import repo_root
 BASELINE_DIR = repo_root() / "docs" / "generated" / "visual-baselines"
 GRADUATION_LEDGER = repo_root() / "docs" / "generated" / "graduation-ledger.json"
 VISION_METRICS_JSON = repo_root() / ".godot-smoke" / "vision-metrics.json"
+VISION_REVIEW_JSON = repo_root() / ".godot-smoke" / "vision-review.json"
+SHOTS_DIR = repo_root() / ".godot-smoke" / "shots"
 
 
 def _load_tool(name: str):
@@ -171,6 +173,83 @@ def ssim_section() -> list[str]:
     return lines
 
 
+def rubric_coverage_section() -> tuple[list[str], int, int]:
+    """Rubric-coverage ledger (mechanizes the retired pilot `_review` coverage-gap
+    pseudo-row): renders, per shot-group, how many rubric questions a FRESH
+    reviewer pass answered vs. left unanswered, and which reviewer KIND each
+    unanswered question needs. Advisory-loud, NEVER red and NEVER counted in
+    "Total findings" (the Legibility Debt regex matches only that first line): an
+    unanswered group is impossible to miss here but does not break GREEN. Reads the
+    rubric_coverage block from the fresh .godot-smoke/vision-review.json; a missing
+    or stale manifest degrades to an honest note (CI/garden have no fresh shots).
+    Returns (lines, gap_group_count, unanswered_count)."""
+    lines = ["## Rubric coverage (Lane-4 question ledger)", ""]
+    vr = _load_tool("vision_review")
+    if vr is None:
+        lines.append("Skipped: vision_review tool unavailable.")
+        lines.append("")
+        return lines, 0, 0
+    if not VISION_REVIEW_JSON.exists():
+        lines.append("Skipped: no .godot-smoke/vision-review.json (run a windowed "
+                     "visual_sweep to generate a fresh Lane-4 review). Until a reviewer "
+                     "pass is recorded, every rubric question is counted UNANSWERED, never "
+                     "assumed answered.")
+        lines.append("")
+        return lines, 0, 0
+    try:
+        doc = json.loads(VISION_REVIEW_JSON.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        lines.append("Skipped: .godot-smoke/vision-review.json is unreadable.")
+        lines.append("")
+        return lines, 0, 0
+    coverage = doc.get("rubric_coverage") if isinstance(doc, dict) else None
+    if not isinstance(coverage, dict):
+        lines.append("Skipped: vision-review.json predates the rubric-coverage ledger "
+                     "(no rubric_coverage block); regenerate with a fresh visual_sweep.")
+        lines.append("")
+        return lines, 0, 0
+    fresh = True
+    try:
+        fresh = vr.review_is_fresh(doc, SHOTS_DIR, BASELINE_DIR)
+    except Exception:
+        fresh = False
+    if not fresh:
+        lines.append("NOTE: vision-review.json is STALE vs current shots (review_is_fresh "
+                     "false); the coverage below reflects an older pass. The next visual_sweep "
+                     "regenerates it.")
+        lines.append("")
+    totals = coverage.get("totals", {})
+    groups = coverage.get("groups", [])
+    gaps = coverage.get("gaps", [])
+    answered = int(totals.get("questions_answered", 0) or 0)
+    total_q = int(totals.get("questions_total", 0) or 0)
+    unanswered = int(totals.get("unanswered", 0) or 0)
+    kinds_ran = coverage.get("reviewer_kinds_ran", [])
+    lines.append(f"Reviewer kinds that ran a fresh pass: {', '.join(kinds_ran) or 'none'}. "
+                 f"{answered}/{total_q} rubric questions answered; {unanswered} unanswered "
+                 f"across {len(gaps)} shot-group(s). Advisory-loud, never red: an unanswered "
+                 "question is COUNTED here (never faked as answered) until a capable reviewer "
+                 "(art-anchor and/or model) runs.")
+    lines.append("")
+    for group in groups:
+        name = group.get("group", "?")
+        ga = int(group.get("questions_answered", 0) or 0)
+        gt = int(group.get("questions_total", 0) or 0)
+        gkinds = ", ".join(group.get("reviewer_kinds", [])) or "none"
+        changed = len(group.get("shots_changed", []))
+        covered_n = len(group.get("shots_covered", []))
+        status = "COVERED" if ga == gt and gt > 0 else ("GAP" if gt > 0 else "no questions")
+        lines.append(f"- {name}: {ga}/{gt} answered [{status}] — fresh reviewer kinds: "
+                     f"{gkinds}; shots {changed} changed of {covered_n} covered")
+        for uq in group.get("unanswered", []):
+            lines.append(f"    - UNANSWERED {uq.get('id', '?')}: {uq.get('reason', '?')}")
+            text = uq.get("text")
+            if text:
+                lines.append(f"        \"{text}\"")
+    lines.append("")
+    return lines, len(gaps), unanswered
+
+
 def generate(output_path: Path) -> int:
     checks = {
         "repo_contracts": check_repo_contracts.run(),
@@ -180,6 +259,7 @@ def generate(output_path: Path) -> int:
     findings = sum(len(items) for items in checks.values())
     contrast_lines, contrast_low = contrast_section()
     cvd_lines, cvd_collapses = cvd_section()
+    rubric_lines, rubric_gap_groups, rubric_unanswered = rubric_coverage_section()
     graduation_lines = graduation_section()
     ssim_lines = ssim_section()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
@@ -190,7 +270,8 @@ def generate(output_path: Path) -> int:
         "Review cadence days: 7",
         "Source paths: tools/generate_legibility_report.py, tools/check_repo_contracts.py, "
         "tools/check_architecture.py, tools/check_quality_docs.py, tools/contrast_check.py, "
-        "tools/cvd_sim.py, tools/graduation_ledger.py, tools/vision_metrics.py",
+        "tools/cvd_sim.py, tools/graduation_ledger.py, tools/vision_metrics.py, "
+        "tools/vision_review.py",
         "",
         "# Legibility Report",
         "",
@@ -198,6 +279,8 @@ def generate(output_path: Path) -> int:
         f"- Total findings: {findings}",
         f"- contrast_low findings (advisory, quarantine-tier): {contrast_low}",
         f"- cvd_collapse findings (accessibility evidence, quarantine-forever): {cvd_collapses}",
+        f"- rubric_coverage gaps (advisory, never red): {rubric_gap_groups} shot-group(s), "
+        f"{rubric_unanswered} unanswered question(s)",
         "",
     ]
 
@@ -214,6 +297,7 @@ def generate(output_path: Path) -> int:
 
     lines.extend(contrast_lines)
     lines.extend(cvd_lines)
+    lines.extend(rubric_lines)
     lines.extend(graduation_lines)
     lines.extend(ssim_lines)
 

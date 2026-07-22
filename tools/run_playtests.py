@@ -55,6 +55,14 @@ SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
 # single-sourced in the sibling smoke harness (see the note there).
 WINDOWED_SUBPROCESS_SCENARIOS = smoketest.WINDOWED_SUBPROCESS_SCENARIOS
 WINDOWED_ONLY_SCENARIOS = smoketest.WINDOWED_ONLY_SCENARIOS
+# Both sweep scenario names. The compare-side post-steps (region gate,
+# contrast/CVD, vision review) guard on "visual_sweep" alone — they are
+# meaningless right after a baseline rewrite. The anchor gate is the ONE
+# post-step that MUST also run for "visual_sweep_update": policing that rewrite
+# is its entire reason to exist (the update-mode baseline-regeneration
+# refusal), so both its snapshot (prepare_anchor_gate) and its verdict
+# (apply_anchor_gate) cover both names.
+VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
@@ -562,6 +570,16 @@ def _load_tool_module(name: str) -> Any:
 # history graduates contrast_low to coded red. cvd_collapse NEVER graduates.
 CONTRAST_GRADUATED = False
 
+# Art-anchor live-respect (compare mode) ships quarantine-tier first; flip True
+# once an anchor has the graduation proof (byte-stable findings across runs +
+# clean streak + a recorded seeded plant — the exit4_proof pattern). The
+# baseline-REGENERATION refusal in update mode is ALWAYS armed regardless of this
+# flag, because a wrong baseline frozen green is worse than a missing baseline —
+# that half is what structurally closes the 3-days-green HP-bar hole. The HP
+# tracks (battle/enemy_hp_track, battle/player_hp_track) are the first candidates
+# to graduate.
+ANCHOR_DRIFT_GRADUATED = False
+
 
 def apply_contrast_cvd(project: Path, result: dict[str, Any]) -> None:
     """Runner-recorded WCAG contrast + CVD evidence for the visual_sweep scenario.
@@ -657,10 +675,16 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
     .godot-smoke/vision-review.json on EVERY visual_sweep compare run (even 0 changed
     shots -- full manifest, zero findings), so any sweep whose shots change has a
     current file and the manifest is the complete freshness authority. The default
-    reviewer is deterministic (no model); --reviewer-cmd is a plugin handled inside
-    tools/vision_review.py. Only a tool ERROR (bad PNG decode, unwritable output)
-    fails red via the exception path (fail-closed); dropped/ungrounded findings are
-    counted, never errors. Skipped on transport-skip and in update mode; a
+    reviewer is deterministic (no model); the OPT-IN model lane rides the
+    VISION_REVIEWER_CMD env var (e.g. "python3 tools/vlm_reviewer.py"), passed
+    through to tools/vision_review.py's --reviewer-cmd plugin socket. Default
+    unset => the deterministic lane; CI NEVER sets it. The plugin owns its own
+    degrade (composite: always runs the deterministic pass, adds the model only
+    when POSITIVELY available), so an absent model records a degrade and exits 0
+    — never a silent fallback, never a red run. Only a tool ERROR (bad PNG
+    decode, unwritable output, broken plugin) fails red via the exception path
+    (fail-closed); dropped/ungrounded findings are counted, never errors. Skipped
+    on transport-skip and in update mode; a
     transport-skipped run that leaves a stale review file on disk REFUSES it (warn,
     not recorded, never red). It runs after apply_region_gate so region-diff's
     clusters.json exists; if that step erred, vision_review degrades to
@@ -697,9 +721,18 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
         return
     try:
         vision_review = _load_tool_module("vision_review")
+        # OPT-IN model lane: VISION_REVIEWER_CMD wires a --reviewer-cmd plugin
+        # (e.g. "python3 tools/vlm_reviewer.py") into this post-step. Default
+        # unset => the deterministic default reviewer; CI NEVER sets it. The
+        # plugin owns its degrade (composite: the deterministic pass always
+        # runs, the model only when positively available), so an absent model
+        # is a RECORDED degrade with exit 0, never a silent fallback and never
+        # a red run; a broken plugin stays fail-closed via the exception path.
+        reviewer_cmd = os.environ.get("VISION_REVIEWER_CMD") or None
         doc = vision_review.run_vision_review(
             shots_dir, baseline_dir, output_dir,
-            clusters_path=output_dir / "region-diff" / "clusters.json")
+            clusters_path=output_dir / "region-diff" / "clusters.json",
+            reviewer_cmd=reviewer_cmd)
     except Exception as exc:  # a broken review tool must not silently pass
         result.setdefault("exceptions", []).append(f"vision review failed: {exc}")
         result["ok"] = False
@@ -715,6 +748,164 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
           f"({written['grounded']} grounded, {written['dropped']} dropped), "
           f"{written['shots_changed']} changed of {written['shots_reviewed']} covered shot(s), "
           f"reviewer={written['reviewer']}")
+
+
+def _baseline_dir(project: Path) -> Path:
+    return project / "docs" / "generated" / "visual-baselines"
+
+
+def prepare_anchor_gate(project: Path, scenario: str) -> dict[str, bytes]:
+    """Snapshot the committed baseline bytes BEFORE a visual_sweep run so the
+    baseline-regeneration refusal gate (apply_anchor_gate) can restore them if an
+    anchored element drifts. Called in the scenario loop ahead of dispatch --
+    post-steps run AFTER the sweep rewrites baselines, so the prior bytes must be
+    captured here. Returns {} for any non-sweep scenario (nothing to police).
+    Covers BOTH sweep names — the snapshot must exist for visual_sweep_update,
+    the scenario that actually rewrites baselines (an empty snapshot would make
+    a refusal unlink every baseline and restore nothing). The snapshot is the
+    whole baseline dir (PNG + sidecar), so a refusal reverts the update
+    completely -- a wrong baseline is worse than a missing one.
+    """
+    if scenario not in VISUAL_SWEEP_SCENARIOS:
+        return {}
+    baseline_dir = _baseline_dir(project)
+    if not baseline_dir.is_dir():
+        return {}
+    snapshot: dict[str, bytes] = {}
+    for path in sorted(baseline_dir.iterdir()):
+        if path.is_file():
+            try:
+                snapshot[path.name] = path.read_bytes()
+            except OSError:
+                pass
+    return snapshot
+
+
+def _anchor_sidecar_violations(checker, sidecar_dir: Path, project: Path) -> tuple[list[dict], list[dict]]:
+    """Run live-respect across every sidecar in a dir. Returns (violations,
+    unverifiable) aggregated; each carries the shot name."""
+    violations: list[dict] = []
+    unverifiable: list[dict] = []
+    if not sidecar_dir.is_dir():
+        return violations, unverifiable
+    for sidecar_path in sorted(sidecar_dir.glob("*.sidecar.json")):
+        try:
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(sidecar, dict):
+            continue
+        shot = sidecar_path.name[: -len(".png.sidecar.json")]
+        v, u = checker.live_violations(sidecar, project)
+        for item in v:
+            item["shot"] = shot
+        for item in u:
+            item["shot"] = shot
+        violations.extend(v)
+        unverifiable.extend(u)
+    return violations, unverifiable
+
+
+def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str, bytes]) -> None:
+    """Source-art anchor gate for the visual_sweep / visual_sweep_update
+    scenarios (spec: docs/product-specs/vision-fidelity.md § Source-art anchor
+    registry). The ONLY sweep post-step that ALSO runs in update/auto_update mode
+    -- the others skip because baselines were just rewritten; this one exists
+    precisely to police that rewrite. Both sweep scenario names are covered
+    (VISUAL_SWEEP_SCENARIOS): visual_sweep_update is the scenario that actually
+    rewrites baselines, so a guard on "visual_sweep" alone would leave the
+    refusal branch unreachable -- the exact hole the gate closes.
+
+    Two tiers, both keyed off the SAME stage-to-stage comparison (a sidecar
+    draw_order rect vs the registry stage_rect -- NO stage->display mapping):
+
+      update/auto_update (REFUSAL, blocks baseline regeneration): read each
+        JUST-WRITTEN baseline sidecar's anchored draw_order rects; on ANY anchor
+        violation, RESTORE the snapshotted prior baseline bytes and fail RED
+        ("fix the alignment, not the baseline"). This closes the hole that froze
+        the 11px HP-bar defect green for 3+ days: a drifted element can no longer
+        be baked into a baseline. Fires regardless of graduation tier.
+
+      compare mode (quarantine, pre-graduation): read the FRESH shots' sidecars
+        and record anchor_drift quarantine findings (reported, never failing ok)
+        -- the arming path; flips to coded red via the graduation ledger once an
+        anchor has a determinism proof + clean streak + seeded plant.
+
+    Anchored nodes the sidecar does not expose (a nested node before
+    render_introspection collects it) are recorded UNVERIFIABLE, never silently
+    passed. An empty registry is a no-op (the gate arms once >=1 anchor exists).
+    """
+    if result.get("scenario") not in VISUAL_SWEEP_SCENARIOS:
+        return
+    if result.get("transport") == "skipped-headless":
+        return  # nothing captured to gate
+    try:
+        checker = _load_tool_module("check_art_anchors")
+        geometry = _load_tool_module("art_geometry")
+    except Exception as exc:  # a broken anchor tool must not silently pass
+        result.setdefault("exceptions", []).append(f"art-anchor gate failed to load: {exc}")
+        result["ok"] = False
+        return
+    registry = geometry.load_registry(project)
+    if not registry:
+        return  # not armed: no anchors registered yet
+
+    payload = result.get("passed_payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    update_mode = payload.get("mode") == "update" or payload.get("auto_update")
+
+    if update_mode:
+        # The baselines were JUST rewritten (fresh captures copied onto the
+        # committed dir). Police that rewrite against the art anchors.
+        violations, unverifiable = _anchor_sidecar_violations(checker, _baseline_dir(project), project)
+        result["anchor_unverifiable"] = unverifiable
+        if violations:
+            # RESTORE the prior baseline bytes so the tree is never left with a
+            # drifted baseline on disk (the exact 3-days-green fossilization).
+            baseline_dir = _baseline_dir(project)
+            restored = 0
+            try:
+                for current in sorted(baseline_dir.iterdir()):
+                    if current.is_file() and current.name not in snapshot:
+                        current.unlink()  # file the update added; remove to revert
+                for name, data in snapshot.items():
+                    (baseline_dir / name).write_bytes(data)
+                    restored += 1
+            except OSError as exc:
+                result.setdefault("exceptions", []).append(f"anchor gate: baseline restore failed: {exc}")
+            result["anchor_refusals"] = violations
+            result["anchor_restored_files"] = restored
+            for item in violations:
+                print(f"  visual_sweep: baseline regeneration REFUSED — anchor {item['id']} ({item['node']}): "
+                      f"{item['shot']} live {item['live_rect']} violates art anchor {item['stage_rect']} "
+                      f"(tol {item['tol_px']}px). Restored {restored} prior baseline file(s); "
+                      f"fix the alignment, not the baseline.")
+            result["ok"] = False
+        else:
+            result["anchor_gate"] = {"mode": "update", "violations": 0,
+                                     "unverifiable": len(unverifiable)}
+        return
+
+    # compare mode: quarantine anchor_drift over the FRESH shots (never flips ok
+    # pre-graduation; the baseline-refusal above is the hard, always-armed half).
+    violations, unverifiable = _anchor_sidecar_violations(
+        checker, project / ".godot-smoke" / "shots", project)
+    result["anchor_unverifiable"] = unverifiable
+    if violations:
+        if ANCHOR_DRIFT_GRADUATED:
+            result["anchor_drift_failures"] = violations
+            result["ok"] = False  # graduated: anchor drift is coded red
+        quarantine = result.setdefault("anchor_drift_quarantine", [])
+        for item in violations:
+            quarantine.append({"kind": "anchor_drift", "shot": item["shot"],
+                               "anchor_id": item["id"], "node": item["node"],
+                               "stage_rect": item["stage_rect"], "live_rect": item["live_rect"],
+                               "detail": f"{item['node']} live {item['live_rect']} off art anchor "
+                                         f"{item['stage_rect']} (tol {item['tol_px']}px)"})
+        for item in violations:
+            print(f"  visual_sweep: anchor_drift [quarantine] {item['shot']} {item['node']}: "
+                  f"live {item['live_rect']} vs art anchor {item['stage_rect']}")
 
 
 def main() -> int:
@@ -776,6 +967,10 @@ def main() -> int:
 
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
+        # Snapshot committed baselines BEFORE the sweep so apply_anchor_gate can
+        # restore them if a regenerated baseline freezes an anchored misalignment
+        # (the ONLY post-step that also runs in update mode). {} for other shots.
+        anchor_snapshot = prepare_anchor_gate(project, scenario)
         if scenario in WINDOWED_ONLY_SCENARIOS and force_headless():
             result = skip_windowed_scenario(scenario)
         elif scenario in WINDOWED_SUBPROCESS_SCENARIOS and not force_headless():
@@ -788,6 +983,7 @@ def main() -> int:
         apply_region_gate(project, result)
         apply_contrast_cvd(project, result)
         apply_vision_review(project, result)
+        apply_anchor_gate(project, result, anchor_snapshot)
         print_row(result)
 
     failed = [result for result in results if not result["ok"]]
@@ -813,6 +1009,12 @@ def main() -> int:
             for finding in result.get("vision_review_quarantine", [])[:4]:
                 print(f"  {name}: vision_review [{finding.get('class', '')}] {finding.get('shot', '')} "
                       f"{finding.get('region_id', '')}: {finding.get('note', '')}")
+            for refusal in result.get("anchor_refusals", [])[:4]:
+                print(f"  {name}: anchor REFUSED {refusal.get('shot', '')} {refusal.get('node', '')}: "
+                      f"live {refusal.get('live_rect')} off art anchor {refusal.get('stage_rect')}")
+            for finding in result.get("anchor_drift_quarantine", [])[:4]:
+                print(f"  {name}: anchor_drift [quarantine] {finding.get('shot', '')} "
+                      f"{finding.get('node', '')}: {finding.get('detail', '')}")
             if result.get("clusters_unexplained"):
                 print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
                       "(see region-diff/clusters.json — guards false closure)")

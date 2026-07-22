@@ -14,6 +14,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 - The action box uses the baked `battle_screen2.png` command text for `FIGHT`, disabled `PKMN`, `ITEM`, and `RUN`.
 - Battle menu selection supports both directional input plus `Z`/`X` and direct mouse clicks.
 - HUD name plates show the full species display name when it fits at the battle font, falling back to the base-species first token for long alternate-form names; the `:L` level marker is redrawn dynamically after the measured name width, and a visible status tag reserves its width so level and status never collide.
+- The programmatic HP bars sit flush on the HP tracks baked into the GSC battle art: the enemy bar spans stage x32..79 at y18..21 and the player bar spans stage x96..143 at y74..77 (48x4 stage px each, fill flush at the track origin, width-scaled by `floor(48 * ratio)`). The art-anchored render model (`ui_render_art.gd`, `battle_surface_layout.gd`) encodes no bar rects, so the live bar position rides the shot sidecars' `draw_order` and the audits match it automatically.
 - Battle sprites render the first frame of the source vertical strip sheets (frame cropping keyed by texture shape), with an intentional `?` placeholder when a species has no sprite art.
 - The item box lists bag items single-column, GSC-style, so long item names can no longer overlap a second column.
 - Move info text that is too wide for the baked side box's first row (`TYPE/<type>`) drops to the box's second row instead of crossing the border.

@@ -141,6 +141,7 @@ class Runner:
         # both vision-review reads happen after the sweep regenerated the file.
         self._binary_triple_cache = _UNSET
         self._vision_fresh_cache = _UNSET
+        self._vision_coverage_cache = _UNSET
 
     # ------------------------------------------------------------------ steps
     def echo(self, text: str) -> None:
@@ -544,6 +545,25 @@ class Runner:
                         f"review_is_fresh={'true' if fresh is True else 'false/unavailable'}",
                         level="warn")
 
+        # R7 — rubric-coverage honesty (advisory, NEVER red). When the sweep
+        # produced a FRESH vision-review.json, surface any shot-groups whose rubric
+        # questions have no fresh reviewer pass as a WARN: impossible to miss in the
+        # output, but warn maps to GREEN so coverage gaps never break the gate (the
+        # mechanized pilot _review row: "unanswered" is counted, never faked, never
+        # a failure). When coverage is uncertifiable (no fresh manifest / --skip-
+        # windowed) this stays silent — R6 already records that the review is
+        # uncertified, so there is no second, conflicting warn.
+        coverage_gaps = self._vision_coverage_gaps()
+        if coverage_gaps:
+            self.refuse("rubric_coverage", False,
+                        f"rubric-coverage gaps (advisory, never red): {len(coverage_gaps)} "
+                        f"shot-group(s) have rubric questions with no fresh reviewer pass — "
+                        + "; ".join(coverage_gaps),
+                        level="warn")
+        elif coverage_gaps is not None:
+            self.refuse("rubric_coverage", True,
+                        "every rubric shot-group has a fresh reviewer pass (no coverage gaps)")
+
     def _vision_review_fresh(self):
         """True/False, or an error string when the evidence cannot be read.
         Memoized: re-reads vision-review.json + re-execs vision_review.py once."""
@@ -559,6 +579,26 @@ class Runner:
                 except Exception as exc:  # load failure: uncertifiable, never a silent pass
                     self._vision_fresh_cache = f"review_is_fresh raised {exc}"
         return self._vision_fresh_cache
+
+    def _vision_coverage_gaps(self):
+        """Rubric-coverage gap summaries from a FRESH vision-review.json, or None
+        when coverage cannot be certified (manifest absent/unreadable/stale, or it
+        predates the rubric-coverage ledger). Memoized; reuses the memoized R6
+        freshness check so the module/doc are not re-read. Coverage gaps are
+        ADVISORY (never red): they ride the WARN surface so they are impossible to
+        miss without ever breaking GREEN. Returns None (uncertifiable), [] (fresh,
+        no gaps), or [..] (fresh, with gaps)."""
+        if self._vision_coverage_cache is _UNSET:
+            gaps = None
+            if self._vision_review_fresh() is True:
+                doc, err = _read_json(VISION_REVIEW_JSON)
+                if err is None and isinstance(doc, dict):
+                    coverage = doc.get("rubric_coverage")
+                    if isinstance(coverage, dict):
+                        gaps = [f"[{g.get('group', '?')}] {g.get('reason', '')}"
+                                for g in (coverage.get("gaps") or []) if isinstance(g, dict)]
+            self._vision_coverage_cache = gaps
+        return self._vision_coverage_cache
 
     def _binary_triple(self, bin_: str) -> str | None:
         """Leading X.Y.Z from `Godot --version`. Memoized: launches the binary once."""
@@ -606,6 +646,7 @@ class Runner:
                          "baseline_capture_env": capture_env.get("renderer"),
                          "match": renderer_match},
             "vision_review_fresh": self._vision_review_fresh(),
+            "rubric_coverage_gaps": self._vision_coverage_gaps(),
         }
 
     def _verdict(self) -> int:

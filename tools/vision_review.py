@@ -18,8 +18,31 @@ tool exits 0 on completion and 2 only on a tool error (bad PNG decode, unwritabl
 output). It writes .godot-smoke/vision-review.json, unconditionally replacing the
 stale pilot, with a shot-hash manifest that is the freshness authority.
 
-Stdlib-only. Reuses visual_diff.decode_png_rgba, png_canvas, and
-visual_explain.rects_overlap via the sanctioned importlib pattern (never forked).
+Stdlib-only. Reuses visual_diff.decode_png_rgba, png_canvas,
+visual_explain.rects_overlap, and art_geometry via the sanctioned importlib pattern
+(never forked).
+
+ANCHOR BRIDGE (the G1<->G2 join): for shots of an anchored scene group the region
+table gains anchor:<id> entries -- art-anchors.toml stage_rects (loaded via
+art_geometry) mapped stage->display by the existing _stage_to_display home -- and
+the default reviewer gains the anchor_drift class (reviewer_kind
+deterministic-art-anchor, quarantine-tier): each anchored node with a live
+draw_order rect is compared stage-to-stage to its anchor within the registry
+tol_px; drift emits a finding grounded by construction (bbox = the enclosing
+rect of the live mapped rect and the registered anchor rect, so it intersects
+the anchor rect for drifts of any magnitude), while nodes absent from
+draw_order are counted UNVERIFIED, never findings.
+The kind self-tags into the rubric-coverage ledger, so the HP-bar trigger question
+registers answered whenever the pass runs -- even on a zero-drift tree.
+
+RUBRIC-COVERAGE LEDGER: the manifest also carries a `rubric_coverage` block --
+every shot-group's rubric questions parsed into a stable inventory, each mapped to
+the reviewer KIND(S) that can answer it, recording per group which kinds ran a
+FRESH pass and which questions are therefore answered. "Unanswered" is a first-
+class COUNTED state (the mechanized pilot `_review` coverage-gap row), surfaced
+advisory-loud (manifest warnings, legibility report, verify_all WARN) and NEVER
+red. A RED question-inventory backstop (rubric_inventory_issues, folded into
+check_repo_contracts) pins the inventory so a rubric edit cannot silently empty it.
 """
 from __future__ import annotations
 
@@ -42,17 +65,29 @@ REVIEWER_TIMEOUT = 300
 CROP_PAD = 8
 EXIT_OK, EXIT_ERROR = 0, 2
 
+# Reviewer kinds (shared by _mk, the anchor bridge, and the coverage ledger).
+KIND_DETERMINISTIC = "deterministic-sidecar-consistency"  # this module's default reviewer
+KIND_ART_ANCHOR = "deterministic-art-anchor"              # art-anchor drift class (G1<->G2 bridge)
+KIND_MODEL = "model-qwen3-vl"                             # Qwen3-VL rubric reviewer (vlm slice)
+
 # SoM outline colour per region kind; numbering is kind-priority then region-id.
+# `anchor` rects are ART-TRUTH (art-anchors.toml), ranked above sidecar-derived kinds.
 KIND_COLOR = {
     "canary": (255, 48, 48, 255),
     "string": (255, 200, 0, 255),
     "ink": (255, 200, 0, 255),
     "label": (255, 200, 0, 255),
     "cursor": (0, 220, 255, 255),
+    "anchor": (0, 255, 128, 255),
     "draw": (160, 160, 160, 255),
     "palette:canary": (255, 0, 255, 255),
 }
-KIND_ORDER = {"cursor": 0, "string": 1, "label": 2, "ink": 3, "canary": 4, "draw": 5, "palette:canary": 6}
+KIND_ORDER = {"cursor": 0, "string": 1, "label": 2, "ink": 3, "anchor": 4,
+              "canary": 5, "draw": 6, "palette:canary": 7}
+
+# Shot-group -> scene whose baked-art overlay nodes art-anchors.toml anchors; the
+# region table carries anchor:<id> regions only for shots of that group.
+ANCHOR_SCENE_BY_GROUP = {"battle": "scenes/ui/BattleView.tscn"}
 
 
 def _load(name: str, path: Path):
@@ -111,10 +146,23 @@ def _stage_to_display(rect: list[int], window: list[int]) -> list[int]:
     return [ox + rect[0] * k, oy + rect[1] * k, rect[2] * k, rect[3] * k]
 
 
+_ART_GEOMETRY = None
+
+
+def _art_geometry():
+    """Sanctioned importlib load of tools/art_geometry.py (the single registry-parse
+    + rect-tolerance home), cached -- the anchor bridge never re-parses TOML itself."""
+    global _ART_GEOMETRY
+    if _ART_GEOMETRY is None:
+        _ART_GEOMETRY = _load("art_geometry", TOOLS / "art_geometry.py")
+    return _ART_GEOMETRY
+
+
 # --------------------------------------------------------------------------
 # region table: union of fresh + baseline sidecars, addressed per regionIdSpace
 # --------------------------------------------------------------------------
-def _build_region_table(base: dict | None, fresh: dict | None, window: list[int]) -> dict:
+def _build_region_table(base: dict | None, fresh: dict | None, window: list[int],
+                        group: str | None = None) -> dict:
     table: dict[str, dict] = {}
 
     def add(rid, kind, rect, source, meta=None):
@@ -162,6 +210,22 @@ def _build_region_table(base: dict | None, fresh: dict | None, window: list[int]
             if _valid_rect(rect) and any(rect):  # overworld nodes carry rect [] -> ungroundable
                 add(f"draw:{node['node']}", "draw", _stage_to_display(_ri(rect), window), source)
 
+    # anchor:<id> -- the FIRST region kind whose rect is ART-TRUTH, not sidecar/code
+    # output (the G1<->G2 bridge): the art-anchors.toml stage_rects for the shot's
+    # scene group, mapped stage->display via the single _stage_to_display home, so
+    # grounding + VLM citations resolve them like any other region. The meta carries
+    # the stage-space truth the default reviewer's anchor_drift class compares to.
+    scene = ANCHOR_SCENE_BY_GROUP.get(group) if group else None
+    if scene:
+        for anchor in _art_geometry().load_registry(ROOT):
+            aid = anchor.get("id")
+            rect = anchor.get("stage_rect")
+            if anchor.get("scene") != scene or not (isinstance(aid, str) and aid and _valid_rect(rect)):
+                continue
+            add(f"anchor:{aid}", "anchor", _stage_to_display(_ri(rect), window), "registry",
+                {"anchor_id": aid, "stage_rect": _ri(rect), "tol_px": int(anchor.get("tol_px", 0)),
+                 "nodes": [str(n) for n in anchor.get("nodes") or []]})
+
     for entry in table.values():
         sources = entry.pop("sources")
         entry["source"] = "both" if len(sources) > 1 else next(iter(sources))
@@ -184,11 +248,12 @@ def _selfcheck_draw_cursor(table: dict) -> str | None:
 # --------------------------------------------------------------------------
 # deterministic default reviewer (pure function of sidecar + clusters bytes)
 # --------------------------------------------------------------------------
-def _mk(shot, cls, region_id, bbox, severity, confidence, note, explanation, sidecar_ref):
+def _mk(shot, cls, region_id, bbox, severity, confidence, note, explanation, sidecar_ref,
+        reviewer_kind=KIND_DETERMINISTIC):
     return {"shot": shot, "class": cls, "region_id": region_id, "bbox": _ri(bbox),
             "severity": severity, "confidence": confidence, "note": note,
             "explanation": explanation, "sidecar_ref": sidecar_ref,
-            "reviewer_kind": "deterministic-sidecar-consistency"}
+            "reviewer_kind": reviewer_kind}
 
 
 def _enclosing(rects: list[list[int]]) -> list[int]:
@@ -336,6 +401,62 @@ def default_reviewer(ctx: dict) -> list[dict]:
         # stops one deletion from double-counting (once as a node delta, once here).
         ungroundable_deltas += 1  # sequence delta recorded as ungroundable context
 
+    # --- anchor_drift: live draw_order stage rect vs the art-anchor stage_rect ---
+    # The G1<->G2 bridge: truth is the SOURCE ART (art-anchors.toml via art_geometry),
+    # compared stage-to-stage within the registry tol_px (absent = 0, exact int). The
+    # finding's bbox = the ENCLOSING rect of the live rect (mapped stage->display)
+    # and the registered (mapped) anchor rect: it CONTAINS the anchor rect, so it
+    # intersects it by construction for drifts of ANY magnitude -- a live-rect-only
+    # bbox stops intersecting once the drift reaches the bar width, which would
+    # ground-drop the finding for exactly the catastrophic case;
+    # pipeline-side grounding is still the gate. Nodes ABSENT from draw_order are
+    # counted UNVERIFIED (a pre-collection sidecar cannot be said to drift) -- a
+    # warning, never a finding. Self-tags KIND_ART_ANCHOR into the coverage ledger
+    # even on a zero-finding pass (the comparison itself is the answered question).
+    anchor_entries = [(rid, e) for rid, e in ctx["region_table"].items() if e.get("kind") == "anchor"]
+    # anchor_kind_ran means the stage-to-stage comparison ACTUALLY EXECUTED: an
+    # entry whose meta (nodes/stage_rect) was stripped from a serialized region
+    # table CANNOT run the comparison, so it is counted live-unverified with the
+    # true cause, never as a ran comparison (the coverage ledger must not credit
+    # a comparison that never happened, and must not mislabel a missing meta as
+    # a node absent from draw_order).
+    comparison_ran = False
+    anchor_unverified: list[str] = []
+    window = ctx.get("window") or [1152, 648]  # documented default-capture fallback (plugin ctx)
+    for rid, entry in anchor_entries:
+        meta = entry.get("meta") or {}
+        stage_rect = meta.get("stage_rect")
+        nodes = meta.get("nodes") or []
+        aid = meta.get("anchor_id", rid)
+        tol = int(meta.get("tol_px", 0))
+        if not nodes or not _valid_rect(stage_rect):
+            anchor_unverified.append(f"{aid} (anchor meta unavailable: nodes/stage_rect "
+                                     f"missing from region-table entry)")
+            continue
+        comparison_ran = True
+        live, live_node = None, None
+        for node in fresh_order:
+            if node["node"] in nodes and _valid_rect(node.get("rect")) and any(node["rect"]):
+                live, live_node = _ri(node["rect"]), node["node"]
+                break
+        if live is None:
+            anchor_unverified.append(f"{aid} (node absent from draw_order: {', '.join(nodes)})")
+            continue
+        if _valid_rect(stage_rect) and not _art_geometry().rects_close(live, _ri(stage_rect), tol):
+            drift_bbox = _stage_to_display(live, window)
+            anchor_rects = entry.get("rects") or []
+            if anchor_rects and _valid_rect(anchor_rects[0]):
+                drift_bbox = _enclosing([drift_bbox, anchor_rects[0]])
+            findings.append(_mk(shot, "anchor_drift", rid, drift_bbox, "high", "high",
+                                f"anchor '{aid}' drift on '{live_node}'",
+                                f"Live draw_order rect {live} for '{live_node}' is off its source-art anchor "
+                                f"{_ri(stage_rect)} (tol {tol}px) — the track lives in the baked art; fix the "
+                                f"node, never the baseline.",
+                                {"source": "fresh", "field": f"draw_order[node={live_node}].rect",
+                                 "baseline": _ri(stage_rect), "fresh": live}, KIND_ART_ANCHOR))
+    ctx["anchor_kind_ran"] = comparison_ran
+    ctx["anchor_unverified"] = anchor_unverified
+
     # --- palettes: canary drop (hud is ungroundable, never emits) ---
     bcan = set((base.get("palettes") or {}).get("canary") or [])
     fcan = set((fresh.get("palettes") or {}).get("canary") or [])
@@ -414,7 +535,7 @@ def _rect_inside(inner, outer) -> bool:
 
 def _pick_region_for_bbox(bbox: list[int], table: dict) -> dict | None:
     """Most-specific groundable region intersecting bbox: priority
-    cursor > string > label > ink > canary > draw (smallest) > palette:canary."""
+    cursor > string > label > ink > anchor > canary > draw (smallest) > palette:canary."""
     best = None
     for rid, entry in table.items():
         kind = entry["kind"]
@@ -590,6 +711,353 @@ def _rubric_section(shot: str, rubric_text: str) -> str:
     return "\n".join(out) or rubric_text
 
 
+# --------------------------------------------------------------------------
+# rubric-coverage ledger
+#
+# Mechanizes the pilot's RETIRED `_review` coverage-gap pseudo-shot: instead of a
+# fake finding, "the rubric's art-fidelity questions were answered" becomes a
+# checkable, freshness-gated, HONESTLY-COUNTED fact. Every shot-group's rubric
+# questions are parsed into a stable inventory; each question declares which
+# reviewer KIND can answer it; the manifest records, per shot-group, which kinds
+# ran a FRESH pass and which questions are therefore answered. "Unanswered" is a
+# first-class COUNTED state -- never faked as answered and never red (advisory-
+# loud): a shot-group with unanswered questions emits a rubric_coverage_gap line
+# that rides the manifest, the legibility report, and verify_all's WARN surface.
+# --------------------------------------------------------------------------
+# KIND_DETERMINISTIC / KIND_ART_ANCHOR / KIND_MODEL are defined module-top (shared
+# by _mk, the anchor bridge above, and the ledger below).
+
+# Ordered shot-group inventory. `marker` is the substring _rubric_section matches
+# on the "## " heading -- the SAME single source of truth the bundle excerpter
+# uses, so the coverage ledger and the per-shot rubric excerpt never disagree.
+RUBRIC_GROUPS = [
+    ("overworld", "Overworld states"),
+    ("day_night", "Day/night states"),
+    ("menu", "Menu states"),
+    ("battle", "Battle states"),
+    ("display_matrix", "Display-matrix states"),
+]
+
+# Answerer declarations: per shot-group, a list of (fingerprint, capable kinds).
+# A question's fingerprint is a distinctive LOWERCASE substring of its canonical
+# text; matching by CONTENT (not position) makes the join robust to rubric
+# REORDERING, while REWORDING a question breaks its fingerprint -> the question
+# falls through to "unassigned" (a COUNTED state), surfacing the id rotation
+# instead of silently keeping a stale answerer. A brand-new question nobody mapped
+# is likewise counted. The deterministic sidecar-consistency reviewer answers ONLY
+# the two battle questions its classes mechanically implement (cursor row centering
+# via cursor_*, name/level presence via label_*); the HP-bar art-fidelity question
+# needs the art-anchor class, and every judgment / non-baked-UI question needs the
+# model reviewer -- exactly the 13/19 an art anchor is structurally blind to.
+QUESTION_ANSWERERS = {
+    "battle": [
+        ("cursor vertically centered", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("name plates read fully", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("hp bars on their baked tracks", [KIND_ART_ANCHOR, KIND_MODEL]),
+        ("single clean frame", [KIND_MODEL]),
+        ("text inside its box", [KIND_MODEL]),
+    ],
+    "overworld": [
+        ("biome read as its intended terrain", [KIND_MODEL]),
+        ("props sit on their tiles", [KIND_MODEL]),
+        ("render behind tall prop canopies", [KIND_MODEL]),
+        ("tall-grass patches visibly distinct", [KIND_MODEL]),
+        ("untextured solid-color", [KIND_MODEL]),
+        ("player sprite intact", [KIND_MODEL]),
+    ],
+    "day_night": [
+        ("tint plausibly", [KIND_MODEL]),
+        ("hint bar", [KIND_MODEL]),
+    ],
+    "menu": [
+        ("uniformly dimmed", [KIND_MODEL]),
+        ("panels framed and readable", [KIND_MODEL]),
+        ("every row align its name", [KIND_MODEL]),
+        ("hp bars visible and color-graded", [KIND_MODEL]),
+        ("clipped, overlapping, or escaping", [KIND_MODEL]),
+    ],
+    "display_matrix": [
+        ("every window size", [KIND_MODEL]),
+    ],
+}
+
+# Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
+# parsed inventory drifts from these counts the run records a loud warning
+# (advisory in this slice; a RED check_repo_contracts backstop is the documented
+# follow-up). Totals: 6 + 2 + 5 + 5 + 1 = 19 rubric questions.
+EXPECTED_QUESTION_COUNTS = {
+    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "display_matrix": 1,
+}
+
+ANSWER_VERDICTS = ("yes", "no")
+
+
+def _canonical_question(text: str) -> str:
+    return " ".join(str(text).split())
+
+
+def _question_id(text: str) -> str:
+    """Stable rubric-question join key: `q1-` + 8 hex of sha256 over the canonical
+    (whitespace-collapsed) question text. Stable across REORDERING; REWORDING
+    rotates the id (surfaced as an unassigned question, never a silent loss). The
+    versioned prefix lets the scheme rotate without collisions (the finding_id
+    `vr1-` convention applied to questions)."""
+    return "q1-" + hashlib.sha256(_canonical_question(text).encode("utf-8")).hexdigest()[:8]
+
+
+def _shot_group(name: str) -> str | None:
+    """Map a shot name to its rubric group key (shares _rubric_section's prefix
+    map). None for a name no group claims."""
+    stem = str(name).split(".")[0]
+    if stem.startswith(("09", "10", "11", "12")):
+        return "battle"
+    if stem.startswith(("06", "07", "08")):
+        return "menu"
+    if stem.startswith(("04", "05")):
+        return "day_night"
+    if stem.startswith("matrix"):
+        return "display_matrix"
+    if stem.startswith(("01", "02", "03")):
+        return "overworld"
+    return None
+
+
+def parse_rubric_questions(rubric_text: str) -> dict:
+    """Parse the rubric's per-shot-group '## ' sections into a stable inventory:
+    {group_key: [{"id", "text"}, ...]}. A question is a column-0 '- ' bullet plus
+    its indented wrap lines, joined on whitespace; collection stops at the next
+    '## ' heading, so the grounding/schema/automation sections (tables + prose,
+    not shot-group questions) are never misparsed as questions."""
+    lines = str(rubric_text or "").splitlines()
+    markers = {marker: key for key, marker in RUBRIC_GROUPS}
+    questions: dict[str, list[dict]] = {key: [] for key, _ in RUBRIC_GROUPS}
+    active_group: str | None = None
+    current: list[str] = []
+
+    def flush() -> None:
+        nonlocal current
+        if active_group is not None and current:
+            text = _canonical_question(" ".join(current))
+            if text:
+                questions[active_group].append({"id": _question_id(text), "text": text})
+        current = []
+
+    for line in lines:
+        if line.startswith("## "):
+            flush()
+            active_group = None
+            for marker, key in markers.items():
+                if marker in line:
+                    active_group = key
+                    break
+            continue
+        if line.startswith("###"):
+            flush()
+            active_group = None  # a subsection (e.g. a future Answerers table) ends question collection
+            continue
+        if active_group is None:
+            continue
+        if line.startswith("- "):
+            flush()
+            current = [line[2:].strip()]
+        elif line.strip() == "":
+            flush()
+        elif current and line[:1] in (" ", "\t"):
+            current.append(line.strip())
+        else:
+            flush()  # unexpected non-bullet, non-indented line ends the bullet
+    flush()
+    return questions
+
+
+def answerers_for(group_key: str, question_text: str) -> list[str]:
+    """Capable reviewer kinds for a question: the first declaration whose
+    fingerprint is a substring of the canonical (lowercased) question text. [] =
+    unassigned (a counted state that surfaces a reworded/new question nobody
+    mapped)."""
+    canonical = _canonical_question(question_text).lower()
+    for fingerprint, kinds in QUESTION_ANSWERERS.get(group_key, []):
+        if fingerprint in canonical:
+            return list(kinds)
+    return []
+
+
+def _unanswered_reason(group_key: str, capable: list[str]) -> str:
+    if not capable:
+        return "no answerer declared (rubric question not mapped in QUESTION_ANSWERERS)"
+    base = f"no fresh reviewer of kind [{' / '.join(capable)}] ran this pass"
+    if group_key == "overworld":
+        base += "; overworld shots carry zero groundable regions"
+    return base
+
+
+def _validate_answer(answer) -> tuple[dict | None, str | None]:
+    """Repair/validate a reviewer's rubric answer (the additive answers[] seam a
+    --reviewer-cmd plugin uses to ANSWER rubric questions). verdict in {yes,no};
+    question_id a stable q1- id; region_id + bbox optional (an answer that cites a
+    resolvable region grounds a verdict-`no` quarantine finding; one without a
+    resolvable region is counted, never a finding)."""
+    if not isinstance(answer, dict):
+        return None, "schema_invalid"
+    qid = answer.get("question_id")
+    verdict = answer.get("verdict")
+    if not isinstance(qid, str) or not qid:
+        return None, "schema_invalid"
+    if verdict not in ANSWER_VERDICTS:
+        return None, "schema_invalid"
+    clean = {"question_id": qid, "verdict": verdict,
+             "note": str(answer.get("note", "")),
+             "reviewer_kind": str(answer.get("reviewer_kind") or "cmd")}
+    region_id = answer.get("region_id")
+    bbox = answer.get("bbox")
+    if isinstance(region_id, str) and region_id:
+        clean["region_id"] = region_id
+    try:
+        clean["bbox"] = [int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])]
+    except (TypeError, ValueError, IndexError):
+        clean["bbox"] = None
+    return clean, None
+
+
+def _kinds_that_ran(reviewer_kind: str, shots_out: list, answers: list,
+                    extra_kinds=None) -> set:
+    """The reviewer kinds that ran a fresh pass this run: the configured reviewer,
+    every kind that self-tagged an emitted finding or a returned answer, and any
+    kinds a composite wrapper declared via reviewer_meta.kinds_ran (extra_kinds).
+    A composite VLM/art-anchor wrapper self-tags and/or declares, so its coverage
+    registers without any pipeline change -- even on a 0-changed-shot run."""
+    kinds = {reviewer_kind}
+    kinds.update(extra_kinds or ())
+    for shot in shots_out or []:
+        if not isinstance(shot, dict):
+            continue
+        for finding in shot.get("findings") or []:
+            if isinstance(finding, dict) and finding.get("reviewer_kind"):
+                kinds.add(finding["reviewer_kind"])
+    for answer in answers or []:
+        if isinstance(answer, dict) and answer.get("reviewer_kind"):
+            kinds.add(answer["reviewer_kind"])
+    return kinds
+
+
+def compute_rubric_coverage(rubric_text, reviewer_kind, shots_out, covered,
+                            run_answers=None, extra_kinds=None):
+    """Build the rubric-coverage ledger block + advisory gap lines + inventory
+    warnings. Coverage is a function of (rubric inventory, answerer declarations,
+    reviewer configuration); its FRESHNESS rides the manifest sha (review_is_fresh
+    covers every covered shot). A question is `answered` iff a capable reviewer
+    kind RAN this pass, or a returned answer addressed its id. Returns
+    (block, gap_lines, warnings)."""
+    run_answers = run_answers or []
+    inventory = parse_rubric_questions(rubric_text)
+    kinds_ran = _kinds_that_ran(reviewer_kind, shots_out, run_answers, extra_kinds)
+    answered_ids = {a["question_id"] for a in run_answers
+                    if isinstance(a, dict) and a.get("question_id")}
+
+    covered_by_group: dict[str, list[str]] = {key: [] for key, _ in RUBRIC_GROUPS}
+    changed_by_group: dict[str, list[str]] = {key: [] for key, _ in RUBRIC_GROUPS}
+    for entry in covered or []:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("shot")
+        group = _shot_group(name or "")
+        if group is None:
+            continue
+        covered_by_group[group].append(name)
+        if entry.get("changed"):
+            changed_by_group[group].append(name)
+
+    groups = []
+    gaps = []
+    warnings: list[str] = []
+    totals = {"questions_total": 0, "questions_answered": 0, "unanswered": 0,
+              "unassigned": 0, "groups_with_gap": 0}
+    for group_key, marker in RUBRIC_GROUPS:
+        qlist = inventory.get(group_key, [])
+        expected = EXPECTED_QUESTION_COUNTS.get(group_key)
+        if expected is not None and len(qlist) != expected:
+            warnings.append(
+                f"rubric_coverage: {group_key} parsed {len(qlist)} question(s), expected "
+                f"{expected} -- the rubric question inventory drifted; re-map "
+                f"QUESTION_ANSWERERS / EXPECTED_QUESTION_COUNTS deliberately")
+        answered: list[dict] = []
+        unanswered: list[dict] = []
+        group_kinds: set[str] = set()
+        for q in qlist:
+            capable = answerers_for(group_key, q["text"])
+            ran = sorted(set(capable) & kinds_ran)
+            totals["questions_total"] += 1
+            if not capable:
+                totals["unassigned"] += 1
+            if ran or q["id"] in answered_ids:
+                by = ran or sorted({a["reviewer_kind"] for a in run_answers
+                                    if isinstance(a, dict) and a.get("question_id") == q["id"]})
+                group_kinds.update(by)
+                totals["questions_answered"] += 1
+                answered.append({"id": q["id"], "text": q["text"], "by": by})
+            else:
+                totals["unanswered"] += 1
+                unanswered.append({"id": q["id"], "text": q["text"],
+                                   "reason": _unanswered_reason(group_key, capable)})
+        if unanswered:
+            totals["groups_with_gap"] += 1
+            needs = sorted({k for q in unanswered
+                            for k in (answerers_for(group_key, q["text"]) or [KIND_MODEL])})
+            gaps.append({
+                "group": group_key, "marker": marker,
+                "questions_total": len(qlist), "questions_answered": len(answered),
+                "unanswered": len(unanswered), "needs_reviewer_kinds": needs,
+                "reason": (f"{len(unanswered)} of {len(qlist)} rubric question(s) have no "
+                           f"fresh reviewer pass (needs [{' / '.join(needs)}])"),
+            })
+        groups.append({
+            "group": group_key, "marker": marker,
+            "questions_total": len(qlist), "questions_answered": len(answered),
+            "reviewer_kinds": sorted(group_kinds),
+            "shots_covered": sorted(covered_by_group[group_key]),
+            "shots_changed": sorted(changed_by_group[group_key]),
+            "answered": answered, "unanswered": unanswered,
+        })
+    block = {"schema": "rubric-coverage/1",
+             "reviewer_kinds_ran": sorted(kinds_ran),
+             "totals": totals, "groups": groups, "gaps": gaps}
+    gap_lines = [f"rubric_coverage_gap [{g['group']}]: {g['reason']}" for g in gaps]
+    return block, gap_lines, warnings
+
+
+def rubric_inventory_issues(rubric_text: str) -> list[str]:
+    """RED-tier integrity of the rubric question inventory -- the static backstop
+    (region_diff_backstop_sync-style) so a rubric edit cannot SILENTLY EMPTY or
+    rotate the question list the coverage ledger is built on: (1) each shot-group
+    must parse to its EXPECTED_QUESTION_COUNTS pin, and (2) every declared answerer
+    fingerprint must still match a parsed question in its group (a REWORDED
+    question breaks its fingerprint, so its answerer no longer maps -- surfaced
+    here as a forcing function, the q1- id rotation made loud, never a silent stale
+    mapping). Pure function of the rubric text + the declarations above; folded
+    into check_repo_contracts.run(). Distinct from the coverage GAP (unanswered
+    questions), which is advisory and never red."""
+    issues: list[str] = []
+    inventory = parse_rubric_questions(rubric_text)
+    for group_key, _ in RUBRIC_GROUPS:
+        expected = EXPECTED_QUESTION_COUNTS.get(group_key)
+        parsed = len(inventory.get(group_key, []))
+        if expected is not None and parsed != expected:
+            issues.append(
+                f"rubric question inventory drift: {group_key} parses {parsed} "
+                f"question(s), expected {expected} -- a rubric edit changed the "
+                f"question list; update EXPECTED_QUESTION_COUNTS deliberately")
+    for group_key, decls in QUESTION_ANSWERERS.items():
+        texts = [_canonical_question(q["text"]).lower()
+                 for q in inventory.get(group_key, [])]
+        for fingerprint, _kinds in decls:
+            if not any(fingerprint in text for text in texts):
+                issues.append(
+                    f"rubric answerer fingerprint stale: {group_key} '{fingerprint}' "
+                    f"matches no parsed question -- the question was reworded; re-map "
+                    f"QUESTION_ANSWERERS deliberately (id rotation, not a silent loss)")
+    return issues
+
+
 def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clusters,
                     table, bundle_dir, vd, canvas_mod, window, rubric_text) -> tuple[dict, dict]:
     """Returns (bundle-relative paths, som_legend): the legend maps region_id to
@@ -689,12 +1157,23 @@ def _reviewer_params() -> dict:
                     "runs once -- votes are meaningless when deterministic"}
 
 
-def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> list[dict]:
+def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list]:
     """Run the configured plugin reviewer. FAIL-CLOSED per the grounding
     contract: non-zero exit, timeout, invalid JSON, or findings-not-a-list is
     a TOOL ERROR (propagates to the top-level handler -> exit 2 -> runner red).
     A hung or garbage plugin is never a silent fallback to the deterministic
-    default -- the default runs only when no --reviewer-cmd is configured."""
+    default -- the default runs only when no --reviewer-cmd is configured.
+
+    Returns (findings, answers, meta_kinds). `answers` is the ADDITIVE rubric-
+    coverage seam (a plugin ANSWERS rubric questions via [{question_id, verdict,
+    region_id?, bbox?, note?}]); it is optional, but when present it must be a
+    list, exactly like findings -- a malformed answers field is a tool error, never
+    a silent drop, so a plugin cannot quietly pretend it answered nothing.
+    `meta_kinds` is the set of reviewer kinds the plugin declares it RAN via
+    `reviewer_meta.kinds_ran` -- how a COMPOSITE wrapper (which always runs the
+    deterministic pass internally and adds the model pass) registers its internal
+    deterministic coverage even on a 0-changed-shot run where nothing self-tags a
+    finding. Optional; malformed entries are ignored (never a tool error)."""
     try:
         argv = shlex.split(cmd)
         proc = subprocess.run(argv, input=json.dumps(public_ctx), capture_output=True,
@@ -706,11 +1185,20 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> list[dict]:
     try:
         doc = json.loads(proc.stdout)
         findings = doc.get("findings") if isinstance(doc, dict) else None
+        answers = doc.get("answers", []) if isinstance(doc, dict) else None
+        meta = doc.get("reviewer_meta") if isinstance(doc, dict) else None
     except ValueError as exc:
         raise ValueError("reviewer-cmd returned invalid JSON") from exc
     if not isinstance(findings, list):
         raise ValueError("reviewer-cmd findings not a list")
-    return findings
+    if not isinstance(answers, list):
+        raise ValueError("reviewer-cmd answers not a list")
+    meta_kinds: set[str] = set()
+    if isinstance(meta, dict):
+        declared = meta.get("kinds_ran")
+        if isinstance(declared, list):
+            meta_kinds = {k for k in declared if isinstance(k, str) and k}
+    return findings, answers, meta_kinds
 
 
 # --------------------------------------------------------------------------
@@ -795,6 +1283,9 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                         "dropped_samples": [], "ungroundable_deltas": 0, "ungroundable_clusters": 0,
                         "ungroundable_shots": []}
     reviewer_kind = "cmd" if reviewer_cmd else "deterministic-sidecar-consistency"
+    run_answers: list[dict] = []  # validated rubric answers returned by a plugin reviewer
+    answers_dropped = 0
+    run_meta_kinds: set[str] = set()  # kinds a composite wrapper declares via reviewer_meta
 
     for name in shot_names:
         base_png = baseline_dir / name
@@ -819,7 +1310,7 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                               "reviewer_raw_count": 0, "dropped_count": 0, "findings": []})
             continue
 
-        table = _build_region_table(base_sidecar, fresh_sidecar, window)
+        table = _build_region_table(base_sidecar, fresh_sidecar, window, _shot_group(name))
         warn = _selfcheck_draw_cursor(table)
         if warn:
             warnings.append(f"{name}: {warn}")
@@ -842,17 +1333,61 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
         public_ctx = {k: ctx[k] for k in
                       ("shot", "shot_kind", "paths", "reviewer_params", "finding_schema",
                        "window", "clusters", "som_legend")}
-        public_ctx["region_table"] = {rid: {"kind": e["kind"], "rects": e["rects"], "source": e["source"]}
-                                      for rid, e in table.items()}
+        # anchor:<id> entries keep their stage-truth META in the public table:
+        # a composite plugin reviewer (vlm_reviewer) re-runs default_reviewer over
+        # this stdin ctx alone, and the anchor_drift class reads entry["meta"] for
+        # anchor_id/nodes/stage_rect/tol_px. Stripping it made the internal default
+        # reviewer see nodes=[]/stage_rect=None, count BOTH bars live-unverified
+        # instead of running the comparison, and undercount battle hp as unanswered.
+        public_ctx["region_table"] = {
+            rid: {"kind": e["kind"], "rects": e["rects"], "source": e["source"],
+                  **({"meta": {"anchor_id": (e.get("meta") or {}).get("anchor_id"),
+                               "nodes": list((e.get("meta") or {}).get("nodes") or []),
+                               "stage_rect": (e.get("meta") or {}).get("stage_rect"),
+                               "tol_px": int((e.get("meta") or {}).get("tol_px", 0))}}
+                     if e["kind"] == "anchor" else {})}
+            for rid, e in table.items()}
         public_ctx["grounding_rules"] = {
             "cite": "region_id resolvable in region_table",
             "intersect": "bbox must pass rects_overlap against >=1 registered rect",
             "enforcement": "ungrounded findings are dropped and counted"}
 
         if reviewer_cmd:
-            raw = _run_cmd_reviewer(reviewer_cmd, public_ctx)
+            raw, raw_answers, meta_kinds = _run_cmd_reviewer(reviewer_cmd, public_ctx)
+            run_meta_kinds |= meta_kinds
+            # Validate the additive answers[] seam; a verdict-"no" answer that cites
+            # a resolvable region + bbox becomes a quarantine finding through the SAME
+            # enforce_grounding path as every other finding (ungrounded ones drop and
+            # count). Every valid answer (yes or no) marks its question addressed.
+            for ans in raw_answers:
+                clean, reason = _validate_answer(ans)
+                if clean is None:
+                    answers_dropped += 1
+                    warnings.append(f"{name}: dropped answer ({reason})")
+                    continue
+                run_answers.append(clean)
+                if clean["verdict"] == "no" and clean.get("region_id") and clean.get("bbox"):
+                    raw.append({"shot": name, "class": "rubric_answer_no",
+                                "region_id": clean["region_id"], "bbox": clean["bbox"],
+                                "severity": "medium", "confidence": "low",
+                                "note": f"rubric answer 'no': {clean['question_id']}",
+                                "explanation": (clean["note"] or
+                                                f"Reviewer answered 'no' to rubric question "
+                                                f"{clean['question_id']}."),
+                                "sidecar_ref": {"source": "fresh",
+                                                "field": f"answers[question_id={clean['question_id']}]",
+                                                "baseline": None, "fresh": clean["verdict"]},
+                                "reviewer_kind": clean["reviewer_kind"]})
         else:
             raw = default_reviewer(ctx)
+            # The anchor class self-tags into the coverage ledger's ran set even on a
+            # ZERO-finding pass (an aligned tree) -- the comparison itself ran -- and
+            # reports anchored nodes absent from draw_order (counted, never findings).
+            if ctx.get("anchor_kind_ran"):
+                run_meta_kinds.add(KIND_ART_ANCHOR)
+            if ctx.get("anchor_unverified"):
+                warnings.append(f"{name}: art-anchor live-unverified (counted, never a "
+                                f"finding): {'; '.join(ctx['anchor_unverified'])}")
 
         emitted, stats = enforce_grounding(raw, table, window)
 
@@ -886,12 +1421,24 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
     # non-default capture reports its real frame instead of a hard-coded [1152, 648].
     manifest_window = [max((w[0] for w in windows), default=1152),
                        max((w[1] for w in windows), default=648)]
+    # Rubric-coverage ledger: per-shot-group answered/unanswered, honestly counted.
+    # Gap lines + inventory-drift warnings ride `warnings` so run_playtests forwards
+    # them and main()/verify_all surface them -- advisory-loud, never red.
+    rubric_coverage, gap_lines, coverage_warnings = compute_rubric_coverage(
+        rubric_text, reviewer_kind, shots_out, covered, run_answers=run_answers,
+        extra_kinds=run_meta_kinds)
+    if answers_dropped:
+        coverage_warnings.append(f"rubric_coverage: dropped {answers_dropped} invalid "
+                                 f"reviewer answer(s) (counted, never emitted)")
+    warnings.extend(coverage_warnings)
+    warnings.extend(gap_lines)
     doc = {
         "schema": SCHEMA, "generated_by": "tools/vision_review.py",
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "head_sha": _head_sha(), "rubric_ref": RUBRIC_REF,
         "reviewer": {"kind": reviewer_kind, "cmd": reviewer_cmd, "params": _reviewer_params()},
         "manifest": {"window": manifest_window, "shots_covered": covered},
+        "rubric_coverage": rubric_coverage,
         "grounding": grounding_totals,
         "shots": shots_out,
         "warnings": warnings,
@@ -936,11 +1483,21 @@ def main() -> int:
                   file=sys.stderr)
     for warn in doc.get("warnings", []):
         print(f"warn: {warn}", file=sys.stderr)
+    cov = doc.get("rubric_coverage", {})
+    ct = cov.get("totals", {})
+    gap_detail = ("; " + "; ".join(gp["reason"] for gp in cov.get("gaps", []))
+                  if cov.get("gaps") else "")
     print("vision-review: %d shot(s), %d finding(s) emitted, %d grounded, %d dropped, reviewer=%s"
           % (len(doc["shots"]), g["emitted"], g["grounded"], g["dropped"], doc["reviewer"]["kind"]),
           file=sys.stderr)
+    print("rubric-coverage: %d/%d question(s) answered by a fresh reviewer pass; "
+          "%d unanswered across %d shot-group(s)%s"
+          % (ct.get("questions_answered", 0), ct.get("questions_total", 0),
+             ct.get("unanswered", 0), ct.get("groups_with_gap", 0), gap_detail),
+          file=sys.stderr)
     print(json.dumps({"schema": doc["schema"], "grounding": g,
-                      "reviewer": doc["reviewer"]["kind"], "shots": len(doc["shots"])}, sort_keys=True))
+                      "reviewer": doc["reviewer"]["kind"], "shots": len(doc["shots"]),
+                      "rubric_coverage": ct}, sort_keys=True))
     return EXIT_OK  # findings are quarantine-tier; only tool errors exit 2
 
 

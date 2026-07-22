@@ -81,9 +81,9 @@ offset_bottom = 16.0
 
 [node name="EnemyHPBar" type="ColorRect" parent="BattleViewport/BattleStage"]
 layout_mode = 0
-offset_left = 43.0
+offset_left = 32.0
 offset_top = 18.0
-offset_right = 91.0
+offset_right = 80.0
 offset_bottom = 22.0
 color = Color(0.14902, 0.14902, 0.14902, 1)
 
@@ -114,9 +114,9 @@ offset_bottom = 72.0
 
 [node name="PlayerHPBar" type="ColorRect" parent="BattleViewport/BattleStage/PlayerHUD"]
 layout_mode = 0
-offset_left = 107.0
+offset_left = 96.0
 offset_top = 74.0
-offset_right = 155.0
+offset_right = 144.0
 offset_bottom = 78.0
 color = Color(0.14902, 0.14902, 0.14902, 1)
 

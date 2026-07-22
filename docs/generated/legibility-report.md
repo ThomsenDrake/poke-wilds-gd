@@ -1,14 +1,15 @@
 Status: generated
-Last verified: 2026-07-21
+Last verified: 2026-07-22
 Review cadence days: 7
-Source paths: tools/generate_legibility_report.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/contrast_check.py, tools/cvd_sim.py, tools/graduation_ledger.py, tools/vision_metrics.py
+Source paths: tools/generate_legibility_report.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/contrast_check.py, tools/cvd_sim.py, tools/graduation_ledger.py, tools/vision_metrics.py, tools/vision_review.py
 
 # Legibility Report
 
-- Generated at: 2026-07-21 17:12:54Z
+- Generated at: 2026-07-22 15:35:40Z
 - Total findings: 0
 - contrast_low findings (advisory, quarantine-tier): 0
 - cvd_collapse findings (accessibility evidence, quarantine-forever): 17
+- rubric_coverage gaps (advisory, never red): 5 shot-group(s), 17 unanswered question(s)
 
 ## Repo Contracts
 
@@ -96,6 +97,50 @@ cvd_collapse findings: 17 (quarantine-forever)
 - [protan] 12_battle_items.png: ['#308840', '#ba6c35'] deltaE 69.77 -> 3.52 (< 10.0)
 - [protan] 12_battle_items.png: ['#338a42', '#b86830'] deltaE 70.8 -> 6.09 (< 10.0)
 - [protan] 12_battle_items.png: ['#338a42', '#ba6c35'] deltaE 69.56 -> 4.2 (< 10.0)
+
+## Rubric coverage (Lane-4 question ledger)
+
+Reviewer kinds that ran a fresh pass: deterministic-sidecar-consistency. 2/19 rubric questions answered; 17 unanswered across 5 shot-group(s). Advisory-loud, never red: an unanswered question is COUNTED here (never faked as answered) until a capable reviewer (art-anchor and/or model) runs.
+
+- overworld: 0/6 answered [GAP] — fresh reviewer kinds: none; shots 0 changed of 7 covered
+    - UNANSWERED q1-44e6550d: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Does every biome read as its intended terrain (water blue, sand tan, grass green, rock gray, snow white, lava red)?"
+    - UNANSWERED q1-a0c3a4be: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Do props sit ON their tiles (grounded at the tile's bottom edge, not floating between tiles, not sunk into the ground)?"
+    - UNANSWERED q1-983d14ae: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Does the player render behind tall prop canopies when standing north of them and in front when standing south?"
+    - UNANSWERED q1-77580103: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Are tall-grass patches visibly distinct from short grass, and do they appear in grass biomes only?"
+    - UNANSWERED q1-8f1eec66: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Is anything rendered as an untextured solid-color or repeated-ghost blob?"
+    - UNANSWERED q1-781aad06: no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions
+        "Is the player sprite intact (no clipped frames, no direction mismatch)?"
+- day_night: 0/2 answered [GAP] — fresh reviewer kinds: none; shots 0 changed of 2 covered
+    - UNANSWERED q1-ced3b142: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Is the tint plausibly nighttime (dark blue) / dawn (warm) without text or the player becoming unreadable?"
+    - UNANSWERED q1-33511ca3: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Does UI (hint bar) stay untinted?"
+- menu: 0/5 answered [GAP] — fresh reviewer kinds: none; shots 0 changed of 3 covered
+    - UNANSWERED q1-2fedf7ed: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Is the world uniformly dimmed behind the UI with no undimmed band?"
+    - UNANSWERED q1-4421773b: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Are panels framed and readable against the dim?"
+    - UNANSWERED q1-50b2ed71: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Does every row align its name, level, HP bar, and counts on one line?"
+    - UNANSWERED q1-2b5b64a1: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Are HP bars visible and color-graded (green/orange/red)?"
+    - UNANSWERED q1-e9f24cea: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Is any text clipped, overlapping, or escaping its panel?"
+- battle: 2/5 answered [GAP] — fresh reviewer kinds: deterministic-sidecar-consistency; shots 0 changed of 4 covered
+    - UNANSWERED q1-e506c09e: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Is each Pokemon sprite a single clean frame (no strip bleed, no stretching, no slivers), positioned in its arena spot?"
+    - UNANSWERED q1-b7a28823: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "Is all text inside its box, with nothing crossing borders?"
+    - UNANSWERED q1-d8a0dec2: no fresh reviewer of kind [deterministic-art-anchor / model-qwen3-vl] ran this pass
+        "Are HP bars on their baked tracks, and do HP numbers show a single slash?"
+- display_matrix: 0/1 answered [GAP] — fresh reviewer kinds: none; shots 0 changed of 0 covered
+    - UNANSWERED q1-78ef42a9: no fresh reviewer of kind [model-qwen3-vl] ran this pass
+        "At EVERY window size: is the text pixel-crisp (uniform stroke widths, no shimmering/uneven glyph columns), the surface centered with even margins, and nothing clipped at the surface edges?"
 
 ## Graduation & calibration
 

@@ -127,6 +127,10 @@ validation_commands = [
 ]
 required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played", "mon_relocated"]
 quality_bucket = "battle"
+# HUD note (2026-07-21): the programmatic HP bars sit on the baked GSC tracks —
+# EnemyHPBar stage rect (32,18,48,4), PlayerHPBar stage rect (96,74,48,4) in
+# scenes/ui/BattleView.tscn. The art-anchored model encodes no bar rects, so the
+# live position rides the shot sidecars' draw_order and the audits match it.
 
 [[subsystems]]
 name = "menu_ui"
@@ -171,7 +175,7 @@ quality_bucket = "harvest"
 name = "vision_fidelity"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py"]
+code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py", "tools/vision_review.py", "tools/art_geometry.py", "tools/check_art_anchors.py", "tools/vlm_reviewer.py"]
 scene_paths = []
 spec_doc = "docs/product-specs/vision-fidelity.md"
 validation_commands = [
@@ -181,6 +185,13 @@ validation_commands = [
   "python3 tools/determinism_verify.py canary --shot docs/generated/visual-baselines/09_battle.png",
   "python3 tools/visual_region_diff.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines",
   "python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines",
+  # Art-anchor gate (G1): the static art_anchor_issues half folds into check_repo_contracts.run() above;
+  # the --live mode compares a fresh sidecar's draw_order rects to the docs/registry/art-anchors.toml stage_rects:
+  "python3 tools/check_art_anchors.py",
+  "python3 tools/check_art_anchors.py --live .godot-smoke/shots/09_battle.png.sidecar.json",
+  # OPTIONAL model-reviewer lane (G2; quarantine-forever; degrades to the deterministic pass when no model is
+  # pulled, exit 0; CI never sets --reviewer-cmd): the populated Qwen3-VL 8b answerer, tools/vlm_reviewer.py:
+  "python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd \"python3 tools/vlm_reviewer.py\"",
   # OPTIONAL corroboration step (quarantine-tier, never a gate; needs `uv sync --extra vision`, skips cleanly without it):
   "python3 tools/vision_metrics.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --out .godot-smoke/vision-metrics.json",
   "python3 tools/generate_legibility_report.py --output .godot-smoke/legibility-report.md",
@@ -190,3 +201,28 @@ validation_commands = [
 ]
 required_trace_events = ["snapshot_captured", "capture_invalid", "text_oracle_passed", "quarantine_finding"]
 quality_bucket = "vision"
+# Vision-fidelity systemic fix (the 11 stage-px HP-bar escape; spec docs/product-specs/vision-fidelity.md
+# § Source-art anchor registry / VLM reviewer lane / Rubric coverage ledger):
+#   G1 (source-art anchors) — docs/registry/art-anchors.toml ([[scenes]] mechanical overlay inventory +
+#     [[anchors]] tables; seeded with the dark-run HP tracks battle/enemy_hp_track (32,18,48,4) and
+#     battle/player_hp_track (96,74,48,4)) is read by tools/art_geometry.py (load_registry/load_scenes/
+#     derive_rect/rects_close/overlay_inventory), tools/check_art_anchors.py (static RED art_anchor_issues
+#     folded into check_repo_contracts.run + --live mode), and tools/run_playtests.py apply_anchor_gate
+#     (baseline-regeneration refusal). The anchor_drift class + the anchor:<id> art-truth region ride
+#     tools/vision_review.py (reviewer_kind deterministic-art-anchor, quarantine -> per-anchor coded red).
+#   G2 (rubric answerer) — tools/vlm_reviewer.py (Qwen3-VL 8b, reviewer_kind model-qwen3-vl) populates the
+#     Lane-4 --reviewer-cmd socket; the rubric_coverage ledger (q1- question ids, QUESTION_ANSWERERS,
+#     EXPECTED_QUESTION_COUNTS backstop) makes "unanswered" a counted state. Miss-postmortem protocol +
+#     ledger: docs/references/miss-postmortem-protocol.md + docs/generated/miss-postmortems.json (entry #1).
+#   TRACE EVENTS — anchor_drift / rubric_coverage_gap / anchor_gate_refused are PYTHON-SIDE report kinds and
+#     report FIELDS riding the existing `quarantine_finding` + `vision_review_written` rows (documented in
+#     trace-events.md); they are NOT emitted as .gd JSONL literals, so they are DELIBERATELY NOT added to
+#     required_trace_events (that key requires a quoted literal in runtime .gd code — `quarantine_finding`
+#     already covers the anchor_drift kind).
+#   INTEGRATE docNeed — tools/check_art_anchors.py (#296, folded into check_repo_contracts.run via
+#     art_anchor_issues) and apply_anchor_gate (#297, in run_playtests.py) have LANDED and are listed in
+#     code_paths/validation_commands. REMAINING (#298): the anchor_drift class + anchor:<id> art-truth
+#     region kind in tools/vision_review.py and the per-anchor graduation/arming — until those land, the
+#     anchor_drift signal rides check_art_anchors.py (--live) plus the static gate, and the anchor:<id>
+#     region row in vision-review-rubric.md is the pre-pinned contract. Optionally split this concern into a
+#     dedicated vision_fidelity_anchors subsystem with its own QUALITY_SCORE.md row.
