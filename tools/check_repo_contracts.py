@@ -506,9 +506,59 @@ def miss_postmortem_advisories(root: Path | None = None) -> list[str]:
     return advisories
 
 
+# House seeding convention (miss-postmortem miss-002): the determinism half is
+# ADOPTED per scenario (the seed_for_smoke seam pins both runtime rngs), so the
+# convention is held by a loud advisory rather than silent trust.
+SEED_DRIVE_MARKERS = ("generate_wild_encounter(", "start_wild_battle(")
+SEED_PIN_MARKERS = ("seed_for_smoke(", "_rng.seed")
+_PASSED_EMIT_RE = re.compile(r'emit_trace\(\s*"([A-Za-z0-9_]+)_passed"')
+
+
+def seed_convention_advisories(root: Path | None = None) -> list[str]:
+    """Advisory scenario-authoring checklist (stderr, NEVER red — the house
+    progressive-arming style): any scenario file that drives wild/battle inputs
+    (generate_wild_encounter / start_wild_battle) and emits a <scenario>_passed
+    trace must pin the runtime rng first (seed_for_smoke, or a direct _rng.seed
+    assignment as visual_sweep.gd's BATTLE_RNG_SEED). A file that skips the pin
+    gates its pass event on the per-process wall-clock randomize() — the exact
+    nav_audit false-red class (miss-002). A violation can still flake, but never
+    silently (the honest-reporting half makes every red reason-carrying); the
+    advisory names the remaining seeding debt on every gate run until it is
+    closed. Per-file granularity by design: the pin must sit in the file that
+    drives the inputs (nav_audit.gd passes its check by delegation to the seeded
+    nav_audit_battle.gd, which carries the pin itself)."""
+    root = root or Path(__file__).resolve().parents[1]
+    scripts_dir = root / "scripts"
+    if not scripts_dir.is_dir():
+        return []
+    advisories: list[str] = []
+    for path in sorted(scripts_dir.rglob("*.gd")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        passed = sorted({match.group(1) + "_passed" for match in _PASSED_EMIT_RE.finditer(text)})
+        if not passed:
+            continue  # not a pass-gating scenario file
+        driven = sorted({marker.rstrip("(") for marker in SEED_DRIVE_MARKERS if marker in text})
+        if not driven:
+            continue  # draws no wild/battle inputs into this file
+        if any(marker in text for marker in SEED_PIN_MARKERS):
+            continue  # rng pinned (the seam or a direct assignment)
+        advisories.append(
+            f"{path.relative_to(root)} drives {', '.join(driven)} and emits "
+            f"{', '.join(passed)} without pinning the runtime rng (seed_for_smoke "
+            "or _rng.seed) before the pass-gating work — the nav_audit false-red "
+            "class (miss-002): the pass event rides the per-process wall-clock "
+            "seed (advisory, never red)")
+    return advisories
+
+
 def main() -> int:
     issues = run()
     for advisory in miss_postmortem_advisories():
+        print(f"advisory: {advisory}", file=sys.stderr)
+    for advisory in seed_convention_advisories():
         print(f"advisory: {advisory}", file=sys.stderr)
     if issues:
         print("Repo contract check failed:")

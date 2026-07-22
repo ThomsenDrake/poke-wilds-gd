@@ -3,7 +3,10 @@ extends RefCounted
 # Journey/soak engine behind scripts/app/playtest_scenarios.gd. Drives battles
 # through the public GameRuntime API (the same methods live input uses), checks
 # party/bag invariants, verifies save round-trips, and owns the save
-# backup/restore discipline so playtests never clobber the player's save.
+# backup/restore discipline so playtests never clobber the player's save. The
+# ONE documented internal reach: the MAX_BATTLE_ROUNDS stall-break expires a
+# trap refusal deterministically (nav_audit_battle.gd's seam) so the escape it
+# forces is a real terminal outcome, never an outcome-"" non-terminal.
 
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
@@ -195,6 +198,17 @@ func _drive_battle(runtime, wild_mon: Dictionary, chooser: Callable, state: Dict
 	while not response.is_empty() and not bool(response.get("finished", false)):
 		if rounds >= MAX_BATTLE_ROUNDS:
 			response = runtime.run_from_battle()
+			if not bool(response.get("finished", false)):
+				# run_from_battle's ONLY refusal is a "Can't escape!" trap
+				# (battle_rules.is_trapped), and escape attempts never tick
+				# end-of-turn, so trap_turns cannot decay on its own here: a
+				# player trapped at exactly the stall limit would otherwise
+				# yield outcome "" and a journey/soak 'no terminal outcome'
+				# failure (the nav_audit false-red's nearest sibling, miss-002).
+				# Expire the trap deterministically (nav_audit_battle.gd's seam)
+				# and re-prove the escape so the stall-break always terminates.
+				runtime.battle_runtime._player_mon["trap_turns"] = 0
+				response = runtime.run_from_battle()
 			break
 		var action: Dictionary = chooser.call(response.get("snapshot", {}), state)
 		response = _apply_battle_action(runtime, action)

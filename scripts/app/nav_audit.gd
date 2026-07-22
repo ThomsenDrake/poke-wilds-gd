@@ -8,17 +8,20 @@ extends Node
 # cut-capable party until the resolver clears the tile, and a surf gate opens
 # passively for a surf-capable party but stays shut without one. The battle
 # contract lives in nav_audit_battle.gd; the menu contract walks the
-# entry list and both sub-screens. One nav_audit_passed trace on success;
-# push_error with specifics otherwise. Save backup/restore is the
-# dispatcher's job, so this file holds no save-guard logic.
+# entry list and both sub-screens. Success traces nav_audit_passed; a non-pass
+# traces nav_audit_failed carrying the failures (plus push_error) — the total
+# exit contract, so a red can never be silent. Save guard is the dispatcher's.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const NavAuditBattle := preload("res://scripts/app/nav_audit_battle.gd")
 
 const SCAN_RADIUS := 10
-const GATED_SCAN_RADIUS := 20
+# Scan bound (never the gate contract): nearest surf gate measured ring 22 from
+# a real saved tile — must outrun the save's geometry (miss-002 save-drift sibling).
+const GATED_SCAN_RADIUS := 40
 const MAX_RING_TESTS := 8
 const MIN_TRAVERSAL_CHECKS := 5
+const NAV_AUDIT_SEED := 20260718 # battle-half determinism pin (distinct from SOAK_SEED/BATTLE_RNG_SEED)
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -35,7 +38,7 @@ func run(ctx: Dictionary) -> void:
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	await _audit_traversal()
-	var battle: Dictionary = NavAuditBattle.new().run(_ctx)
+	var battle: Dictionary = NavAuditBattle.new().run(_ctx, NAV_AUDIT_SEED)
 	_failures.append_array(battle.get("failures", []))
 	_battle_options_checked = int(battle.get("options_checked", 0))
 	await _audit_menu()
@@ -48,6 +51,7 @@ func run(ctx: Dictionary) -> void:
 			"menu_entries_checked": _menu_entries_checked
 		})
 	else:
+		_runtime().emit_trace("nav_audit_failed", "SmokeScenarios", {"failures": _failures})
 		push_error("Nav audit failed: %s" % "; ".join(PackedStringArray(_failures)))
 
 
@@ -74,10 +78,9 @@ func _audit_traversal() -> void:
 		_failures.append("traversal: only %d tiles testable within %d rings" % [_traversal_checked, SCAN_RADIUS])
 
 
-# Proves both gate contracts with crafted parties (restored after): the cut
-# gate rejects a cut-capable party until the resolver clears the tile, and
-# the surf gate rejects a magikarp party but accepts a gyarados one. The surf
-# pair is scanned under the non-surf party or water reads walkable and hides.
+# Proves both gate contracts with crafted parties (restored after): the cut gate
+# rejects until the resolver clears the tile; the surf gate rejects a magikarp
+# party but accepts a gyarados one (scanned under the non-surf party).
 func _audit_gated_tile(center: Vector2i) -> void:
 	var party_before: Array = _runner.swap_party(_runtime(), ["MAGIKARP"])
 	var cut_pair := _runner.find_gated_pair(_world(), center, GATED_SCAN_RADIUS, "cut")
@@ -113,8 +116,7 @@ func _audit_gated_tile(center: Vector2i) -> void:
 	_runner.restore_party(_runtime(), party_before)
 
 
-# Drives one step from the pair's stand tile toward the gated tile and reports
-# {"accepted", "reason"}; reason is the block text when the step is rejected.
+# One step from the pair's stand tile toward the gated tile: {"accepted", "reason"}.
 func _probe_gate_step(pair: Dictionary) -> Dictionary:
 	_runner.teleport_player(_world(), _player(), _runtime(), pair["from_tile"])
 	await _settle_movement()
@@ -157,8 +159,7 @@ func _check_walkable_tile(entry: Dictionary) -> void:
 		_traversal_checked += 1
 
 
-# A failed probe can leave the player mid-walk; never step again until it ends.
-func _settle_movement() -> void:
+func _settle_movement() -> void: # a failed probe can leave the player mid-walk; never step again until it ends
 	if _player()._moving:
 		await _player().tile_changed
 

@@ -48,7 +48,15 @@ func load_payload() -> Dictionary:
 		return {}
 	var text = file.get_as_text()
 	file.close()
-	var parsed = JSON.parse_string(text)
+	# Quiet parse (JSON.new().parse returns an error code; the engine prints
+	# nothing on failure) so a recovered corrupt save emits no spurious engine
+	# "ERROR: Parse JSON failed" stderr line — the refusal is traced by
+	# _recovery below, never swallowed, never doubled by engine noise.
+	var json = JSON.new()
+	if json.parse(text) != OK:
+		_recovery("corrupt", _preserve(".corrupt.bak"))
+		return {}
+	var parsed = json.data
 	if not (parsed is Dictionary):
 		_recovery("corrupt", _preserve(".corrupt.bak"))
 		return {}

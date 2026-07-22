@@ -7,8 +7,12 @@ extends RefCounted
 # view's selection id matching the layout model at each step; activating move
 # row 0 performs the lead mon's actual first move (PP drops on row 0 only and
 # the battle text names it); cancel from each submenu returns to the action
-# state and RUN ends the battle cleanly. Fully synchronous: battle
-# activations resolve through the runtime without frame waits.
+# state and RUN ends the battle — trap-tolerantly: a legitimate "Can't escape!"
+# refusal is PROVEN, the trap expired, and escape re-proven, never a failure.
+# Determinism pin: run() takes the caller's seed and calls seed_for_smoke so
+# the wild draw and every battle roll are a pure function of (code, save, seed)
+# — the house seeding convention, never the per-process wall-clock randomize().
+# Fully synchronous: activations resolve through the runtime without frame waits.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
@@ -19,8 +23,9 @@ var _failures: Array = []
 var _options_checked := 0
 
 
-func run(ctx: Dictionary) -> Dictionary:
+func run(ctx: Dictionary, rng_seed: int) -> Dictionary:
 	var runtime: Node = ctx["runtime"]
+	runtime.seed_for_smoke(rng_seed)
 	runtime.session.heal_party_full()
 	_runner.refill_party_pp(runtime)
 	if not _start_battle(ctx):
@@ -32,9 +37,9 @@ func run(ctx: Dictionary) -> Dictionary:
 	_audit_submenu(view, "item", "item")
 	_audit_move_activation(view, ctx)
 	if view.visible:
-		_check_run_escape(view)
+		_check_run_escape(view, ctx)
 	elif _start_battle(ctx):
-		_check_run_escape(ctx["battle_view"])
+		_check_run_escape(ctx["battle_view"], ctx)
 	else:
 		_failures.append("battle: could not restart a battle for the run check")
 	_set_battle(ctx, false)
@@ -140,12 +145,27 @@ func _audit_move_activation(view: Node, ctx: Dictionary) -> void:
 	_failures.append("battle: move_0 never performed the lead mon's first move")
 
 
-func _check_run_escape(view: Node) -> void:
+# Total RUN contract: escape ends the battle when legal; while trapped the
+# game's ONLY refusal is "Can't escape!" (battle_runtime.run_from_battle), so
+# a still-visible view must carry exactly that text — proving the trap-refusal
+# mechanic (new coverage) — then the trap is expired and escape re-proven. A
+# legitimate in-game escape refusal can never be recorded as a suite failure.
+func _check_run_escape(view: Node, ctx: Dictionary) -> void:
 	view._set_menu_state("action")
 	view._selection = "run"
 	view._activate_selection()
+	if not view.visible:
+		_options_checked += 1
+		return
+	if not view._message.contains("Can't escape!"):
+		_failures.append("battle: RUN left the view up without the trap refusal text (message: %s)" % view._message)
+		return
+	_options_checked += 1 # the refusal itself is proven contract behavior
+	ctx["runtime"].battle_runtime._player_mon["trap_turns"] = 0
+	view._selection = "run"
+	view._activate_selection()
 	if view.visible:
-		_failures.append("battle: RUN did not end the battle")
+		_failures.append("battle: RUN did not end the battle after the trap expired")
 	else:
 		_options_checked += 1
 

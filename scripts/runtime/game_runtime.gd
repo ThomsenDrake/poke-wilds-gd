@@ -13,8 +13,7 @@ const MusicRouter := preload("res://scripts/runtime/music_router.gd")
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
 
-# Emitted once per successful harvest so the view layer can mirror the
-# override and re-render the tile without a world rebuild.
+# Emitted per successful harvest so the view can re-render the tile without a world rebuild.
 signal world_overridden(tile: Vector2i)
 
 var trace = TraceLogger.new()
@@ -35,8 +34,7 @@ func _ready() -> void:
 	catalog.setup(trace)
 	save_store.setup(trace)
 	battle_runtime.setup(session, catalog, pokemon_rules, trace)
-	# The router lives under this autoload so its lazily created player is in
-	# the scene tree and audible; main.gd drives it via runtime.music_router.
+	# The router lives under this autoload so its lazy player is in the tree and audible.
 	music_router.setup(trace)
 	add_child(music_router)
 
@@ -51,8 +49,7 @@ func ensure_initialized() -> void:
 			"party_size": session.party.size(), "player_tile": _tile_payload(session.player_tile)})
 		_initialized = true
 		return
-	# A parsed-but-unapplicable save (empty/non-Dictionary party) still holds
-	# player data; preserve it (refusal .bak mirror) before new_game() clobbers it.
+	# A parsed-but-unapplicable save still holds player data; preserve it before new_game().
 	if not payload.is_empty():
 		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store.preserve_save(".unusable.bak")})
 	new_game()
@@ -113,8 +110,7 @@ func get_time_of_day_minutes() -> int:
 	return session.time_of_day_minutes
 
 
-# True when any party member can perform the field move. Party capability is
-# the single field-move check now; there is no stored-unlock model anymore.
+# True when any party member can perform the field move (the single capability check).
 func party_has_field_move_ability(move_id: String) -> bool:
 	var get_species := Callable(catalog, "get_species")
 	for mon in session.party:
@@ -123,16 +119,14 @@ func party_has_field_move_ability(move_id: String) -> bool:
 	return false
 
 
-# Campsite hold (Phase 0 defect 0.1): a capture with a full party relocates
-# the mon to the player's last campsite (session.campsite_tile) instead of
-# losing it; it waits there until retrieved from the party screen.
+# Campsite hold (Phase 0 defect 0.1): a capture with a full party relocates the
+# mon to the player's last campsite instead of losing it; the party screen retrieves it.
 func get_campsite_pokemon() -> Array:
 	return session.get_campsite_pokemon()
 
 
-# Pulls the held mon at `index` from the campsite back into the party. The
-# party-screen RETRIEVE row is the only caller and renders only when the
-# party has room (< 6). Traces the handoff (mirror of mon_relocated).
+# Pulls the held mon at `index` from the campsite back into the party; the
+# party-screen RETRIEVE row is the only caller (renders only with party room).
 func retrieve_campsite_mon(index: int) -> Dictionary:
 	var mon: Dictionary = session.retrieve_campsite_mon(index)
 	if mon.is_empty():
@@ -145,9 +139,8 @@ func retrieve_campsite_mon(index: int) -> Dictionary:
 	return mon
 
 
-# Harvests one faced tile through the shared resolver (spec section 3):
-# resolves the action (cut/dig/smash), checks capability (the given mon, else
-# the whole party), stamps the world override, grants the yield, and traces.
+# Harvests one faced tile through the shared resolver (spec section 3): resolves
+# the action, checks capability, stamps the world override, grants the yield, traces.
 func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
 	var logic: Dictionary = _world_gen.get_tile_logic(tile)
 	var action := HarvestResolver.action_for_tile(logic)
@@ -177,8 +170,7 @@ func _harvest_capable(action: String, mon_constraint: Dictionary) -> bool:
 	return party_has_field_move_ability(action)
 
 
-# The runtime's generator owns the canonical override map; the view layer and
-# scenarios read copies through these accessors, never the map itself.
+# The runtime's generator owns the canonical override map; callers read copies only.
 func world_overrides_for_save() -> Dictionary:
 	return _world_gen.overrides_for_save()
 
@@ -202,6 +194,15 @@ func get_item_count(item_id: String) -> int:
 
 func set_party_lead(index: int) -> void:
 	session.set_party_lead(index)
+
+
+# Smoke determinism seam (house seeding convention; visual_sweep pins
+# battle_runtime._rng directly, playtest_soak its bot): pins BOTH rngs so a
+# scenario's audited inputs are a pure function of (code, save, seed), never
+# the per-process wall-clock seed from _ready's randomize().
+func seed_for_smoke(seed: int) -> void:
+	_rng.seed = seed
+	battle_runtime._rng.seed = seed
 
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
@@ -278,8 +279,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 	if normalized_party.is_empty():
 		return false
 	session.apply_loaded_state(payload, normalized_party)
-	# Re-seed the runtime generator to the loaded world, then restore the saved
-	# overrides exactly (clear first so a prior in-memory session cannot leak).
+	# Re-seed the generator to the loaded world, then restore saved overrides exactly.
 	_world_gen.setup(session.world_seed)
 	_world_gen.clear_overrides()
 	var saved_overrides: Variant = payload.get("world_overrides", {})

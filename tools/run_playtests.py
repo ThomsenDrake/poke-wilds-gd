@@ -83,7 +83,11 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 6006
 DEFAULT_TIMEOUT = 90.0
 DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
-ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error")
+# Single-sourced in the sibling smoke harness so the DAP and headless/windowed
+# transports treat the identical line set as an exception — including the
+# "ERROR: " prefix push_error prints (the silent-fail class behind the
+# nav_audit false-red; see miss-postmortems.json miss-002).
+ERROR_MARKERS = smoketest.ERROR_MARKERS
 CONNECT_TIMEOUT_S = 3.0
 NO_RESPONSE_GRACE_S = 10.0
 SETTLE_S = 0.5
@@ -91,12 +95,14 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class TraceCollector:
-    """Accumulates events, warnings, the *_passed payload, and snapshot stamps."""
+    """Accumulates events, warnings, the *_passed payload, the *_failed
+    reasons (symmetric failure contract), and snapshot stamps."""
 
     def __init__(self) -> None:
         self.events: set[str] = set()
         self.warnings: list[dict[str, Any]] = []
         self.passed_payload: Any = None
+        self.failed_events: list[dict[str, Any]] = []
         self.snapshot_payloads: list[dict[str, Any]] = []
 
     def add(self, trace: dict[str, Any]) -> None:
@@ -119,6 +125,9 @@ class TraceCollector:
             self.snapshot_payloads.append(payload)
         if event.endswith("_passed"):
             self.passed_payload = payload
+        entry = smoketest.failed_event_entry(trace)
+        if entry is not None:
+            self.failed_events.append(entry)
 
 
 def project_stamp(payloads: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -181,9 +190,18 @@ def finalize(
     result["exceptions"] = exceptions
     result["warnings"] = collector.warnings
     result["passed_payload"] = collector.passed_payload
+    result["failed_events"] = collector.failed_events
     result["stamp"] = project_stamp(collector.snapshot_payloads)
     result["duration_s"] = round(time.monotonic() - started, 2)
-    result["ok"] = not exceptions and not result["missing_all"] and not result["missing_any"]
+    # Total-run contract: a red ALWAYS names its cause — an exception (now
+    # including captured push_error "ERROR: " lines) OR a missing required
+    # event OR a structured <scenario>_failed trace carrying the reasons.
+    result["ok"] = (
+        not exceptions
+        and not result["missing_all"]
+        and not result["missing_any"]
+        and not collector.failed_events
+    )
     return result
 
 
@@ -997,6 +1015,8 @@ def main() -> int:
                 print(f"  {name}: missing alternative group: {' | '.join(group)}")
             for exception in result["exceptions"][:5]:
                 print(f"  {name}: exception: {exception}")
+            for failure in result.get("failed_events", [])[:5]:
+                print(f"  {name}: failed event {failure['event']}: {failure['payload']}")
             for failure in result.get("region_failures", [])[:8]:
                 print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
             for finding in result.get("region_quarantine", [])[:4]:
