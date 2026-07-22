@@ -1,0 +1,90 @@
+tools/run_playtests.py
+  s_8237c2c8e4b53f::t_9d7256c2a45b43 98-99,105,128-130
+  s_8237c2c8e4b53f::t_b8193d1523f700 1018-1019
+  s_8237c2c8e4b53f::t_71c7c493f9971f 86-90
+  s_8237c2c8e4b53f::t_c8972d690a9c95 193,196-204
+docs/product-specs/bootstrap-and-overworld.md
+  s_8237c2c8e4b53f::t_52f88a3bc4996d 2
+  s_8237c2c8e4b53f::t_b60e718c493508 63
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_8ccce9d17cd807 13
+  s_8237c2c8e4b53f::t_abf8da67325ed6 12
+scripts/runtime/playtest_bot.gd
+  s_8237c2c8e4b53f::t_50a15eb9177da7 201-211
+  s_8237c2c8e4b53f::t_cdf9004f4eb5c8 6-9
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_7307600618ff1a 255
+  s_8237c2c8e4b53f::t_eea459460d76aa 119
+  s_8237c2c8e4b53f::t_34a4c3cfa5a2d7 115-117
+  s_8237c2c8e4b53f::t_36cec6565cc383 118
+scripts/app/nav_audit_battle.gd
+  s_8237c2c8e4b53f::t_80b78294b45559 10-15
+  s_8237c2c8e4b53f::t_50ad42c6a58217 40,42,148-153,157-166,168
+  s_8237c2c8e4b53f::t_797f576455a70f 26
+  s_8237c2c8e4b53f::t_0609e9ba08adff 28
+tools/check_repo_contracts.py
+  s_8237c2c8e4b53f::t_e4ec22b8b15e05 509-556,561
+  s_8237c2c8e4b53f::t_11d13d43b35347 562
+scripts/app/nav_audit.gd
+  s_8237c2c8e4b53f::t_ecb16679451df8 119
+  s_8237c2c8e4b53f::t_679ec24c366d87 162
+  s_8237c2c8e4b53f::t_942757e4a2e553 83
+  s_8237c2c8e4b53f::t_62977fa3a6bafa 21
+  s_8237c2c8e4b53f::t_090c2f9ff2107e 19-20
+  s_8237c2c8e4b53f::t_9b4f939cd63829 24
+  s_8237c2c8e4b53f::t_aceb901c0c594f 41
+  s_8237c2c8e4b53f::t_373d97199ca8bf 11-13
+  s_8237c2c8e4b53f::t_a86879075175e7 54
+  s_8237c2c8e4b53f::t_af993dbf04bd77 82
+  s_8237c2c8e4b53f::t_06e570e0c4e14d 81
+scripts/runtime/save_store.gd
+  s_8237c2c8e4b53f::t_41ce860e119be1 51-59
+docs/product-specs/menu-and-save.md
+  s_8237c2c8e4b53f::t_fd8f7378bad80e 2
+  s_8237c2c8e4b53f::t_20909d4b4da0dd 15-16
+docs/generated/miss-postmortems.json
+  s_8237c2c8e4b53f::t_4e6724b982f12a 3
+  s_8237c2c8e4b53f::t_12e0f6196b0ab8 46-65,67-73,75-80
+  s_8237c2c8e4b53f::t_7d3b693d1c1510 66
+  s_8237c2c8e4b53f::t_e422b10d0b6cdf 74
+scripts/runtime/game_runtime.gd
+  s_8237c2c8e4b53f::t_2f97830c73757b 122-123
+  s_8237c2c8e4b53f::t_9a90c7ff6d0a49 16
+  s_8237c2c8e4b53f::t_c58c03a34f7b10 199-202
+  s_8237c2c8e4b53f::t_ae21b596293acc 52
+  s_8237c2c8e4b53f::t_8dd448c5dce9c5 37
+  s_8237c2c8e4b53f::t_9744703542c312 142-143
+  s_8237c2c8e4b53f::t_21df26be3bed9c 282
+  s_8237c2c8e4b53f::t_0ab7ebbe1f6560 113
+  s_8237c2c8e4b53f::t_22151e2d3d0a40 173
+  s_8237c2c8e4b53f::t_1434985cb42264 203-207
+  s_8237c2c8e4b53f::t_632d2ba464b816 128-129
+tools/godot_dap_smoketest.py
+  s_8237c2c8e4b53f::t_e5247b264ac4b6 19-24,26
+  s_8237c2c8e4b53f::t_41dd482dec9ff3 195-208
+  s_8237c2c8e4b53f::t_70eb422568c1b0 25
+  s_8237c2c8e4b53f::t_b502db2aaa3153 336-337
+  s_8237c2c8e4b53f::t_ce57a78040d921 216-226,230-231,237-240
+  s_8237c2c8e4b53f::t_03bced387b9e47 386-388,391-393,400
+  s_8237c2c8e4b53f::t_6dd7a309a8ff45 418,432-435
+docs/registry/subsystems.toml
+  s_8237c2c8e4b53f::t_41bae7c2cb7c63 22
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_70b58c7784268f 33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "164c3dd60dffb9460689e40706c8f136175c99ba",
+  "prompts": {},
+  "sessions": {
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
