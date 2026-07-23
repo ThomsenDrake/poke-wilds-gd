@@ -11,8 +11,12 @@ extends RefCounted
 # legacy ids from older saves are remapped on load (see LEGACY_ITEM_IDS).
 # v3 also carries campsite_x/campsite_y/campsite_pokemon (additive keys): the
 # non-losing hold for full-party captures, retrievable from the party screen.
+# The build loop's placed structures ride the same v3-additive pattern under a
+# separate "structures" key (SAVE_VERSION stays 3): older saves and saves from
+# before building simply lack the key and backfill to {} on load.
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
+const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 
 const SAVE_VERSION := 3
 const DAY_MINUTES := 1440
@@ -32,6 +36,10 @@ var player_tile: Vector2i = Vector2i.ZERO
 # sites) instead of losing it. Phase 0 hold + retrieval, not Phase 3 boxes.
 var campsite_tile: Vector2i = Vector2i.ZERO
 var campsite_pokemon: Array = []
+# Load-time handoff for placed structures (save-shape "x,y" -> entry). Populated
+# by apply_loaded_state from the "structures" key so GameRuntime can feed it to
+# the generator's placement map; the live canonical map lives on the generator.
+var structures: Dictionary = {}
 var party: Array = []
 var bag: Dictionary = {}
 var unlocked_field_moves: Dictionary = {}
@@ -44,6 +52,7 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	player_tile = spawn_tile
 	campsite_tile = spawn_tile
 	campsite_pokemon.clear()
+	structures = {}
 	party.clear()
 	unlocked_field_moves.clear()
 	bag = STARTING_BAG.duplicate()
@@ -59,6 +68,9 @@ func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	# Absent campsite keys (v1/v2/pre-hold v3 saves) anchor to the player tile.
 	campsite_tile = Vector2i(int(data.get("campsite_x", player_tile.x)), int(data.get("campsite_y", player_tile.y)))
 	campsite_pokemon = _normalize_campsite(data.get("campsite_pokemon", []))
+	# Absent/invalid structures (pre-building saves) backfill to {} exactly like
+	# the campsite keys; invalid entries are dropped (see _normalize_structures).
+	structures = _normalize_structures(data.get("structures", {}))
 	party = normalized_party
 	var raw_bag: Variant = data.get("bag", null)
 	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
@@ -69,7 +81,7 @@ func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	unlocked_field_moves.clear()
 
 
-func to_save_payload(world_overrides: Dictionary = {}) -> Dictionary:
+func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dictionary = {}) -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"world_seed": world_seed,
@@ -80,10 +92,19 @@ func to_save_payload(world_overrides: Dictionary = {}) -> Dictionary:
 		"time_of_day_minutes": time_of_day_minutes,
 		"total_steps": total_steps,
 		"world_overrides": world_overrides,
+		# Split save key for placed structures; the canonical value is the
+		# generator's placements map, passed in by GameRuntime.save_game.
+		"structures": structures_overrides,
 		"campsite_x": campsite_tile.x,
 		"campsite_y": campsite_tile.y,
 		"campsite_pokemon": campsite_pokemon
 	}
+
+
+# Load-time structures handoff (save-shape); GameRuntime feeds this to the
+# generator's placement map after re-seeding the world.
+func get_structures() -> Dictionary:
+	return structures.duplicate(true)
 
 
 func get_active_party_index() -> int:
@@ -236,6 +257,25 @@ func _normalize_campsite(raw: Variant) -> Array:
 		for mon in raw:
 			if mon is Dictionary and not (mon as Dictionary).is_empty():
 				normalized.append(rules.normalize_loaded_mon(mon))
+	return normalized
+
+
+# Validates a loaded "structures" map into save shape ("x,y" -> entry), dropping
+# malformed keys and entries that fail the placement validator (mirrors
+# WorldOverrides.merge_placements' defensiveness, minus a trace logger here).
+func _normalize_structures(raw: Variant) -> Dictionary:
+	var normalized: Dictionary = {}
+	if not (raw is Dictionary):
+		return normalized
+	var raw_map: Dictionary = raw
+	for key in raw_map.keys():
+		var parts := str(key).split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			continue
+		var entry: Variant = raw_map[key]
+		if not (entry is Dictionary) or not WorldOverrides.is_valid_placement(entry):
+			continue
+		normalized["%d,%d" % [parts[0].to_int(), parts[1].to_int()]] = (entry as Dictionary).duplicate(true)
 	return normalized
 
 

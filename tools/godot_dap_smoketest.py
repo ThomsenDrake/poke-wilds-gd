@@ -135,6 +135,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["harvest_flow_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "placement_flow": {
+        "all": ["placement_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

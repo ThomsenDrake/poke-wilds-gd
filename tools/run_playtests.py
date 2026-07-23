@@ -66,7 +66,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",

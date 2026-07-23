@@ -45,13 +45,12 @@ func restore_window_size(previous: Vector2i) -> void:
 # new-game spawn selection. Returns false when a species id is unknown.
 func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 	var runtime = ctx["runtime"]
-	var move_lookup = Callable(runtime.catalog, "get_move")
 	var party: Array = []
 	for entry_spec in spec["party"]:
 		var entry: Dictionary = runtime.catalog.get_species(str(entry_spec[0]))
 		if entry.is_empty():
 			return false
-		party.append(runtime.pokemon_rules.create_pokemon_instance(entry, int(entry_spec[1]), move_lookup))
+		party.append(runtime.pokemon_rules.create_pokemon_instance(entry, int(entry_spec[1]), Callable(runtime.catalog, "get_move")))
 	var spawn: Vector2i = runtime._world_gen.find_walkable_spawn(int(spec["world_seed"]))
 	var payload := {
 		"version": 2, "world_seed": spec["world_seed"],
@@ -61,10 +60,12 @@ func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 		"unlocked_field_moves": []
 	}
 	runtime.save_store.write_payload(payload)
-	var normalized: Array = []
-	for mon in party:
-		normalized.append(runtime.pokemon_rules.normalize_loaded_mon(mon))
+	var normalized := party.map(func(m): return runtime.pokemon_rules.normalize_loaded_mon(m))
 	runtime.session.apply_loaded_state(payload, normalized)
+	# Wipe the loaded save's leftover clears+placements so the crafted world is a pure
+	# function of the seed (rebuild and each teleport's rebuild re-pull the live maps).
+	runtime._world_gen.clear_overrides()
+	runtime._world_gen.clear_placements()
 	ctx["world"].rebuild(int(spec["world_seed"]))
 	runner.teleport_player(ctx["world"], ctx["player"], runtime, spawn)
 	ctx["world"].set_time_of_day(int(spec["time_of_day"]))

@@ -2,14 +2,13 @@ extends Node
 
 # Lane 1 of the autonomous oracle suite (spec: docs/superpowers/specs/
 # 2026-07-18-autonomous-playtesting-oracles-design.md). Tiles around spawn are
-# bucketed per biome and category (prop, gate, tall_grass, blocked, walkable)
-# so rare classes cannot slip past a flat cap; for every sample the generator
-# logic, the rendered scene textures, and the collision/movement answers must
-# agree. Spatial halves (z-order, player rect) live in world_spatial_audit.gd.
-# Expectations anchor to source art and the model's own solid-prop knowledge,
-# never to the code under test. The override extension stamps one real cut,
-# then cross-checks every overridden tile across logic/render/collision.
-# Encounters are muted. Save guard: the dispatcher.
+# bucketed per biome and category so rare classes cannot slip past a flat cap;
+# for every sample the generator logic, the rendered scene textures, and the
+# collision/movement answers must agree. The spatial + movement halves and the
+# shared solid-prop/texture helpers live in world_spatial_audit.gd. Expectations
+# anchor to source art, never to the code under test. Two mutation lanes stamp
+# one real override each — a cut (clears) and a wall+door (build) — then
+# cross-check every mutated tile across logic/render/collision. Save guard: dispatcher.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
@@ -21,16 +20,6 @@ const MAX_FAILURES := 20
 # Biomes carrying the tall-grass encounter mechanic (biome_defs.gd); the
 # others encounter biome-wide by design and render no overlay.
 const TALL_GRASS_BIOMES := ["GRASSLAND", "FOREST", "SAVANNA"]
-# Model truth independent of the data under test: these props are solid
-# structures, so a walkable tile rendering one is a world-data regression.
-const SOLID_PROP_PATHS := [
-	"res://pokewilds/tiles/tree1.png",
-	"res://pokewilds/tiles/swamp/tree13.png",
-	"res://pokewilds/tiles/spooky/tree1.png",
-	"res://pokewilds/tiles/cactus1.png",
-	"res://pokewilds/rock_small1.png",
-	"res://pokewilds/tiles/lava_sheet1.png",
-]
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -41,7 +30,6 @@ var _tiles_checked := 0
 var _movement_checked := 0
 var _spatial_checked := 0
 
-
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
 	await get_tree().create_timer(0.2).timeout
@@ -50,6 +38,7 @@ func run(ctx: Dictionary) -> void:
 	_player().encounter_chance = 0.0
 	await _audit_tiles(center)
 	await _audit_overridden_tiles(center)
+	await _audit_placed_structures(center)
 	var z_result: Dictionary = _spatial.audit_z_order(_world(), _player(), _runtime(), center, _runner)
 	_failures.append_array(z_result["failures"])
 	_spatial_checked += int(z_result["checked"])
@@ -85,10 +74,11 @@ func _audit_tiles(center: Vector2i) -> void:
 				return
 
 
-# Mutation-lane extension: stamps one real override through the resolver (a
-# cut-capable party on a tree), then cross-checks every tile in
+# Clears lane: stamps one real override through the resolver (a cut-capable
+# party on a tree), then cross-checks every tile in the generator's clears-only
 # overrides_for_save() across logic (mutated, walkable, no prop, no block
 # reason), render (no prop sprite, matching ground), and collision (step in).
+# Iterating the clears-only map keeps the build placements from contaminating it.
 func _audit_overridden_tiles(center: Vector2i) -> void:
 	var party_before: Array = _runner.swap_party(_runtime(), ["BULBASAUR"])
 	var found := _runner.find_harvest_target(_world(), center, SAMPLE_RADIUS, "cut")
@@ -96,11 +86,11 @@ func _audit_overridden_tiles(center: Vector2i) -> void:
 		_failures.append({"kind": "override_target_missing", "note": "no cut target within %d tiles" % SAMPLE_RADIUS})
 	elif not bool(_runtime().harvest_tile(found["tile"]).get("ok", false)):
 		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_harvest_refused"})
-	elif not _runtime().world_overrides_for_save().has("%d,%d" % [found["tile"].x, found["tile"].y]):
+	elif not _runtime()._world_gen.overrides_for_save().has("%d,%d" % [found["tile"].x, found["tile"].y]):
 		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_not_saved"})
 	_runner.restore_party(_runtime(), party_before)
 	var overridden: Array = []
-	for key in _runtime().world_overrides_for_save().keys():
+	for key in _runtime()._world_gen.overrides_for_save().keys():
 		var parts := str(key).split(",")
 		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
 			overridden.append(Vector2i(parts[0].to_int(), parts[1].to_int()))
@@ -115,9 +105,53 @@ func _audit_overridden_tiles(center: Vector2i) -> void:
 		_world().sync_visible(tile)
 		if _world().get_tile_prop_texture(tile) != null:
 			_failures.append({"tile": [tile.x, tile.y], "kind": "override_prop_rendered"})
-		if not _textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(_world().get_tile_render_data(tile))):
+		if not WorldSpatialAudit.textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(_world().get_tile_render_data(tile))):
 			_failures.append({"tile": [tile.x, tile.y], "kind": "override_base_mismatch"})
 		await _check_movement_probe(tile)
+
+
+# Build lane: places a wall + a door (a Build-capable Machop party on granted
+# materials) then reuses the generic logic/render check (_check_tile) and the
+# collision probe on each — a placed structure must agree across all three
+# sources like any base tile: the wall reads solid (non-walkable + block reason
+# + rejected step), the door a walkable opening (accepted step).
+func _audit_placed_structures(center: Vector2i) -> void:
+	var party_before: Array = _runner.swap_party(_runtime(), ["MACHOP"])
+	for item_id in ["log", "dry_soil", "hard_stone"]:
+		_runtime().session.add_item(item_id, 6)
+	var pair := _find_build_pair(center)
+	if pair.is_empty():
+		_failures.append({"kind": "placed_target_missing", "note": "no adjacent placeable pair within %d tiles" % SAMPLE_RADIUS})
+	else:
+		# A refused placement must fail the lane, not pass vacuously on the bare tile.
+		for structure_id in ["wall", "door"]:
+			if not bool(_runtime().build_runtime.try_place(pair[structure_id], structure_id, {}).get("ok", false)):
+				_failures.append({"tile": [pair[structure_id].x, pair[structure_id].y], "kind": "placed_refused", "structure_id": structure_id})
+			_check_tile(pair[structure_id])
+			await _check_movement_probe(pair[structure_id])
+	_runner.restore_party(_runtime(), party_before)
+
+
+# Adjacent open-ground pair near center, each with a stand neighbor other than its partner so the probe can stand once both are built.
+func _find_build_pair(center: Vector2i) -> Dictionary:
+	for radius in range(1, SAMPLE_RADIUS + 1):
+		for tile in _runner.ring_around(center, radius):
+			var other: Vector2i = tile + Vector2i.RIGHT
+			if _placeable(tile) and _placeable(other) and _has_stand(tile, other) and _has_stand(other, tile):
+				return {"wall": tile, "door": other}
+	return {}
+
+
+func _placeable(tile: Vector2i) -> bool:
+	var logic: Dictionary = _world().get_tile_logic(tile)
+	return bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() and str(logic.get("structure_id", "")).is_empty()
+
+
+func _has_stand(tile: Vector2i, exclude: Vector2i) -> bool:
+	for direction in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if tile + direction != exclude and _world().is_tile_walkable(tile + direction):
+			return true
+	return false
 
 
 func _tile_category(logic: Dictionary) -> String:
@@ -138,7 +172,7 @@ func _check_tile(tile: Vector2i) -> void:
 		return
 	_world().sync_visible(tile)
 	var render: Dictionary = _world().get_tile_render_data(tile)
-	if not _textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(render)):
+	if not WorldSpatialAudit.textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(render)):
 		_failures.append({"tile": [tile.x, tile.y], "kind": "base_texture_mismatch"})
 	var prop_path := str(logic.get("prop_path", ""))
 	var shown_prop: Texture2D = _world().get_tile_prop_texture(tile)
@@ -147,14 +181,14 @@ func _check_tile(tile: Vector2i) -> void:
 	elif not prop_path.is_empty():
 		if shown_prop == null:
 			_failures.append({"tile": [tile.x, tile.y], "kind": "missing_prop"})
-		elif not _textures_match(shown_prop, _tex_cache.prop_texture(render)):
+		elif not WorldSpatialAudit.textures_match(shown_prop, _tex_cache.prop_texture(render)):
 			_failures.append({"tile": [tile.x, tile.y], "kind": "prop_texture_mismatch"})
 	var walkable: bool = _world().is_tile_walkable(tile)
 	if walkable != bool(logic.get("walkable", true)):
 		_failures.append({"tile": [tile.x, tile.y], "kind": "walkable_mismatch", "logic": logic.get("walkable"), "view": walkable})
 	if not walkable and _world().get_traversal_block_reason(tile).is_empty():
 		_failures.append({"tile": [tile.x, tile.y], "kind": "block_without_reason"})
-	if walkable and prop_path in SOLID_PROP_PATHS:
+	if walkable and prop_path in WorldSpatialAudit.SOLID_PROP_PATHS:
 		_failures.append({"tile": [tile.x, tile.y], "kind": "solid_prop_walkable", "prop": prop_path})
 
 
@@ -167,51 +201,18 @@ func _check_tall_grass(tile: Vector2i) -> void:
 	var plain := render.duplicate()
 	plain["tall_grass_path"] = ""
 	plain["tall_grass_key_color"] = ""
-	var has_overlay := not _textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(plain))
+	var has_overlay := not WorldSpatialAudit.textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(plain))
 	if bool(render.get("encounter", false)) != has_overlay:
 		_failures.append({"tile": [tile.x, tile.y], "kind": "tall_grass_mismatch", "encounter": render.get("encounter"), "overlay": has_overlay})
 
 
+# Collision agreement, delegated to the shared spatial/movement probe; folds the
+# probe's movement + spatial counters and failures back into the audit totals.
 func _check_movement_probe(tile: Vector2i) -> void:
-	var spot := _runner.stand_spot(_world(), tile)
-	if spot.is_empty():
-		return
-	_movement_checked += 1
-	_runner.teleport_player(_world(), _player(), _runtime(), spot["from_tile"])
-	await _settle_movement()
-	var expected := _expected_walkable(tile)
-	var accepted: bool = _player().smoke_step(spot["direction"])
-	var moved := false
-	if accepted:
-		await _player().tile_changed
-		moved = _player().tile_position == tile
-	if moved != expected or accepted != expected:
-		_failures.append({"tile": [tile.x, tile.y], "kind": "movement_mismatch", "expected_walkable": expected, "moved": moved, "accepted": accepted})
-	_spatial_checked += 1
-	_failures.append_array(_spatial.check_player_rect(_world(), _player()))
-
-
-# The model's expectation: solid props block no matter what the data says.
-func _expected_walkable(tile: Vector2i) -> bool:
-	if str(_world().get_tile_logic(tile).get("prop_path", "")) in SOLID_PROP_PATHS:
-		return false
-	return _world().is_tile_walkable(tile)
-
-
-func _textures_match(a: Texture2D, b: Texture2D) -> bool:
-	if a == null or b == null:
-		return a == b
-	var image_a := a.get_image()
-	var image_b := b.get_image()
-	if image_a.get_size() != image_b.get_size():
-		return false
-	return image_a.get_data() == image_b.get_data()
-
-
-# A failed probe can leave the player mid-walk; never step again until it ends.
-func _settle_movement() -> void:
-	if _player()._moving:
-		await _player().tile_changed
+	var result: Dictionary = await _spatial.movement_probe(_world(), _player(), _runtime(), _runner, tile)
+	_movement_checked += int(result["movement"])
+	_spatial_checked += int(result["spatial"])
+	_failures.append_array(result["failures"])
 
 
 func _world() -> Node: return _ctx["world"]

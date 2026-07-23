@@ -1,15 +1,39 @@
 extends RefCounted
 
-# Spatial half of world_consistency_audit: the z-order north/south contract
-# for tall props plus the player-vs-blocking-prop rect check. Synchronous —
-# every read is transform-level (positions, z_index, y-sort flags), so no
-# frame waits are needed.
+# Spatial + movement half of world_consistency_audit: the z-order north/south
+# contract for tall props, the player-vs-blocking-prop rect check, and the
+# per-tile movement probe (collision agreement). The z-order/rect reads are
+# transform-level and synchronous; the movement probe awaits step animations.
+# Also hosts the shared helpers the audit's clears AND build lanes both use
+# (solid-prop model truth + the texture byte-equality check), extracted so the
+# consistency audit stays under its line budget.
 
 const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
 
 const SAMPLE_RADIUS := 20
 const MAX_Z_ORDER_PROPS := 6
 const TILE := 16
+# Model truth independent of the data under test: these props are solid
+# structures, so a walkable tile rendering one is a world-data regression.
+const SOLID_PROP_PATHS := [
+	"res://pokewilds/tiles/tree1.png",
+	"res://pokewilds/tiles/swamp/tree13.png",
+	"res://pokewilds/tiles/spooky/tree1.png",
+	"res://pokewilds/tiles/cactus1.png",
+	"res://pokewilds/rock_small1.png",
+	"res://pokewilds/tiles/lava_sheet1.png",
+]
+
+
+# Byte-equality of two rendered textures (size + pixel data); null == null.
+static func textures_match(a: Texture2D, b: Texture2D) -> bool:
+	if a == null or b == null:
+		return a == b
+	var image_a := a.get_image()
+	var image_b := b.get_image()
+	if image_a.get_size() != image_b.get_size():
+		return false
+	return image_a.get_data() == image_b.get_data()
 
 
 # North of a tall prop its canopy must draw over the player; south, the
@@ -56,3 +80,36 @@ func check_player_rect(world, player) -> Array:
 
 func _player_sprite(player) -> CanvasItem:
 	return player.get_node("AnimatedSprite2D")
+
+
+# Collision agreement for one tile: step into it from a stand neighbor and
+# require the avatar to move iff the tile is expected-walkable. Returns
+# {"failures", "movement", "spatial"} so the audit can fold in its counters.
+func movement_probe(world, player, runtime, runner, tile: Vector2i) -> Dictionary:
+	var result := {"failures": [], "movement": 0, "spatial": 0}
+	var spot: Dictionary = runner.stand_spot(world, tile)
+	if spot.is_empty():
+		return result
+	result["movement"] = 1
+	runner.teleport_player(world, player, runtime, spot["from_tile"])
+	if player._moving:
+		await player.tile_changed
+	var expected := expected_walkable(world, tile)
+	var accepted: bool = player.smoke_step(spot["direction"])
+	var moved := false
+	if accepted:
+		await player.tile_changed
+		moved = player.tile_position == tile
+	if moved != expected or accepted != expected:
+		(result["failures"] as Array).append({"tile": [tile.x, tile.y], "kind": "movement_mismatch",
+			"expected_walkable": expected, "moved": moved, "accepted": accepted})
+	result["spatial"] = 1
+	(result["failures"] as Array).append_array(check_player_rect(world, player))
+	return result
+
+
+# The model's expectation: solid props block no matter what the data says.
+func expected_walkable(world, tile: Vector2i) -> bool:
+	if str(world.get_tile_logic(tile).get("prop_path", "")) in SOLID_PROP_PATHS:
+		return false
+	return world.is_tile_walkable(tile)

@@ -4,6 +4,8 @@ const GameRuntimePath := "/root/GameRuntime"
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const CryPlayer := preload("res://scripts/runtime/cry_player.gd")
 const InputRouter := preload("res://scripts/app/input_router.gd")
+const FieldActionRouter := preload("res://scripts/app/field_action_router.gd")
+const StructureLayer := preload("res://scripts/runtime/structure_layer.gd")
 
 @onready var _world = $World
 @onready var _player = $Player
@@ -15,6 +17,8 @@ const InputRouter := preload("res://scripts/app/input_router.gd")
 var _smoke_runner = SmokeScenarioRunner.new()
 var _cry_player = CryPlayer.new()
 var _input_router = InputRouter.new(Callable(self, "_toggle_menu"), Callable(self, "_on_context_action"))
+var _field_router = FieldActionRouter.new()
+var _structure_layer = StructureLayer.new()
 var _in_battle = false
 var _menu_open = false
 var _suppress_close_toast = false
@@ -35,6 +39,12 @@ func _ready() -> void:
 		"experience_for_level": Callable(_runtime().pokemon_rules, "experience_for_level")
 	})
 	_player.setup(_world)
+	# Build mode: y-sort-enabled sibling of World/Player so the ghost joins the prop/player depth chain.
+	_structure_layer.name = "StructureLayer"
+	add_child(_structure_layer)
+	_structure_layer.setup(_runtime(), _world, _player, Callable(_message_box, "show_message"))
+	_structure_layer.build_finished.connect(Callable(_field_router, "on_build_finished"))
+	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"))
 	_connect_signals()
 	_sync_world_from_runtime()
 	_message_box.show_message("Port in progress: Explore, battle, catch, and save with Enter.", 4.0)
@@ -47,7 +57,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_input_router.poll_menu_toggle()
-	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving())
+	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving() and not _structure_layer.is_active())
 
 
 func _on_player_tile_changed(tile_position: Vector2i) -> void:
@@ -64,11 +74,8 @@ func _on_player_blocked(reason: String, tile: Vector2i) -> void:
 		return
 	_message_box.show_message(reason if not reason.is_empty() else "Can't move there.", 0.8)
 	var field_move = _world.tile_requires_field_move(tile) if _world != null else ""
-	_runtime().emit_trace("traversal_blocked", "App.Main", {
-		"tile": _tile_payload(tile),
-		"reason": reason,
-		"requires_field_move": field_move
-	})
+	_runtime().emit_trace("traversal_blocked", "App.Main", {"tile": _tile_payload(tile),
+		"reason": reason, "requires_field_move": field_move})
 
 
 func _on_encounter_requested(tile_position: Vector2i) -> void:
@@ -109,7 +116,7 @@ func _on_battle_finished(outcome: String, message: String) -> void:
 
 
 func _toggle_menu() -> void:
-	if _in_battle:
+	if _in_battle or _structure_layer.is_active():
 		return
 	_menu_open = not _menu_open
 	_player.input_enabled = not _menu_open
@@ -131,18 +138,14 @@ func _on_menu_closed() -> void:
 		_message_box.show_message("Saved.", 0.8)
 
 
-# Party-screen FIELD MOVE: the chosen mon enforces its own capability.
-func _on_field_move_requested(_move_id: String, mon_index: int = -1) -> void:
+# Party-screen FIELD MOVE: the router consumes move_id (Build -> build mode).
+func _on_field_move_requested(move_id: String, mon_index: int = -1) -> void:
 	_suppress_close_toast = _menu_open
-	var party: Array = _runtime().get_party_snapshot()
-	var mon: Dictionary = party[mon_index] if mon_index >= 0 and mon_index < party.size() else {}
-	var result: Dictionary = _runtime().harvest_tile(_player.facing_tile(), mon)
-	_message_box.show_message(str(result.get("message", "")), 1.6)
+	_field_router.on_field_move_requested(move_id, mon_index)
 
 
 func _on_context_action() -> void:
-	var result: Dictionary = _runtime().harvest_tile(_player.facing_tile())
-	_message_box.show_message(str(result.get("message", "")), 1.6)
+	_field_router.on_context_action()
 
 
 func _on_game_reset() -> void:
@@ -156,10 +159,8 @@ func _sync_world_from_runtime() -> void:
 	_world.sync_visible(_player.tile_position)
 	_world.set_time_of_day(_runtime().get_time_of_day_minutes())
 	_play_biome_music()
-	_runtime().emit_trace("world_rebuilt", "App.Main", {
-		"world_seed": _runtime().get_world_seed(),
-		"center_tile": _tile_payload(_player.tile_position)
-	})
+	_runtime().emit_trace("world_rebuilt", "App.Main", {"world_seed": _runtime().get_world_seed(),
+		"center_tile": _tile_payload(_player.tile_position)})
 
 func _connect_signals() -> void:
 	_player.tile_changed.connect(_on_player_tile_changed)
@@ -208,9 +209,9 @@ func smoke_context() -> Dictionary:
 		"start_menu": _start_menu,
 		"message_box": _message_box,
 		"music_router": _music_router(),
+		"structure_layer": _structure_layer,
 		"toggle_menu": Callable(self, "_toggle_menu"),
-		"set_battle": Callable(self, "_smoke_set_battle"),
-		"field_move": Callable(self, "_on_field_move_requested")
+		"set_battle": Callable(self, "_smoke_set_battle"), "field_move": Callable(self, "_on_field_move_requested")
 	}
 
 

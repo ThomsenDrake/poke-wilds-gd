@@ -190,21 +190,24 @@ func rebuild(seed_value: int) -> void:
 	_generator.clear_overrides()
 	var runtime := _runtime_or_null()
 	if runtime != null:
-		_generator.apply_overrides(runtime.world_overrides_for_save())
+		_generator.apply_overrides(runtime.mutations_for_view())
 	_tile_cache.clear()
 	_last_biome = ""
 	_clear_rendered_nodes()
 
 
-# Live mutation sync: the runtime just stamped an override on this tile, so
+# Live mutation sync: the runtime just changed an override on this tile, so
 # mirror the map, drop the tile's cached data, and re-render it in place when
 # it sits inside the synced window (the ground texture too — dug tiles lose
 # their tall-grass overlay). Off-window tiles refresh on the next sync_visible.
+# Clear-then-apply (same shape as rebuild): demolition REMOVES entries, so a
+# merge alone would keep a demolished structure rendered + colliding.
 func _on_world_overridden(tile: Vector2i) -> void:
 	var runtime := _runtime_or_null()
 	if runtime == null:
 		return
-	_generator.apply_overrides(runtime.world_overrides_for_save())
+	_generator.clear_overrides()
+	_generator.apply_overrides(runtime.mutations_for_view())
 	_tile_cache.erase(tile)
 	var ground: Sprite2D = _ground_nodes.get(tile, null)
 	if ground == null and not _prop_nodes.has(tile):

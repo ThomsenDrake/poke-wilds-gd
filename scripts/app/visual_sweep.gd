@@ -14,6 +14,7 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
+const VisualSweepBuild := preload("res://scripts/app/visual_sweep_build.gd")
 
 const WALK_STEPS := 4
 const MAX_BIOME_SHOTS := 5
@@ -74,6 +75,11 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_world().set_time_of_day(CRAFTED_STATE["time_of_day"])
 	await _menu_shots()
 	await _battle_shots()
+	# Deterministic build: a small house + door (see visual_sweep_build.gd). Runs
+	# last so it cannot perturb shots 01-12; adds 13_built_house + 14_build_ghost.
+	var build := VisualSweepBuild.new()
+	add_child(build)
+	await build.craft_build(_ctx, _runner, _crafted, Callable(self, "_capture"))
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()

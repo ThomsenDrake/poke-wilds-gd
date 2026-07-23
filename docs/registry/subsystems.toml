@@ -57,6 +57,7 @@ code_paths = [
   "scripts/domain/biome_encounters.gd",
   "scripts/domain/world_generator.gd",
   "scripts/domain/world_overrides.gd",
+  "scripts/domain/world_invariants.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
@@ -170,6 +171,48 @@ validation_commands = [
 ]
 required_trace_events = ["field_move_used", "harvest_flow_passed"]
 quality_bucket = "harvest"
+
+[[subsystems]]
+name = "building_loop"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/structures.gd",
+  "scripts/runtime/build_runtime.gd",
+  "scripts/runtime/structure_layer.gd",
+  "scripts/app/field_action_router.gd",
+  "scripts/app/placement_flow_scenario.gd",
+  "scripts/app/placement_flow_demolition.gd",
+  "scripts/app/visual_sweep_build.gd",
+]
+scene_paths = ["scenes/app/Main.tscn"]
+spec_doc = "docs/product-specs/building-and-placement.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario placement_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
+]
+required_trace_events = ["build_mode_entered", "structure_placed", "structure_refused", "materials_consumed", "structure_demolished", "materials_refunded", "placement_flow_passed"]
+quality_bucket = "building"
+# CROSS-SUBSYSTEM CO-MODIFICATION: building_loop EXTENDS world_runtime's sparse
+# mutation map + generator with a "placed" entry kind — scripts/domain/world_overrides.gd
+# and scripts/domain/world_generator.gd (plus scripts/runtime/session_state.gd's save
+# payload and scripts/runtime/game_runtime.gd's save/load threading). Demolition
+# (build_runtime.try_demolish) extends the same generator surface with remove_placement
+# — the placements map entry only; the clears map is never touched — and joins the
+# Z-action flow via game_runtime.harvest_tile's placed-tile branch. The would-trap
+# guard extends world_generator.reachable_walkable_count with an optional `blocked`
+# tile parameter (default Vector2i.MAX — existing callers unchanged) so its
+# hypothetical placement never mutates the live placements map. Those files stay
+# OWNED BY world_runtime / session_runtime (one owner per file): the clears lane, the
+# shared 10k cap, and the save shape are world/session concerns, so they are NOT
+# double-listed here. world_runtime's validation_commands (overworld_step / biome_probe)
+# guard the clears lane against regressions from the shared apply/merge_save changes.
+# Placements persist under a NEW additive v3 "structures" save key (version stays 3);
+# the world view renders them through its existing prop pipeline via a merged
+# mutations_for_view() mirror, so world_view.gd itself is never extended. See
+# docs/product-specs/building-and-placement.md.
 
 [[subsystems]]
 name = "vision_fidelity"

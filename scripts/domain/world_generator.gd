@@ -2,16 +2,12 @@ extends RefCounted
 
 const BiomeDefs := preload("res://scripts/domain/biome_defs.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
+const WorldInvariants := preload("res://scripts/domain/world_invariants.gd")
 const TILE_SIZE := 16
 const ROCK_PROP_PATH := "res://pokewilds/rock_small1.png"
 const SPAWN_SEARCH_RADIUS := 24
 const SPAWN_MIN_WALK_NEIGHBORS := 2
 const SPAWN_MIN_SAFE_NEIGHBORS := 1
-const SPAWN_REACH_BUDGET := 64
-const SPAWN_REACH_MIN := 12
-const RING_INNER := 10
-const RING_MIDDLE := 28
-const RING_OUTER := 60
 
 var _seed: int = 1337
 var _elevation_noise: FastNoiseLite
@@ -19,7 +15,11 @@ var _tall_grass_noise: FastNoiseLite
 var _biome_noise: FastNoiseLite
 var _defs: Dictionary = {}
 var _textures: Dictionary = {}
+# Two independent sparse maps (one save key each): harvest clears and build
+# placements. They coexist per tile (build on a cleared tile) and share one 10k
+# cap; the merged view mirror is built by mutations_for_view().
 var _overrides: Dictionary = {}
+var _placements: Dictionary = {}
 
 
 func setup(seed_value: int) -> void:
@@ -106,21 +106,60 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 		"tall_grass_path": tall_grass_path,
 		"tall_grass_key_color": tall_grass_key
 	}
-	# Overrides apply last, at this single boundary; an empty map keeps base generation byte-identical.
-	return logic if not _overrides.has(map_pos) else WorldOverrides.apply(logic, _overrides[map_pos])
+	# Mutations apply last, at this single boundary, clears then placements so a
+	# built structure shadows a cleared tile; empty maps keep base byte-identical.
+	if _overrides.has(map_pos):
+		logic = WorldOverrides.apply(logic, _overrides[map_pos])
+	if _placements.has(map_pos):
+		logic = WorldOverrides.apply(logic, _placements[map_pos])
+	return logic
 
 
 func add_override(tile: Vector2i, kind: String, by: String, step: int) -> bool:
-	return WorldOverrides.put(_overrides, tile, WorldOverrides.make_entry(kind, by, step))
+	return WorldOverrides.put(_overrides, tile, WorldOverrides.make_entry(kind, by, step), _placements.size())
 
 func apply_overrides(saved: Dictionary) -> void:
-	WorldOverrides.merge_save(_overrides, saved)
+	WorldOverrides.merge_save(_overrides, saved, _placements.size())
 
 func overrides_for_save() -> Dictionary:
 	return WorldOverrides.to_save(_overrides)
 
 func clear_overrides() -> void:
 	_overrides.clear()
+
+
+# --- Build placements (second sparse map, second save key) --------------------
+
+func add_placement(tile: Vector2i, structure_id: String, by: String, step: int, gate: bool = false) -> bool:
+	return WorldOverrides.put_placement(_placements, tile, WorldOverrides.make_placement(structure_id, by, step, gate), _overrides.size())
+
+# Demolition: erases the placement entry and returns it ({} when none). The
+# tile's clear (if any) lives in the SEPARATE clears map and is untouched, so
+# demolished ground reverts to cleared ground — never respawns its raw prop.
+func remove_placement(tile: Vector2i) -> Dictionary:
+	var entry: Dictionary = _placements.get(tile, {})
+	if not entry.is_empty():
+		_placements.erase(tile)
+	return entry
+
+func apply_placements(saved: Dictionary) -> void:
+	WorldOverrides.merge_placements(_placements, saved, _overrides.size())
+
+func placements_for_save() -> Dictionary:
+	return WorldOverrides.to_save(_placements)
+
+func clear_placements() -> void:
+	_placements.clear()
+
+# Merged clears+placements in save shape, placements shadowing same-tile clears,
+# for the zero-touch view mirror + audit (never written to the save, which keeps
+# the two keys split). Bounded by MAX_OVERRIDES via the shared cap, so a single
+# merge_save into the view's one map can never truncate.
+func mutations_for_view() -> Dictionary:
+	var merged := WorldOverrides.to_save(_overrides)
+	for tile: Vector2i in _placements.keys():
+		merged["%d,%d" % [tile.x, tile.y]] = (_placements[tile] as Dictionary).duplicate(true)
+	return merged
 
 
 func get_tile(map_pos: Vector2i) -> Dictionary:
@@ -172,8 +211,10 @@ func find_walkable_spawn(seed_value: int) -> Vector2i:
 	return Vector2i.ZERO
 
 
-func reachable_walkable_count(start: Vector2i, max_tiles: int) -> int:
-	if not bool(get_tile_logic(start)["walkable"]):
+# `blocked` is one extra tile treated as unwalkable — the build trap guard's
+# hypothetical stamp, so the guard flood-fills without mutating the live placements map.
+func reachable_walkable_count(start: Vector2i, max_tiles: int, blocked: Vector2i = Vector2i.MAX) -> int:
+	if start == blocked or not bool(get_tile_logic(start)["walkable"]):
 		return 0
 	var visited: Dictionary = {start: true}
 	var frontier: Array = [start]
@@ -183,7 +224,7 @@ func reachable_walkable_count(start: Vector2i, max_tiles: int) -> int:
 		count += 1
 		for direction in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 			var next = current + direction
-			if visited.has(next):
+			if next == blocked or visited.has(next):
 				continue
 			if bool(get_tile_logic(next)["walkable"]):
 				visited[next] = true
@@ -191,42 +232,11 @@ func reachable_walkable_count(start: Vector2i, max_tiles: int) -> int:
 	return count
 
 
+# Determinism + biome-ring + spawn-reach audit, split into world_invariants.gd
+# (it was the budget pressure that forced the pre-split); thin delegate so the
+# view's validate_world_invariants() call site is unchanged.
 func validate_invariants(seed_value: int) -> Dictionary:
-	setup(seed_value)
-	var failures: Array = []
-	var gen2 = get_script().new()
-	gen2.setup(seed_value)
-
-	for pos in _invariant_sample_positions():
-		var a = get_tile_logic(pos)
-		var b = gen2.get_tile_logic(pos)
-		if str(a["biome"]) != str(b["biome"]) or bool(a["walkable"]) != bool(b["walkable"]) or str(a["requires_field_move"]) != str(b["requires_field_move"]):
-			failures.append("determinism_mismatch @ %d,%d" % [pos.x, pos.y])
-
-	for pos in _invariant_sample_positions():
-		var distance = abs(pos.x) + abs(pos.y)
-		var biome = str(get_tile_logic(pos)["biome"])
-		if distance < RING_INNER and not _biome_in(biome, ["WATER", "SAND", "PLAINS", "GRASSLAND"]):
-			failures.append("ring_inner_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
-		if distance < RING_MIDDLE and _biome_in(biome, ["DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]):
-			failures.append("ring_middle_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
-		if distance < RING_OUTER and _biome_in(biome, ["SNOW", "LAVA"]):
-			failures.append("ring_outer_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
-
-	var spawn = find_walkable_spawn(seed_value)
-	if not bool(get_tile_logic(spawn)["walkable"]):
-		failures.append("spawn_not_walkable @ %d,%d" % [spawn.x, spawn.y])
-	var reachable = reachable_walkable_count(spawn, SPAWN_REACH_BUDGET)
-	if reachable < SPAWN_REACH_MIN:
-		failures.append("spawn_reach_too_small %d (< %d)" % [reachable, SPAWN_REACH_MIN])
-
-	return {
-		"ok": failures.is_empty(),
-		"failures": failures,
-		"spawn": [spawn.x, spawn.y],
-		"reachable": reachable,
-		"seed": seed_value
-	}
+	return WorldInvariants.validate_invariants(self, seed_value)
 
 
 func _spawn_meets_neighbors(tile: Vector2i) -> bool:
@@ -250,18 +260,6 @@ func _ring_tiles(ring: int) -> Array:
 			if max(abs(x), abs(y)) == ring:
 				tiles.append(Vector2i(x, y))
 	return tiles
-
-
-func _invariant_sample_positions() -> Array:
-	var positions: Array = []
-	for y in range(-70, 71, 14):
-		for x in range(-70, 71, 14):
-			positions.append(Vector2i(x, y))
-	return positions
-
-
-func _biome_in(biome: String, allowed: Array) -> bool:
-	return allowed.has(biome)
 
 
 func _pick_biome(map_pos: Vector2i, elevation: float) -> String:

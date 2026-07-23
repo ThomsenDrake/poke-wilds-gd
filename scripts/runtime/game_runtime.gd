@@ -9,6 +9,7 @@ const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const BattleRuntime := preload("res://scripts/runtime/battle_runtime.gd")
+const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
 const MusicRouter := preload("res://scripts/runtime/music_router.gd")
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
@@ -22,6 +23,7 @@ var pokemon_rules = PokemonRules.new()
 var session = SessionState.new()
 var save_store = SaveStore.new()
 var battle_runtime = BattleRuntime.new()
+var build_runtime = BuildRuntime.new()
 var music_router = MusicRouter.new()
 var _world_gen = WorldGenerator.new()
 var _biome_encounters = BiomeEncounters.new()
@@ -34,6 +36,10 @@ func _ready() -> void:
 	catalog.setup(trace)
 	save_store.setup(trace)
 	battle_runtime.setup(session, catalog, pokemon_rules, trace)
+	build_runtime.setup(session, catalog, trace, _world_gen)
+	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
+	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
+	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
 	# The router lives under this autoload so its lazy player is in the tree and audible.
 	music_router.setup(trace)
 	add_child(music_router)
@@ -57,27 +63,24 @@ func ensure_initialized() -> void:
 
 func new_game() -> void:
 	_world_gen.clear_overrides()
+	_world_gen.clear_placements()
 	var starter = _build_starter()
 	var seed = int(_rng.randi() & 0x7fffffff)
 	var spawn = _world_gen.find_walkable_spawn(seed)
 	session.reset_for_new_game(seed, starter, spawn)
 	_initialized = true
 	save_game()
-	trace.emit_event("session_created", "GameRuntime", {
-		"world_seed": session.world_seed,
-		"player_tile": _tile_payload(session.player_tile),
-		"party_size": session.party.size()
-	})
+	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,
+		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
 
 
 func save_game() -> void:
-	if not save_store.write_payload(session.to_save_payload(_world_gen.overrides_for_save())):
+	# Split save: clears ("world_overrides") + placements ("structures") stay two keys; the merged map is view-only.
+	if not save_store.write_payload(session.to_save_payload(_world_gen.overrides_for_save(), _world_gen.placements_for_save())):
 		trace.warning("GameRuntime", "Could not write save file.", {})
 		return
-	trace.emit_event("save_written", "GameRuntime", {
-		"party_size": session.party.size(),
-		"player_tile": _tile_payload(session.player_tile)
-	})
+	trace.emit_event("save_written", "GameRuntime", {"party_size": session.party.size(),
+		"player_tile": _tile_payload(session.player_tile)})
 
 
 func emit_trace(event_name: String, source: String, payload: Dictionary = {}) -> void:
@@ -88,12 +91,10 @@ func warn(source: String, message: String, payload: Dictionary = {}) -> void:
 	trace.warning(source, message, payload)
 
 
-func get_world_seed() -> int:
-	return session.world_seed
+func get_world_seed() -> int: return session.world_seed
 
 
-func get_player_tile() -> Vector2i:
-	return session.player_tile
+func get_player_tile() -> Vector2i: return session.player_tile
 
 
 func set_player_tile(tile_position: Vector2i) -> void:
@@ -106,8 +107,7 @@ func note_player_step() -> void:
 	session.advance_time(1)
 
 
-func get_time_of_day_minutes() -> int:
-	return session.time_of_day_minutes
+func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
 
 # True when any party member can perform the field move (the single capability check).
@@ -119,14 +119,11 @@ func party_has_field_move_ability(move_id: String) -> bool:
 	return false
 
 
-# Campsite hold (Phase 0 defect 0.1): a capture with a full party relocates the
-# mon to the player's last campsite instead of losing it; the party screen retrieves it.
-func get_campsite_pokemon() -> Array:
-	return session.get_campsite_pokemon()
+# Campsite hold (Phase 0 defect 0.1): full-party captures relocate to the last campsite; the party screen retrieves.
+func get_campsite_pokemon() -> Array: return session.get_campsite_pokemon()
 
 
-# Pulls the held mon at `index` from the campsite back into the party; the
-# party-screen RETRIEVE row is the only caller (renders only with party room).
+# Pulls the held mon at `index` back into the party (party-screen RETRIEVE row is the only caller).
 func retrieve_campsite_mon(index: int) -> Dictionary:
 	var mon: Dictionary = session.retrieve_campsite_mon(index)
 	if mon.is_empty():
@@ -134,19 +131,20 @@ func retrieve_campsite_mon(index: int) -> Dictionary:
 	session.party.append(mon)
 	emit_trace("mon_retrieved", "GameRuntime", {"species_id": str(mon.get("species_id", "")),
 		"name": str(mon.get("name", "")), "level": int(mon.get("level", 1)),
-		"campsite": [session.campsite_tile.x, session.campsite_tile.y],
-		"party_size": session.party.size()})
+		"campsite": [session.campsite_tile.x, session.campsite_tile.y], "party_size": session.party.size()})
 	return mon
 
 
-# Harvests one faced tile through the shared resolver (spec section 3): resolves
-# the action, checks capability, stamps the world override, grants the yield, traces.
+# Harvests one faced tile through the shared resolver: action, capability, override stamp, yield, trace.
+# A built tile instead routes to demolition (Cut refunds everything; hard-stone shells need Smash).
 func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
 	var logic: Dictionary = _world_gen.get_tile_logic(tile)
 	var action := HarvestResolver.action_for_tile(logic)
 	if action.is_empty():
+		if str(logic.get("override_kind", "")) == "placed":
+			return build_runtime.try_demolish(tile, mon_constraint)
 		return {"ok": false, "move_id": "", "message": "There is nothing left here.", "yield_item": ""}
-	if not _harvest_capable(action, mon_constraint):
+	if not field_move_capable(action, mon_constraint):
 		var mon_name := str(mon_constraint.get("name", "")) if not mon_constraint.is_empty() else ""
 		return {"ok": false, "move_id": action, "message": HarvestResolver.refusal_message(action, logic, mon_name), "yield_item": ""}
 	var yield_item := HarvestResolver.yield_for(action, logic)
@@ -164,23 +162,24 @@ func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary
 	return {"ok": true, "move_id": action, "message": HarvestResolver.success_message(action, item_name), "yield_item": yield_item}
 
 
-func _harvest_capable(action: String, mon_constraint: Dictionary) -> bool:
+# Single capability gate for harvest AND build: a constrained mon must itself be able; else any party member.
+func field_move_capable(move_id: String, mon_constraint: Dictionary = {}) -> bool:
 	if not mon_constraint.is_empty():
-		return FieldMoves.can_perform(mon_constraint, action, Callable(catalog, "get_species"))
-	return party_has_field_move_ability(action)
+		return FieldMoves.can_perform(mon_constraint, move_id, Callable(catalog, "get_species"))
+	return party_has_field_move_ability(move_id)
 
 
-# The runtime's generator owns the canonical override map; callers read copies only.
-func world_overrides_for_save() -> Dictionary:
-	return _world_gen.overrides_for_save()
+# MERGED clears + placements (placements shadow) for the world_view mirror; the name mirrors the
+# generator. NEVER feed it to the SAVE (stays split via save_game); clears-only readers use
+# _world_gen.overrides_for_save().
+func mutations_for_view() -> Dictionary:
+	return _world_gen.mutations_for_view()
 
 
 func apply_world_overrides(saved: Dictionary) -> void:
 	if saved.size() > WorldOverrides.MAX_OVERRIDES:
-		trace.warning("GameRuntime", "Saved world overrides exceed the cap; extra entries were dropped.", {
-			"saved_entries": saved.size(),
-			"cap": WorldOverrides.MAX_OVERRIDES
-		})
+		trace.warning("GameRuntime", "Saved world overrides exceed the cap; extra entries were dropped.",
+			{"saved_entries": saved.size(), "cap": WorldOverrides.MAX_OVERRIDES})
 	_world_gen.apply_overrides(saved)
 
 
@@ -215,9 +214,8 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 		if species_entry.is_empty():
 			trace.warning("GameRuntime", "Species catalog is empty; skipping the wild encounter.", {"biome": biome})
 			return {}
-		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.", {
-			"fallback_species_id": str(species_entry.get("species_id", ""))
-		})
+		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.",
+			{"fallback_species_id": str(species_entry.get("species_id", ""))})
 	var level = level_from_distance(tile_pos)
 	return pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"))
 
@@ -226,10 +224,8 @@ func _pick_encounter_species(biome: String) -> String:
 	if not biome.is_empty():
 		var filtered = _biome_encounters.filter_species_ids(catalog.species, biome)
 		if bool(filtered.get("used_fallback", false)):
-			trace.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.", {
-				"biome": biome,
-				"reason": str(filtered.get("reason", ""))
-			})
+			trace.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.",
+				{"biome": biome, "reason": str(filtered.get("reason", ""))})
 		var ids = filtered.get("ids", [])
 		if ids is Array and not (ids as Array).is_empty():
 			return str(ids[_rng.randi_range(0, (ids as Array).size() - 1)])
@@ -285,6 +281,10 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 	var saved_overrides: Variant = payload.get("world_overrides", {})
 	if saved_overrides is Dictionary:
 		apply_world_overrides(saved_overrides)
+	# Placements (v3-additive "structures" key): the session normalized the key
+	# (absent/invalid backfills to {}); feed the generator's placement map.
+	_world_gen.clear_placements()
+	_world_gen.apply_placements(session.structures)
 	return true
 
 

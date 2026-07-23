@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-20
+Last verified: 2026-07-23
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 
@@ -9,4 +9,5 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Battle and capture loop: [battle-and-capture.md](battle-and-capture.md)
 - Menu and save loop: [menu-and-save.md](menu-and-save.md)
 - Harvest and mutation loop: [harvest-and-mutation.md](harvest-and-mutation.md)
+- Building and placement loop: [building-and-placement.md](building-and-placement.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)

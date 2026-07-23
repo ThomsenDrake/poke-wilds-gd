@@ -2,7 +2,8 @@ extends Node
 
 # Phase-0 defect-fix scenarios (qa_scenarios pattern) inside the runner's save
 # backup/restore guard. wild_battle: campsite hold/retrieval + clean heal (0.1/0.5).
-# save_migration: v1/v2->v3 migration, future refusal, corrupt recovery, campsite round-trip.
+# save_migration: v1/v2->v3 migration, the v3-additive "structures" round-trip,
+# future refusal, corrupt recovery, and the campsite round-trip.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
@@ -16,6 +17,9 @@ const MIGRATION_FIXTURES := [
 		"time_of_day_minutes": 700, "total_steps": 10, "unlocked_field_moves": {"cut": 1}},
 	{"version": 2, "world_seed": 1234, "player_x": 5, "player_y": 6, "party": [MIGRATION_MON], "bag": {"poke_ball": 2, "potion": 1},
 		"time_of_day_minutes": 800, "total_steps": 20, "unlocked_field_moves": {"surf": 1}},
+	{"version": 3, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON], "bag": {"poke_ball": 2},
+		"time_of_day_minutes": 600, "total_steps": 0, "structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
+		"11,10": {"kind": "placed", "structure_id": "door", "by": "build", "step": 0}}},
 ]
 
 static func handles(scenario: String) -> bool:
@@ -33,7 +37,6 @@ func run_wild_battle(ctx: Dictionary, host: Node) -> void:
 	var player: Node = ctx["player"]
 	var runner := SmokeScenarioRunner.new()
 	var fail := ""
-	# Phase A: the original UI-driven smoke battle still reaches an outcome.
 	var wild_mon: Dictionary = runtime.generate_wild_encounter(player.tile_position, world.get_tile_biome(player.tile_position))
 	if wild_mon.is_empty():
 		fail = "could not create a wild encounter"
@@ -43,7 +46,6 @@ func run_wild_battle(ctx: Dictionary, host: Node) -> void:
 	if set_battle.is_valid():
 		set_battle.call(false)
 	runner.resync_player_tile(world, player, runtime)
-	# Phase B: a full-party capture overflows to the campsite hold, not loss.
 	var party_before: Array = runner.swap_party(runtime, _species_sample(runtime, 6))
 	runtime.session.add_item("poke_ball", 5)
 	var cursor := runner.trace_log_line_count()
@@ -52,7 +54,6 @@ func run_wild_battle(ctx: Dictionary, host: Node) -> void:
 		fail = "no catalog species met the guaranteed-capture catch rate"
 	if fail.is_empty():
 		fail = _assert_campsite_capture(runtime, runner, target, cursor)
-	# Phase C: the blackout heal restores HP AND clears status/sleep_turns.
 	if fail.is_empty():
 		fail = _assert_defeat_clean_heal(runtime, runner)
 	runner.resync_player_tile(world, player, runtime)
@@ -62,7 +63,6 @@ func run_wild_battle(ctx: Dictionary, host: Node) -> void:
 	else:
 		push_error("Wild battle scenario failed: %s" % fail)
 
-# Box-full outcome, mon held (not lost) with mon_relocated traced, retrieved.
 func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) -> String:
 	var session = runtime.session
 	runtime.start_wild_battle(target)
@@ -83,7 +83,6 @@ func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) 
 		return "no mon_retrieved trace for the retrieval"
 	return ""
 
-# Forces a defeat against an unkillable enemy; asserts a clean blackout heal.
 func _assert_defeat_clean_heal(runtime, runner) -> String:
 	runner.swap_party(runtime, _species_sample(runtime, 1))
 	var sick: Dictionary = runtime.session.get_party_member(0)
@@ -145,9 +144,8 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	var checks := 0
 	var fail := ""
 	var cursor := runner.trace_log_line_count()
-	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok")]
-	var v_ok := [false, false]
-	# v1 (legacy bag id, dropped unlock key) then v2 (bag/time/steps added).
+	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok"), Callable(self, "_v3_fields_ok")]
+	var v_ok := [false, false, false]
 	for i in range(MIGRATION_FIXTURES.size()):
 		if not fail.is_empty():
 			break
@@ -158,9 +156,7 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 			checks += 1
 		else:
 			fail = "v%d fixture did not migrate" % (i + 1)
-	# Future version: refused, preserved to .newer.bak, warning traced -- so
-	# the autosave after a refused load writes the now-empty live path and
-	# can never overwrite the preserved newer save.
+	# Future version: refused, preserved to .newer.bak + warning traced, so the autosave can't clobber the newer save.
 	var future_refused := false
 	if fail.is_empty():
 		_write_fixture({"version": 99, "party": [MIGRATION_MON]})
@@ -178,13 +174,12 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 			checks += 1
 		else:
 			fail = "future version was not refused non-destructively"
-	# Corrupt-tier recovery (0.3) + populated-campsite save/load round-trip (0.1).
 	if fail.is_empty():
 		fail = runner.assert_save_recovery(runtime, cursor)
 	_cleanup_fixtures()
 	if fail.is_empty():
 		runtime.emit_trace("save_migration_passed", "SmokeScenarios", {
-			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "future_refused": future_refused, "checks": checks})
+			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "v3_ok": v_ok[2], "future_refused": future_refused, "checks": checks})
 	else:
 		push_error("Save migration scenario failed: %s" % fail)
 
@@ -196,7 +191,7 @@ func _v1_fields_ok(runtime) -> bool:
 		and not session.bag.has("pokeball") and session.get_unlocked_field_moves().is_empty() and int(session.time_of_day_minutes) == 700 \
 		and int(session.total_steps) == 10 and str(mon.get("species_id", "")) == "CHIKORITA" and str(mon.get("status", "")) == "PSN" \
 		and int(mon.get("sleep_turns", -1)) == 0 and int(mon.get("level", 0)) == 5 and int(stats.get("hp", 0)) == 20 \
-		and session.campsite_count() == 0 and session.campsite_tile == session.player_tile
+		and session.campsite_count() == 0 and session.campsite_tile == session.player_tile and session.get_structures().is_empty()
 
 func _v2_fields_ok(runtime) -> bool:
 	var session = runtime.session
@@ -204,7 +199,13 @@ func _v2_fields_ok(runtime) -> bool:
 		and int(session.bag.get("potion", 0)) == 1 and session.get_unlocked_field_moves().is_empty() \
 		and int(session.time_of_day_minutes) == 800 and int(session.total_steps) == 20 \
 		and session.campsite_count() == 0 and session.campsite_tile == session.player_tile \
-		and runtime.world_overrides_for_save().is_empty()
+		and runtime.mutations_for_view().is_empty() and session.get_structures().is_empty()
+
+# v3-additive "structures" round-trips into the placement map (a structures-less save backfills to {}, asserted above). The v3->v4 box-contents fixture lands with Phase 3.
+func _v3_fields_ok(runtime) -> bool:
+	var placed: Dictionary = runtime._world_gen.placements_for_save()
+	return str(placed.get("10,10", {}).get("structure_id", "")) == "wall" \
+		and str(placed.get("11,10", {}).get("structure_id", "")) == "door" and runtime.session.get_structures().size() == 2
 
 func _write_fixture(payload: Dictionary) -> void:
 	var file = FileAccess.open(SaveStore.SAVE_PATH, FileAccess.WRITE)
@@ -212,7 +213,6 @@ func _write_fixture(payload: Dictionary) -> void:
 		file.store_string(JSON.stringify(payload))
 		file.close()
 
-# Fixture artifacts must not leak into sibling scenarios (guard restores SAVE_PATH).
 func _cleanup_fixtures() -> void:
 	for suffix in [".newer.bak", ".corrupt.bak", SaveStore.TMP_SUFFIX]:
 		var path: String = SaveStore.SAVE_PATH + str(suffix)
