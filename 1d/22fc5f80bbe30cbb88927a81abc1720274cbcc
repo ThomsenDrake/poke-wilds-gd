@@ -1,0 +1,266 @@
+docs/generated/visual-baselines/13_built_house.png.sidecar.json
+  s_8237c2c8e4b53f::t_7bce88020b0949 1
+docs/tech-debt-tracker.md
+  s_8237c2c8e4b53f::t_8f35da5918e580 15
+  s_8237c2c8e4b53f::t_425c47d0cc30f1 16
+  s_8237c2c8e4b53f::t_9806b5373c38f2 23
+  s_8237c2c8e4b53f::t_b46708d8dcc463 13
+  s_8237c2c8e4b53f::t_e4920266db36e9 14
+  s_8237c2c8e4b53f::t_55045e894d6efa 2,4
+scripts/app/world_consistency_audit.gd
+  s_8237c2c8e4b53f::t_13e471afee93e0 128-131
+  s_8237c2c8e4b53f::t_6b6b79ec8e703f 5-6,41,108,118-125,127,132-134,136-138,140-156,175,184,191,204
+  s_8237c2c8e4b53f::t_d544209557ea0e 135
+  s_8237c2c8e4b53f::t_7101eecea1aa1b 7-8,77-78,81,113-117,139,209-210,212-215
+  s_8237c2c8e4b53f::t_5a13cea6870c53 126
+  s_8237c2c8e4b53f::t_6e589ea18f45c9 89
+  s_8237c2c8e4b53f::t_0a9c796f7f41ee 9-11
+  s_8237c2c8e4b53f::t_be8fdd8f7b7cb5 93
+tools/godot_dap_smoketest.py
+  s_8237c2c8e4b53f::t_77c5337cbef6f8 138-141
+scripts/app/main.gd
+  s_8237c2c8e4b53f::t_984cb9f0f0ec6e 43-47
+  s_8237c2c8e4b53f::t_7cda0c5bf1ce6b 60
+  s_8237c2c8e4b53f::t_767e296bdc006f 20-21
+  s_8237c2c8e4b53f::t_7476ace6b60e40 162-163
+  s_8237c2c8e4b53f::t_1d9a591ed415cf 42
+  s_8237c2c8e4b53f::t_715c18426abfae 77-78
+  s_8237c2c8e4b53f::t_e0ba01637cc740 212,214
+  s_8237c2c8e4b53f::t_ba09688d421040 7-8
+  s_8237c2c8e4b53f::t_d74b086db16145 119
+  s_8237c2c8e4b53f::t_05cc72259a819b 141-142,144,148
+scripts/app/world_spatial_audit.gd
+  s_8237c2c8e4b53f::t_06f28c55f899b9 16-36
+  s_8237c2c8e4b53f::t_780766af079ce5 3-9
+  s_8237c2c8e4b53f::t_1610e512620d21 83-115
+docs/product-specs/menu-and-save.md
+  s_8237c2c8e4b53f::t_a2f965294d8f13 15
+  s_8237c2c8e4b53f::t_8ec05d3dacb6bb 26
+scripts/runtime/game_runtime.gd
+  s_8237c2c8e4b53f::t_cedabbe2013320 42
+  s_8237c2c8e4b53f::t_c2494d02a2acf1 39-41
+  s_8237c2c8e4b53f::t_488d60234027e8 26
+  s_8237c2c8e4b53f::t_463f51071952e2 110
+  s_8237c2c8e4b53f::t_a682eae34a11fd 123
+  s_8237c2c8e4b53f::t_cae7f849e71d71 126
+  s_8237c2c8e4b53f::t_46d9019e453436 134
+  s_8237c2c8e4b53f::t_c2cf3460b1c6ec 227-228
+  s_8237c2c8e4b53f::t_9a4094b76bbe77 94,97
+  s_8237c2c8e4b53f::t_378c7b7fdf9909 286
+  s_8237c2c8e4b53f::t_db5140355013c7 82-83
+  s_8237c2c8e4b53f::t_fb48df52bbab25 138
+  s_8237c2c8e4b53f::t_6873e0a78462c1 139,144-145
+  s_8237c2c8e4b53f::t_905e2d1fea7473 122
+  s_8237c2c8e4b53f::t_6ece5c0f5cdd88 165
+  s_8237c2c8e4b53f::t_7c619224eaf1df 66
+  s_8237c2c8e4b53f::t_02653a6c775db4 79
+  s_8237c2c8e4b53f::t_3fe6600968b9d6 172-175
+  s_8237c2c8e4b53f::t_63730047866faf 12
+  s_8237c2c8e4b53f::t_5fd76fb8a447d3 78
+  s_8237c2c8e4b53f::t_d214541c18a4c9 176
+  s_8237c2c8e4b53f::t_62c2e19ed718a7 217-218
+  s_8237c2c8e4b53f::t_71f5a06e29fa19 73-74
+  s_8237c2c8e4b53f::t_40a90d8b811490 284-285,287
+  s_8237c2c8e4b53f::t_c914878ec49a9c 147
+  s_8237c2c8e4b53f::t_b96f090786f6b9 181-182
+  s_8237c2c8e4b53f::t_7b458ae99d8d0b 166,168-169
+scripts/domain/world_invariants.gd
+  s_8237c2c8e4b53f::t_17679d87452961 1-71
+scripts/domain/world_generator.gd
+  s_8237c2c8e4b53f::t_caaa141479d9a6 5,18-20,22,109-115,119,122,131-135,145-164,235-237,239
+  s_8237c2c8e4b53f::t_73621e1e9a5165 136-144
+  s_8237c2c8e4b53f::t_9951e52a202131 214-217,227
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_3130f9e354e832 19
+  s_8237c2c8e4b53f::t_d28649a24b113d 2
+  s_8237c2c8e4b53f::t_5b9778f6cf1111 20
+scripts/runtime/structure_layer.gd
+  s_8237c2c8e4b53f::t_832bcfc9f8f78d 160-161
+  s_8237c2c8e4b53f::t_5dbb1fa876e6c5 183-193
+  s_8237c2c8e4b53f::t_17449305273151 1-159,162-182,194-202,204-215
+  s_8237c2c8e4b53f::t_0ac8e55bc50501 203
+scripts/app/field_action_router.gd
+  s_8237c2c8e4b53f::t_59f332f286425a 1-68
+scripts/app/visual_sweep_build.gd
+  s_8237c2c8e4b53f::t_dd2caaef38728b 35-38
+  s_8237c2c8e4b53f::t_fd577f3265e49e 57-59,62-64
+  s_8237c2c8e4b53f::t_01fa35389ba578 67-68,72-73,75,78-91
+  s_8237c2c8e4b53f::t_1227016f266d41 1-34,39-56,60-61,65-66,69-71,74,76-77,92-122
+scripts/runtime/world_view.gd
+  s_8237c2c8e4b53f::t_2a8293e8c24446 193
+  s_8237c2c8e4b53f::t_89371dbdf4546d 210
+  s_8237c2c8e4b53f::t_1c9c335615fe64 199,203-204,209
+scripts/domain/world_overrides.gd
+  s_8237c2c8e4b53f::t_c82a4b14e375d9 14-16
+  s_8237c2c8e4b53f::t_b042441292a03f 3-13,17-19,23,31-40,44-58,75-117,119-124,134,143-155
+  s_8237c2c8e4b53f::t_c6b428487a7fc9 130-133,142,156
+docs/product-specs/building-and-placement.md
+  s_8237c2c8e4b53f::t_7ec5fce368fb53 16
+  s_8237c2c8e4b53f::t_127ac188b8a9dd 22
+  s_8237c2c8e4b53f::t_e99ea42431988c 77
+  s_8237c2c8e4b53f::t_9525272ebf31e0 4
+  s_8237c2c8e4b53f::t_9eff12c9e34236 1-3,5-15,19-21,23-34,36-49,63-66,68,70-76,78-81,83-85
+  s_8237c2c8e4b53f::t_b8fd05091c755e 35
+  s_8237c2c8e4b53f::t_aacafa4089ac04 59,61
+  s_8237c2c8e4b53f::t_8d9bae30c1ae4a 67
+  s_8237c2c8e4b53f::t_e5d8e2a413dcbd 69
+  s_8237c2c8e4b53f::t_d84cbea388f414 82
+  s_8237c2c8e4b53f::t_e248889d3fcf21 17-18
+  s_8237c2c8e4b53f::t_027cb091535553 86
+  s_8237c2c8e4b53f::t_79a40c5761d787 50-58,60,62
+docs/generated/miss-postmortems.json
+  s_8237c2c8e4b53f::t_7f4defc8254249 76
+  s_8237c2c8e4b53f::t_d90c817bc46148 77
+  s_8237c2c8e4b53f::t_9ded437c5068d5 3
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_b51a507354616a 36
+  s_8237c2c8e4b53f::t_d4f7fea404d0cd 2
+  s_8237c2c8e4b53f::t_dcbe4c818f0a43 34-35
+  s_8237c2c8e4b53f::t_1438b57494cc8a 32
+  s_8237c2c8e4b53f::t_f78eee8480d1f3 4
+  s_8237c2c8e4b53f::t_610bd2d5793474 30-31,33
+scripts/domain/structures.gd
+  s_8237c2c8e4b53f::t_b042595b93e6e9 13-19
+  s_8237c2c8e4b53f::t_41910b0963565c 42-47,55-56
+  s_8237c2c8e4b53f::t_b755cbc1b41099 122-125,130-133
+  s_8237c2c8e4b53f::t_35b6b6625cd8ad 126-129
+  s_8237c2c8e4b53f::t_f8085ede1deca4 1-12,20-41,48-54,57-121,134-193
+scripts/app/placement_flow_demolition.gd
+  s_8237c2c8e4b53f::t_d24cfde69693e7 1-5,7-12,20-34,37-55,57-108,110-111,113-123,125-140,206-220
+  s_8237c2c8e4b53f::t_73dc08e7f44810 141-152
+  s_8237c2c8e4b53f::t_9e28c1cfb429e2 35
+  s_8237c2c8e4b53f::t_444803aaba981c 6,13-19
+  s_8237c2c8e4b53f::t_9ad3ff26e9642a 157-205
+  s_8237c2c8e4b53f::t_52bbabec86b247 153-156
+  s_8237c2c8e4b53f::t_8c03e377b5a43a 36
+  s_8237c2c8e4b53f::t_008944fa9fd865 124
+  s_8237c2c8e4b53f::t_3d74e57e5657c8 56
+  s_8237c2c8e4b53f::t_049200e0d0bdb1 109,112
+scripts/runtime/build_runtime.gd
+  s_8237c2c8e4b53f::t_2b3497d3412d62 73
+  s_8237c2c8e4b53f::t_fd7abd49e1622d 81
+  s_8237c2c8e4b53f::t_5a33d05a808be8 157-158,160-161
+  s_8237c2c8e4b53f::t_ff5a7e31d8cdf3 216-217,221-231
+  s_8237c2c8e4b53f::t_cb5a5456c24ea1 193-201
+  s_8237c2c8e4b53f::t_458ea3630e482d 179-190
+  s_8237c2c8e4b53f::t_12e2b38362483e 123-156,159,162-167
+  s_8237c2c8e4b53f::t_fe14939c7bacd4 80,83
+  s_8237c2c8e4b53f::t_795e67068a4193 12
+  s_8237c2c8e4b53f::t_ed09d14d38af16 1-11,13-18,20,26-60,63-64,66-72,84-94,170-171,173,175-176,191-192,202-215,218-220,232-247
+  s_8237c2c8e4b53f::t_368146fe23237a 19,21-23
+  s_8237c2c8e4b53f::t_051678f761d9ac 24-25
+  s_8237c2c8e4b53f::t_f396f6ed4ddfa2 74-79
+  s_8237c2c8e4b53f::t_71fb42acfe393e 61-62,65,82,95-122,168-169,172,174,177-178
+docs/generated/visual-baselines/14_build_ghost.png.sidecar.json
+  s_8237c2c8e4b53f::t_7bce88020b0949 1
+scripts/app/placement_flow_scenario.gd
+  s_8237c2c8e4b53f::t_f09aca920e4782 159
+  s_8237c2c8e4b53f::t_ef4041876eb154 197
+  s_8237c2c8e4b53f::t_976c132670fe9f 213
+  s_8237c2c8e4b53f::t_d2edab0780c6d9 133
+  s_8237c2c8e4b53f::t_5582ae432d332e 4-7
+  s_8237c2c8e4b53f::t_35104e80b5a3df 25,114,126,171,175-176,180,191,198,200-203
+  s_8237c2c8e4b53f::t_098d78c5b1e114 42
+  s_8237c2c8e4b53f::t_c706898a4b81a3 1-3,13-16,18-24,26-39,41,43,45-46,48-52,54-59,61-62,64-73,76-80,83-84,86,94,97,99-102,105-109,111-113,115-125,127-132,134-138,140,142,144-145,148-151,153,156,158,160-166,168-170,172-173,182,184-190,192,194-196,199,204,206-212,215-220
+  s_8237c2c8e4b53f::t_8c5cb340aa9ad3 104,205
+  s_8237c2c8e4b53f::t_2b63a3313d89a7 98
+  s_8237c2c8e4b53f::t_317806212d56b3 146
+  s_8237c2c8e4b53f::t_8282dc2e947581 177-178
+  s_8237c2c8e4b53f::t_9dbdbd850b79bc 183
+  s_8237c2c8e4b53f::t_2dc17f2da4292c 17
+  s_8237c2c8e4b53f::t_3d8dca737274b3 10-11
+  s_8237c2c8e4b53f::t_6f79f16462c587 8-9
+  s_8237c2c8e4b53f::t_bbf7c6af0fba76 74
+  s_8237c2c8e4b53f::t_7ad3b5aa2601d3 44,47
+  s_8237c2c8e4b53f::t_794b2ae68927b2 139,143
+  s_8237c2c8e4b53f::t_9792056e935d64 152
+  s_8237c2c8e4b53f::t_4b4464e575eca9 53
+  s_8237c2c8e4b53f::t_98335254e0049b 60,63,81,85,90,92-93,96,103,141,147,154-155,157,167,174,193,214
+  s_8237c2c8e4b53f::t_ed590e6766b3f9 110
+  s_8237c2c8e4b53f::t_f77e7a3035c865 40,75,82,87-89,91,95,179,181
+  s_8237c2c8e4b53f::t_4c3fa4ca3be811 12
+tools/run_playtests.py
+  s_8237c2c8e4b53f::t_0a8dbc8fad842b 69
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_cad59590f69a9a 105
+  s_8237c2c8e4b53f::t_d5259b015ef1ff 134
+  s_8237c2c8e4b53f::t_303ee373c1ad11 2
+  s_8237c2c8e4b53f::t_9bad4e79224645 136
+  s_8237c2c8e4b53f::t_6a535901aa8296 95
+  s_8237c2c8e4b53f::t_88413324e729ed 103
+  s_8237c2c8e4b53f::t_db56a5283a9d6a 135
+scripts/runtime/session_state.gd
+  s_8237c2c8e4b53f::t_268b8dc79bced0 14-16
+  s_8237c2c8e4b53f::t_f15e2e56900f15 55
+  s_8237c2c8e4b53f::t_d5b11cb9cf4bce 71-73
+  s_8237c2c8e4b53f::t_b46fb5b902ae92 19
+  s_8237c2c8e4b53f::t_3ecdd4fa6b3bbe 84,95-97,104-107
+  s_8237c2c8e4b53f::t_dcf9849cc0fec0 39-42
+  s_8237c2c8e4b53f::t_81e320205ff99e 263-281
+  s_8237c2c8e4b53f::t_52b7a15f4d061a 108-109
+docs/product-specs/index.md
+  s_8237c2c8e4b53f::t_3f76625a726b11 2,12
+scripts/app/qa_scenarios.gd
+  s_8237c2c8e4b53f::t_e18ca6660d81b6 17
+scripts/app/visual_sweep_baselines.gd
+  s_8237c2c8e4b53f::t_e19ff97b3698f8 67-68
+  s_8237c2c8e4b53f::t_b1fbe1098b3986 53
+  s_8237c2c8e4b53f::t_386ec46ed89e39 63
+  s_8237c2c8e4b53f::t_1c57b066b782a9 65-66
+docs/product-specs/bootstrap-and-overworld.md
+  s_8237c2c8e4b53f::t_76bf24e3e02bd4 2,4
+  s_8237c2c8e4b53f::t_b94345e4102684 27
+  s_8237c2c8e4b53f::t_8434e48d680025 33
+scripts/app/phase0_scenarios.gd
+  s_8237c2c8e4b53f::t_27b33a61a6107a 202
+  s_8237c2c8e4b53f::t_f6aab77190515e 204
+  s_8237c2c8e4b53f::t_1b6b767d3bd4b6 5-6,20-22,147-148,159,182,194,205-208
+  s_8237c2c8e4b53f::t_a15a188958eb51 203
+docs/registry/subsystems.toml
+  s_8237c2c8e4b53f::t_f53525035e274c 185
+  s_8237c2c8e4b53f::t_6b57649f9d4e10 201-203
+  s_8237c2c8e4b53f::t_632a8d612f59e4 60
+  s_8237c2c8e4b53f::t_5faa8ca77b1cd5 176-184,186-195,197-200,208-216
+  s_8237c2c8e4b53f::t_ac9e35695d598d 196
+  s_8237c2c8e4b53f::t_ae97ca91683c6d 204-207
+  s_8237c2c8e4b53f::t_254b3183d1e840 175
+scripts/app/placement_flow_demolition.gd.uid
+  s_8237c2c8e4b53f::t_272da50fcf8f40 1
+scripts/app/visual_sweep.gd
+  s_8237c2c8e4b53f::t_0ced8549d7f174 17
+  s_8237c2c8e4b53f::t_10bca782cfcd2c 78-82
+docs/generated/visual-baselines/14_build_ghost.png.import
+  s_8237c2c8e4b53f::t_668e9d03b717d3 1-40
+docs/generated/visual-baselines/13_built_house.png.import
+  s_8237c2c8e4b53f::t_b63812b39cfc3e 1-40
+scripts/app/field_action_router.gd.uid
+  s_8237c2c8e4b53f::t_4c209c7b1d8ace 1
+scripts/app/placement_flow_scenario.gd.uid
+  s_8237c2c8e4b53f::t_e2fdb4eef3362f 1
+scripts/app/visual_sweep_build.gd.uid
+  s_8237c2c8e4b53f::t_9e0358e222fc59 1
+scripts/domain/structures.gd.uid
+  s_8237c2c8e4b53f::t_f6ac79ac58589b 1
+scripts/domain/world_invariants.gd.uid
+  s_8237c2c8e4b53f::t_48541a84dea1c8 1
+scripts/runtime/build_runtime.gd.uid
+  s_8237c2c8e4b53f::t_9665c2aeb67fb7 1
+scripts/runtime/structure_layer.gd.uid
+  s_8237c2c8e4b53f::t_07b7c49349f28f 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.15",
+  "base_commit_sha": "1d22fc5f80bbe30cbb88927a81abc1720274cbcc",
+  "prompts": {},
+  "sessions": {
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
