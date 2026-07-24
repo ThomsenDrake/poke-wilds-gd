@@ -269,3 +269,111 @@ quality_bucket = "vision"
 #     anchor_drift signal rides check_art_anchors.py (--live) plus the static gate, and the anchor:<id>
 #     region row in vision-review-rubric.md is the pre-pinned contract. Optionally split this concern into a
 #     dedicated vision_fidelity_anchors subsystem with its own QUALITY_SCORE.md row.
+
+[[subsystems]]
+name = "camping_loop"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/day_phase.gd",
+  "scripts/domain/encounter_selection.gd",
+  "scripts/runtime/night_system.gd",
+  "scripts/runtime/camping_runtime.gd",
+  "scripts/app/camp_survival_scenario.gd",
+  "scripts/app/night_cycle_scenario.gd",
+  "scripts/app/night_cycle_checks.gd",
+  "scripts/app/time_evolution_scenario.gd",
+  "scripts/app/visual_sweep_camping.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/camping-crafting-survival.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario camp_survival",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario night_cycle",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario time_evolution",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_camping",
+]
+required_trace_events = ["campfire_lit", "rested", "campsite_established", "night_hazard_spawned", "retreat_blocked", "evolution_time_gate", "camp_survival_passed", "night_cycle_passed", "time_evolution_passed", "visual_sweep_camping_passed"]
+quality_bucket = "camping"
+# CROSS-SUBSYSTEM CO-MODIFICATION: camping_loop EXTENDS four budget-owned files by
+# EXTRACTION + same-line edit only, never by growth — scripts/runtime/game_runtime.gd
+# (session_runtime-owned, stays AT the 320 budget: the campsite accessors and the
+# encounter level/fallback helpers move OUT into camping_runtime.gd /
+# encounter_selection.gd FIRST (one-line forwarders, static call sites), freeing the
+# lines the night-delegation + drop-grant wiring, the placed_structures() accessor
+# for the light model, and the _retreat_allowed forwarder passed as a Callable into
+# battle_runtime.setup then spend); scripts/runtime/battle_runtime.gd
+# (battle_loop-owned, stays WITHIN 320: the one-line _move_priority moves into
+# battle_rules.gd as static BattleRules.move_priority, paying for the same-line
+# evolution time-context argument at _try_evolve and the injected retreat_check
+# callable in run_from_battle; blackout returns to campsite_tile instead of
+# Vector2i.ZERO on the SAME line); the lit light-source GLOW composes INSIDE
+# building_loop's scripts/runtime/structure_layer.gd (the design's documented
+# fallback path — one static generated gradient per lit campfire/torch in the
+# visible window, night-only, no per-frame animation, refreshed on
+# world_overridden + player tile change — so world_view.gd and main.gd stay
+# untouched); and scripts/runtime/session_state.gd (session_runtime-owned:
+# STARTING_BAG +=
+# sleeping_bag plus the one-line time_of_day_label() delegation the evolution fix
+# reads, -> ~300/320; rest only WRITES the existing
+# campsite_x/campsite_y/time_of_day_minutes vars — zero new API). scripts/domain/
+# biome_encounters.gd (world_runtime-owned) gains the additive time_of_day filter
+# parameter (default "DAY" keeps the existing caller compiling), scripts/app/main.gd
+# (app_bootstrap-owned, 220/220) gets exactly ONE same-line edit (the
+# _field_router.setup argument passing the $UI/CampMenu node; the defeat-toast
+# wording is unchanged), and scripts/domain/pokemon_rules.gd
+# (pokemon_progression-owned) stays UNTOUCHED at 320/320 (the evolution fix is
+# caller-side; the empty-context fail-open stays with a documented guarantee). The
+# lit state of a placed campfire is an additive "lit" field on the placement entry —
+# co-owned with building_loop's structures map: world_overrides.is_valid_placement
+# checks only kind + structure_id so the extra key round-trips untouched (see the
+# crafting subsystem note below). DayPhase (day_phase.gd) is the single day/night
+# source of truth mirroring world_view's TIME_OF_DAY_KEYFRAMES; night_cycle asserts
+# the boundary minutes agree with the tint keyframes so the duplication cannot drift
+# silently. See docs/product-specs/camping-crafting-survival.md.
+
+[[subsystems]]
+name = "crafting"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/recipes.gd",
+  "scripts/domain/material_drops.gd",
+  "scripts/runtime/crafting_runtime.gd",
+  "scripts/ui/camp_menu.gd",
+  "scripts/app/craft_flow_scenario.gd",
+]
+scene_paths = ["scenes/ui/CampMenu.tscn"]
+spec_doc = "docs/product-specs/camping-crafting-survival.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario craft_flow",
+]
+required_trace_events = ["item_crafted", "craft_refused", "material_dropped", "craft_flow_passed"]
+quality_bucket = "crafting"
+# CROSS-SUBSYSTEM CO-MODIFICATION: crafting extends building_loop's
+# scripts/domain/structures.gd (the torch structure appended LAST to IDS so existing
+# build-cycle indices stay stable, the _CAMPFIRE_LIT_REGION + LIGHT_SOURCES
+# constants, and a lit parameter on sprite_region_for defaulting true) and its
+# scripts/app/field_action_router.gd (Z-precedence: faced campfire -> CampMenu
+# (Craft / Extinguish-or-Light / Demolish), faced bed -> direct rest("bed"),
+# everything else -> the existing harvest/demolish path — demolition STAYS reachable
+# via the menu entry so the region-seal escape the building spec's witness invariant
+# depends on is preserved; placement_flow/placement_flow_demolition call
+# build_runtime.try_demolish directly and stay green regardless of router
+# precedence). scripts/ui/bag_screen.gd (menu_ui-owned) gains the sleeping_bag
+# _activate_item branch. The lit field rides building_loop's placement entry:
+# world_overrides.gd / world_generator.gd / session_state.gd stay OWNED BY
+# world_runtime / session_runtime (one owner per file) — is_valid_placement checks
+# only kind + structure_id, so the extra "lit" key round-trips save/normalize/merge
+# untouched with ZERO validator changes. material_dropped is emitted by
+# game_runtime.gd (session_runtime-owned) on battle victory/capture — the interim
+# type-drop table (material_drops.gd) NEVER contains log or hard_stone so the
+# building_loop demolition-witness invariant holds (placement_flow asserts it every
+# run). The CampMenu node lives in scenes/app/Main.tscn (app_bootstrap-owned scene)
+# and self-wires via the /root/GameRuntime autoload convention; the ui scene
+# references ui only per check_architecture. See
+# docs/product-specs/camping-crafting-survival.md.

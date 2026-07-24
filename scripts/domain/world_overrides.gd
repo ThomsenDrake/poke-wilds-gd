@@ -82,7 +82,7 @@ static func apply_placement(logic: Dictionary, placement: Dictionary) -> Diction
 	var out := logic.duplicate(true)
 	out["walkable"] = Structures.is_walkable(structure_id)
 	out["prop_path"] = Structures.sprite_path_for(structure_id, biome, gate)
-	out["prop_region"] = Structures.sprite_region_for(structure_id, biome, gate)
+	out["prop_region"] = Structures.sprite_region_for(structure_id, biome, gate, Structures.placement_is_lit(placement))
 	out["block_reason"] = Structures.block_reason(structure_id)
 	out["requires_field_move"] = ""
 	out["encounter"] = false

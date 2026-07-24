@@ -15,8 +15,16 @@ const SCENARIOS := {
 	"display_matrix": [preload("res://scripts/app/display_matrix.gd"), "run", []],
 	"harvest_flow": [preload("res://scripts/app/harvest_flow_scenario.gd"), "run", []],
 	"placement_flow": [preload("res://scripts/app/placement_flow_scenario.gd"), "run", []],
+	# Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md);
+	# like every non-playtest entry, they run inside smoke_scenarios' save guard.
+	"camp_survival": [preload("res://scripts/app/camp_survival_scenario.gd"), "run", []],
+	"craft_flow": [preload("res://scripts/app/craft_flow_scenario.gd"), "run", []],
+	"night_cycle": [preload("res://scripts/app/night_cycle_scenario.gd"), "run", []],
+	"time_evolution": [preload("res://scripts/app/time_evolution_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
+	"visual_sweep_camping": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", []],
+	"visual_sweep_camping_update": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", [{"mode": "update"}]],
 }
 
 

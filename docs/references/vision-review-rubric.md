@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-22
+Last verified: 2026-07-23
 Review cadence days: 21
 Source paths: scripts/app/world_consistency_audit.gd, scripts/app/ui_render_audit.gd, tools/vision_review.py, tools/vlm_reviewer.py, docs/registry/art-anchors.toml, .godot-smoke/shots
 
@@ -68,6 +68,13 @@ The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-
   tol_px whenever a changed battle shot is reviewed; model-qwen3-vl keeps the
   single-slash number JUDGMENT)
 
+## Camping states (`15_camp_night_lit`, `16_craft_menu`, `17_dawn_after_rest`)
+
+- In `15_camp_night_lit`, is a warm glow visible around the fire (campfire and
+  torch) over the night tint, with no glow where the fire is extinguished?
+- In `16_craft_menu`, are the recipe names + ingredient counts legible (no
+  clipping, no overlap, affordable and missing rows distinct)?
+
 ## Display-matrix states (`matrix/<w>x<h>_battle.png`)
 
 - At EVERY window size: is the text pixel-crisp (uniform stroke widths, no
@@ -105,6 +112,7 @@ Per-shot-kind coverage (verified from the committed sidecars):
 | Battle 09-12 | ALL kinds (richest; the validation plant lives here) |
 | Menu 06-08 | `label:<i>` ONLY (06: MENU + hint labels; 07 party: 7 labels incl. the `'>'` cursor-label; 08 bag: 3 labels; cursor_pairs [], draw_order [], palettes empty) |
 | Overworld 01-05 | ZERO groundable regions (canary [], labels [], expected_regions empty, cursor_pairs [], palettes empty, draw rects []) — reviewers emit NO findings there; sidecar deltas (e.g. 04_night Player y_sort/order) are counted as `ungroundable_deltas` context |
+| Camping 15-17 | ZERO groundable regions (committed sidecars carry empty canary/labels/cursor_pairs/expected_regions) — the two camping questions are model-only judgment, counted UNANSWERED offline like every model-only question |
 
 Consequence: Lane-4 coverage is battle-heavy by current sidecar contents (matching the pilot `_review` note that overworld y-sort has no pixel canary). Extending sidecars (e.g. a `dynamic_zones`/mapped overworld rect field) is a future slice, not a rubric change; the plant for any validation pass must live on a battle shot (or a menu label).
 
@@ -266,7 +274,7 @@ The mechanized version of the pilot's RETIRED `_review` coverage-gap pseudo-row 
 - **Stable question ids.** `question_id = "q1-"` + the first 8 hex of sha256 over the canonical (whitespace-collapsed) question text — stable across REORDERING; REWORDING rotates the id (surfaced as an UNASSIGNED question, never a silent loss), and a brand-new question nobody mapped is likewise counted. (The `vr1-` `finding_id` convention applied to questions.)
 - **Answered predicate.** A question is `answered` iff a CAPABLE reviewer kind RAN this pass (`_kinds_that_ran`: the configured reviewer plus every kind that self-tagged an emitted finding or a returned answer — a composite VLM/art-anchor wrapper self-tags, so its coverage registers without any pipeline change), OR a returned `answers[]` entry addressed its id.
 - **Unanswered is a first-class COUNTED state** — never faked as answered, never red (advisory-loud). A shot-group with unanswered questions emits a `rubric_coverage_gap [<group>]: N of M rubric question(s) have no fresh reviewer pass (needs [...])` line that rides the manifest `warnings[]`, the legibility report, and `verify_all`'s WARN surface (degrading under `--skip-windowed` like R6). Overworld reports its reason as "no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions" — the honest, mechanized form of the pilot's "overworld y-sort has no pixel canary" note.
-- **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, display_matrix 1 (19 total) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
+- **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, camping 2, display_matrix 1 (21 total) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
 - **Freshness.** `rubric_coverage` rides the sha256 manifest, so `review_is_fresh` covers it; the lane-4 staleness refusal (§ Staleness) applies unchanged.
 
 ### Answerers table (`QUESTION_ANSWERERS`)
@@ -293,9 +301,11 @@ Matching is by CONTENT (a distinctive lowercase fingerprint substring of the can
 | menu | every row align its name | model-qwen3-vl |
 | menu | hp bars visible and color-graded | model-qwen3-vl |
 | menu | clipped, overlapping, or escaping | model-qwen3-vl |
+| camping | glow visible around the fire | model-qwen3-vl |
+| camping | recipe names + ingredient counts legible | model-qwen3-vl |
 | display_matrix | every window size | model-qwen3-vl |
 
-Consequence: the deterministic sidecar-consistency reviewer answers ONLY the two battle questions its classes mechanically implement; the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the 13 judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to. Offline (no model run), those 13 are counted UNANSWERED with reason, never faked.
+Consequence: the deterministic sidecar-consistency reviewer answers ONLY the two battle questions its classes mechanically implement; the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the 15 judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to (the two camping questions ride the same model-only tier: the 15-17 sidecars carry zero groundable regions). Offline (no model run), those 15 are counted UNANSWERED with reason, never faked.
 
 ### `answers[]` contract (additive `--reviewer-cmd` seam)
 

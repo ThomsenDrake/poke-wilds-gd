@@ -66,7 +66,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -77,6 +77,7 @@ SMOKE_SCENARIOS = [
     "field_move",
     "save_migration",
     "visual_sweep",
+    "visual_sweep_camping",
 ]
 DEFAULT_SCENE = "res://scenes/app/Main.tscn"
 DEFAULT_HOST = "127.0.0.1"

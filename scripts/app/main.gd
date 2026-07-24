@@ -44,7 +44,7 @@ func _ready() -> void:
 	add_child(_structure_layer)
 	_structure_layer.setup(_runtime(), _world, _player, Callable(_message_box, "show_message"))
 	_structure_layer.build_finished.connect(Callable(_field_router, "on_build_finished"))
-	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"))
+	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu)
 	_connect_signals()
 	_sync_world_from_runtime()
 	_message_box.show_message("Port in progress: Explore, battle, catch, and save with Enter.", 4.0)

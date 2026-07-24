@@ -10,4 +10,5 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Menu and save loop: [menu-and-save.md](menu-and-save.md)
 - Harvest and mutation loop: [harvest-and-mutation.md](harvest-and-mutation.md)
 - Building and placement loop: [building-and-placement.md](building-and-placement.md)
+- Camping, crafting & night survival loop: [camping-crafting-survival.md](camping-crafting-survival.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)

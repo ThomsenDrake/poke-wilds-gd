@@ -1,11 +1,9 @@
 extends RefCounted
 
-# File, diff, and state-crafting plumbing for VisualSweep
-# (scripts/app/visual_sweep.gd): crafts the deterministic session state,
-# finds a writable shots directory, clears stale captures, syncs the
-# committed baselines in update mode, and shells out to tools/visual_diff.py
-# in compare mode so the scenario and CI share one diff implementation. Kept
-# tree-free; the sweep node owns scene driving and capture timing.
+# File, diff, and state-crafting plumbing for VisualSweep: crafts the session
+# state, finds a writable shots dir, clears stale captures, syncs the committed
+# baselines (update mode) or shells out to tools/visual_diff.py (compare mode).
+# The baseline dir is SHARED with visual_sweep_camping (its 15-17 shots).
 
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 
@@ -18,13 +16,11 @@ const PYTHON_BIN := "python3"
 const MODE_COMPARE := "compare"
 const MODE_UPDATE := "update"
 
-# Canonical window size for every sweep capture so baselines stay
-# window-size-stable (captures used to follow the launch-time window size).
+# Canonical capture window so baselines stay window-size-stable.
 const CANONICAL_WINDOW_SIZE := Vector2i(1152, 648)
 
 
-# Resizes the window to CANONICAL_WINDOW_SIZE and returns the previous size
-# for restore_window_size. Headless runs skip the resize (no window to size).
+# Resizes to CANONICAL_WINDOW_SIZE, returning the prior size (headless: no-op).
 func apply_canonical_window_size() -> Vector2i:
 	var previous := DisplayServer.window_get_size()
 	if DisplayServer.get_name() != "headless":
@@ -32,17 +28,13 @@ func apply_canonical_window_size() -> Vector2i:
 	return previous
 
 
-# Puts the window back to the size apply_canonical_window_size found.
 func restore_window_size(previous: Vector2i) -> void:
 	if DisplayServer.get_name() != "headless" and previous.x > 0 and previous.y > 0:
 		DisplayServer.window_set_size(previous)
 
 
-# Crafts fixed session state so every run renders identical frames: written
-# as a save payload (the dispatcher's save-guard restores the real save) and
-# applied through the same normalization path as a boot-time load. The spawn
-# tile comes from GameRuntime's generator for the fixed seed, mirroring
-# new-game spawn selection. Returns false when a species id is unknown.
+# Crafts fixed session state (save payload + boot-load normalization; the
+# dispatcher's save-guard restores the real save). False = unknown species id.
 func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 	var runtime = ctx["runtime"]
 	var party: Array = []
@@ -62,8 +54,7 @@ func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 	runtime.save_store.write_payload(payload)
 	var normalized := party.map(func(m): return runtime.pokemon_rules.normalize_loaded_mon(m))
 	runtime.session.apply_loaded_state(payload, normalized)
-	# Wipe the loaded save's leftover clears+placements so the crafted world is a pure
-	# function of the seed (rebuild and each teleport's rebuild re-pull the live maps).
+	# Wipe leftover clears+placements so the crafted world is a pure function of the seed.
 	runtime._world_gen.clear_overrides()
 	runtime._world_gen.clear_placements()
 	ctx["world"].rebuild(int(spec["world_seed"]))
@@ -85,18 +76,26 @@ func damaging_move_id(runtime) -> String:
 	return "move_0"
 
 
-# Runs the reconcile and reports: push_error per drift/error and no trace on
-# failure, one visual_sweep_passed trace on success (carries the canonical
-# window size, the sweep's duplicate-check + invalid-capture counts, and the
-# per-shot sidecar paths alongside the diff).
+# Reconcile + report: push_error per drift/error/lost shot, else visual_sweep_passed.
 func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float, dup_checked: int = 0, invalid: int = 0) -> void:
 	var result: Dictionary = reconcile(shots, base_dir, mode, threshold_pct)
+	# The baseline dir is shared with visual_sweep_camping: its 15-17 baselines
+	# never have captures in THIS sweep, so their uncaptured flag is not a failure
+	# (symmetric mirror of the camping sweep rescoping ours). Own lost shots stay loud.
+	var lost: Array = []
+	for shot in result.get("uncaptured_baselines", []):
+		if not _foreign_shot(str(shot)):
+			lost.append(str(shot))
+	if not bool(result.get("ok", false)) and lost.is_empty() and (result.get("mismatched", []) as Array).is_empty() and (result.get("errors", []) as Array).is_empty():
+		result["ok"] = true # the differ tripped only on the other sweep's baselines
 	if not bool(result.get("ok", false)):
 		var per_shot: Dictionary = result.get("per_shot", {})
 		for shot in result.get("mismatched", []):
 			push_error("Visual sweep drift on %s: %s%% of pixels changed (threshold %s%%)." % [shot, per_shot.get(shot, "?"), threshold_pct])
 		for message in result.get("errors", []):
 			push_error("Visual sweep diff error: %s" % message)
+		for shot in lost:
+			push_error("Visual sweep lost a shot: baseline %s has no capture this run." % shot)
 		return
 	runtime.emit_trace("visual_sweep_passed", "SmokeScenarios", {
 		"shots": shots,
@@ -108,6 +107,7 @@ func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct
 		"updated": result.get("updated", []),
 		"pruned": result.get("pruned", []),
 		"threshold_pct": threshold_pct,
+		"foreign_uncaptured": result.get("uncaptured_baselines", []),
 		"base_dir": base_dir,
 		"window": [CANONICAL_WINDOW_SIZE.x, CANONICAL_WINDOW_SIZE.y],
 		"dup_checked": dup_checked,
@@ -116,11 +116,9 @@ func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct
 	})
 
 
-# Compare mode: diff captures against baselines via tools/visual_diff.py.
-# Update mode — or compare mode with any baseline missing (first run): copy
-# the captures over the baselines and prune entries without a current shot.
-# Result keys: ok, mode, auto_update, compared, mismatched, max_drift_pct,
-# per_shot, errors, plus updated/pruned on update passes.
+# Compare: diff vs baselines via tools/visual_diff.py. Update (or any baseline
+# missing): copy captures over the baselines, pruning stale entries. Keys: ok,
+# mode, auto_update, compared, mismatched, max_drift_pct, per_shot, errors.
 func reconcile(shots: Array, shot_dir: String, mode: String, threshold_pct: float) -> Dictionary:
 	if mode == MODE_UPDATE or not _missing_baselines(shots).is_empty():
 		return _update_baselines(shots, shot_dir, mode != MODE_UPDATE)
@@ -160,6 +158,12 @@ func _missing_baselines(shots: Array) -> Array:
 	return missing
 
 
+# Baselines the shared dir holds for the OTHER sweep (camping owns 15-17;
+# numbering contract: 09-12 battle-reserved, 13-14 build, 15-17 camping).
+static func _foreign_shot(name: String) -> bool:
+	return name.begins_with("15_") or name.begins_with("16_") or name.begins_with("17_")
+
+
 func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dictionary:
 	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(BASELINE_DIR)) != OK:
 		return {"ok": false, "errors": ["baseline directory is not writable: %s" % BASELINE_DIR]}
@@ -171,8 +175,7 @@ func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dic
 			ProjectSettings.globalize_path("%s/%s" % [BASELINE_DIR, shot_name]))
 		if err != OK:
 			return {"ok": false, "errors": ["could not copy %s into the baseline directory (err %d)" % [shot_name, err]]}
-		# A captured shot always wrote a sidecar, so a copy failure would advance
-		# the PNG but strand a stale sidecar — fail rather than pass on a desync.
+		# Copy failed after the PNG advanced: fail rather than strand a stale sidecar.
 		if not RenderIntrospection.copy_sidecar(shot_dir, shot_name, BASELINE_DIR):
 			return {"ok": false, "errors": ["could not copy the sidecar for %s into the baseline directory (PNG/sidecar desync)" % shot_name]}
 		updated.append(shot_name)
@@ -180,10 +183,10 @@ func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dic
 	var dir := DirAccess.open(ProjectSettings.globalize_path(BASELINE_DIR))
 	if dir != null:
 		for filename in dir.get_files():
-			if filename.ends_with(".png") and not shots.has(filename):
+			if filename.ends_with(".png") and not shots.has(filename) and not _foreign_shot(filename):
 				dir.remove(filename)
 				pruned.append(filename)
-	pruned.append_array(RenderIntrospection.prune_sidecars(BASELINE_DIR, shots))
+	pruned.append_array(RenderIntrospection.prune_sidecars(BASELINE_DIR, shots, _foreign_shot))
 	return {
 		"ok": true, "mode": MODE_UPDATE, "auto_update": auto_update,
 		"updated": updated, "pruned": pruned, "compared": 0,
@@ -191,7 +194,6 @@ func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dic
 	}
 
 
-# Blocking run of the stdlib differ; stdout carries one JSON verdict line.
 func _compare_with_baselines(shot_dir: String, threshold_pct: float) -> Dictionary:
 	var output: Array = []
 	var args := PackedStringArray([
@@ -210,7 +212,6 @@ func _compare_with_baselines(shot_dir: String, threshold_pct: float) -> Dictiona
 	return verdict
 
 
-# Animations play asynchronously after a response; captures must wait them out.
 func await_battle_idle(tree: SceneTree, view: Node) -> void:
 	for _i in range(240):
 		if not view.visible or not view.is_animating():

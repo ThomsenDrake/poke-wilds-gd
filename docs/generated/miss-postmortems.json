@@ -1,6 +1,6 @@
 {
   "schema": "miss-postmortem/1",
-  "note": "Tracked canonical-JSON ledger; a deliberate human/agent ritual, NEVER a runner post-step (mirrors graduation-ledger.json). Counts are COMPUTED from entries, never narrated. Refuse-on-unreadable: a present-but-corrupt ledger is a hard error, never reset to empty. The both-directions check_repo_contracts backstop is IMPLEMENTED (tools/check_repo_contracts.py miss_postmortem_issues, folded into run; incompleteness advisories on stderr): every entry's mechanism_added MUST resolve to a landed artifact (each named repo path exists; each named art-anchor id is in the registry) and every executed plant's revert_scope sha256 pins MUST still match the tree — the pins are recorded at the byte-identical revert, so the check is position-independent (it holds mid-slice as well as post-commit, where a live git status would false-red on unrelated in-flight edits). Entry #1's plant EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable, 1152x648, forward_plus); the run artifacts are machine-local (.godot-smoke is gitignored: proof-class1-compare.json first-break, proof-class1-update-refusal.json regen-under-break RED, proof-class1-revert-compare.json post-revert GREEN, proof-vlm-plugin-degrade.json opt-in reviewer degrade) — the DURABLE proof is the revert_scope pins below plus the backstop that holds them. Entry #2's plant (the nav_audit false-red; the protocol's first FALSE-RED variant) EXECUTED 2026-07-22 (headless, PLAYTEST_FORCE_HEADLESS, Godot 4.6.1-stable): a forced turn-1 trap stayed GREEN and stream-identical across 20 fresh subprocesses under the seed while removing the seed diverged 10/10 streams and the pre-fix RUN check went 3/3 RED; the pre-fix harness reproduced the reasonless red that the fixed harness reports with reasons — the durable proof is the revert_scope pins below (the FIXED-tree bytes, since the mechanism landed before the plant ran). Entry #2's scripts/app/nav_audit.gd pin was RE-STAMPED 2026-07-22 after a GATED_SCAN_RADIUS hardening (20->40): a live world measured its nearest surf gate on ring 22 from a real saved player tile, so the tighter bound made the pass event hostage to the save's geometry (deterministic RED after any mid-run save drift, e.g. a harness kill — the save-geometry sibling this entry's classes_silent already discloses); the gate CONTRACTS the entry's mechanism proved are unchanged (same surf/cut proofs, wider scan). The pin follows the fixed tree through legitimate code change — the documented maintenance route, like fixing a broken internal link. Entry #2's tools/godot_dap_smoketest.py pin was RE-STAMPED 2026-07-23 for the building_loop slice: registering the new placement_flow scenario in SCENARIO_REQUIREMENTS (so the smoke/visual harness accepts it as a first-class scenario, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + nav_audit_failed emission) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route. Entry #2's tools/run_playtests.py pin was likewise RE-STAMPED 2026-07-23 for the building_loop slice: adding placement_flow to PLAYTEST_SCENARIOS (wiring the Phase 1 acceptance scenario into the verify_all one-command gate, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves this entry's proved honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_event_entry + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route; the remaining two scope pins (nav_audit.gd, nav_audit_battle.gd) are unchanged and still hold.",
+  "note": "Tracked canonical-JSON ledger; a deliberate human/agent ritual, NEVER a runner post-step (mirrors graduation-ledger.json). Counts are COMPUTED from entries, never narrated. Refuse-on-unreadable: a present-but-corrupt ledger is a hard error, never reset to empty. The both-directions check_repo_contracts backstop is IMPLEMENTED (tools/check_repo_contracts.py miss_postmortem_issues, folded into run; incompleteness advisories on stderr): every entry's mechanism_added MUST resolve to a landed artifact (each named repo path exists; each named art-anchor id is in the registry) and every executed plant's revert_scope sha256 pins MUST still match the tree — the pins are recorded at the byte-identical revert, so the check is position-independent (it holds mid-slice as well as post-commit, where a live git status would false-red on unrelated in-flight edits). Entry #1's plant EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable, 1152x648, forward_plus); the run artifacts are machine-local (.godot-smoke is gitignored: proof-class1-compare.json first-break, proof-class1-update-refusal.json regen-under-break RED, proof-class1-revert-compare.json post-revert GREEN, proof-vlm-plugin-degrade.json opt-in reviewer degrade) — the DURABLE proof is the revert_scope pins below plus the backstop that holds them. Entry #2's plant (the nav_audit false-red; the protocol's first FALSE-RED variant) EXECUTED 2026-07-22 (headless, PLAYTEST_FORCE_HEADLESS, Godot 4.6.1-stable): a forced turn-1 trap stayed GREEN and stream-identical across 20 fresh subprocesses under the seed while removing the seed diverged 10/10 streams and the pre-fix RUN check went 3/3 RED; the pre-fix harness reproduced the reasonless red that the fixed harness reports with reasons — the durable proof is the revert_scope pins below (the FIXED-tree bytes, since the mechanism landed before the plant ran). Entry #2's scripts/app/nav_audit.gd pin was RE-STAMPED 2026-07-22 after a GATED_SCAN_RADIUS hardening (20->40): a live world measured its nearest surf gate on ring 22 from a real saved player tile, so the tighter bound made the pass event hostage to the save's geometry (deterministic RED after any mid-run save drift, e.g. a harness kill — the save-geometry sibling this entry's classes_silent already discloses); the gate CONTRACTS the entry's mechanism proved are unchanged (same surf/cut proofs, wider scan). The pin follows the fixed tree through legitimate code change — the documented maintenance route, like fixing a broken internal link. Entry #2's tools/godot_dap_smoketest.py pin was RE-STAMPED 2026-07-23 for the building_loop slice: registering the new placement_flow scenario in SCENARIO_REQUIREMENTS (so the smoke/visual harness accepts it as a first-class scenario, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + nav_audit_failed emission) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route. Entry #2's tools/run_playtests.py pin was likewise RE-STAMPED 2026-07-23 for the building_loop slice: adding placement_flow to PLAYTEST_SCENARIOS (wiring the Phase 1 acceptance scenario into the verify_all one-command gate, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves this entry's proved honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_event_entry + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route; the remaining two scope pins (nav_audit.gd, nav_audit_battle.gd) are unchanged and still hold. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED again 2026-07-24 for the final-fix minor slice: registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS + the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets and SMOKE_SCENARIOS, mirroring visual_sweep exactly, is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + the single-sourced table + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pins follow the fixed tree through the same legitimate maintenance route; the two nav_audit scope pins are unchanged and still hold.",
   "entries": [
     {
       "id": "miss-001-hp-bar-11px",
@@ -8,21 +8,66 @@
       "head_sha": "cf44597ecc5203d8830a4d594030dfcdfbd7b931",
       "instance": {
         "description": "Programmatic HP bars (EnemyHPBar/PlayerHPBar ColorRects in scenes/ui/BattleView.tscn) were misaligned +11 stage-px from the baked GSC tracks: enemy at x43 (track x32), player at x107 (track x96). The committed baseline sidecar (fd7d0925e0aed24c9cb0f04526a3368717dfac72, 2026-07-18) froze the wrong draw_order EnemyHPBar rect [43,18,48,4] and the suite stayed GREEN against it for 3+ days. Every automated check class was self-referential: truth was the code's own output or a human transcription of it, so nothing could see an overlay sitting off the art feature it belongs on.",
-        "shots": ["09_battle.png", "10_battle_moves.png", "11_battle_after_attack.png", "12_battle_items.png"],
+        "shots": [
+          "09_battle.png",
+          "10_battle_moves.png",
+          "11_battle_after_attack.png",
+          "12_battle_items.png"
+        ],
         "perturbation": "Fix: EnemyHPBar offset_left 43->32 and PlayerHPBar offset_left 107->96 (-11 stage px each), then visual_sweep_update regenerated exactly the four battle baselines 09-12 (overworld/menu baselines byte-identical)."
       },
       "missing_anchor_class": "SA",
       "classes_silent": [
-        {"class": "pixel baseline + global 0.5% gate (visual_diff.py)", "anchor_kind": "CO", "why_silent": "The wrong render WAS the baseline; delta 0."},
-        {"class": "visual_region_diff red tiers", "anchor_kind": "CO", "why_silent": "No clusters vs its own baseline; the bar moved WITH the baseline."},
-        {"class": "Lane-4 deterministic sidecar-consistency reviewer", "anchor_kind": "CO", "why_silent": "draw_order delta checks z/y_sort/presence only, never rects; baseline and fresh sidecars both carried the code's [43,18,...]."},
-        {"class": "ui_render_model / ui_render_art", "anchor_kind": "HM", "why_silent": "HP bars were never modeled — no bar rect in the ACTION_*/MOVE_*/ITEM_* constants."},
-        {"class": "text_oracle glyph XOR", "anchor_kind": "CO", "why_silent": "HP numbers are not ANCHOR strings; the glyph oracle matches anchor-mode strings only."},
-        {"class": "layout_audit", "anchor_kind": "CO", "why_silent": "Checks name/level overlap only; consumes the layout model, not art."},
-        {"class": "contrast_check (WCAG)", "anchor_kind": "XS", "why_silent": "Label rects unchanged; a translation changes no contrast ratio."},
-        {"class": "cvd_sim (Machado 2009)", "anchor_kind": "XS", "why_silent": "Palettes unchanged; position-independent."},
-        {"class": "display_matrix", "anchor_kind": "CO", "why_silent": "Self-consistent scale replication at every window size; the offset replicates cleanly."},
-        {"class": "rubric line 63 'Are HP bars on their baked tracks...?'", "anchor_kind": "EA", "why_silent": "Asked by the rubric, answered by NO agent — the model-reviewer lane was designed but never populated."}
+        {
+          "class": "pixel baseline + global 0.5% gate (visual_diff.py)",
+          "anchor_kind": "CO",
+          "why_silent": "The wrong render WAS the baseline; delta 0."
+        },
+        {
+          "class": "visual_region_diff red tiers",
+          "anchor_kind": "CO",
+          "why_silent": "No clusters vs its own baseline; the bar moved WITH the baseline."
+        },
+        {
+          "class": "Lane-4 deterministic sidecar-consistency reviewer",
+          "anchor_kind": "CO",
+          "why_silent": "draw_order delta checks z/y_sort/presence only, never rects; baseline and fresh sidecars both carried the code's [43,18,...]."
+        },
+        {
+          "class": "ui_render_model / ui_render_art",
+          "anchor_kind": "HM",
+          "why_silent": "HP bars were never modeled — no bar rect in the ACTION_*/MOVE_*/ITEM_* constants."
+        },
+        {
+          "class": "text_oracle glyph XOR",
+          "anchor_kind": "CO",
+          "why_silent": "HP numbers are not ANCHOR strings; the glyph oracle matches anchor-mode strings only."
+        },
+        {
+          "class": "layout_audit",
+          "anchor_kind": "CO",
+          "why_silent": "Checks name/level overlap only; consumes the layout model, not art."
+        },
+        {
+          "class": "contrast_check (WCAG)",
+          "anchor_kind": "XS",
+          "why_silent": "Label rects unchanged; a translation changes no contrast ratio."
+        },
+        {
+          "class": "cvd_sim (Machado 2009)",
+          "anchor_kind": "XS",
+          "why_silent": "Palettes unchanged; position-independent."
+        },
+        {
+          "class": "display_matrix",
+          "anchor_kind": "CO",
+          "why_silent": "Self-consistent scale replication at every window size; the offset replicates cleanly."
+        },
+        {
+          "class": "rubric line 63 'Are HP bars on their baked tracks...?'",
+          "anchor_kind": "EA",
+          "why_silent": "Asked by the rubric, answered by NO agent — the model-reviewer lane was designed but never populated."
+        }
       ],
       "mechanism_added": "SA anchor class: docs/registry/art-anchors.toml entries battle/enemy_hp_track + battle/player_hp_track (dark-run stage_rects (32,18,48,4)/(96,74,48,4) re-derived from battle_screen2.png bytes); tools/art_geometry.py derive_rect; tools/check_art_anchors.py art_anchor_issues folded into check_repo_contracts.run (RED static gate); anchor_drift class in tools/vision_review.py default_reviewer (quarantine-tier, art:<id> regions); tools/run_playtests.py apply_anchor_gate baseline-regeneration refusal — active for BOTH visual_sweep and visual_sweep_update via VISUAL_SWEEP_SCENARIOS (a guard on the compare name alone leaves the refusal branch unreachable, which the plant's first pass exposed and fixed), plus the VISION_REVIEWER_CMD opt-in wiring of the --reviewer-cmd socket into apply_vision_review; EA answerer: tools/vlm_reviewer.py (reviewer_kind model-qwen3-vl, composite degrade, kinds_ran contract) populating the socket for the battle 'hp bars on their baked tracks' question — opt-in in the runner (default unset ⇒ deterministic lane), the first model-answered manifest pending a qwen3-vl pull; protocol backstop: tools/check_repo_contracts.py miss_postmortem_issues (both-directions, folded into run) resolving this mechanism_added to landed artifacts and holding this plant's revert_scope. All resolve to landed artifacts in this slice.",
       "plant": {
@@ -50,18 +95,48 @@
       "head_sha": "385da7efcb93a2963ed3c96d80528a3480f775e1",
       "instance": {
         "description": "FALSE-RED variant (the suite intermittently LIES; not a miss). nav_audit intermittently failed on FRESH verify_all runs with 'missing required events: nav_audit_passed' — the scenario ran to completion in ~2.6s but never emitted its pass event. The pass event was gated on the outcome of a wild battle whose inputs were drawn from UNSEEDED, wall-clock-seeded RNG (game_runtime.gd and battle_runtime.gd both call _rng.randomize() once per fresh subprocess): when the drawn wild landed an EFFECT_TRAP_TARGET move, the game CORRECTLY refused to flee ('Can't escape!' while is_trapped, view stays visible) and _check_run_escape recorded that legitimate mechanic as a suite failure, suppressing nav_audit_passed. Compounding the red into a REASONLESS one: the failure reason was emitted only via push_error ('ERROR: Nav audit failed: ...'), and ERROR_MARKERS=('SCRIPT ERROR','Parse Error') never matched the 'ERROR: ' prefix, so exceptions:[] and the report showed only the blank missing-event. Investigations exonerated the create_timer/cold-start hypothesis (nav_audit uses only tile_changed/process_frame awaits; failing runs last ~2.6s against a 120s budget): the wall-clock dependence was in the RNG SEED — which is why cold-start only correlated (it shifts the randomize() seed), why the true failure rate was ~3-5% regardless of temperature, why re-runs passed (new seed), why 10/10 greens occurred (luck), and why a git-stash test proved it PRE-EXISTING at clean HEAD cf44597 (the unseeded draw and the unversioned user:// save both live outside the working tree).",
-        "shots": ["nav_audit (fresh headless subprocess runs under verify_all / run_playtests.py --include-smoke)"],
+        "shots": [
+          "nav_audit (fresh headless subprocess runs under verify_all / run_playtests.py --include-smoke)"
+        ],
         "perturbation": "Fix (instance closed AS A SIDE EFFECT of the class mechanism): pin both runtime rngs via seed_for_smoke(NAV_AUDIT_SEED := 20260718) before _start_battle (the house seeding convention), and make _check_run_escape total — a visible view after RUN must carry the game's ONLY refusal text 'Can't escape!' (proving the trap-refusal mechanic as NEW coverage), then the trap is deterministically expired (battle_runtime._player_mon['trap_turns'] = 0) and RUN re-proven to end the battle. A legitimate in-game escape refusal can never again be recorded as a suite failure; the traversal/menu halves are untouched (no battle rng), and the save backup/restore guard is untouched."
       },
       "missing_anchor_class": "CO",
       "classes_silent": [
-        {"class": "run_playtests.py required-event check (missing_all)", "anchor_kind": "CO", "why_silent": "Checks only that nav_audit_passed is present; the scenario RAN and simply never emitted it, so the check reported 'missing' correctly but with no reason — there was no failure-event contract symmetric with the _passed special-casing."},
-        {"class": "ERROR_MARKERS exception capture (run_playtests.py + godot_dap_smoketest.py)", "anchor_kind": "CO", "why_silent": "('SCRIPT ERROR','Parse Error') does not match push_error's 'ERROR: <message>' prefix (the 'at:' backtrace line carries no marker either), so the emitted failure reason was discarded into exceptions:[] — the reason existed and was thrown away."},
-        {"class": "determinism_verify.py pins + canary", "anchor_kind": "CO", "why_silent": "Pins the visual_sweep CAPTURE determinism (project.godot msaa/snap pins, canary shot hash); never covers scenario PASS EVENTS or the rng draws feeding them — a different determinism surface."},
-        {"class": "playtest_soak seeded bot (SOAK_SEED)", "anchor_kind": "CO", "why_silent": "Proves the soak's OWN bot rng deterministic; nav_audit never adopted the convention — its wild draw, enemy move choice, and trap/attract rolls rode the per-process randomize()."},
-        {"class": "visual_sweep/display_matrix BATTLE_RNG_SEED direct assignment", "anchor_kind": "CO", "why_silent": "Seeds the battle rng for a HAND-CRAFTED wild (visual_sweep never drives generate_wild_encounter); no seam covered the real encounter-draw path nav_audit exercises, and nothing pinned the game-side _rng at all."},
-        {"class": "miss_postmortem_issues / graduation_ledger backstops", "anchor_kind": "CO", "why_silent": "Track landed mechanisms and graduation streaks, not run-to-run determinism of scenario inputs; a flake that re-passes leaves no ledger trace."},
-        {"class": "per-scenario save backup/restore guard (smoke_scenarios.gd)", "anchor_kind": "CO", "why_silent": "Restores the SAVE around each run but cannot pin in-process rng draws (and, as recorded here, cannot protect save geometry from a harness SIGKILL mid-scenario — the latent sibling subclass, advisory, not this entry's fix)."}
+        {
+          "class": "run_playtests.py required-event check (missing_all)",
+          "anchor_kind": "CO",
+          "why_silent": "Checks only that nav_audit_passed is present; the scenario RAN and simply never emitted it, so the check reported 'missing' correctly but with no reason — there was no failure-event contract symmetric with the _passed special-casing."
+        },
+        {
+          "class": "ERROR_MARKERS exception capture (run_playtests.py + godot_dap_smoketest.py)",
+          "anchor_kind": "CO",
+          "why_silent": "('SCRIPT ERROR','Parse Error') does not match push_error's 'ERROR: <message>' prefix (the 'at:' backtrace line carries no marker either), so the emitted failure reason was discarded into exceptions:[] — the reason existed and was thrown away."
+        },
+        {
+          "class": "determinism_verify.py pins + canary",
+          "anchor_kind": "CO",
+          "why_silent": "Pins the visual_sweep CAPTURE determinism (project.godot msaa/snap pins, canary shot hash); never covers scenario PASS EVENTS or the rng draws feeding them — a different determinism surface."
+        },
+        {
+          "class": "playtest_soak seeded bot (SOAK_SEED)",
+          "anchor_kind": "CO",
+          "why_silent": "Proves the soak's OWN bot rng deterministic; nav_audit never adopted the convention — its wild draw, enemy move choice, and trap/attract rolls rode the per-process randomize()."
+        },
+        {
+          "class": "visual_sweep/display_matrix BATTLE_RNG_SEED direct assignment",
+          "anchor_kind": "CO",
+          "why_silent": "Seeds the battle rng for a HAND-CRAFTED wild (visual_sweep never drives generate_wild_encounter); no seam covered the real encounter-draw path nav_audit exercises, and nothing pinned the game-side _rng at all."
+        },
+        {
+          "class": "miss_postmortem_issues / graduation_ledger backstops",
+          "anchor_kind": "CO",
+          "why_silent": "Track landed mechanisms and graduation streaks, not run-to-run determinism of scenario inputs; a flake that re-passes leaves no ledger trace."
+        },
+        {
+          "class": "per-scenario save backup/restore guard (smoke_scenarios.gd)",
+          "anchor_kind": "CO",
+          "why_silent": "Restores the SAVE around each run but cannot pin in-process rng draws (and, as recorded here, cannot protect save geometry from a harness SIGKILL mid-scenario — the latent sibling subclass, advisory, not this entry's fix)."
+        }
       ],
       "mechanism_added": "Two coordinated class-level mechanisms (the instance is fixed as a side effect; neither changes what nav_audit verifies). (A) DETERMINISM — scripts/runtime/game_runtime.gd seed_for_smoke(seed) seam pins BOTH _rng and battle_runtime._rng (mirrors the existing direct-assignment convention at scripts/app/visual_sweep.gd BATTLE_RNG_SEED and scripts/app/display_matrix.gd but covers the whole generate_wild_encounter path), called from scripts/app/nav_audit_battle.gd run() with scripts/app/nav_audit.gd NAV_AUDIT_SEED := 20260718 before _start_battle, so the audited inputs are a pure function of (code, save, seed), reproducible across subprocesses and across cold and warm starts; plus the total RUN contract in scripts/app/nav_audit_battle.gd _check_run_escape — a legitimate 'Can't escape!' trap refusal is PROVEN, the trap expired deterministically, and escape re-proven (strengthened coverage, never relaxed). (C) HONEST REPORTING — shared-harness class fix so EVERY scenario's red names its cause: tools/godot_dap_smoketest.py ERROR_MARKERS widened to capture push_error's 'ERROR: ' prefix and single-sourced (imported by tools/run_playtests.py so both transports agree by construction), plus failed_event_entry: any trace event ending in '_failed' is collected as a named failure with its reasons payload and both finalize and result_summary mark not-ok and record it; scripts/app/nav_audit.gd emits nav_audit_failed with the failures array on the non-pass branch alongside push_error (the going-forward contract for every audit's non-pass branch), documented in docs/references/trace-events.md and held by tools/check_repo_contracts.py (nav_audit_failed in app_bootstrap required_trace_events; the miss_postmortem_issues backstop holds this entry's revert_scope pins). Handled engine-side refusals stay quiet at the source — scripts/runtime/save_store.gd parses corrupt saves via JSON.new().parse (error code, no engine output) — so the widened capture adds no false reds on green paths (proven by a full headless suite run). The class — unseeded pass-events plus silent non-pass exits suite-wide — is closed by (A) as the convention every scenario adopts plus (C) in the shared harness. All resolve to landed artifacts in this slice.",
       "plant": {
@@ -69,12 +144,12 @@
         "executed": true,
         "mechanism_caught": true,
         "classes_silent_confirmed": true,
-        "revert_proof": "git-tracked plant scope sha-verified equal to the pre-plant fixed-tree snapshots (byte-identical revert); the pins below are held by the check_repo_contracts miss_postmortem_issues backstop (position-independent: holds mid-slice/uncommitted exactly as post-commit). Plant artifacts (.godot-smoke/plant-p2-1.json reasonless-red specimen, plant-p2-2.json reason-carrying report) are machine-local.",
+        "revert_proof": "git-tracked plant scope sha-verified equal to the pre-plant fixed-tree snapshots (byte-identical revert); the pins below are held by the check_repo_contracts miss_postmortem_issues backstop (position-independent: holds mid-slice/uncommitted exactly as post-commit). Plant artifacts (.godot-smoke/plant-p2-1.json reasonless-red specimen, plant-p2-2.json reason-carrying report) are machine-local. RE-STAMP 2026-07-23 (Phase 2 scenarios+baselines slice): the four camping/crafting/night/evolution scenarios were registered in SCENARIO_REQUIREMENTS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS (run_playtests.py), legitimately perturbing both pinned scope files. The (C) honest-reporting mechanism was re-verified intact in the drifted bytes before re-stamping: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:222), and run_playtests.py still single-sources the table from the sibling harness (:53); the mechanism FIRED live in this slice — the Phase 2 scenario reds reported named reasons on both channels (failed_events=[night_cycle_failed {'failures': [...]}] AND exceptions=['ERROR: ...']). The (A) determinism seam is untouched (game_runtime.seed_for_smoke; the four new scenarios all pin it). The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py 767e43a77f84..., godot_dap_smoketest.py 875682aacd2a.... RE-STAMP 2026-07-23 (final-fix agent, post-adversarial-review slice): nav_audit_battle.gd legitimately perturbed — run() now DAY-pins the clock (Phase 2 time-aware encounter draws: the nocturnal filter + ghost roll had made the audited stream a function of the save's time_of_day) and swap-pins a fixed BULBASAUR party (a craft sweep leaking an overleveled party through the unguarded playtest entries KOs the audit wild on move activation, leaving the RUN check reading a pending victory view). Both mechanisms re-verified intact in the drifted bytes before re-stamping: (A) seed_for_smoke(rng_seed) is still run()'s first act (nav_audit_battle.gd:28), the total RUN contract untouched (:171-175), NAV_AUDIT_SEED still threaded (nav_audit.gd:41), game_runtime.seed_for_smoke unchanged (:203); (C) untouched — the other three scope pins are byte-identical (nav_audit.gd ad29dd5c..., godot_dap_smoketest.py e65e93a2..., run_playtests.py d437b440...). Proven save-independent: nav_audit green twice on a polluted save (night clock + overleveled leaked party) and on a fresh save. Old pin: nav_audit_battle.gd 537661553c06.... RE-STAMP 2026-07-24 (final-fix agent, post-adversarial-review minor-fix slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS plus the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets (godot_dap_smoketest.py) and SMOKE_SCENARIOS (run_playtests.py), mirroring visual_sweep exactly so the camping sweep is a first-class gate scenario that transport-skips honestly under PLAYTEST_FORCE_HEADLESS instead of failing headless where its captures cannot render. Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:234), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:91) from the sibling harness, and finalize's ok contract is unchanged (:204). The (A) determinism seam is untouched. The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py d437b4407c37..., godot_dap_smoketest.py e65e93a264e8....",
         "revert_scope": {
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
-          "scripts/app/nav_audit_battle.gd": "537661553c06c0310f94d7e9119c54037f6337ca85333d0adfbec85de40c0c3b",
-          "tools/run_playtests.py": "767e43a77f842078be8ba663f3942630d1025e8490000f2b1d9d0446bcc799ba",
-          "tools/godot_dap_smoketest.py": "875682aacd2a5278217f67b6f026a144d2fa654d2a00171648e3e799f9b44717"
+          "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
+          "tools/run_playtests.py": "46d5366f3ae5e1ec8a958f98396303742b9c2af9bbee891350a5baef089f1002",
+          "tools/godot_dap_smoketest.py": "5c9ef279f6d91a1e3c03fbdfd7f5024434bec2c2af3d64ed911cfbd3d1be83e2"
         }
       },
       "plants_recorded_but_excluded_from_stats": true

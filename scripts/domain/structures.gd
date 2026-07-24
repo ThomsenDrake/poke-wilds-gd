@@ -20,8 +20,9 @@ extends RefCounted
 
 # Buildable structure ids. The order doubles as the build-mode cycle order
 # (structure_layer cycles this list); the two Phase 2-3 placeholders trail so a
-# player never lands on an unbuildable entry first.
-const IDS := ["wall", "door", "roof", "partition", "fence", "campfire", "storage_box", "bed"]
+# player never lands on an unbuildable entry first. TORCH is APPENDED LAST (after
+# bed) so every existing build-cycle index and placement scenario stays stable.
+const IDS := ["wall", "door", "roof", "partition", "fence", "campfire", "storage_box", "bed", "torch"]
 # The only walkable structure: a door is the opening in a wall line that
 # connects rooms (and, beside a fence, renders as a gate). Every other id is
 # solid and blocks traversal.
@@ -38,6 +39,9 @@ const _DEFAULT_COSTS := {
 	"campfire": {"log": 4, "dry_soil": 2},
 	"storage_box": {"log": 2},
 	"bed": {"log": 4, "soft_bedding": 1},
+	# Original torch = 1 Log + 1 Grass (buildings-scrape.md:286); Grass -> dry_soil is
+	# the documented Phase 1 thatch/daub mapping used across the wood costs above.
+	"torch": {"log": 1, "dry_soil": 1},
 }
 # Desert homes require Hard Stone for the shell — SOURCED (house-building-scrape.md:
 # "Most homes require Logs and Grass... with the exception of Desert homes which
@@ -66,6 +70,7 @@ const _BLOCK_REASONS := {
 	"campfire": "A campfire blocks the way.",
 	"storage_box": "A storage box blocks the way.",
 	"bed": "A bed blocks the way.",
+	"torch": "A torch blocks the way.",
 }
 
 # Sprite families per shell kind. The asset dump ships house1/house5 per-tile
@@ -97,9 +102,16 @@ const _FENCE_PATH := "res://pokewilds/tiles/fence1.png"
 const GATE_PATH := "res://pokewilds/tiles/fence1gate1.png"
 const _BED_PATH := "res://pokewilds/tiles/buildings/house_bed1.png"
 const _BOX_PATH := "res://pokewilds/tiles/chest1.png"
+const _TORCH_PATH := "res://pokewilds/tiles/torch_sheet1.png"
 # campfire1/chest1 are 2-frame sheets; one 16-wide frame is the static prop.
+# campfire1 is a 32x20 sheet (two 16x20 frames): frame 0 is the unlit base the
+# build loop stamps, frame 1 is the lit fire — pin both so the light layer can swap.
 const _CAMPFIRE_REGION := Rect2(0, 0, 16, 20)
+const _CAMPFIRE_LIT_REGION := Rect2(16, 0, 16, 20)
 const _BOX_REGION := Rect2(0, 0, 16, 32)
+# torch_sheet1 is a multi-frame sheet; a torch is ALWAYS lit, so the build loop
+# stamps its first 16x20 frame (verified against the camping visual-sweep shot).
+const _TORCH_REGION := Rect2(0, 0, 16, 20)
 
 
 static func is_valid(id: String) -> bool:
@@ -156,18 +168,26 @@ static func sprite_path_for(id: String, biome: String, gate: bool = false) -> St
 			return _BED_PATH
 		"storage_box":
 			return _BOX_PATH
+		"torch":
+			return _TORCH_PATH
 		"wall", "door", "roof":
 			return (_SHELL[_shell_family(biome)] as Dictionary).get(id, "")
 	return ""
 
 
-# Atlas region for multi-frame sheets; null means the full PNG (the default).
-static func sprite_region_for(id: String, _biome: String, _gate: bool = false) -> Variant:
+# Atlas region for multi-frame sheets; null means the full PNG (the default). A
+# campfire shows its lit frame unless `lit` is false: apply_placement threads the
+# placement entry's "lit" field through placement_is_lit, so an extinguished fire
+# stamps its UNLIT base frame AND drops its glow (the light layer reads the same
+# field off the placement map — sprite and light can never disagree).
+static func sprite_region_for(id: String, _biome: String, _gate: bool = false, lit: bool = true) -> Variant:
 	match id:
 		"campfire":
-			return _CAMPFIRE_REGION
+			return _CAMPFIRE_LIT_REGION if lit else _CAMPFIRE_REGION
 		"storage_box":
 			return _BOX_REGION
+		"torch":
+			return _TORCH_REGION
 	return null
 
 
@@ -191,3 +211,42 @@ static func _shell_family(biome: String) -> String:
 	if biome == "SAVANNA":
 		return "savanna"
 	return "default"
+
+
+# --- Phase 2 behavior hooks (camping / crafting; spec camping-crafting-survival) --
+# Pure classification the camping / crafting / night systems read off a structure id
+# or a placement entry. Definitions + costs + occupancy above are unchanged; these
+# fill the Phase 1 no-behavior placeholders (campfire, bed) and the torch light prop.
+
+# Light sources for the night model: a placed campfire (unless extinguished via a
+# "lit": false entry field) or a torch (always lit) lights its surroundings.
+const LIGHT_SOURCES := {"campfire": true, "torch": true}
+
+
+static func is_light_source(id: String) -> bool:
+	return bool(LIGHT_SOURCES.get(id, false))
+
+
+# The crafting station a placed structure provides ("" for non-stations). A campfire
+# is the only station in Phase 2; the value is recipes.gd's STATION_CAMPFIRE literal.
+static func crafting_station_for(id: String) -> String:
+	return "campfire" if id == "campfire" else ""
+
+
+static func is_crafting_station(id: String) -> bool:
+	return id == "campfire"
+
+
+# The rest kind a placed structure offers ("" for none): a bed gives full heal +
+# status cure. The sleeping bag is a BAG item (session_state STARTING_BAG), not a
+# structure, so it is deliberately absent here.
+static func rest_kind_for(id: String) -> String:
+	return "bed" if id == "bed" else ""
+
+
+# A campfire is lit unless its placement entry explicitly carries "lit": false
+# (absent = lit, so Phase 1 campfire saves load as lit). A torch is always lit.
+static func placement_is_lit(placement: Dictionary) -> bool:
+	if str(placement.get("structure_id", "")) == "torch":
+		return true
+	return bool(placement.get("lit", true))

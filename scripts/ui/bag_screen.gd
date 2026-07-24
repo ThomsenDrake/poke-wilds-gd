@@ -1,7 +1,8 @@
 extends Control
 
 # Bag screen: item list with the highlighted item's description. POTION opens
-# a party picker and heals the chosen member; anything else reports that it
+# a party picker and heals the chosen member; the SLEEPING BAG rests the party
+# through camping_runtime (Phase 2 camping seam); anything else reports that it
 # cannot be used here. Data comes from the injected context (see start_menu.gd).
 
 signal closed
@@ -10,6 +11,9 @@ const PartyRows := preload("res://scripts/ui/party_rows.gd")
 
 const POTION_ITEM_ID := "potion"
 const POTION_HEAL_AMOUNT := 20
+# Phase 2 camping slice (spec: camping-crafting-survival.md): a REUSABLE key item
+# (never consumed) — its Z entry routes to camping_runtime.rest("bag").
+const SLEEPING_BAG_ITEM_ID := "sleeping_bag"
 const STATE_ITEMS := "items"
 const STATE_PARTY_PICK := "party_pick"
 
@@ -104,6 +108,8 @@ func _activate_item() -> void:
 	var item_id := str((_entries[_selected] as Dictionary).get("item_id", ""))
 	if item_id == POTION_ITEM_ID:
 		_open_party_pick()
+	elif item_id == SLEEPING_BAG_ITEM_ID:
+		_use_sleeping_bag()
 	else:
 		_message_box.show_message("Can't use that here.", 1.4)
 
@@ -139,6 +145,28 @@ func _apply_potion() -> void:
 	_message_box.show_message("Used Potion on %s." % str(mon.get("name", "Pokemon")), 1.6)
 	_close_party_pick()
 	_refresh_items()
+
+# Sleeping bag (Phase 2 camping slice; spec: camping-crafting-survival.md): a
+# reusable key item, so the count never decrements. camping_runtime.rest("bag")
+# owns the heal, the time advance and the campsite trail — the SAME semantics as
+# the faced-bed path field_action_router routes; the screen only surfaces the
+# message, resyncs the world tint to the advanced clock, and saves. Self-wires
+# through the /root/GameRuntime autoload (camp_menu's convention).
+func _use_sleeping_bag() -> void:
+	var runtime := get_node_or_null("/root/GameRuntime")
+	var camping: Variant = runtime.get("camping_runtime") if runtime != null else null
+	if camping == null or not camping.has_method("rest"):
+		_message_box.show_message("Can't use that here.", 1.4)
+		return
+	var result: Variant = camping.call("rest", "bag")
+	var response: Dictionary = result if result is Dictionary else {}
+	var text := str(response.get("message", ""))
+	_message_box.show_message(text if not text.is_empty() else "You rested for a while.", 2.2)
+	if bool(response.get("ok", false)) and runtime != null:
+		var world := get_node_or_null("/root/Main/World")
+		if world != null and world.has_method("set_time_of_day"):
+			world.set_time_of_day(int(runtime.get_time_of_day_minutes()))
+		runtime.save_game()
 
 func _rebuild_party_rows() -> void:
 	for child in _party_rows.get_children():

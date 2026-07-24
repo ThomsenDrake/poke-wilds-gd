@@ -27,7 +27,8 @@ ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "ERROR: ")
 # Scenarios that need a real resizable window (editor-managed DAP game windows
 # reject programmatic resize) — the playtest runner launches them as standalone
 # windowed subprocesses. Single-sourced here; run_playtests.py imports it.
-WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update"}
+WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update",
+                                 "visual_sweep_camping", "visual_sweep_camping_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -36,7 +37,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 # here: it self-skips its pixel work in-engine when headless
 # (display_matrix.gd:44-47) and still emits display_matrix_passed, so it stays
 # runnable under force-headless.
-WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update"}
+WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
+                           "visual_sweep_camping", "visual_sweep_camping_update"}
 
 
 def force_headless() -> bool:
@@ -99,6 +101,16 @@ SCENARIO_REQUIREMENTS = {
         "all": ["visual_sweep_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Camping-state sweep (shots 15-17, shared baseline dir). Windowed-only like
+    # visual_sweep: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_camping": {
+        "all": ["visual_sweep_camping_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_camping_update": {
+        "all": ["visual_sweep_camping_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "nav_audit": {
         "all": ["nav_audit_passed"],
         "any": [["session_loaded", "session_created"]],
@@ -137,6 +149,29 @@ SCENARIO_REQUIREMENTS = {
     },
     "placement_flow": {
         "all": ["placement_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md).
+    # The all-lists pin the DOMAIN events each scenario must emit, not just the
+    # pass marker (single-sourced mirror in run_playtests' PLAYTEST_SCENARIOS).
+    "camp_survival": {
+        "all": ["boot_started", "boot_ready", "rested", "campsite_established",
+                "battle_finished", "camp_survival_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "craft_flow": {
+        "all": ["boot_started", "boot_ready", "item_crafted", "craft_refused",
+                "craft_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "night_cycle": {
+        "all": ["boot_started", "boot_ready", "night_hazard_spawned",
+                "retreat_blocked", "night_cycle_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "time_evolution": {
+        "all": ["boot_started", "boot_ready", "evolution_time_gate",
+                "time_evolution_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

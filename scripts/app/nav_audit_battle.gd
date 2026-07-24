@@ -10,8 +10,8 @@ extends RefCounted
 # state and RUN ends the battle — trap-tolerantly: a legitimate "Can't escape!"
 # refusal is PROVEN, the trap expired, and escape re-proven, never a failure.
 # Determinism pin: run() takes the caller's seed and calls seed_for_smoke so
-# the wild draw and every battle roll are a pure function of (code, save, seed)
-# — the house seeding convention, never the per-process wall-clock randomize().
+# the wild draw and every battle roll are a pure function of (code, seed) — the
+# party is swap-pinned and the clock DAY-pinned below (house seeding convention).
 # Fully synchronous: activations resolve through the runtime without frame waits.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
@@ -26,10 +26,20 @@ var _options_checked := 0
 func run(ctx: Dictionary, rng_seed: int) -> Dictionary:
 	var runtime: Node = ctx["runtime"]
 	runtime.seed_for_smoke(rng_seed)
+	# Phase 2 made the wild draw time-aware (nocturnal pool filter + the unlit-night
+	# ghost roll on this very rng): pin DAY so a save left at night — the unguarded
+	# playtest entries advance the clock — cannot shift the audit's encounter stream.
+	runtime.session.time_of_day_minutes = 600
+	# Fixed party (house swap_party pattern): a save left with an overleveled mon
+	# (the craft sweeps leak one through the unguarded playtest entries) KOs the
+	# audit wild on move activation, and the RUN check would read the pending
+	# victory view — pin BULBASAUR so the audit is a function of (code, seed) only.
+	var party_before: Array = _runner.swap_party(runtime, ["BULBASAUR"])
 	runtime.session.heal_party_full()
 	_runner.refill_party_pp(runtime)
 	if not _start_battle(ctx):
 		_failures.append("battle: could not start a wild battle")
+		_runner.restore_party(runtime, party_before)
 		return _result()
 	var view: Node = ctx["battle_view"]
 	_audit_state(view, "action")
@@ -43,6 +53,7 @@ func run(ctx: Dictionary, rng_seed: int) -> Dictionary:
 	else:
 		_failures.append("battle: could not restart a battle for the run check")
 	_set_battle(ctx, false)
+	_runner.restore_party(runtime, party_before)
 	return _result()
 
 

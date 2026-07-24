@@ -697,6 +697,8 @@ def _rubric_section(shot: str, rubric_text: str) -> str:
         marker = "Menu states"
     elif stem.startswith(("04", "05")):
         marker = "Day/night states"
+    elif stem.startswith(("15", "16", "17")):
+        marker = "Camping states"
     elif stem.startswith("matrix"):
         marker = "Display-matrix states"
     else:
@@ -735,6 +737,7 @@ RUBRIC_GROUPS = [
     ("day_night", "Day/night states"),
     ("menu", "Menu states"),
     ("battle", "Battle states"),
+    ("camping", "Camping states"),
     ("display_matrix", "Display-matrix states"),
 ]
 
@@ -779,14 +782,18 @@ QUESTION_ANSWERERS = {
     "display_matrix": [
         ("every window size", [KIND_MODEL]),
     ],
+    "camping": [
+        ("glow visible around the fire", [KIND_MODEL]),
+        ("recipe names + ingredient counts legible", [KIND_MODEL]),
+    ],
 }
 
 # Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
 # parsed inventory drifts from these counts the run records a loud warning
 # (advisory in this slice; a RED check_repo_contracts backstop is the documented
-# follow-up). Totals: 6 + 2 + 5 + 5 + 1 = 19 rubric questions.
+# follow-up). Totals: 6 + 2 + 5 + 5 + 2 + 1 = 21 rubric questions.
 EXPECTED_QUESTION_COUNTS = {
-    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "display_matrix": 1,
+    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "camping": 2, "display_matrix": 1,
 }
 
 ANSWER_VERDICTS = ("yes", "no")
@@ -815,6 +822,8 @@ def _shot_group(name: str) -> str | None:
         return "menu"
     if stem.startswith(("04", "05")):
         return "day_night"
+    if stem.startswith(("15", "16", "17")):
+        return "camping"
     if stem.startswith("matrix"):
         return "display_matrix"
     if stem.startswith(("01", "02", "03")):

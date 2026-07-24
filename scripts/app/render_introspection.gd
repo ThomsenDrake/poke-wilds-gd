@@ -196,7 +196,7 @@ static func _as_recti(int_rect: Array) -> Rect2i:
 	return Rect2i() if int_rect.size() < 4 else \
 		Rect2i(int(int_rect[0]), int(int_rect[1]), int(int_rect[2]), int(int_rect[3]))
 
-# Baseline sync helpers (budget escape hatch): sidecars ride their PNGs on update + prune.
+# Baseline sync helpers (budget escape hatch): sidecars ride their PNGs on update + prune. prune_sidecars' optional foreign guard keeps the shared-dir main sweep from deleting the camping sweep's 15-17 sidecars.
 static func copy_sidecar(shot_dir: String, shot_name: String, baseline_dir: String) -> bool:
 	var source := "%s/%s%s" % [shot_dir, shot_name, SIDECAR_SUFFIX]
 	if not FileAccess.file_exists(source):
@@ -204,7 +204,7 @@ static func copy_sidecar(shot_dir: String, shot_name: String, baseline_dir: Stri
 	return DirAccess.copy_absolute(ProjectSettings.globalize_path(source),
 		ProjectSettings.globalize_path("%s/%s%s" % [baseline_dir, shot_name, SIDECAR_SUFFIX])) == OK
 
-static func prune_sidecars(baseline_dir: String, shots: Array) -> Array:
+static func prune_sidecars(baseline_dir: String, shots: Array, foreign: Callable = Callable()) -> Array:
 	var pruned := []
 	var dir := DirAccess.open(ProjectSettings.globalize_path(baseline_dir))
 	if dir == null:
@@ -213,7 +213,7 @@ static func prune_sidecars(baseline_dir: String, shots: Array) -> Array:
 		if not filename.ends_with(SIDECAR_SUFFIX):
 			continue
 		var shot_name := filename.substr(0, filename.length() - SIDECAR_SUFFIX.length())
-		if not shots.has(shot_name):
+		if not shots.has(shot_name) and not (foreign.is_valid() and foreign.call(shot_name)):
 			dir.remove(filename)
 			pruned.append(filename)
 	return pruned

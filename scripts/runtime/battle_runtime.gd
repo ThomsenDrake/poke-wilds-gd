@@ -11,6 +11,9 @@ var _session = null
 var _catalog = null
 var _pokemon_rules = null
 var _trace = null
+# Injected retreat gate (game_runtime -> night_system): invalid default = always
+# allowed, so legacy setup() callers keep the original escape behavior.
+var _retreat_check: Callable
 var _rules = BattleRules.new()
 var _anims = AttackAnims.new()
 var _rng = RandomNumberGenerator.new()
@@ -25,11 +28,12 @@ func _init() -> void:
 	_rng.randomize()
 
 
-func setup(session_state, catalog, pokemon_rules, trace_logger) -> void:
+func setup(session_state, catalog, pokemon_rules, trace_logger, retreat_check := Callable()) -> void:
 	_session = session_state
 	_catalog = catalog
 	_pokemon_rules = pokemon_rules
 	_trace = trace_logger
+	_retreat_check = retreat_check
 
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
@@ -129,6 +133,8 @@ func run_from_battle() -> Dictionary:
 	if not _active:
 		return {}
 	if _rules.is_trapped(_player_mon): return _response("Can't escape!", "action")
+	# Shadow battles (night_system) block retreat for their whole duration (trace emits in the callable).
+	if _retreat_check.is_valid() and not _retreat_check.call(): return _response("The shadows block the way!", "action")
 	return _end_battle("escaped", "Got away safely!")
 
 
@@ -137,8 +143,8 @@ func _resolve_round(player_move_index: int, lines: Array, turns: Array) -> Dicti
 	var enemy_index = _rules.choose_enemy_move_index(_enemy_mon, _rng)
 	var enemy_move: Dictionary = (_enemy_mon.get("moves", []) as Array)[enemy_index] if enemy_index >= 0 else {}
 	var player_move: Dictionary = (_player_mon.get("moves", []) as Array)[player_move_index]
-	var enemy_first: bool = _move_priority(enemy_move) > _move_priority(player_move) \
-		or (_move_priority(enemy_move) == _move_priority(player_move) \
+	var enemy_first: bool = BattleRules.move_priority(enemy_move) > BattleRules.move_priority(player_move) \
+		or (BattleRules.move_priority(enemy_move) == BattleRules.move_priority(player_move) \
 		and _rules.effective_stat(_enemy_mon, "spe") > _rules.effective_stat(_player_mon, "spe"))
 	var skip_side := ""
 	for side in (["enemy", "player"] if enemy_first else ["player", "enemy"]):
@@ -151,8 +157,6 @@ func _resolve_round(player_move_index: int, lines: Array, turns: Array) -> Dicti
 		if not finished.is_empty():
 			return finished
 	return _apply_end_of_turn(lines)
-func _move_priority(move: Dictionary) -> int: return 1 if str(move.get("effect", "")) == "EFFECT_PRIORITY_HIT" else 0
-
 func _enemy_counterattack(lines: Array, turns: Array) -> Dictionary:
 	_act("enemy", _rules.choose_enemy_move_index(_enemy_mon, _rng), lines, turns)
 	var finished = _check_knockout(lines)
@@ -256,15 +260,17 @@ func _handle_victory(outcome: String, lines: Array) -> Dictionary:
 
 
 func _try_evolve(lines: Array) -> Dictionary:
-	var evolution = _pokemon_rules.check_level_evolution(_player_mon, Callable(_catalog, "get_species"))
+	var evolution = _pokemon_rules.check_level_evolution(_player_mon, Callable(_catalog, "get_species"), {"time_of_day": _session.time_of_day_label()})
 	var target_id = str(evolution.get("target", ""))
+	# Time gate traced on every call so DAY-no-evolve and NIGHT-evolve are both provable.
+	if _trace != null:
+		_trace.emit_event("evolution_time_gate", "BattleRuntime", {"species_id": str(_player_mon.get("species_id", "")), "time_of_day": _session.time_of_day_label(), "evolved": target_id})
 	if target_id.is_empty():
 		return {}
 	var target_entry = _catalog.get_species(target_id)
 	if target_entry.is_empty():
 		# Dangling evolution target: skip silently.
 		return {}
-
 	var from_id = str(_player_mon.get("species_id", ""))
 	var from_name = str(_player_mon.get("name", "Pokemon"))
 	var old_max_hp = maxi(1, int(_player_mon.get("max_hp", 1)))
@@ -291,29 +297,19 @@ func _end_battle(outcome: String, message: String, evolved: Dictionary = {}) -> 
 
 	if outcome == "defeat":
 		_session.heal_party_full()
-		_session.player_tile = Vector2i.ZERO
+		_session.player_tile = _session.campsite_tile
 
 	_active = false
 	if _trace != null:
 		_trace.emit_event("battle_finished", "BattleRuntime", {"outcome": outcome})
 	return {
-		"active": false,
-		"finished": true,
-		"outcome": outcome,
-		"message": message,
-		"menu": "",
-		"evolved": evolved,
-		"snapshot": get_snapshot()
+		"active": false, "finished": true, "outcome": outcome, "message": message,
+		"menu": "", "evolved": evolved, "snapshot": get_snapshot()
 	}
 
 
 func _response(message: String, menu: String) -> Dictionary:
 	return {
-		"active": _active,
-		"finished": false,
-		"outcome": "",
-		"message": message,
-		"menu": menu,
-		"evolved": {},
-		"snapshot": get_snapshot()
+		"active": _active, "finished": false, "outcome": "",
+		"message": message, "menu": menu, "evolved": {}, "snapshot": get_snapshot()
 	}

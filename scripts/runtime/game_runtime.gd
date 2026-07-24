@@ -13,6 +13,12 @@ const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
 const MusicRouter := preload("res://scripts/runtime/music_router.gd")
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
+const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
+const DayPhase := preload("res://scripts/domain/day_phase.gd")
+const NightSystem := preload("res://scripts/runtime/night_system.gd")
+const MaterialDrops := preload("res://scripts/domain/material_drops.gd")
+const CraftingRuntime := preload("res://scripts/runtime/crafting_runtime.gd")
+const CampingRuntime := preload("res://scripts/runtime/camping_runtime.gd")
 
 # Emitted per successful harvest so the view can re-render the tile without a world rebuild.
 signal world_overridden(tile: Vector2i)
@@ -27,6 +33,9 @@ var build_runtime = BuildRuntime.new()
 var music_router = MusicRouter.new()
 var _world_gen = WorldGenerator.new()
 var _biome_encounters = BiomeEncounters.new()
+var night_system = NightSystem.new()
+var crafting_runtime = CraftingRuntime.new()
+var camping_runtime = CampingRuntime.new()
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
 
@@ -35,8 +44,11 @@ func _ready() -> void:
 	_rng.randomize()
 	catalog.setup(trace)
 	save_store.setup(trace)
-	battle_runtime.setup(session, catalog, pokemon_rules, trace)
+	battle_runtime.setup(session, catalog, pokemon_rules, trace, Callable(self, "_retreat_allowed"))
 	build_runtime.setup(session, catalog, trace, _world_gen)
+	night_system.setup(session, catalog, trace, Callable(_world_gen, "placements_for_save"), Callable(_biome_encounters, "is_battle_viable"), _rng)
+	crafting_runtime.setup(session, catalog, trace)
+	camping_runtime.setup(session, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
 	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
@@ -119,20 +131,9 @@ func party_has_field_move_ability(move_id: String) -> bool:
 	return false
 
 
-# Campsite hold (Phase 0 defect 0.1): full-party captures relocate to the last campsite; the party screen retrieves.
-func get_campsite_pokemon() -> Array: return session.get_campsite_pokemon()
-
-
-# Pulls the held mon at `index` back into the party (party-screen RETRIEVE row is the only caller).
-func retrieve_campsite_mon(index: int) -> Dictionary:
-	var mon: Dictionary = session.retrieve_campsite_mon(index)
-	if mon.is_empty():
-		return mon
-	session.party.append(mon)
-	emit_trace("mon_retrieved", "GameRuntime", {"species_id": str(mon.get("species_id", "")),
-		"name": str(mon.get("name", "")), "level": int(mon.get("level", 1)),
-		"campsite": [session.campsite_tile.x, session.campsite_tile.y], "party_size": session.party.size()})
-	return mon
+# Campsite hold (Phase 0 defect 0.1) now lives in camping_runtime; these keep callers working.
+func get_campsite_pokemon() -> Array: return camping_runtime.get_campsite_pokemon()
+func retrieve_campsite_mon(index: int) -> Dictionary: return camping_runtime.retrieve_campsite_mon(index)
 
 
 # Harvests one faced tile through the shared resolver: action, capability, override stamp, yield, trace.
@@ -210,19 +211,22 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 	if not species_id.is_empty():
 		species_entry = catalog.get_species(species_id)
 	if species_entry.is_empty():
-		species_entry = _fallback_species_entry()
+		species_entry = EncounterSelection.fallback_species_entry(catalog.species)
 		if species_entry.is_empty():
 			trace.warning("GameRuntime", "Species catalog is empty; skipping the wild encounter.", {"biome": biome})
 			return {}
 		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.",
 			{"fallback_species_id": str(species_entry.get("species_id", ""))})
-	var level = level_from_distance(tile_pos)
+	var level = EncounterSelection.level_from_distance(tile_pos, _rng)
 	return pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"))
 
 
 func _pick_encounter_species(biome: String) -> String:
+	# Night danger: unlit-night draws may become shadow ghosts (night_system rolls the shared _rng; empty by day or in light).
+	var ghost := night_system.try_ghost_species(session.player_tile)
+	if not ghost.is_empty(): return ghost
 	if not biome.is_empty():
-		var filtered = _biome_encounters.filter_species_ids(catalog.species, biome)
+		var filtered = _biome_encounters.filter_species_ids(catalog.species, biome, DayPhase.time_of_day_label(session.time_of_day_minutes))
 		if bool(filtered.get("used_fallback", false)):
 			trace.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.",
 				{"biome": biome, "reason": str(filtered.get("reason", ""))})
@@ -233,6 +237,7 @@ func _pick_encounter_species(biome: String) -> String:
 
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
+	night_system.begin_battle(wild_mon)
 	trace.emit_event("encounter_started", "GameRuntime", {
 		"species_id": str(wild_mon.get("species_id", "")),
 		"level": int(wild_mon.get("level", 1))
@@ -241,17 +246,11 @@ func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 
 
 func perform_battle_move(index: int) -> Dictionary:
-	var response = battle_runtime.perform_move(index)
-	if bool(response.get("finished", false)):
-		save_game()
-	return response
+	return _finish_battle(battle_runtime.perform_move(index))
 
 
 func use_pokeball() -> Dictionary:
-	var response = battle_runtime.use_pokeball()
-	if bool(response.get("finished", false)):
-		save_game()
-	return response
+	return _finish_battle(battle_runtime.use_pokeball())
 
 
 func use_potion() -> Dictionary:
@@ -259,9 +258,19 @@ func use_potion() -> Dictionary:
 
 
 func run_from_battle() -> Dictionary:
-	var response = battle_runtime.run_from_battle()
-	if bool(response.get("finished", false)):
-		save_game()
+	return _finish_battle(battle_runtime.run_from_battle())
+
+
+# Battle-end: grant the interim type-derived material drop on victory/capture, then save.
+func _finish_battle(response: Dictionary) -> Dictionary:
+	if not bool(response.get("finished", false)): return response
+	if ["victory", "caught", "caught_box_full"].has(str(response.get("outcome", ""))):
+		var enemy: Dictionary = battle_runtime.get_snapshot().get("enemy_mon", {})
+		var drop := MaterialDrops.drop_for(catalog.get_species(str(enemy.get("species_id", ""))))
+		if not drop.is_empty():
+			session.add_item(drop, 1)
+			trace.emit_event("material_dropped", "GameRuntime", {"species_id": str(enemy.get("species_id", "")), "item_id": drop})
+	save_game()
 	return response
 
 
@@ -289,7 +298,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 
 
 func _build_starter() -> Dictionary:
-	var starter_species = _fallback_species_entry()
+	var starter_species = EncounterSelection.fallback_species_entry(catalog.species)
 	var starter = pokemon_rules.create_pokemon_instance(starter_species, 5, Callable(catalog, "get_move"))
 	if not starter.is_empty():
 		return starter
@@ -301,20 +310,11 @@ func _build_starter() -> Dictionary:
 	return pokemon_rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, Callable(catalog, "get_move"))
 
 
-func _tile_payload(tile_position: Vector2i) -> Array:
-	return [tile_position.x, tile_position.y]
+func _tile_payload(tile_position: Vector2i) -> Array: return [tile_position.x, tile_position.y]
 
 
-func level_from_distance(tile_pos: Vector2i) -> int:
-	var distance = abs(tile_pos.x) + abs(tile_pos.y)
-	return clampi(2 + int(distance / 24) + _rng.randi_range(0, 3), 2, 80)
+# Live placements (save shape, incl. the additive "lit" field) for the night system's light read.
+func placed_structures() -> Dictionary: return _world_gen.placements_for_save()
 
 
-func _fallback_species_entry() -> Dictionary:
-	var starter_species = catalog.get_species("CHIKORITA")
-	if not starter_species.is_empty():
-		return starter_species
-	for species_entry in catalog.species.values():
-		if species_entry is Dictionary and not (species_entry as Dictionary).is_empty():
-			return species_entry
-	return {}
+func _retreat_allowed() -> bool: return night_system.retreat_allowed() # injected into battle_runtime.setup (shadow battles block retreat)

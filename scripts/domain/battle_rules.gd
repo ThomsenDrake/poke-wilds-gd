@@ -301,7 +301,7 @@ func _has_type(mon: Dictionary, type_id: String) -> bool:
 		if str(raw_type).strip_edges().to_upper() == wanted:
 			return true
 	return false
-
+static func move_priority(move: Dictionary) -> int: return 1 if str(move.get("effect", "")) == "EFFECT_PRIORITY_HIT" else 0
 func _move_display_name(move: Dictionary) -> String:
 	var move_name = str(move.get("name", ""))
 	if move_name.is_empty():

@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/app/main.gd" id="1_t2ieu"]
 [ext_resource type="Script" path="res://scripts/runtime/world_view.gd" id="2_g5d62"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleView.tscn" id="5_o6ff5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/StartMenu.tscn" id="6_r56t4"]
 [ext_resource type="Script" path="res://scripts/app/smoke_scenarios.gd" id="7_smoke"]
+[ext_resource type="PackedScene" path="res://scenes/ui/CampMenu.tscn" id="8_cmenu"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_t2ieu")
@@ -37,6 +38,8 @@ enabled = true
 [node name="BattleView" parent="UI" instance=ExtResource("5_o6ff5")]
 
 [node name="StartMenu" parent="UI" instance=ExtResource("6_r56t4")]
+
+[node name="CampMenu" parent="UI" instance=ExtResource("8_cmenu")]
 
 [node name="SmokeScenarios" type="Node" parent="."]
 script = ExtResource("7_smoke")

@@ -22,6 +22,14 @@ const TYPE_SENTINEL := "TYPE"
 # learnset): it is a breeding artifact, never a wild encounter.
 const NEVER_ENCOUNTER_IDS := {"EGG": true}
 
+# Nocturnal filter (Phase 2 night survival): NIGHT_ONLY species are barred
+# from DAY pools — the one wiki-anchored datum is Umbreon (Savanna, night
+# only). NIGHT pools include them, and every biome's type set gains GHOST at
+# night (ghosts seek the player out everywhere after dark; the night-danger
+# system in scripts/runtime/night_system.gd owns the separate unlit hazard).
+# The time_of_day label comes from day_phase.gd ("DAY" covers dawn+day+dusk).
+const NIGHT_ONLY_IDS := {"UMBREON": true}
+
 # Source wilds_data.asm spawn token -> world biome id (see biome_defs.gd).
 const SOURCE_BIOME_ALIASES := {
 	"BEACH": "SAND",
@@ -69,17 +77,24 @@ func encounter_types_for_biome(biome: String) -> Array:
 	return []
 
 
-func filter_species_ids(species_dict: Dictionary, biome: String) -> Dictionary:
+# time_of_day is additive (default "DAY"): legacy callers keep the exact day
+# pool, so the filter stays deterministic under seed_for_smoke either way.
+func filter_species_ids(species_dict: Dictionary, biome: String, time_of_day := "DAY") -> Dictionary:
+	var is_night := str(time_of_day).to_upper() == "NIGHT"
 	var type_set: Dictionary = {}
 	for type_name in encounter_types_for_biome(biome):
 		type_set[str(type_name)] = true
+	if is_night:
+		type_set["GHOST"] = true
 
 	var ids: Array = []
 	for key in species_dict.keys():
 		var entry = species_dict[key]
 		if not (entry is Dictionary):
 			continue
-		if not _entry_is_battle_viable(str(key), entry as Dictionary):
+		if not is_battle_viable(str(key), entry as Dictionary):
+			continue
+		if not is_night and NIGHT_ONLY_IDS.has(str(key)):
 			continue
 		var spawn_biomes = _spawn_biomes_of(entry as Dictionary)
 		if _spawn_biomes_include(spawn_biomes, biome):
@@ -111,8 +126,9 @@ func known_biomes() -> Array:
 # (CORSOLA_GALARIAN, SHELLOS_EAST/WEST ship sprites + wilds_data only), which
 # would otherwise produce uncatchable encounters, and several form folders
 # (GMRMIME, the ROTOM appliance forms) ship no evos_attacks.asm at all.
-# The deliberate full-catalog fallback below is left untouched.
-func _entry_is_battle_viable(species_id: String, entry: Dictionary) -> bool:
+# The deliberate full-catalog fallback below is left untouched. Public so
+# the night system's ghost pool (injected Callable) shares this exact rule.
+func is_battle_viable(species_id: String, entry: Dictionary) -> bool:
 	if NEVER_ENCOUNTER_IDS.has(species_id):
 		return false
 	if str(entry.get("front_path", "")) == "" or str(entry.get("back_path", "")) == "":

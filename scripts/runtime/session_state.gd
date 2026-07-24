@@ -17,13 +17,17 @@ extends RefCounted
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
+const DayPhase := preload("res://scripts/domain/day_phase.gd")
 
 const SAVE_VERSION := 3
 const DAY_MINUTES := 1440
 const NEW_GAME_TIME_OF_DAY := 600 # 10:00
+# The sleeping bag rides the bag as a REUSABLE key item (used from the bag, never
+# consumed; id already in i18n so data_audit's starting-bag resolution passes).
 const STARTING_BAG := {
 	"poke_ball": 5,
-	"potion": 3
+	"potion": 3,
+	"sleeping_bag": 1
 }
 const LEGACY_ITEM_IDS := {
 	"pokeball": "poke_ball",
@@ -232,6 +236,13 @@ func get_bag_snapshot() -> Array:
 
 func advance_time(minutes: int) -> void:
 	time_of_day_minutes = _wrap_time(time_of_day_minutes + minutes)
+
+
+# The day/night gate label for the current clock ("DAY"|"NIGHT"), delegated to the
+# day_phase single source of truth. battle_runtime threads it into
+# check_level_evolution's context so the Espeon/Umbreon/Frosmoth time gates fire.
+func time_of_day_label() -> String:
+	return DayPhase.time_of_day_label(time_of_day_minutes)
 
 
 func note_step_taken() -> void:

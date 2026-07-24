@@ -13,6 +13,7 @@ extends Node2D
 # sorts against the player's feet like every prop.
 
 const Structures := preload("res://scripts/domain/structures.gd")
+const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
 
 const TILE_SIZE := 16
@@ -20,6 +21,12 @@ const DEFAULT_STRUCTURE := "wall"
 const HINT_SECONDS := 1.6
 const GHOST_VALID := Color(1.0, 1.0, 1.0, 0.65)
 const GHOST_INVALID := Color(1.0, 0.0, 1.0, 0.65)
+# Lit light-source glow (Phase 2; spec: camping-crafting-survival.md) — the
+# DOCUMENTED FALLBACK for light_layer's world_view composition: one static
+# generated gradient per lit campfire/torch in the visible window, night-only,
+# NO per-frame animation — byte-stable baselines.
+const GLOW_SIZE := 48
+const GLOW_COLOR := Color(1.0, 0.82, 0.5, 0.5)
 
 # Emitted when build mode ends (cancel or a successful placement); Main's field
 # router restores player input and saves.
@@ -35,6 +42,9 @@ var _active := false
 var _selected_id := DEFAULT_STRUCTURE
 var _target_tile := Vector2i.ZERO
 var _mon_constraint: Dictionary = {}
+var _glow_nodes: Dictionary = {}
+var _glow_texture: Texture2D = null
+var _last_glow_minutes := -1
 
 
 func _ready() -> void:
@@ -51,8 +61,11 @@ func setup(runtime: Node, world_view: Node, player_avatar: Node, show_hint: Call
 	_world = world_view
 	_player = player_avatar
 	_show_hint = show_hint
+	_glow_texture = _make_glow_texture()
 	if runtime != null and not runtime.world_overridden.is_connected(_on_world_overridden):
 		runtime.world_overridden.connect(_on_world_overridden)
+	if player_avatar != null and player_avatar.has_signal("tile_changed") and not player_avatar.tile_changed.is_connected(_on_player_moved):
+		player_avatar.tile_changed.connect(_on_player_moved)
 
 
 func is_active() -> bool:
@@ -102,6 +115,7 @@ func stop_build() -> void:
 
 
 func _process(_delta: float) -> void:
+	_glow_time_check()
 	if not _active:
 		return
 	# Input-driven only (no wall-clock gates) so scenarios can drive the mode.
@@ -210,6 +224,97 @@ func _emit_cost_hint() -> void:
 
 
 # A placed/mutated tile is no longer placeable; re-tint when it is the target.
+# Overrides also add/remove/extinguish lights, so glows re-resolve here too.
 func _on_world_overridden(tile: Vector2i) -> void:
 	if _active and tile == _target_tile:
 		_refresh_ghost()
+	_refresh_light_glows()
+
+
+# --- Lit light-source glow (documented light_layer fallback) --------------------
+
+# Re-resolve glows when the clock minute changes (one step can flip night<->day).
+func _glow_time_check() -> void:
+	var minutes := int(_runtime.get_time_of_day_minutes()) if _runtime != null else -1
+	if minutes != _last_glow_minutes:
+		_last_glow_minutes = minutes
+		_refresh_light_glows()
+
+
+func _on_player_moved(_tile_position: Vector2i) -> void:
+	_refresh_light_glows() # the visible window moved with the player
+
+
+# One static additive glow per lit light source in the synced window, night
+# only; defers entirely when the dedicated light layer is composed (the spec's
+# primary compositor) so the glow is never drawn twice.
+func _refresh_light_glows() -> void:
+	if _runtime == null or _world == null or _player == null:
+		return
+	var night := not _light_layer_present() and DayPhase.is_night(int(_runtime.get_time_of_day_minutes()))
+	var lit_tiles: Dictionary = _lit_light_tiles() if night else {}
+	_sync_glow_nodes(lit_tiles)
+
+
+func _sync_glow_nodes(lit_tiles: Dictionary) -> void:
+	for tile in _glow_nodes.keys():
+		if not lit_tiles.has(tile):
+			(_glow_nodes[tile] as Sprite2D).queue_free()
+			_glow_nodes.erase(tile)
+	for tile in lit_tiles.keys():
+		if _glow_nodes.has(tile):
+			continue
+		var glow := Sprite2D.new()
+		glow.texture = _glow_texture
+		glow.centered = true
+		glow.z_index = 1 # above ground + props; additive, so player overlap reads as light
+		var blend := CanvasItemMaterial.new()
+		blend.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		glow.material = blend
+		glow.position = _world.map_to_world(tile) + Vector2(TILE_SIZE / 2.0, TILE_SIZE / 2.0)
+		add_child(glow)
+		_glow_nodes[tile] = glow
+
+
+# Lit light sources inside the synced window, read off the public
+# placed_structures accessor + the structures.gd classification, so this layer
+# and the night system never disagree about what emits light.
+func _lit_light_tiles() -> Dictionary:
+	var merged: Dictionary = _runtime.placed_structures()
+	var center: Vector2i = _player.tile_position
+	var half_w := int(_world.half_width_tiles)
+	var half_h := int(_world.half_height_tiles)
+	var lit: Dictionary = {}
+	for key in merged.keys():
+		var entry: Variant = merged[key]
+		if not (entry is Dictionary):
+			continue
+		if not Structures.is_light_source(str((entry as Dictionary).get("structure_id", ""))):
+			continue
+		if not Structures.placement_is_lit(entry as Dictionary):
+			continue
+		var parts := str(key).split(",")
+		if parts.size() != 2:
+			continue
+		var tile := Vector2i(int(parts[0]), int(parts[1]))
+		if absi(tile.x - center.x) <= half_w and absi(tile.y - center.y) <= half_h:
+			lit[tile] = true
+	return lit
+
+
+# True when the dedicated light layer has been composed (the spec's primary).
+func _light_layer_present() -> bool:
+	return (_runtime != null and _runtime.get("light_layer") != null) or (_world != null and _world.get_node_or_null("LightLayer") != null)
+
+
+# Static warm radial gradient (bright center -> transparent rim), generated
+# once — no per-frame animation, so the sweep baselines are byte-stable.
+func _make_glow_texture() -> Texture2D:
+	var image := Image.create(GLOW_SIZE, GLOW_SIZE, false, Image.FORMAT_RGBA8)
+	var radius := GLOW_SIZE / 2.0
+	var center := Vector2(radius, radius)
+	for y in range(GLOW_SIZE):
+		for x in range(GLOW_SIZE):
+			var strength := clampf(1.0 - Vector2(x + 0.5, y + 0.5).distance_to(center) / radius, 0.0, 1.0)
+			image.set_pixel(x, y, Color(GLOW_COLOR.r, GLOW_COLOR.g, GLOW_COLOR.b, GLOW_COLOR.a * strength * strength))
+	return ImageTexture.create_from_image(image)

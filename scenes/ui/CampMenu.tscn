@@ -1,0 +1,77 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/camp_menu.gd" id="1_cmenu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_camp"]
+bg_color = Color(0.07, 0.08, 0.11, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.82, 0.84, 0.9, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="CampMenu" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_cmenu")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="MenuPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -288.0
+offset_top = 184.0
+offset_right = -8.0
+offset_bottom = 452.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_camp")
+
+[node name="Margin" type="MarginContainer" parent="MenuPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="MenuPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "CAMPFIRE"
+
+[node name="Entries" type="ItemList" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Detail" type="Label" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+
+[node name="Hint" type="Label" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Z: Craft   X: Close"
