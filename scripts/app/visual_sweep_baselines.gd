@@ -158,10 +158,10 @@ func _missing_baselines(shots: Array) -> Array:
 	return missing
 
 
-# Baselines the shared dir holds for the OTHER sweep (camping owns 15-17;
-# numbering contract: 09-12 battle-reserved, 13-14 build, 15-17 camping).
+# Baselines the shared dir holds for the OTHER sweeps (camping 15-17, storage
+# 18-19; 09-12 battle-reserved, 13-14 build): the prune guard (Phase 2 fix) keeps each sweep's update from deleting them, the report guard from failing on them.
 static func _foreign_shot(name: String) -> bool:
-	return name.begins_with("15_") or name.begins_with("16_") or name.begins_with("17_")
+	return name.begins_with("15_") or name.begins_with("16_") or name.begins_with("17_") or name.begins_with("18_") or name.begins_with("19_")
 
 
 func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dictionary:

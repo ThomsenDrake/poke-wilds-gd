@@ -2,9 +2,11 @@ extends Control
 
 # Toast plus a yes/no confirm. show_message() is the timed toast; show_confirm()
 # holds until Z confirms or X cancels and never auto-hides while confirming.
-# StartMenu is a later tree sibling, so it gates its own input while a confirm
-# is pending and lets those Z/X keys reach this box first (Main.tscn child
-# order: MessageBox -> BattleView -> StartMenu).
+# StartMenu and (since Phases 2/3) StorageScreen + CampMenu are later tree
+# siblings, so they gate their own input while a confirm is pending and let
+# those Z/X keys reach this box first (Main.tscn child order: MessageBox ->
+# BattleView -> StartMenu -> StorageScreen -> CampMenu; StorageScreen and
+# CampMenu both gate themselves while hidden).
 
 signal confirmed
 signal cancelled

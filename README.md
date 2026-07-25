@@ -11,6 +11,16 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 - Validate the whole slice with one command: `python3 tools/verify_all.py` — the local gate that orchestrates the static checks, determinism pins, the transport-honest headless playtest/smoke suite, the windowed pixel lanes (`ui_render_audit` + `visual_sweep`), and the legibility report.
 - Load source data from the checked-in `pokewilds/` asset and data subtree.
 
+## Controls
+
+- Move: arrow keys or `WASD`.
+- `Z`: confirm in menus/battle, and the overworld CONTEXT action on the faced tile — harvest (Cut/Smash/Dig), interact with a placed campfire (craft menu) or bed (rest), or enter build mode on open ground with a Build-capable party member.
+- `X`: cancel in menus/battle; HOLD to run in the overworld — one key, mutually exclusive contexts (never both live at once).
+- `Enter`: open the start menu. While the campfire craft menu is open, `Z`/`X`/`Enter` belong to it (a key that closes it does nothing else that frame).
+- Build mode: movement keys cycle the structure, `Z` places, `X` exits.
+- Menus also accept a left-click on an entry (the start menu and the campfire craft menu).
+- The canonical Input map lives in [docs/product-specs/bootstrap-and-overworld.md](docs/product-specs/bootstrap-and-overworld.md) § Input map.
+
 ## Start Here
 
 - Repo map: [AGENTS.md](AGENTS.md)

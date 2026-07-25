@@ -25,7 +25,7 @@ var _suppress_close_toast = false
 var _battle_enemy_dex := 0
 
 func _ready() -> void:
-	_input_router.configure_input_map()
+	_input_router.configure_input_map(); _input_router.bind_ui_consumers([$UI/CampMenu, _start_menu, _message_box, $UI/StorageScreen])
 	_runtime().emit_trace("boot_started", "App.Main", {"scene": "res://scenes/app/Main.tscn"})
 	_runtime().ensure_initialized()
 	# Registered next to the music router so its player enters the tree.
@@ -44,7 +44,7 @@ func _ready() -> void:
 	add_child(_structure_layer)
 	_structure_layer.setup(_runtime(), _world, _player, Callable(_message_box, "show_message"))
 	_structure_layer.build_finished.connect(Callable(_field_router, "on_build_finished"))
-	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu)
+	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu, $UI/StorageScreen)
 	_connect_signals()
 	_sync_world_from_runtime()
 	_message_box.show_message("Port in progress: Explore, battle, catch, and save with Enter.", 4.0)
@@ -57,7 +57,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_input_router.poll_menu_toggle()
-	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving() and not _structure_layer.is_active())
+	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving() and not _structure_layer.is_active() and not $UI/StorageScreen.visible)
 
 
 func _on_player_tile_changed(tile_position: Vector2i) -> void:
@@ -96,7 +96,7 @@ func _on_encounter_requested(tile_position: Vector2i) -> void:
 
 
 func _on_battle_finished(outcome: String, message: String) -> void:
-	_in_battle = false
+	_in_battle = false; _input_router.note_press_consumed() # battle-end press must not re-fire the same-frame overworld polls (input_router's latch)
 	_player.input_enabled = true
 	_sync_world_from_runtime()
 
@@ -116,7 +116,7 @@ func _on_battle_finished(outcome: String, message: String) -> void:
 
 
 func _toggle_menu() -> void:
-	if _in_battle or _structure_layer.is_active():
+	if _in_battle or _structure_layer.is_active() or $UI/CampMenu.visible or $UI/StorageScreen.visible:
 		return
 	_menu_open = not _menu_open
 	_player.input_enabled = not _menu_open
@@ -206,7 +206,7 @@ func smoke_context() -> Dictionary:
 		"player": _player,
 		"runtime": _runtime(),
 		"battle_view": _battle_view,
-		"start_menu": _start_menu,
+		"start_menu": _start_menu, "camp_menu": $UI/CampMenu,
 		"message_box": _message_box,
 		"music_router": _music_router(),
 		"structure_layer": _structure_layer,

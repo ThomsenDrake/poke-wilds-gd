@@ -28,7 +28,8 @@ ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "ERROR: ")
 # reject programmatic resize) — the playtest runner launches them as standalone
 # windowed subprocesses. Single-sourced here; run_playtests.py imports it.
 WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update",
-                                 "visual_sweep_camping", "visual_sweep_camping_update"}
+                                 "visual_sweep_camping", "visual_sweep_camping_update",
+                                 "visual_sweep_storage", "visual_sweep_storage_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -38,7 +39,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 # (display_matrix.gd:44-47) and still emits display_matrix_passed, so it stays
 # runnable under force-headless.
 WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
-                           "visual_sweep_camping", "visual_sweep_camping_update"}
+                           "visual_sweep_camping", "visual_sweep_camping_update",
+                           "visual_sweep_storage", "visual_sweep_storage_update"}
 
 
 def force_headless() -> bool:
@@ -111,6 +113,23 @@ SCENARIO_REQUIREMENTS = {
         "all": ["visual_sweep_camping_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Storage-state sweep (shots 18-19, shared baseline dir). Windowed-only like
+    # the other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_storage": {
+        "all": ["visual_sweep_storage_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_storage_update": {
+        "all": ["visual_sweep_storage_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Phase 3 storage box + party-management proof (storage-and-party.md): the
+    # all-list pins the DOMAIN events, not just the pass marker.
+    "storage_flow": {
+        "all": ["boot_started", "boot_ready", "box_opened", "mon_deposited",
+                "mon_withdrawn", "mon_released", "storage_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "nav_audit": {
         "all": ["nav_audit_passed"],
         "any": [["session_loaded", "session_created"]],
@@ -149,6 +168,20 @@ SCENARIO_REQUIREMENTS = {
     },
     "placement_flow": {
         "all": ["placement_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Same-press input double-fire regression (exec plan Part A5): real input-
+    # phase injection through the Main polls, never direct runtime calls.
+    "input_gate": {
+        "all": ["boot_started", "boot_ready", "input_gate_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Battle-END same-press leak (the latch's battle arm): a press that ends a
+    # battle (RUN / capture) must not re-fire the overworld context action the
+    # same frame; a fresh deliberate press next frame still harvests.
+    "battle_end_input": {
+        "all": ["boot_started", "boot_ready", "encounter_started", "battle_finished",
+                "field_move_used", "battle_end_input_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md).

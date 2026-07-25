@@ -250,3 +250,25 @@ static func placement_is_lit(placement: Dictionary) -> bool:
 	if str(placement.get("structure_id", "")) == "torch":
 		return true
 	return bool(placement.get("lit", true))
+
+
+# --- Phase 3 storage hooks (spec: docs/product-specs/storage-and-party.md) ----
+# A storage box is an INDEPENDENT per-placement Pokemon container (faithful:
+# buildings-scrape.md:290-294 — "the contents of the box are not shared with
+# other built boxes"). The box IS its tile: caught mons ride the placement entry
+# itself under the additive "contents" key (the "lit" precedent), so two boxes
+# can never share contents by construction and demolishing a box removes its
+# entry + contents atomically — there is no parallel store to desync.
+
+const BOX_ID := "storage_box"
+
+
+static func is_storage(id: String) -> bool:
+	return id == BOX_ID
+
+
+# Mons stored in a placed box (absent/non-Array "contents" -> empty box). A deep
+# copy, so callers (ui snapshot, demolition guard) never mutate the live entry.
+static func box_contents(placement: Dictionary) -> Array:
+	var contents: Variant = placement.get("contents", [])
+	return (contents as Array).duplicate(true) if contents is Array else []

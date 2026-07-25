@@ -7,7 +7,7 @@ extends Node2D
 # logic/render/collision by construction. This layer only draws the transient
 # GHOST preview, runs the build-mode input loop (movement keys cycle the
 # selection, action_a/Z places, action_b/X exits — the input_router action set;
-# the original's C/V cycle maps to our movement keys), and answers occupancy
+# the original's L/R build cycle maps to our movement keys), answers occupancy
 # queries. Main parents it as a y-sort-enabled sibling of World/Player so the
 # ghost joins the existing y-sort chain (world_view._setup_canvas_order) and
 # sorts against the player's feet like every prop.

@@ -20,36 +20,53 @@ extends RefCounted
 # exactly like occupancy. Phase 2 runtime handles (the crafting_runtime /
 # camping_runtime members on GameRuntime) are duck-typed: until they land, a
 # camp-object Z degrades to the Phase 1 harvest/demolish path.
+#
+# Phase 3 storage slice (spec: docs/product-specs/storage-and-party.md): the
+# faced-tile Z gains a storage_box arm mirroring the campfire one — disable the
+# avatar, open the StorageScreen on that box's tile, and on its `closed` signal
+# re-enable the avatar + save (every box mutation persists). The closing X
+# press feeds input_router's generalized latch via main.gd's bind_ui_consumers
+# (it cannot re-fire the polls); the _overlay_open early-return (registry-
+# mandated name, subsystems.toml) neutralizes the context poll while ANY overlay owns the screen.
 
 const BUILD_MOVE := "build"
 const CAMPFIRE_ID := "campfire"
 const BED_ID := "bed"
+const BOX_ID := "storage_box"
+# The ONLY field moves with a live overworld effect from the party screen; the
+# rest render as capability display (their overworld triggers are future phases —
+# spec: menu-and-save.md FIELD MOVE classification).
+const HARVEST_ACTIONS := ["cut", "dig", "smash"]
 
 var _runtime: Node = null
 var _world: Node = null
 var _player: Node = null
 var _structure_layer: Node = null
 var _camp_menu: Node = null
+var _storage_screen: Node = null
 var _show_message: Callable = Callable()
 
 
-func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show_message: Callable, camp_menu: Node = null) -> void:
+func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show_message: Callable, camp_menu: Node = null, storage_screen: Node = null) -> void:
 	_runtime = runtime
 	_world = world
 	_player = player
 	_structure_layer = structure_layer
 	_show_message = show_message
 	_camp_menu = camp_menu
+	_storage_screen = storage_screen
 	if _camp_menu != null and _camp_menu.has_signal("closed") and not _camp_menu.closed.is_connected(_on_camp_menu_closed):
 		_camp_menu.closed.connect(_on_camp_menu_closed)
+	if _storage_screen != null and _storage_screen.has_signal("closed") and not _storage_screen.closed.is_connected(_on_storage_screen_closed):
+		_storage_screen.closed.connect(_on_storage_screen_closed)
 
 
 # Overworld context Z: placed camp objects first (campfire -> CampMenu, bed ->
 # rest); then harvest; when nothing is left here and the faced tile is walkable
 # with a Build-capable party member, open build mode on it.
 func on_context_action() -> void:
-	if _camp_menu != null and _camp_menu.visible:
-		return # the menu owns Z/X while open; the Main poll still fires
+	if _overlay_open():
+		return # an overlay owns Z/X while open; the Main poll still fires
 	var faced: Vector2i = _player.facing_tile()
 	if _route_camp_object(faced):
 		return
@@ -63,8 +80,10 @@ func on_context_action() -> void:
 
 
 # Party-screen FIELD MOVE: Build opens build mode constrained to the selected
-# mon (which must itself be capable); every other move harvests the faced tile
-# under that mon's constraint (the pre-existing harvest behavior).
+# mon (which must itself be capable); cut/dig/smash harvest the faced tile under
+# that mon's constraint (the pre-existing harvest behavior); every other move is
+# capability display only — activating it explains there is nothing here that
+# needs it instead of silently harvesting (overworld triggers: future phases).
 func on_field_move_requested(move_id: String, mon_index: int) -> void:
 	var party: Array = _runtime.get_party_snapshot()
 	var mon: Dictionary = party[mon_index] if mon_index >= 0 and mon_index < party.size() else {}
@@ -75,6 +94,9 @@ func on_field_move_requested(move_id: String, mon_index: int) -> void:
 			_show_message.call("%s can't use that here." % str(mon.get("name", "That Pokemon")), 1.6)
 			return
 		enter_build_mode(mon)
+		return
+	if not HARVEST_ACTIONS.has(move_id):
+		_show_message.call("%s knows %s, but there's nothing here that needs it." % [str(mon.get("name", "That Pokemon")), _runtime.catalog.get_field_move_name(move_id)], 1.8)
 		return
 	_message(_runtime.harvest_tile(_player.facing_tile(), mon))
 
@@ -102,7 +124,15 @@ func _route_camp_object(tile: Vector2i) -> bool:
 			return _open_camp_menu(tile)
 		BED_ID:
 			return _rest_at_bed()
+		BOX_ID:
+			return _open_storage_screen(tile)
 	return false
+
+
+# Any overlay the router opened owns Z/X/Enter while visible; main.gd's
+# overworld_idle expression carries the same check for the poll itself.
+func _overlay_open() -> bool:
+	return (_camp_menu != null and _camp_menu.visible) or (_storage_screen != null and _storage_screen.visible)
 
 
 func _open_camp_menu(tile: Vector2i) -> bool:
@@ -110,6 +140,16 @@ func _open_camp_menu(tile: Vector2i) -> bool:
 		return false
 	_player.input_enabled = false
 	_camp_menu.open_menu(tile, CAMPFIRE_ID, Callable(self, "_toggle_campfire").bind(tile))
+	return true
+
+
+# Mirrors _open_camp_menu: the app layer owns the avatar; the screen's
+# `closed` signal owns the re-enable + save below.
+func _open_storage_screen(tile: Vector2i) -> bool:
+	if _storage_screen == null or not _storage_screen.has_method("open_screen"):
+		return false
+	_player.input_enabled = false
+	_storage_screen.open_screen(tile)
 	return true
 
 
@@ -163,6 +203,14 @@ func _toggle_campfire(tile: Vector2i) -> Dictionary:
 
 
 func _on_camp_menu_closed() -> void:
+	_player.input_enabled = true
+	if _runtime != null:
+		_runtime.save_game()
+
+
+# The closed-driven save captures every box mutation; the closing X press's
+# polls die on input_router's latch (wired by main.gd's bind_ui_consumers).
+func _on_storage_screen_closed() -> void:
 	_player.input_enabled = true
 	if _runtime != null:
 		_runtime.save_game()

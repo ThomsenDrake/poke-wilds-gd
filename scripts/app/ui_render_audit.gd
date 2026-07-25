@@ -143,8 +143,14 @@ func _audit_menus(catalog) -> void:
 	menu._activate_entry(1)
 	await _settle(2)
 	var bag_screen: Control = menu.get_node("BagScreen")
-	_check_menu_state("bag", bag_screen, bag_screen.get_node("Panel").get_global_rect(), _bag_names(catalog))
+	_check_menu_state("bag", bag_screen, bag_screen.get_node("Panel").get_global_rect(), UiRenderModel.bag_names(catalog))
 	bag_screen.close_screen()
+	var storage: Control = menu.get_node_or_null("../StorageScreen")
+	if storage != null and storage.has_method("open_screen"):
+		storage.open_screen(Vector2i.ZERO) # no box at the origin -> the empty two-column state
+		await _settle(2)
+		_check_menu_state("storage", storage, storage.get_node("Panel").get_global_rect(), ["STORAGE BOX"])
+		storage.close_screen()
 	_ctx["toggle_menu"].call()
 	menu.setup(original)
 
@@ -168,15 +174,6 @@ func _check_menu_state(state: String, root: Control, bounds: Rect2, contains: Ar
 				break
 		if not found:
 			_failures.append({"state": state, "kind": "missing_string", "text": wanted})
-
-
-func _bag_names(catalog) -> Array:
-	var names := []
-	for entry in UiRenderModel.worst_bag(catalog):
-		var item: Dictionary = catalog.get_item(str(entry.get("item_id", "")))
-		if not item.is_empty():
-			names.append(str(item.get("display_name", "")).capitalize())
-	return names
 
 
 # Pixel half (windowed only; headless skips): capture the battle SubViewport 1:1; a magenta/stale

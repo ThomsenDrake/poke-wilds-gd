@@ -1,12 +1,18 @@
 extends Node
 
 # Phase-0 defect-fix scenarios (qa_scenarios pattern) inside the runner's save
-# backup/restore guard. wild_battle: campsite hold/retrieval + clean heal (0.1/0.5).
-# save_migration: v1/v2->v3 migration, the v3-additive "structures" round-trip,
-# future refusal, corrupt recovery, and the campsite round-trip.
+# backup/restore guard. wild_battle: campsite hold/retrieval + clean heal
+# (0.1/0.5) — the implementation lives in wild_battle_scenario.gd (extracted for
+# the v4 fixture work + the app line budget; dispatch name stays stable here).
+# save_migration: v1/v2->v3->v4 migration, the v3-additive "structures" round-
+# trip (a contents-less storage_box backfills empty; the campsite hold rides the
+# v3 keys), the v4-additive box "contents" round-trip (corrupt contents degrade
+# to an empty box, never a crash), future refusal, corrupt recovery, and the
+# campsite round-trip.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
+const WildBattleScenario := preload("res://scripts/app/wild_battle_scenario.gd")
 
 const SCENARIOS := {"wild_battle": "run_wild_battle", "save_migration": "run_save_migration"}
 const MIGRATION_MON := {"species_id": "CHIKORITA", "name": "Chikorita", "level": 5, "exp": 125,
@@ -18,8 +24,18 @@ const MIGRATION_FIXTURES := [
 	{"version": 2, "world_seed": 1234, "player_x": 5, "player_y": 6, "party": [MIGRATION_MON], "bag": {"poke_ball": 2, "potion": 1},
 		"time_of_day_minutes": 800, "total_steps": 20, "unlocked_field_moves": {"surf": 1}},
 	{"version": 3, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON], "bag": {"poke_ball": 2},
-		"time_of_day_minutes": 600, "total_steps": 0, "structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
-		"11,10": {"kind": "placed", "structure_id": "door", "by": "build", "step": 0}}},
+		"time_of_day_minutes": 600, "total_steps": 0, "campsite_x": 5, "campsite_y": 2, "campsite_pokemon": [MIGRATION_MON],
+		"structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
+		"11,10": {"kind": "placed", "structure_id": "door", "by": "build", "step": 0},
+		"12,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0}}},
+	# v4 is PURELY additive over v3: a storage_box entry may carry "contents"
+	# (absent = empty). 12,10 round-trips one mon; 13,10's corrupt "garbage"
+	# contents must normalize to an empty box, never a crash or a torn entry.
+	{"version": 4, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON], "bag": {"poke_ball": 2},
+		"time_of_day_minutes": 600, "total_steps": 0, "campsite_x": 3, "campsite_y": 4, "campsite_pokemon": [],
+		"structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
+		"12,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": [MIGRATION_MON]},
+		"13,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": "garbage"}}},
 ]
 
 static func handles(scenario: String) -> bool:
@@ -31,111 +47,9 @@ static func run(scenario: String, host: Node, ctx: Dictionary) -> void:
 	await node.call(SCENARIOS[scenario], ctx, host)
 
 func run_wild_battle(ctx: Dictionary, host: Node) -> void:
-	await host.get_tree().create_timer(0.2).timeout
-	var runtime: Node = ctx["runtime"]
-	var world: Node = ctx["world"]
-	var player: Node = ctx["player"]
-	var runner := SmokeScenarioRunner.new()
-	var fail := ""
-	var wild_mon: Dictionary = runtime.generate_wild_encounter(player.tile_position, world.get_tile_biome(player.tile_position))
-	if wild_mon.is_empty():
-		fail = "could not create a wild encounter"
-	else:
-		await host._run_smoke_battle(wild_mon)
-	var set_battle: Callable = ctx.get("set_battle", Callable())
-	if set_battle.is_valid():
-		set_battle.call(false)
-	runner.resync_player_tile(world, player, runtime)
-	var party_before: Array = runner.swap_party(runtime, _species_sample(runtime, 6))
-	runtime.session.add_item("poke_ball", 5)
-	var cursor := runner.trace_log_line_count()
-	var target: Dictionary = _guaranteed_capture_mon(runtime)
-	if fail.is_empty() and target.is_empty():
-		fail = "no catalog species met the guaranteed-capture catch rate"
-	if fail.is_empty():
-		fail = _assert_campsite_capture(runtime, runner, target, cursor)
-	if fail.is_empty():
-		fail = _assert_defeat_clean_heal(runtime, runner)
-	runner.resync_player_tile(world, player, runtime)
-	runner.restore_party(runtime, party_before)
-	if fail.is_empty():
-		runtime.emit_trace("wild_battle_passed", "SmokeScenarios", {"campsite_hold": true, "defeat_heal": true})
-	else:
-		push_error("Wild battle scenario failed: %s" % fail)
-
-func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) -> String:
-	var session = runtime.session
-	runtime.start_wild_battle(target)
-	var caught: Dictionary = runtime.use_pokeball()
-	var target_id := str(target.get("species_id", ""))
-	if str(caught.get("outcome", "")) != "caught_box_full":
-		return "full-party capture outcome was '%s', not caught_box_full" % str(caught.get("outcome", ""))
-	var held: Array = session.get_campsite_pokemon()
-	if session.campsite_count() != 1 or str(held[0].get("species_id", "")) != target_id:
-		return "full-party capture did not land in the campsite hold"
-	if not runner.trace_log_has_since("mon_relocated", cursor, {"species_id": target_id, "level": int(target.get("level", 1))}):
-		return "no mon_relocated trace for the full-party capture"
-	session.party.remove_at(session.party.size() - 1) # make room; retrieve via runtime (emits mon_retrieved)
-	var retrieved: Dictionary = runtime.retrieve_campsite_mon(0)
-	if retrieved.is_empty() or str(retrieved.get("species_id", "")) != target_id or session.campsite_count() != 0:
-		return "campsite-held mon was not retrievable"
-	if not runner.trace_log_has_since("mon_retrieved", cursor, {"species_id": target_id}):
-		return "no mon_retrieved trace for the retrieval"
-	return ""
-
-func _assert_defeat_clean_heal(runtime, runner) -> String:
-	runner.swap_party(runtime, _species_sample(runtime, 1))
-	var sick: Dictionary = runtime.session.get_party_member(0)
-	sick["status"] = "PSN"
-	sick["sleep_turns"] = 2
-	runtime.session.set_party_member(0, sick)
-	var brute_id := str(runtime.catalog.species.keys()[0])
-	var brute: Dictionary = runtime.pokemon_rules.create_pokemon_instance(runtime.catalog.get_species(brute_id), 50, Callable(runtime.catalog, "get_move"))
-	brute["max_hp"] = 9999
-	brute["current_hp"] = 9999
-	runtime.start_wild_battle(brute)
-	runtime.battle_runtime._player_mon["current_hp"] = 0
-	runtime.battle_runtime._player_mon["status"] = "PSN"
-	runtime.battle_runtime._player_mon["sleep_turns"] = 2
-	var result: Dictionary = runtime.perform_battle_move(_safe_move_index(runtime.battle_runtime._player_mon))
-	if str(result.get("outcome", "")) != "defeat":
-		return "defeat path reached outcome '%s'" % str(result.get("outcome", ""))
-	for mon in runtime.session.party:
-		if str(mon.get("status", "")) != "" or int(mon.get("sleep_turns", 0)) != 0:
-			return "blackout heal left status '%s' / sleep_turns %d" % [str(mon.get("status", "")), int(mon.get("sleep_turns", 0))]
-		if int(mon.get("current_hp", 0)) != int(mon.get("max_hp", 1)):
-			return "blackout heal did not restore full HP"
-	return ""
-
-# A damaging move that cannot restore the fainted player mon (heal/leech would stall the defeat path).
-func _safe_move_index(mon: Dictionary) -> int:
-	var moves: Array = mon.get("moves", [])
-	for i in range(moves.size()):
-		var effect := str((moves[i] as Dictionary).get("effect", ""))
-		if int(moves[i].get("power", 0)) > 0 and int(moves[i].get("pp", 0)) > 0 and effect != "EFFECT_LEECH_HIT" and effect != "EFFECT_HEAL":
-			return i
-	return 0
-
-# 1 HP + asleep + catch_rate >= 192 pins capture probability at 1.0 (deterministic).
-func _guaranteed_capture_mon(runtime) -> Dictionary:
-	for entry in runtime.catalog.species.values():
-		if entry is Dictionary and int((entry as Dictionary).get("catch_rate", 0)) >= 192:
-			var mon: Dictionary = runtime.pokemon_rules.create_pokemon_instance(entry, 3, Callable(runtime.catalog, "get_move"))
-			if mon.is_empty():
-				continue
-			mon["max_hp"] = 2
-			mon["current_hp"] = 1
-			mon["status"] = "SLP"
-			return mon
-	return {}
-
-func _species_sample(runtime, count: int) -> Array:
-	var ids: Array = []
-	for species_id in runtime.catalog.species.keys():
-		ids.append(str(species_id))
-		if ids.size() >= count:
-			break
-	return ids
+	var node: Node = WildBattleScenario.new()
+	host.add_child(node) # the scenario reaches the host's _run_smoke_battle via get_parent()
+	await node.run(ctx)
 
 func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	await host.get_tree().create_timer(0.2).timeout
@@ -144,8 +58,8 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	var checks := 0
 	var fail := ""
 	var cursor := runner.trace_log_line_count()
-	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok"), Callable(self, "_v3_fields_ok")]
-	var v_ok := [false, false, false]
+	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok"), Callable(self, "_v3_fields_ok"), Callable(self, "_v4_fields_ok")]
+	var v_ok := [false, false, false, false]
 	for i in range(MIGRATION_FIXTURES.size()):
 		if not fail.is_empty():
 			break
@@ -179,7 +93,7 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	_cleanup_fixtures()
 	if fail.is_empty():
 		runtime.emit_trace("save_migration_passed", "SmokeScenarios", {
-			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "v3_ok": v_ok[2], "future_refused": future_refused, "checks": checks})
+			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "v3_ok": v_ok[2], "v4_ok": v_ok[3], "future_refused": future_refused, "checks": checks})
 	else:
 		push_error("Save migration scenario failed: %s" % fail)
 
@@ -201,11 +115,35 @@ func _v2_fields_ok(runtime) -> bool:
 		and session.campsite_count() == 0 and session.campsite_tile == session.player_tile \
 		and runtime.mutations_for_view().is_empty() and session.get_structures().is_empty()
 
-# v3-additive "structures" round-trips into the placement map (a structures-less save backfills to {}, asserted above). The v3->v4 box-contents fixture lands with Phase 3.
+# v3-additive "structures" round-trips into the placement map (a structures-less
+# save backfills to {}, asserted above). A contents-less storage_box backfills to
+# an EMPTY box (absent = empty), and the v3 campsite hold keys load intact.
 func _v3_fields_ok(runtime) -> bool:
+	var session = runtime.session
 	var placed: Dictionary = runtime._world_gen.placements_for_save()
 	return str(placed.get("10,10", {}).get("structure_id", "")) == "wall" \
-		and str(placed.get("11,10", {}).get("structure_id", "")) == "door" and runtime.session.get_structures().size() == 2
+		and str(placed.get("11,10", {}).get("structure_id", "")) == "door" \
+		and str(placed.get("12,10", {}).get("structure_id", "")) == "storage_box" \
+		and (placed.get("12,10", {}).get("contents", []) as Array).is_empty() \
+		and session.get_structures().size() == 3 and session.campsite_count() == 1 \
+		and session.campsite_tile == Vector2i(5, 2) \
+		and str(session.get_campsite_pokemon()[0].get("species_id", "")) == "CHIKORITA"
+
+# v4-additive "contents" round-trips on the placement entry: 12,10 keeps its one
+# mon (normalized — sleep_turns cleared, status kept, exactly like the party),
+# while 13,10's corrupt "garbage" contents degrade to an empty box, never a crash.
+func _v4_fields_ok(runtime) -> bool:
+	var session = runtime.session
+	var placed: Dictionary = runtime._world_gen.placements_for_save()
+	var contents: Array = placed.get("12,10", {}).get("contents", [])
+	var mon: Dictionary = contents[0] if contents.size() == 1 else {}
+	var garbage: Array = placed.get("13,10", {}).get("contents", ["sentinel"])
+	return str(placed.get("10,10", {}).get("structure_id", "")) == "wall" \
+		and str(mon.get("species_id", "")) == "CHIKORITA" and str(mon.get("status", "")) == "PSN" \
+		and int(mon.get("sleep_turns", -1)) == 0 and int(mon.get("level", 0)) == 5 \
+		and int(mon.get("max_hp", 0)) == 20 and garbage.is_empty() \
+		and session.get_structures().size() == 3 and session.campsite_count() == 0 \
+		and int(session.bag.get("poke_ball", 0)) == 2 and session.player_tile == Vector2i(3, 4)
 
 func _write_fixture(payload: Dictionary) -> void:
 	var file = FileAccess.open(SaveStore.SAVE_PATH, FileAccess.WRITE)

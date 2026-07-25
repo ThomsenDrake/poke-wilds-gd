@@ -25,8 +25,9 @@ const RUNTIME_METHODS := {
 	"set_party_lead": "set_party_lead",
 	"save_game": "save_game",
 	"new_game": "new_game",
-	"get_campsite_pokemon": "get_campsite_pokemon",
-	"retrieve_campsite_mon": "retrieve_campsite_mon",
+	"get_campsite_pokemon": "get_campsite_pokemon", "retrieve_campsite_mon": "retrieve_campsite_mon",
+	"deposit_to_nearest": "deposit_to_nearest", "box_tile_near": "box_tile_near",
+	"get_player_tile": "get_player_tile",
 }
 
 const SESSION_METHODS := {
@@ -34,6 +35,7 @@ const SESSION_METHODS := {
 	"get_party_member": "get_party_member",
 	"set_party_member": "set_party_member",
 	"remove_item": "remove_item",
+	"move_party_member": "move_party_member", "set_party_order": "set_party_order",
 }
 
 const ENTRIES: PackedStringArray = ["POKEMON", "BAG", "SAVE", "NEW GAME", "CLOSE"]
@@ -100,9 +102,10 @@ func perform_save() -> void:
 	_call_context("save_game")
 
 func _unhandled_input(event: InputEvent) -> void:
-	# While a New Game confirm is pending this menu must not touch Z/X: it is
-	# the LAST UI child, so it receives unhandled input BEFORE the MessageBox
-	# sibling that owns the confirm answer and would otherwise starve it.
+	# While a New Game confirm is pending this menu must not touch Z/X: it is the
+	# THIRD-LAST UI child since Phase 3 (StorageScreen and CampMenu follow, both
+	# self-gated on visibility), so it still receives unhandled input BEFORE the
+	# MessageBox sibling that owns the confirm answer and would otherwise starve it.
 	if not visible or _submenu_open() or _awaiting_confirm:
 		return
 	if event.is_action_pressed("move_up"):
@@ -144,13 +147,13 @@ func _begin_new_game_confirm() -> void:
 	confirm_box.call("show_confirm", "Start a new game? Your current save will be erased.")
 
 func _on_new_game_confirmed() -> void:
+	# The confirmed signal is SHARED (the StorageScreen's RELEASE rides it too):
+	if not _awaiting_confirm: return # a confirm this menu did not open is not a reset
 	_awaiting_confirm = false
 	_call_context("new_game")
-	hide_menu()
-	game_reset.emit()
+	hide_menu(); game_reset.emit()
 
-func _on_new_game_cancelled() -> void:
-	_awaiting_confirm = false
+func _on_new_game_cancelled() -> void: _awaiting_confirm = false
 
 # Submenus draw their own full-rect dim; hiding ours avoids a doubled overlay.
 func _open_submenu(screen: Control) -> void:

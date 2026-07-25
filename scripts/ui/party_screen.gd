@@ -1,16 +1,21 @@
 extends Control
 
 # Party screen: d-pad list of party members; confirming opens an action menu
-# (SWAP LEAD / SUMMARY / FIELD MOVE / RETRIEVE / CANCEL), SUMMARY shows a
-# compact stats panel. FIELD MOVE emits field_move_requested and closes so the
-# app layer can apply it. RETRIEVE appears only while the campsite hold is
-# non-empty and the party has room, and pulls the oldest held mon into the
-# party. Data comes from the injected context (see start_menu.gd).
+# (SWAP LEAD / MOVE / SUMMARY / FIELD MOVE / DEPOSIT / RETRIEVE / CANCEL); SUMMARY
+# shows a compact stats panel. FIELD MOVE entries are capability display: only
+# cut/dig/smash (and Build) act; other moves surface an explanatory message. MOVE
+# reorders arbitrarily: up/down move the member live (session.move_party_member),
+# Z commits, X restores the pre-MOVE order (session.set_party_order). DEPOSIT moves
+# the selected member into the box beside the player (offered only while one exists;
+# refusals flash the Hint). RETRIEVE pulls the oldest campsite-held mon in while the
+# hold is non-empty with party room. FIELD MOVE emits field_move_requested and
+# closes so the app layer applies it. Data: injected context (see start_menu.gd).
 
 signal closed
 signal field_move_requested(move_id: String)
 
 const PartyRows := preload("res://scripts/ui/party_rows.gd")
+const PartyActions := preload("res://scripts/ui/party_actions.gd")
 
 @onready var _rows: VBoxContainer = $Panel/Margin/HBox/ListColumn/Rows
 @onready var _hint: Label = $Panel/Margin/HBox/ListColumn/Hint
@@ -22,9 +27,10 @@ const PartyRows := preload("res://scripts/ui/party_rows.gd")
 var _context: Dictionary = {}
 var _party: Array = []
 var _selected := 0
-var _state := "list" # list | action | summary
+var _state := "list" # list | action | summary | move
 var _actions: Array = []
 var _action_selected := 0
+var _move_order: Array = [] # during MOVE: original party index per current slot
 
 func _ready() -> void:
 	visible = false
@@ -63,6 +69,15 @@ func _move(direction: int) -> void:
 			_action_selected = wrapi(_action_selected + direction, 0, _actions.size())
 			_action_list.select(_action_selected)
 			_action_list.ensure_current_is_visible()
+	elif _state == "move":
+		var target := PartyActions.move_target_index(_selected, direction, _party.size())
+		if target >= 0 and target != _selected:
+			_call_context("move_party_member", [_selected, target])
+			var original: int = _move_order[_selected]
+			_move_order.remove_at(_selected)
+			_move_order.insert(target, original)
+			_selected = target
+			_rebuild()
 	elif _state == "list" and not _party.is_empty():
 		_selected = wrapi(_selected + direction, 0, _party.size())
 		for i in range(_rows.get_child_count()):
@@ -76,6 +91,9 @@ func _confirm() -> void:
 			_open_actions()
 		"action":
 			_activate_action()
+		"move":
+			_move_order = [] # commit: the live order IS the party order now
+			_show_panel("list")
 		"summary":
 			_show_panel("action")
 
@@ -85,6 +103,11 @@ func _back() -> void:
 			close_screen()
 			closed.emit()
 		"action":
+			_show_panel("list")
+		"move": # cancel: restore the pre-MOVE order, then drop the tracking
+			_call_context("set_party_order", [PartyActions.inverse_permutation(_move_order)])
+			_move_order = []
+			_rebuild()
 			_show_panel("list")
 		"summary":
 			_show_panel("action")
@@ -98,6 +121,8 @@ func _show_panel(mode: String) -> void:
 			_hint.text = "Z: Actions   X: Back"
 		"action":
 			_hint.text = "Z: Confirm   X: Back"
+		"move":
+			_hint.text = "Up/Down: Move   Z: Confirm   X: Cancel"
 		"summary":
 			_hint.text = "Z/X: Back"
 
@@ -105,6 +130,10 @@ func _refresh_party() -> void:
 	var snapshot: Variant = _call_context("get_party_snapshot")
 	_party = snapshot if snapshot is Array else []
 	_selected = clampi(_selected, 0, maxi(0, _party.size() - 1))
+
+func _rebuild() -> void:
+	_refresh_party()
+	_rebuild_rows()
 
 func _rebuild_rows() -> void:
 	for child in _rows.get_children():
@@ -121,14 +150,13 @@ func _rebuild_rows() -> void:
 func _open_actions() -> void:
 	if _party.is_empty():
 		return
-	_actions = [{"id": "swap", "label": "SWAP LEAD"}, {"id": "summary", "label": "SUMMARY"}]
-	for move_id in _eligible_field_moves(_party[_selected]):
-		_actions.append({"id": "field_move", "label": "FIELD: %s" % _field_move_name(move_id), "move_id": move_id})
 	var held: Variant = _call_context("get_campsite_pokemon")
-	if held is Array and not (held as Array).is_empty() and _party.size() < 6:
-		var oldest: Dictionary = (held as Array)[0] if (held as Array)[0] is Dictionary else {}
-		_actions.append({"id": "retrieve", "label": "RETRIEVE: %s" % str(oldest.get("name", "?"))})
-	_actions.append({"id": "cancel", "label": "CANCEL"})
+	var player_tile: Variant = _call_context("get_player_tile")
+	var box: Variant = _call_context("box_tile_near", [player_tile]) if player_tile is Vector2i else {}
+	var has_box: bool = box is Dictionary and bool((box as Dictionary).get("found", false))
+	_actions = PartyActions.build_action_entries(_party[_selected], _eligible_field_moves(_party[_selected]),
+		_context.get("get_field_move_name", Callable()), held if held is Array else [],
+		_party.size(), has_box)
 	_action_list.clear()
 	for action in _actions:
 		_action_list.add_item(str(action.get("label", "?")))
@@ -143,23 +171,28 @@ func _activate_action() -> void:
 	match str(action.get("id", "")):
 		"swap":
 			_call_context("set_party_lead", [_selected])
-			_refresh_party()
-			_rebuild_rows()
+			_rebuild()
 			_show_panel("list")
+		"move":
+			_move_order = range(_party.size()) # party == display order at entry
+			_show_panel("move")
 		"summary":
-			_summary_text.text = PartyRows.summary_text(
-				_party[_selected],
-				_context.get("get_species", Callable()),
-				_context.get("experience_for_level", Callable())
-			)
+			_summary_text.text = PartyRows.summary_text(_party[_selected],
+				_context.get("get_species", Callable()), _context.get("experience_for_level", Callable()))
 			_show_panel("summary")
 		"field_move":
 			close_screen()
 			field_move_requested.emit(str(action.get("move_id", "")))
+		"deposit":
+			var result: Variant = _call_context("deposit_to_nearest", [_selected])
+			if result is Dictionary and bool((result as Dictionary).get("ok", false)):
+				_rebuild()
+				_show_panel("list")
+			else: # refusals (last member, witness guard, no box) flash the Hint
+				_hint.text = str((result as Dictionary).get("message", "That can't be done.")) if result is Dictionary else "That can't be done."
 		"retrieve":
 			_call_context("retrieve_campsite_mon", [0])
-			_refresh_party()
-			_rebuild_rows()
+			_rebuild()
 			_show_panel("list")
 		_:
 			_show_panel("list")
@@ -170,24 +203,14 @@ func _eligible_field_moves(mon: Dictionary) -> Array:
 	if not get_species.is_valid():
 		return move_ids
 	var species: Variant = get_species.call(str(mon.get("species_id", "")))
-	if species is not Dictionary:
-		return move_ids
-	var flags: Variant = (species as Dictionary).get("field_moves", {})
+	var flags: Variant = (species as Dictionary).get("field_moves", {}) if species is Dictionary else {}
 	if flags is not Dictionary:
 		return move_ids
-	# The stored-unlock model is gone; capability comes from the mon's species
-	# flags, so every flagged move the mon has is offered.
-	var ids := (flags as Dictionary).keys()
-	ids.sort()
-	for id_variant in ids:
-		if int((flags as Dictionary)[id_variant]) != 1:
-			continue
-		move_ids.append(str(id_variant))
+	for id_variant in (flags as Dictionary).keys(): # flag==1: the mon is capable
+		if int((flags as Dictionary)[id_variant]) == 1:
+			move_ids.append(str(id_variant))
+	move_ids.sort()
 	return move_ids
-
-func _field_move_name(move_id: String) -> String:
-	var accessor: Callable = _context.get("get_field_move_name", Callable())
-	return str(accessor.call(move_id)) if accessor.is_valid() else move_id.capitalize()
 
 func _call_context(key: String, args: Array = []) -> Variant:
 	var accessor: Callable = _context.get(key, Callable())

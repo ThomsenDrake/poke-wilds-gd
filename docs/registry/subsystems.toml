@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -15,11 +15,13 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_probe",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario biome_traverse",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario field_move",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario input_gate",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario battle_end_input",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_migration",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed"]
 quality_bucket = "bootstrap"
 
 [[subsystems]]
@@ -354,6 +356,90 @@ validation_commands = [
 ]
 required_trace_events = ["item_crafted", "craft_refused", "material_dropped", "craft_flow_passed"]
 quality_bucket = "crafting"
+
+[[subsystems]]
+name = "storage"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/runtime/storage_runtime.gd",
+  "scripts/runtime/harvest_runtime.gd",
+  "scripts/ui/storage_screen.gd",
+  "scripts/ui/party_actions.gd",
+  "scripts/app/storage_flow_scenario.gd",
+  "scripts/app/storage_flow_party_checks.gd",
+  "scripts/app/storage_release_mouse_check.gd",
+  "scripts/app/smoke_tap.gd",
+  "scripts/app/visual_sweep_storage.gd",
+]
+scene_paths = ["scenes/ui/StorageScreen.tscn"]
+spec_doc = "docs/product-specs/storage-and-party.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario storage_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario input_gate",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_storage",
+]
+# storage_flow_passed AND storage_flow_failed are both listed (symmetric with
+# app_bootstrap's nav_audit / input_gate passed+failed pairing): the _failed event
+# is the miss-002 total-exit contract (emitted alongside push_error on any non-pass),
+# so it is a first-class documented event even though it fires only on a failing run.
+required_trace_events = ["box_opened", "mon_deposited", "mon_withdrawn", "mon_released", "storage_refused", "demolish_refused", "storage_flow_passed", "storage_flow_failed"]
+quality_bucket = "storage"
+# CROSS-SUBSYSTEM CO-MODIFICATION: storage EXTENDS the Phase-1 placement system with
+# per-placement box CONTENTS (save schema v4, purely additive) plus the party-management
+# surface, by extraction + same-line edit on every budget-owned file it touches:
+# scripts/runtime/game_runtime.gd (session_runtime-owned) frees ~23 lines FIRST by
+# extracting harvest_tile (+ its tile payload helper) into the NEW
+# scripts/runtime/harvest_runtime.gd (one-line forwarder, all existing callers keep
+# working) then spends them on the storage_runtime var + setup + deposit/nearest-box
+# forwarders (~303/320); scripts/runtime/session_state.gd (session_runtime-owned)
+# grows SAVE_VERSION 4 + move_party_member/set_party_order (set_party_lead delegates)
+# + the _normalize_structures contents sanitizer (~317/320); scripts/domain/
+# structures.gd (building_loop-owned) gains BOX_ID/is_storage/box_contents
+# (the placement_is_lit precedent); scripts/runtime/build_runtime.gd
+# (building_loop-owned) gains the non-empty-box demolition refusal + demolish_refused
+# trace BEFORE remove_placement (refund untouched); scripts/app/field_action_router.gd
+# (building_loop-owned) gains the storage_box Z-route match arm (the BOX_ID arm in
+# _route_camp_object — disable the avatar + open_screen(tile); the screen's closed
+# signal re-enables the avatar + saves, mirroring the campfire-menu pattern) and its
+# overlay-visibility early-return becomes _overlay_open covering BOTH the CampMenu and
+# the StorageScreen — the shared gate the app_bootstrap input-gate latch extends;
+# scripts/app/input_router.gd (app_bootstrap-owned) GENERALIZES that latch
+# (_ui_ate_press + bind_ui_consumers connecting the argless closed/confirmed/cancelled
+# signals of CampMenu, StartMenu, MessageBox, AND StorageScreen — one latch set by
+# every producer, consumed by both polls), and the storage screen's closed signal is
+# one of the four producers (this subsystem's validation_commands therefore include the
+# input_gate regression scenario); the input-driven checks extract into the NEW
+# scripts/app/smoke_tap.gd (shared real-input-phase tap injection), scripts/app/
+# input_gate_menu_checks.gd (the start-CLOSE / NEW-GAME-confirm / inert-FIELD-MOVE leak
+# paths, wired into input_gate_scenario), and scripts/app/storage_release_mouse_check.gd
+# (the S2 release-confirm mouse-bypass group, wired into storage_flow_party_checks);
+# scripts/ui/party_screen.gd (menu_ui-owned) extracts
+# its action-list construction into the NEW scripts/ui/party_actions.gd FIRST, then
+# adds the MOVE reorder state + the context-sensitive DEPOSIT action (the RETRIEVE
+# precedent); scripts/ui/start_menu.gd (menu_ui-owned) grows dict-only
+# SESSION_METHODS/RUNTIME_METHODS resolver keys (no logic change); scripts/app/main.gd
+# (app_bootstrap-owned, 220/220) gets FOUR same-line edits (the bind_ui_consumers line
+# in _ready; the _field_router.setup call gains the $UI/StorageScreen argument; the
+# overworld_idle poll expression gains `and not $UI/StorageScreen.visible`; and
+# _toggle_menu gains `or $UI/StorageScreen.visible`); scripts/app/phase0_scenarios.gd
+# (app_bootstrap-owned, 220/220) extracts run_wild_battle + helpers into the NEW
+# scripts/app/wild_battle_scenario.gd (dispatch name wild_battle stays stable) then
+# spends the headroom on the v4 migration fixtures; scripts/app/qa_scenarios.gd
+# (app_bootstrap-owned) gains the storage_flow / visual_sweep_storage dispatch lines;
+# tools/run_playtests.py + tools/godot_dap_smoketest.py gain the scenario
+# registrations. scripts/domain/world_overrides.gd / world_generator.gd
+# (world_runtime-owned) and scripts/runtime/battle_runtime.gd (battle_loop-owned) stay
+# UNTOUCHED: is_valid_placement checks only kind + structure_id so the extra
+# "contents" key round-trips validate/normalize/merge/save with ZERO validator changes
+# (the "lit" guarantee), and the overflow-capture policy is a decision of NO CHANGE —
+# full-party captures stay on the campsite hold (the always-exists no-loss anchor;
+# boxes are manual), so the 0.1 relocation path carries no regression risk. The
+# StorageScreen node lives in scenes/app/Main.tscn (app_bootstrap-owned scene) and
+# self-wires via the /root/GameRuntime convention; the ui scene references ui only per
+# check_architecture. See docs/product-specs/storage-and-party.md.
 # CROSS-SUBSYSTEM CO-MODIFICATION: crafting extends building_loop's
 # scripts/domain/structures.gd (the torch structure appended LAST to IDS so existing
 # build-cycle indices stay stable, the _CAMPFIRE_LIT_REGION + LIGHT_SOURCES

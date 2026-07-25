@@ -108,6 +108,13 @@ func try_demolish(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary
 	if not _capable(move_id, mon_constraint):
 		return {"ok": false, "move_id": move_id, "refund": {}, "yield_item": "",
 			"message": _demolish_refusal(logic, move_id, mon_constraint)}
+	# A filled storage box refuses Cut (faithful: pokewilds-build.md:38) — demolition
+	# would destroy the mons inside (the no-loss exit criterion). Empty boxes Cut
+	# normally below; contents live ON the entry, so removal is still atomic.
+	if structure_id == Structures.BOX_ID and not _box_is_empty(tile):
+		_emit("demolish_refused", {"structure_id": structure_id, "tile": _tile_payload(tile), "reason": "box_not_empty"})
+		return {"ok": false, "move_id": move_id, "refund": {}, "yield_item": "",
+			"message": "The storage box isn't empty. Take your Pokemon out first."}
 	var refund: Dictionary = materials_for(structure_id, biome)
 	if _world_gen.remove_placement(tile).is_empty():
 		return {"ok": false, "move_id": move_id, "message": "Nothing happened.", "refund": {}, "yield_item": ""}
@@ -127,16 +134,25 @@ func tile_has_clear(tile: Vector2i) -> bool:
 	return _world_gen.overrides_for_save().has("%d,%d" % [tile.x, tile.y])
 
 
+# A placed storage box's contents (absent = empty) via the public save view —
+# the non-empty demolition refusal reads this, never the live map.
+func _box_is_empty(tile: Vector2i) -> bool:
+	var entry: Variant = _world_gen.placements_for_save().get("%d,%d" % [tile.x, tile.y], {})
+	return Structures.box_contents(entry).is_empty() if entry is Dictionary else true
+
+
 # Demolish moves whose shell class has NO witness material — a cost material that
 # ONLY that move yields (log->cut, hard_stone->smash). While this stays empty, any
 # party that gathered the materials to build was forced to field the very move
-# that demolishes the result, and mons never leave the party — so a build-capable
-# party is always demolition-capable. That is the load-bearing escape for the
+# that demolishes the result — the STATIC half of the load-bearing escape for the
 # region-scale enclosure the would-trap guard deliberately allows (a closed wall
-# ring with interior, a sealed island chokepoint): a non-empty result — from a
-# shop/gift/starting-bag material source or a party-release/box mechanic — would
-# turn a permitted seal into a permanent self-trap, so extend the guard before
-# shipping either (spec: building-and-placement.md, the load-bearing invariant).
+# ring with interior, a sealed island chokepoint). Mons CAN leave the party now
+# (Phase 3 storage boxes), so the DYNAMIC half lives in storage_runtime: deposit
+# and party-release refuse to strand a required demolish move (would_strand_
+# demolition; spec: storage-and-party.md § witness guard). A non-empty result
+# here — from a shop/gift/starting-bag material source — would still turn a
+# permitted seal into a permanent self-trap, so extend the guard before shipping
+# one (spec: building-and-placement.md, the load-bearing invariant).
 # PLAINS + DESERT between them cover both cost tables (default + desert shell).
 func unwitnessed_demolish_moves() -> Array:
 	var witnessed := {}

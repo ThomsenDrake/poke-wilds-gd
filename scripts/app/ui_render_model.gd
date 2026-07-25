@@ -196,6 +196,13 @@ static func worst_bag(catalog) -> Array:
 		bag.append({"item_id": str(items[i].get("item_id", "")), "count": 99})
 	return bag
 
+static func bag_names(catalog) -> Array: # worst_bag's display names (the menu audit's bag contains check)
+	var names := []
+	for entry in worst_bag(catalog):
+		var item: Dictionary = catalog.get_item(str(entry.get("item_id", "")))
+		if not item.is_empty(): names.append(str(item.get("display_name", "")).capitalize())
+	return names
+
 
 static func worst_entry(entries: Array, field: String) -> Dictionary:
 	var best: Dictionary = {}

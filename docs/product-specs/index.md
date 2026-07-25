@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-23
+Last verified: 2026-07-24
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 
@@ -11,4 +11,5 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Harvest and mutation loop: [harvest-and-mutation.md](harvest-and-mutation.md)
 - Building and placement loop: [building-and-placement.md](building-and-placement.md)
 - Camping, crafting & night survival loop: [camping-crafting-survival.md](camping-crafting-survival.md)
+- Storage boxes & party management loop: [storage-and-party.md](storage-and-party.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)

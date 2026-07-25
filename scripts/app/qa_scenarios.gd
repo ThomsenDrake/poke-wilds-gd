@@ -15,16 +15,27 @@ const SCENARIOS := {
 	"display_matrix": [preload("res://scripts/app/display_matrix.gd"), "run", []],
 	"harvest_flow": [preload("res://scripts/app/harvest_flow_scenario.gd"), "run", []],
 	"placement_flow": [preload("res://scripts/app/placement_flow_scenario.gd"), "run", []],
+	# Same-press input double-fire regression (exec plan Part A5): real input-phase
+	# injection proves the camp-menu closed latch swallows the toggle + context polls.
+	"input_gate": [preload("res://scripts/app/input_gate_scenario.gd"), "run", []],
+	# Battle-END same-press leak: a press that ends a battle (RUN / capture) must not
+	# re-fire the overworld context action the same frame (the latch's battle arm).
+	"battle_end_input": [preload("res://scripts/app/battle_end_input_scenario.gd"), "run", []],
 	# Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md);
 	# like every non-playtest entry, they run inside smoke_scenarios' save guard.
 	"camp_survival": [preload("res://scripts/app/camp_survival_scenario.gd"), "run", []],
 	"craft_flow": [preload("res://scripts/app/craft_flow_scenario.gd"), "run", []],
 	"night_cycle": [preload("res://scripts/app/night_cycle_scenario.gd"), "run", []],
 	"time_evolution": [preload("res://scripts/app/time_evolution_scenario.gd"), "run", []],
+	# Phase 3 storage box + party-management proof (storage-and-party.md).
+	"storage_flow": [preload("res://scripts/app/storage_flow_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
 	"visual_sweep_camping": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", []],
 	"visual_sweep_camping_update": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", [{"mode": "update"}]],
+	# Storage-state shots 18-19 (shared baseline dir; update never prunes foreign shots).
+	"visual_sweep_storage": [preload("res://scripts/app/visual_sweep_storage.gd"), "run_sweep", []],
+	"visual_sweep_storage_update": [preload("res://scripts/app/visual_sweep_storage.gd"), "run_sweep", [{"mode": "update"}]],
 }
 
 

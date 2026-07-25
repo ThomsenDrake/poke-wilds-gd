@@ -5,11 +5,12 @@ const PokemonCatalog := preload("res://scripts/data/pokemon_catalog.gd")
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const FieldMoves := preload("res://scripts/domain/field_moves.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
-const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const BattleRuntime := preload("res://scripts/runtime/battle_runtime.gd")
 const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
+const HarvestRuntime := preload("res://scripts/runtime/harvest_runtime.gd")
+const StorageRuntime := preload("res://scripts/runtime/storage_runtime.gd")
 const MusicRouter := preload("res://scripts/runtime/music_router.gd")
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
@@ -30,6 +31,8 @@ var session = SessionState.new()
 var save_store = SaveStore.new()
 var battle_runtime = BattleRuntime.new()
 var build_runtime = BuildRuntime.new()
+var harvest_runtime = HarvestRuntime.new()
+var storage_runtime = StorageRuntime.new()
 var music_router = MusicRouter.new()
 var _world_gen = WorldGenerator.new()
 var _biome_encounters = BiomeEncounters.new()
@@ -46,6 +49,8 @@ func _ready() -> void:
 	save_store.setup(trace)
 	battle_runtime.setup(session, catalog, pokemon_rules, trace, Callable(self, "_retreat_allowed"))
 	build_runtime.setup(session, catalog, trace, _world_gen)
+	harvest_runtime.setup(session, catalog, trace, _world_gen, build_runtime, world_overridden.emit)
+	storage_runtime.setup(session, trace, _world_gen, Callable(catalog, "get_species"))
 	night_system.setup(session, catalog, trace, Callable(_world_gen, "placements_for_save"), Callable(_biome_encounters, "is_battle_viable"), _rng)
 	crafting_runtime.setup(session, catalog, trace)
 	camping_runtime.setup(session, trace)
@@ -136,31 +141,26 @@ func get_campsite_pokemon() -> Array: return camping_runtime.get_campsite_pokemo
 func retrieve_campsite_mon(index: int) -> Dictionary: return camping_runtime.retrieve_campsite_mon(index)
 
 
-# Harvests one faced tile through the shared resolver: action, capability, override stamp, yield, trace.
-# A built tile instead routes to demolition (Cut refunds everything; hard-stone shells need Smash).
+# Harvest/demolish orchestration lives in harvest_runtime (extracted for the
+# storage-slice budget); callers keep this name.
 func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
-	var logic: Dictionary = _world_gen.get_tile_logic(tile)
-	var action := HarvestResolver.action_for_tile(logic)
-	if action.is_empty():
-		if str(logic.get("override_kind", "")) == "placed":
-			return build_runtime.try_demolish(tile, mon_constraint)
-		return {"ok": false, "move_id": "", "message": "There is nothing left here.", "yield_item": ""}
-	if not field_move_capable(action, mon_constraint):
-		var mon_name := str(mon_constraint.get("name", "")) if not mon_constraint.is_empty() else ""
-		return {"ok": false, "move_id": action, "message": HarvestResolver.refusal_message(action, logic, mon_name), "yield_item": ""}
-	var yield_item := HarvestResolver.yield_for(action, logic)
-	if yield_item.is_empty() or not _world_gen.add_override(tile, HarvestResolver.kind_for(action), action, session.total_steps):
-		trace.warning("GameRuntime", "Harvest was refused by the world override map.", {"tile": _tile_payload(tile), "move_id": action})
-		return {"ok": false, "move_id": action, "message": "Nothing happened.", "yield_item": ""}
-	session.add_item(yield_item)
-	trace.emit_event("field_move_used", "GameRuntime", {
-		"move_id": action,
-		"tile": _tile_payload(tile),
-		"yield": yield_item
-	})
-	world_overridden.emit(tile)
-	var item_name := str(catalog.get_item(yield_item).get("display_name", yield_item))
-	return {"ok": true, "move_id": action, "message": HarvestResolver.success_message(action, item_name), "yield_item": yield_item}
+	return harvest_runtime.harvest_tile(tile, mon_constraint)
+
+
+# Storage boxes (Phase 3): party-screen DEPOSIT context callables. Boxes are
+# independent per-placement containers; contents ride the placement entry (v4).
+func deposit_to_nearest(party_index: int) -> Dictionary:
+	return storage_runtime.deposit_to_nearest(party_index)
+
+
+# Party-screen DEPOSIT gate context callable (start_menu's RUNTIME_METHODS maps
+# the "box_tile_near" key here): the {found, tile} result, never a tile sentinel.
+func box_tile_near(center: Vector2i) -> Dictionary:
+	return storage_runtime.box_tile_near(center)
+
+
+func nearest_box_tile() -> Dictionary:
+	return storage_runtime.nearest_box_tile()
 
 
 # Single capability gate for harvest AND build: a constrained mon must itself be able; else any party member.
