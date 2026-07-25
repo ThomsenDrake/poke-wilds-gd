@@ -1,0 +1,204 @@
+scripts/runtime/night_system.gd
+  s_8237c2c8e4b53f::t_694084ff8dfb1d 79-91,95-98
+  s_8237c2c8e4b53f::t_03fb2f7992241e 54-62
+  s_8237c2c8e4b53f::t_4882aa2b228a61 63
+scripts/runtime/field_moves_party.gd
+  s_8237c2c8e4b53f::t_01c1e045b5245f 1-125
+scripts/runtime/playtest_bot.gd
+  s_8237c2c8e4b53f::t_176ca53165f1ff 268-270
+  s_8237c2c8e4b53f::t_6f7a4e055d0a2e 275,281-284,292-296,300-303,306,314,318
+  s_8237c2c8e4b53f::t_98e10dbf0a033a 266-267,271-274,276-280,285-291,297-299,307-313,315-317,319-320
+  s_8237c2c8e4b53f::t_0653b9dd8a320c 304-305
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_a0a4d2ea8f9f18 95,97,99
+  s_8237c2c8e4b53f::t_0ee2583eff80cf 2,4
+  s_8237c2c8e4b53f::t_1b40400441c363 93-94
+  s_8237c2c8e4b53f::t_3c53ae7f3d2d75 85,87-92,96,98,100
+  s_8237c2c8e4b53f::t_cdc9f364eb1438 86
+scripts/runtime/field_move_runtime.gd
+  s_8237c2c8e4b53f::t_0b852a037bd071 176-178,182,186-187,189
+  s_8237c2c8e4b53f::t_cbd2fa2caa3a38 205
+  s_8237c2c8e4b53f::t_b9ed6505c0dc85 255
+  s_8237c2c8e4b53f::t_6d156d25b68eec 14-16
+  s_8237c2c8e4b53f::t_76d0cc4ecc0b02 160,166
+  s_8237c2c8e4b53f::t_c5a9287c8107ca 239
+  s_8237c2c8e4b53f::t_08693faaf4cdb2 9-10
+  s_8237c2c8e4b53f::t_1061ac2481a5dc 149
+  s_8237c2c8e4b53f::t_43d133791860ba 122
+  s_8237c2c8e4b53f::t_2708f44c960bf6 46,61
+  s_8237c2c8e4b53f::t_4b8ab8b568e1b1 80-81,84-90
+  s_8237c2c8e4b53f::t_f99b147e992092 1-8,11-12,19,30,32-45,47-48,50-55,57-60,62,64-79,83,91-94,96-121,123-135,137-148,150-159,161-165,167-175,179-181,183-185,188,190-204,206-224,227-238,240-254,256-262,267,269-272,276-304,312-320
+  s_8237c2c8e4b53f::t_4039b7d6f0f76e 268,273-274
+  s_8237c2c8e4b53f::t_6a9b0b922dc633 82
+  s_8237c2c8e4b53f::t_ded659ab7d08e6 13,17-18,20-22,26-29,31
+  s_8237c2c8e4b53f::t_0e65b0d9eb77ec 225-226
+  s_8237c2c8e4b53f::t_cdf04f770396f1 49,56,63
+  s_8237c2c8e4b53f::t_7420ea5da5e0b1 263-266,275
+  s_8237c2c8e4b53f::t_a46999d4001ced 305-311
+  s_8237c2c8e4b53f::t_781ffe0f31d686 23-25
+  s_8237c2c8e4b53f::t_e9bf3f05578d76 136
+  s_8237c2c8e4b53f::t_7c00e556bb9cc8 95
+docs/tech-debt-tracker.md
+  s_8237c2c8e4b53f::t_770ec9513b918e 11
+  s_8237c2c8e4b53f::t_7a5aed42da4065 2,4
+  s_8237c2c8e4b53f::t_81babc56bef631 10
+docs/product-specs/index.md
+  s_8237c2c8e4b53f::t_508c906e9ff8a4 12
+  s_8237c2c8e4b53f::t_b0a8edc9d686a4 2
+scripts/domain/field_moves.gd
+  s_8237c2c8e4b53f::t_697a56cfc1e9ee 5-14
+docs/product-specs/camping-crafting-survival.md
+  s_8237c2c8e4b53f::t_406acc9f04d303 2,149-153
+scripts/runtime/session_state.gd
+  s_8237c2c8e4b53f::t_83510c8ce50dc8 94
+  s_8237c2c8e4b53f::t_6a4c2fc5cf2ffa 45
+  s_8237c2c8e4b53f::t_6f42ba8d803a49 4-13
+  s_8237c2c8e4b53f::t_dc7f8767d47585 59
+  s_8237c2c8e4b53f::t_446032bb6b668f 78
+  s_8237c2c8e4b53f::t_f8cacb014e6aa1 3
+  s_8237c2c8e4b53f::t_4f1d082b0364ce 266
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_5d645bf49f442e 105-107
+  s_8237c2c8e4b53f::t_fb0f68a84cc8cc 2
+  s_8237c2c8e4b53f::t_0c11ed50f3895c 125-127,141
+  s_8237c2c8e4b53f::t_f2d3e50d7b4514 33
+docs/product-specs/field-moves.md
+  s_8237c2c8e4b53f::t_ed5fe6f93ca32e 1-26,28,30-39,42-50,52-66,68-71,73-77,79,81-94,96,99-102,104
+  s_8237c2c8e4b53f::t_1850896403d28a 95,97,105-106
+  s_8237c2c8e4b53f::t_4fdde105c26787 40-41
+  s_8237c2c8e4b53f::t_8993a942e44ad1 67,72
+  s_8237c2c8e4b53f::t_297ab5a0d8712d 107
+  s_8237c2c8e4b53f::t_98e7368b6cc6ed 51
+  s_8237c2c8e4b53f::t_cf05529bf9801d 98
+  s_8237c2c8e4b53f::t_280b2d86a14035 27,29
+  s_8237c2c8e4b53f::t_a16c446342485e 78
+  s_8237c2c8e4b53f::t_170b4cfc972760 103
+  s_8237c2c8e4b53f::t_f4c600995ef9ac 80
+scripts/runtime/game_runtime.gd
+  s_8237c2c8e4b53f::t_ce1e8078df8655 120-121
+  s_8237c2c8e4b53f::t_546768777e6665 23
+  s_8237c2c8e4b53f::t_225a18f06eea42 58
+  s_8237c2c8e4b53f::t_10a4fdf595228d 43
+  s_8237c2c8e4b53f::t_2f4bc2380652d4 208
+scripts/runtime/player_avatar.gd
+  s_8237c2c8e4b53f::t_036b86d0713045 170-171
+  s_8237c2c8e4b53f::t_a5bdd4f98e94dd 203
+  s_8237c2c8e4b53f::t_18f10eac0892c4 35
+  s_8237c2c8e4b53f::t_7d242bcd59f952 224-226,231
+  s_8237c2c8e4b53f::t_965bf7196c66c3 21-23
+  s_8237c2c8e4b53f::t_3b13b193924fcd 108-128
+  s_8237c2c8e4b53f::t_d35a2e192af575 72-75
+scripts/domain/structures.gd
+  s_8237c2c8e4b53f::t_9130e070737d06 198-201
+  s_8237c2c8e4b53f::t_ce86dc160518a8 141-142
+  s_8237c2c8e4b53f::t_bafc67e096d0d7 143
+  s_8237c2c8e4b53f::t_767d39d71ebaa5 29,33-34,39-40
+  s_8237c2c8e4b53f::t_5d1117e0a692f5 304-306,309-317,319-320
+  s_8237c2c8e4b53f::t_a518f4c711b6d4 307-308,318
+  s_8237c2c8e4b53f::t_cdf41626ade0d5 124-126
+  s_8237c2c8e4b53f::t_33752d5cbbfced 21-28
+  s_8237c2c8e4b53f::t_b5e24ed14ac221 56-59
+  s_8237c2c8e4b53f::t_8c57b79b414190 30-32,35-38
+  s_8237c2c8e4b53f::t_3b44439708dcb6 60
+  s_8237c2c8e4b53f::t_6038c9108dc610 90-91
+  s_8237c2c8e4b53f::t_c163a1e2d804db 127-128
+scripts/app/field_move_actions.gd
+  s_8237c2c8e4b53f::t_8789005b50d875 1-92
+scripts/app/build_house_flow_scenario.gd
+  s_8237c2c8e4b53f::t_6620614b7fd6b5 1-5,13-15,17-20,23-44,46-48,55-67,70-72,75-76,78,83,85-102,105-113,115-116,119-137
+  s_8237c2c8e4b53f::t_6474094431c48b 6-12,16,21-22,45,49-54,68-69,73-74,79-80,103-104,114,117-118
+  s_8237c2c8e4b53f::t_eb7e3dd8636758 77,84
+  s_8237c2c8e4b53f::t_ccee2fb6cc8755 81-82
+scripts/app/playtest_field_soak_scenario.gd
+  s_8237c2c8e4b53f::t_a32cab4b91483d 49
+  s_8237c2c8e4b53f::t_95a6004f3d3c7b 1-48,50-90
+docs/product-specs/harvest-and-mutation.md
+  s_8237c2c8e4b53f::t_e51e7f0b887af2 17-20
+  s_8237c2c8e4b53f::t_01fa254fcc746e 2
+scripts/app/qa_scenarios.gd
+  s_8237c2c8e4b53f::t_24e57d57213e03 35-36
+  s_8237c2c8e4b53f::t_b05fdcc0414650 32-34
+scripts/app/field_action_router.gd
+  s_8237c2c8e4b53f::t_dbf9a1ce1b9820 52
+  s_8237c2c8e4b53f::t_b6c4eed8392cd6 18-23
+  s_8237c2c8e4b53f::t_aa0a45f7178124 79-83
+  s_8237c2c8e4b53f::t_59f42f2887bec7 95-97
+  s_8237c2c8e4b53f::t_af10b05cf839ee 4-7,9-16,24-27,40
+  s_8237c2c8e4b53f::t_6bb116c4ffd9ea 33
+scripts/app/playtest_scenarios.gd
+  s_8237c2c8e4b53f::t_c4545783580d9f 90
+  s_8237c2c8e4b53f::t_f35c08241f82a3 91-92
+  s_8237c2c8e4b53f::t_db4945cf3a446c 10
+docs/generated/miss-postmortems.json
+  s_8237c2c8e4b53f::t_3f20ca37bf3678 2-90,93-155,157
+tools/godot_dap_smoketest.py
+  s_8237c2c8e4b53f::t_c3fb10acb17e42 210-230
+docs/registry/subsystems.toml
+  s_8237c2c8e4b53f::t_4969844de8b522 520-525
+  s_8237c2c8e4b53f::t_f7e339955e0115 473
+  s_8237c2c8e4b53f::t_566896d5557acb 480
+  s_8237c2c8e4b53f::t_dc3adb4feabb22 466-472,474-475,477,481-514,526-537
+  s_8237c2c8e4b53f::t_c928f505caacc5 515-519
+  s_8237c2c8e4b53f::t_5a93b1c9200c82 476,478-479
+scripts/app/field_moves_ground_checks.gd
+  s_8237c2c8e4b53f::t_e44e1c94fcf314 1-47,49-75,77-90,92,94,96-97,99-102,112-113,115-117,119-125,128-130,132-176
+  s_8237c2c8e4b53f::t_f342f44f7818f6 91,93,98,103-111,114,118
+  s_8237c2c8e4b53f::t_a15e47be542dda 48,76,95
+  s_8237c2c8e4b53f::t_97dcb56dd2d5e7 126-127,131
+scripts/app/field_moves_checks.gd
+  s_8237c2c8e4b53f::t_a09eea7ef5fca4 72-84
+  s_8237c2c8e4b53f::t_dad7da846181b1 100
+  s_8237c2c8e4b53f::t_e33d7f83a90c9e 1-2,12-13,19-21,23-30,32-34,36-38,40-41,46-53,56-61,63-71,85-95,97-99,101,103-104,106-112,115-120,122-126,129-146,148,151-165,167-169,171-177,179-183,185-203,206-214
+  s_8237c2c8e4b53f::t_118808ebb623de 22,31,35,39
+  s_8237c2c8e4b53f::t_045cd4c7735ca4 3-11,14-18,42-45,54-55,102,105,113-114,128,147,149,170,178,184
+  s_8237c2c8e4b53f::t_a15e47be542dda 62,96,121,127,150,166
+  s_8237c2c8e4b53f::t_4dde05ac2c7654 204-205
+tools/run_playtests.py
+  s_8237c2c8e4b53f::t_5ec49ea7f01206 69
+scripts/app/field_moves_flow_scenario.gd
+  s_8237c2c8e4b53f::t_148b6354cefea9 1-50,52-75
+  s_8237c2c8e4b53f::t_b1b99cee053403 51
+CONTROLS.md
+  s_8237c2c8e4b53f::t_ee2324d09b3145 80
+  s_8237c2c8e4b53f::t_a27bd2411925f8 139
+  s_8237c2c8e4b53f::t_329c82ec525dcf 136-138
+  s_8237c2c8e4b53f::t_698f7c532791ca 161-163
+  s_8237c2c8e4b53f::t_a4d5a7549b21e4 42
+  s_8237c2c8e4b53f::t_cbcac2a6074af3 160
+  s_8237c2c8e4b53f::t_d206844288199f 126,130-131,133-135,140-141
+  s_8237c2c8e4b53f::t_0134c8c789d189 132
+  s_8237c2c8e4b53f::t_154ab5e7788b76 142
+docs/product-specs/building-and-placement.md
+  s_8237c2c8e4b53f::t_406acc9f04d303 2,89-93
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_c860745cfe24c7 2
+  s_8237c2c8e4b53f::t_865f076097d09d 24
+docs/product-specs/bootstrap-and-overworld.md
+  s_8237c2c8e4b53f::t_406acc9f04d303 2,72-77
+scripts/app/smoke_scenarios.gd
+  s_8237c2c8e4b53f::t_b1a6d6ab1cd1c6 37
+docs/product-specs/menu-and-save.md
+  s_8237c2c8e4b53f::t_406acc9f04d303 2,29-34
+scripts/app/build_house_flow_build.gd
+  s_8237c2c8e4b53f::t_a0a29276f538dc 1-24,26-33,35-45,47-134,136-146
+  s_8237c2c8e4b53f::t_f5c5bbfc31de13 25
+  s_8237c2c8e4b53f::t_a607614029b8be 34
+  s_8237c2c8e4b53f::t_2cfc4057ad1b2f 46
+  s_8237c2c8e4b53f::t_c4b8c26787a6d5 135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "e889a7fab678c457804d5a55f5bb58ebc7d7b186",
+  "prompts": {},
+  "sessions": {
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
