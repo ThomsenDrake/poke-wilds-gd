@@ -1,0 +1,361 @@
+scripts/app/wild_battle_scenario.gd
+  s_8237c2c8e4b53f::t_00e65e58881430 1-124
+scripts/app/input_gate_menu_checks.gd.uid
+  s_8237c2c8e4b53f::t_83c05d76d5ec3e 1
+scripts/app/storage_flow_party_checks.gd
+  s_8237c2c8e4b53f::t_c69a0693a24958 5-12
+  s_8237c2c8e4b53f::t_e0dee61e4204d2 33
+  s_8237c2c8e4b53f::t_d0463e9231492f 45-50,63,66-67
+  s_8237c2c8e4b53f::t_6ea4f77a2dece9 31
+  s_8237c2c8e4b53f::t_68c0079a64558e 161-168,170-171
+  s_8237c2c8e4b53f::t_fe05de41939b79 160
+  s_8237c2c8e4b53f::t_c6dfe6b4493052 195-208
+  s_8237c2c8e4b53f::t_b29125bf8bfe82 40-41
+  s_8237c2c8e4b53f::t_ef90a3b3d5c8a3 43
+  s_8237c2c8e4b53f::t_fb7913a9ce5070 129,132-136
+  s_8237c2c8e4b53f::t_a4dd4f95a669f6 1-3,18-30,32,34-39,42,44,51-52,54-62,64-65,68-73,75-89,91-110,112-120,130-131,137-159,169,172-194,209-220
+  s_8237c2c8e4b53f::t_5ed2d66fae04b0 13-14
+  s_8237c2c8e4b53f::t_21ed451d52cd95 4,15-17
+  s_8237c2c8e4b53f::t_ad3bc0511203d8 53,74,90,111
+  s_8237c2c8e4b53f::t_481b78b62fd2c8 121-128
+scripts/ui/message_box.gd
+  s_8237c2c8e4b53f::t_a913ef68ac6037 5-9
+docs/product-specs/building-and-placement.md
+  s_8237c2c8e4b53f::t_f667a8bb8ba2ea 75
+  s_8237c2c8e4b53f::t_42040b34d5438c 80
+  s_8237c2c8e4b53f::t_2e91eb0a425bd6 62
+  s_8237c2c8e4b53f::t_889c58d2ada882 2
+  s_8237c2c8e4b53f::t_138bbc76ec05ac 16
+  s_8237c2c8e4b53f::t_bd13b79c4060bb 47
+  s_8237c2c8e4b53f::t_baea21f4143206 54
+  s_8237c2c8e4b53f::t_1df3023552aa2e 48
+docs/tech-debt-tracker.md
+  s_8237c2c8e4b53f::t_434b7bd9322838 4
+  s_8237c2c8e4b53f::t_47e08b978d4bbf 2
+  s_8237c2c8e4b53f::t_13b14bd410fd77 14-15
+  s_8237c2c8e4b53f::t_ec7bb7a03a6b61 26
+  s_8237c2c8e4b53f::t_fce0bc724cf153 21
+  s_8237c2c8e4b53f::t_130e1aaf3800dc 18
+  s_8237c2c8e4b53f::t_dbb86e0cdc703a 13,16
+  s_8237c2c8e4b53f::t_7a28627e4eea10 19
+scripts/app/input_router.gd
+  s_8237c2c8e4b53f::t_cd23a32b8bd9d6 11-16
+  s_8237c2c8e4b53f::t_b7498ac4bdd3cb 10,41-53,69-93,116,124-127,129-131
+  s_8237c2c8e4b53f::t_6abc5bfdd56ff9 109-112
+  s_8237c2c8e4b53f::t_5ab003bdd68bbf 94-95,117
+  s_8237c2c8e4b53f::t_7ee5902ba98b34 96-108
+  s_8237c2c8e4b53f::t_fd11676ef6caa3 9
+scripts/runtime/structure_layer.gd
+  s_8237c2c8e4b53f::t_f57b124fd949bd 10
+scenes/ui/StorageScreen.tscn
+  s_8237c2c8e4b53f::t_cefd85f48ef68c 1-135
+docs/generated/visual-baselines/19_storage_screen.png.sidecar.json
+  s_8237c2c8e4b53f::t_c178b422688609 1
+README.md
+  s_8237c2c8e4b53f::t_b9a9a5967a8b08 14-23
+scripts/app/qa_scenarios.gd
+  s_8237c2c8e4b53f::t_4687debad6cc0b 18-20
+  s_8237c2c8e4b53f::t_a7abb5afe53cf2 30-31,36-38
+  s_8237c2c8e4b53f::t_ace4d742496984 21-23
+scripts/runtime/build_runtime.gd
+  s_8237c2c8e4b53f::t_fb284ab061be8e 111-117
+  s_8237c2c8e4b53f::t_a09526ed3f841a 147,149-155
+  s_8237c2c8e4b53f::t_7d4d2753735052 137-143
+tools/godot_dap_smoketest.py
+  s_8237c2c8e4b53f::t_a705537682db25 42-43
+  s_8237c2c8e4b53f::t_078f16cce4b742 31-32
+  s_8237c2c8e4b53f::t_ba37201889e2e2 173-178
+  s_8237c2c8e4b53f::t_e6ca2803762623 116-132
+  s_8237c2c8e4b53f::t_d954b9cd213aff 179-186
+scripts/app/smoke_tap.gd
+  s_8237c2c8e4b53f::t_976dada0cb2792 1-56
+docs/product-specs/camping-crafting-survival.md
+  s_8237c2c8e4b53f::t_c6d039e0bd23cf 56
+docs/product-specs/storage-and-party.md
+  s_8237c2c8e4b53f::t_462effde448671 65
+  s_8237c2c8e4b53f::t_5e549335b50051 4
+  s_8237c2c8e4b53f::t_3796618b0de794 20
+  s_8237c2c8e4b53f::t_14801e06069111 66
+  s_8237c2c8e4b53f::t_cc44bd1b53d37f 62
+  s_8237c2c8e4b53f::t_3f371b5ab0e699 54
+  s_8237c2c8e4b53f::t_5dc55a881293a2 14
+  s_8237c2c8e4b53f::t_5c2b0f1ebdffd5 55
+  s_8237c2c8e4b53f::t_6cedb3166618ca 1-3,5-13,15-19,21-53,56-61,63-64
+docs/QUALITY_SCORE.md
+  s_8237c2c8e4b53f::t_8c23cfd880e204 23
+  s_8237c2c8e4b53f::t_7c8c1838d471e1 12
+  s_8237c2c8e4b53f::t_0683e0018e60eb 2
+  s_8237c2c8e4b53f::t_10a239e204c9f8 13
+docs/RELIABILITY.md
+  s_8237c2c8e4b53f::t_07e4853c2d731b 118
+  s_8237c2c8e4b53f::t_7d5889b57d7220 119
+  s_8237c2c8e4b53f::t_7142cc031189d2 2
+  s_8237c2c8e4b53f::t_9229c3c1291a62 141
+  s_8237c2c8e4b53f::t_7f2c225a94b7a9 286-287
+  s_8237c2c8e4b53f::t_3cc19c1f4e9c48 121
+  s_8237c2c8e4b53f::t_4a2d2b43b56202 120
+  s_8237c2c8e4b53f::t_bd0ee26266f053 33
+  s_8237c2c8e4b53f::t_63c4f6a56a19b6 101-102,104
+  s_8237c2c8e4b53f::t_715622f798370d 103
+scripts/ui/party_screen.gd
+  s_8237c2c8e4b53f::t_70eac979565079 155-156,159
+  s_8237c2c8e4b53f::t_1bc58a7ac3acf3 180-181
+  s_8237c2c8e4b53f::t_89d3203e1e712f 6-12
+  s_8237c2c8e4b53f::t_480a8e43bb0f9a 107-108
+  s_8237c2c8e4b53f::t_3023c858efead8 4-5,18,30,33,72-80,94-96,109-111,124-125,134-137,154,157-158,174,176-178,186-192,195,206,209-212
+docs/references/trace-events.md
+  s_8237c2c8e4b53f::t_fd848773ef4ac2 73
+  s_8237c2c8e4b53f::t_a2c92543a4da53 74-75,78-80,82
+  s_8237c2c8e4b53f::t_fe24116ed043ee 55-56
+  s_8237c2c8e4b53f::t_73c6f2eb3faa34 57-58
+  s_8237c2c8e4b53f::t_230cc98513f51b 81
+  s_8237c2c8e4b53f::t_fe6dbe3ade5fc6 4
+  s_8237c2c8e4b53f::t_af25394b7fd1c5 76
+  s_8237c2c8e4b53f::t_800135f45df9c5 77
+  s_8237c2c8e4b53f::t_165071eb7aa7ae 2
+scripts/ui/storage_screen.gd
+  s_8237c2c8e4b53f::t_98b7c1d6fe14c3 3-4,17-18,33,84-87,89,91,93,119,123,139,141,152,159-160,176,189-191,197,211
+  s_8237c2c8e4b53f::t_10449b37a42b13 6-8,34-35,37,39
+  s_8237c2c8e4b53f::t_7b4a70dc814d58 9
+  s_8237c2c8e4b53f::t_c130e133ab0b5d 10-11
+  s_8237c2c8e4b53f::t_b35020119e7c44 217
+  s_8237c2c8e4b53f::t_1ff2cad364f473 5,12,57,68,94,121-122,124-125,136,146,150,175,179
+  s_8237c2c8e4b53f::t_8f0111de5f1757 55,88,90,92
+  s_8237c2c8e4b53f::t_9d4e503bcf8c91 1-2,13-16,19-32,36,38,40-48,51-54,56,58-65,67,69-83,95-118,120,126-135,137-138,140,142-145,147-149,151,153-158,161-169,174,178,180-183,185-188,192-196,198-208,212-216,218-220
+  s_8237c2c8e4b53f::t_072daa645c4287 66
+  s_8237c2c8e4b53f::t_ab757df205070c 170-173
+  s_8237c2c8e4b53f::t_cce4ce0c61d09c 177
+  s_8237c2c8e4b53f::t_2fe62394e0c3d3 49-50,184,209-210
+scripts/runtime/storage_runtime.gd
+  s_8237c2c8e4b53f::t_68953f9133891d 99-100,102
+  s_8237c2c8e4b53f::t_de1f8a24a72ed9 1-51,58-62,65-66,69-98,101,103-275
+  s_8237c2c8e4b53f::t_e975492ec4c97a 52-57,63-64,67-68
+scripts/app/battle_end_input_scenario.gd
+  s_8237c2c8e4b53f::t_2db411a08b39ac 1-14,16-88,90-127,129-213
+  s_8237c2c8e4b53f::t_ae8bf5c7839cff 89
+  s_8237c2c8e4b53f::t_94eb22891f542e 15
+  s_8237c2c8e4b53f::t_e817504aa6c1c6 128
+scripts/app/phase0_scenarios.gd
+  s_8237c2c8e4b53f::t_8841d645fee623 4-11,15,27-38,50-52,61-62,96,118-120,122-136,138-140,142-146
+scripts/app/main.gd
+  s_8237c2c8e4b53f::t_6f72392b5cd416 28
+  s_8237c2c8e4b53f::t_a2b809157d975d 119
+  s_8237c2c8e4b53f::t_6d89cc3cbbab09 47
+  s_8237c2c8e4b53f::t_112182e9acfbfb 60
+  s_8237c2c8e4b53f::t_f3004333385c45 99
+  s_8237c2c8e4b53f::t_7708349c8d707d 209
+tools/run_playtests.py
+  s_8237c2c8e4b53f::t_daf50a9a7abaf2 81
+  s_8237c2c8e4b53f::t_a783ba83edf3d0 69
+docs/generated/visual-baselines/18_storage_box.png.sidecar.json
+  s_8237c2c8e4b53f::t_c178b422688609 1
+scripts/ui/party_actions.gd
+  s_8237c2c8e4b53f::t_037b345fba7357 22-24,26
+  s_8237c2c8e4b53f::t_35dfe2c0995aad 49-58
+  s_8237c2c8e4b53f::t_3909f524442eec 1-21,25,27-33,35-48
+  s_8237c2c8e4b53f::t_5ab2fd4ca5746f 34
+scripts/app/field_action_router.gd
+  s_8237c2c8e4b53f::t_0db8f1e568fa38 127-128,132,134-137,148-152
+  s_8237c2c8e4b53f::t_6c08c55c4cddc3 23-26,35
+  s_8237c2c8e4b53f::t_a708579982fe78 46,50,57,60-61
+  s_8237c2c8e4b53f::t_a9162103cbc5dd 68-69
+  s_8237c2c8e4b53f::t_977539686875c3 211-212
+  s_8237c2c8e4b53f::t_2250cc1ba7b7fe 213-218
+  s_8237c2c8e4b53f::t_ae9acac7692743 27
+  s_8237c2c8e4b53f::t_ceb90063824a85 28-29
+  s_8237c2c8e4b53f::t_aaf9bc2b42d434 30
+  s_8237c2c8e4b53f::t_3c1a219ad6d7e0 36-39
+  s_8237c2c8e4b53f::t_db1c2e43f69055 146-147
+  s_8237c2c8e4b53f::t_75ee8a6481e40d 83-86,98-99
+  s_8237c2c8e4b53f::t_96f0421f836563 133
+  s_7b5284d24921aa::t_f114da94e906bf 100,153-155
+scripts/app/input_gate_scenario.gd
+  s_8237c2c8e4b53f::t_a7eaa521cee48f 123-124
+  s_8237c2c8e4b53f::t_f40bc43340a288 75
+  s_8237c2c8e4b53f::t_4cc283bed3f642 119
+  s_8237c2c8e4b53f::t_9ff2bc1c36d694 129-130
+  s_8237c2c8e4b53f::t_9d7a7dbfbbc12e 1-3,24-25,27,30-45,47-49,54,57,60-61,65-74,76-91,93-118,120-122,125-128,131-146,148-161,163-177,179-184,187-199,201-204,206-220
+  s_8237c2c8e4b53f::t_bb6a478d1b014c 26
+  s_8237c2c8e4b53f::t_614d338634b9ba 62-64
+  s_8237c2c8e4b53f::t_78e4db8f081876 50-52
+  s_8237c2c8e4b53f::t_9fdd276c883479 4-23
+  s_8237c2c8e4b53f::t_0332ce8153e0a8 92
+  s_8237c2c8e4b53f::t_50d6462d9dbe89 162
+  s_8237c2c8e4b53f::t_a65a613350aabd 205
+  s_8237c2c8e4b53f::t_980876d104f6cb 55-56,58-59
+  s_8237c2c8e4b53f::t_3c91a57f94a3e9 28-29
+  s_8237c2c8e4b53f::t_bd22fc2e2ba586 147
+  s_8237c2c8e4b53f::t_d6c40ac99f4008 178,185-186
+  s_8237c2c8e4b53f::t_e80170c1c0ca86 46,53
+  s_8237c2c8e4b53f::t_41a298c3ba4bbc 200
+scripts/app/visual_sweep_baselines.gd
+  s_8237c2c8e4b53f::t_4e66bcd4d61931 161-162,164
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_8237c2c8e4b53f::t_98ac996b653a97 2
+  s_8237c2c8e4b53f::t_dc5b1f89269c68 96-103
+  s_8237c2c8e4b53f::t_0cdc73d64a4623 118
+  s_8237c2c8e4b53f::t_9df13601128b82 117
+scripts/runtime/harvest_runtime.gd
+  s_8237c2c8e4b53f::t_c38b4d38e2c36b 1-71
+docs/registry/subsystems.toml
+  s_8237c2c8e4b53f::t_adc27e87ece24e 18
+  s_8237c2c8e4b53f::t_1887ae6dd32360 404-419,424-427
+  s_8237c2c8e4b53f::t_3cf13d6e4cd656 19
+  s_8237c2c8e4b53f::t_3c1a1f05f6c2fe 384-388
+  s_8237c2c8e4b53f::t_f63af9cff972db 371-372
+  s_8237c2c8e4b53f::t_d28dee983e134a 7
+  s_8237c2c8e4b53f::t_2b9819b8dacb4d 359-369,373-383,389-403,420-423,428-442
+  s_8237c2c8e4b53f::t_f45430a58c0db3 24
+  s_8237c2c8e4b53f::t_04b089f40ce41f 370
+docs/product-specs/menu-and-save.md
+  s_8237c2c8e4b53f::t_6e9f269918edce 2
+  s_8237c2c8e4b53f::t_b2f0d0438dbcf9 16
+  s_8237c2c8e4b53f::t_897fc0655def57 12
+  s_8237c2c8e4b53f::t_a190973fe5567e 14
+  s_8237c2c8e4b53f::t_1b84216ded9dfc 27
+  s_8237c2c8e4b53f::t_8ddd54df5614d4 13
+scripts/domain/structures.gd
+  s_8237c2c8e4b53f::t_27304d6abbdf57 253-274
+scripts/app/input_gate_menu_checks.gd
+  s_8237c2c8e4b53f::t_1adc60939b269c 1-58,60-115,117-142,144-198
+  s_8237c2c8e4b53f::t_4331eb8ca772a1 59,116,143
+scripts/app/battle_end_input_scenario.gd.uid
+  s_8237c2c8e4b53f::t_83c05d76d5ec3e 1
+scripts/app/storage_flow_scenario.gd
+  s_8237c2c8e4b53f::t_13f577dd022dc5 192
+  s_8237c2c8e4b53f::t_695210300d917e 188,195-199,201
+  s_8237c2c8e4b53f::t_c918ad8fa45c82 17,25-26,46,48-49,51,111,113,142,150,152-153,158,160,164,168,172-173,189,200
+  s_8237c2c8e4b53f::t_02d9e31365a82a 4-10
+  s_8237c2c8e4b53f::t_a9b3ba40c1d825 41
+  s_8237c2c8e4b53f::t_e775bee78f647a 66,70
+  s_8237c2c8e4b53f::t_97fe1a6346d20f 39-40
+  s_8237c2c8e4b53f::t_9658a745ec8f26 42,44,52-53
+  s_8237c2c8e4b53f::t_7815d38d355bbf 56
+  s_8237c2c8e4b53f::t_7f6518a635582a 64
+  s_8237c2c8e4b53f::t_155f04b3874f62 1-2,15-16,19-24,27-30,32-36,38,47,54-55,57-59,61-63,65,67-69,71-72,88-90,92-93,101,104-110,112,114-118,120-141,143-149,151,154-157,159,161-163,165-167,169-171,174-187,190-191,193-194,202-220
+  s_8237c2c8e4b53f::t_65441f3ae363ff 11-14
+  s_8237c2c8e4b53f::t_0867ba747471ad 37
+  s_8237c2c8e4b53f::t_4f9d936db0c0bc 60
+  s_8237c2c8e4b53f::t_00c5a67b79d88e 31
+  s_8237c2c8e4b53f::t_7b8b60612e2788 3,18
+  s_8237c2c8e4b53f::t_bb0a4c03f8548c 50
+  s_8237c2c8e4b53f::t_64a03ddd3e8352 73-75,86-87
+  s_8237c2c8e4b53f::t_4ac7d86f6adc08 76-85
+  s_8237c2c8e4b53f::t_50f44fe9a44e93 91
+  s_8237c2c8e4b53f::t_b192406565e177 94-100,102-103
+  s_8237c2c8e4b53f::t_55a78c13710d9e 43,45
+  s_8237c2c8e4b53f::t_4ec0bf5e8a81b9 119
+scripts/app/storage_release_mouse_check.gd
+  s_8237c2c8e4b53f::t_ea1efabf9a083d 33-37
+  s_8237c2c8e4b53f::t_4443ee89e26189 75
+  s_8237c2c8e4b53f::t_1431deb8b901c2 1-32,38-74,76-121
+scripts/ui/start_menu.gd
+  s_8237c2c8e4b53f::t_bb47096753ae79 106-108
+  s_8237c2c8e4b53f::t_0156d25574c365 150-151
+  s_8237c2c8e4b53f::t_ff5306d0836da9 28-30,38
+  s_8237c2c8e4b53f::t_05fd47e2968c14 154,156
+  s_8237c2c8e4b53f::t_d8e2e98afd0014 105
+docs/product-specs/index.md
+  s_8237c2c8e4b53f::t_64211be48a4a08 14
+  s_8237c2c8e4b53f::t_f6942a319cda68 2
+docs/generated/miss-postmortems.json
+  s_8237c2c8e4b53f::t_fdafdf2a917e51 3,147,151-152
+  s_8237c2c8e4b53f::t_6d1febc03e8523 2,4-64,67-146,148-150,154-157
+scenes/app/Main.tscn
+  s_8237c2c8e4b53f::t_c4e32fee54a330 1,11
+  s_8237c2c8e4b53f::t_c89036b352cf78 43-44
+scripts/app/ui_render_audit.gd
+  s_8237c2c8e4b53f::t_9ffbd2f589a268 146,148-153
+scripts/app/visual_sweep_storage.gd
+  s_8237c2c8e4b53f::t_57cf3f25079b37 32
+  s_8237c2c8e4b53f::t_6c417595a17000 104,113
+  s_8237c2c8e4b53f::t_c1d412014ab8da 3-15
+  s_8237c2c8e4b53f::t_3677f651aa4239 1-2,16-31,33-103,105-112,114-220
+scripts/app/ui_render_model.gd
+  s_8237c2c8e4b53f::t_99b87922be5b14 199-205
+scripts/runtime/session_state.gd
+  s_8237c2c8e4b53f::t_7c754fee8a2923 14,17
+  s_8237c2c8e4b53f::t_8e476c1db9c0dd 33
+  s_8237c2c8e4b53f::t_e808fdf953d657 41-42
+  s_8237c2c8e4b53f::t_9c082ea307ad3e 184
+  s_8237c2c8e4b53f::t_d1694af6346ed5 104
+  s_8237c2c8e4b53f::t_a41f8db23814d4 291
+  s_8237c2c8e4b53f::t_af64debfe3495d 96
+  s_8237c2c8e4b53f::t_b1052edab6ae2e 185
+  s_8237c2c8e4b53f::t_6eb4e9fe057feb 5-8
+  s_8237c2c8e4b53f::t_693f39e460c836 27
+  s_8237c2c8e4b53f::t_61a30b9e2dafee 37-38
+  s_8237c2c8e4b53f::t_4b2ccb81c0f14c 278-279
+  s_8237c2c8e4b53f::t_acf34146589fc6 258-259
+  s_8237c2c8e4b53f::t_30b5f0bfe26155 304-308
+  s_8237c2c8e4b53f::t_a18617e52ad491 13,15
+  s_8237c2c8e4b53f::t_f8e37013dd3c1d 268
+  s_8237c2c8e4b53f::t_0232dd81a1e0d2 72-73
+  s_8237c2c8e4b53f::t_4b690cb5c0badf 80-81
+  s_8237c2c8e4b53f::t_2ea7e6d1849118 172-179,181-183,186-187,189-197
+  s_8237c2c8e4b53f::t_72bf983289aa8d 11-12,16
+  s_8237c2c8e4b53f::t_1ab19cefaf8fa6 21,24
+  s_8237c2c8e4b53f::t_039d51fbd92a37 170-171
+scripts/runtime/game_runtime.gd
+  s_8237c2c8e4b53f::t_48037608696890 34-35
+  s_8237c2c8e4b53f::t_1b8fff6a3cf6e3 144-145,147-155,163
+  s_8237c2c8e4b53f::t_190a2d51ab8f67 52-53
+  s_8237c2c8e4b53f::t_ec5cb81420f631 12-13
+  s_8237c2c8e4b53f::t_a44a30668c4807 156-162
+docs/product-specs/bootstrap-and-overworld.md
+  s_8237c2c8e4b53f::t_d4b1281db6a577 51
+  s_8237c2c8e4b53f::t_95cc6e3fca1a69 49
+  s_8237c2c8e4b53f::t_b961a81e2e0d67 4
+  s_8237c2c8e4b53f::t_a321f970c94c2d 2
+  s_8237c2c8e4b53f::t_820b8a484505c3 50
+scripts/app/storage_release_mouse_check.gd.uid
+  s_8237c2c8e4b53f::t_83c05d76d5ec3e 1
+docs/generated/visual-baselines/18_storage_box.png.import
+  s_7b5284d24921aa::t_1df487dc494c6d 1-40
+docs/generated/visual-baselines/19_storage_screen.png.import
+  s_7b5284d24921aa::t_41b4b007e505e7 1-40
+scripts/app/smoke_tap.gd.uid
+  s_7b5284d24921aa::t_c4c350679bd544 1
+scripts/app/storage_flow_party_checks.gd.uid
+  s_7b5284d24921aa::t_e6615d0bd1b4d8 1
+scripts/app/storage_flow_scenario.gd.uid
+  s_7b5284d24921aa::t_f5f94e3b924987 1
+scripts/app/visual_sweep_storage.gd.uid
+  s_7b5284d24921aa::t_516d7b12133d02 1
+scripts/app/wild_battle_scenario.gd.uid
+  s_7b5284d24921aa::t_57741f77115a22 1
+scripts/app/input_gate_scenario.gd.uid
+  s_8237c2c8e4b53f::t_a10f39c86707f5 1
+scripts/runtime/harvest_runtime.gd.uid
+  s_8237c2c8e4b53f::t_1c5c4e20432c9f 1
+scripts/runtime/storage_runtime.gd.uid
+  s_8237c2c8e4b53f::t_e7a5fcce00fcc3 1
+scripts/ui/party_actions.gd.uid
+  s_8237c2c8e4b53f::t_3605743c7cc89f 1
+scripts/ui/storage_screen.gd.uid
+  s_8237c2c8e4b53f::t_87b63316cdf7e2 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "290e272834ae92cfd0e08310c1b3dc2ee9e21ad6",
+  "prompts": {},
+  "sessions": {
+    "s_7b5284d24921aa": {
+      "agent_id": {
+        "tool": "pi",
+        "id": "019f91b1-cb46-7cd7-aefe-0f75b7f0c222",
+        "model": "k3"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    },
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
