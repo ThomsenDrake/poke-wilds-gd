@@ -1,0 +1,25 @@
+CONTROLS.md
+  s_8237c2c8e4b53f::t_efcbb0d41a74a0 53-54
+  s_8237c2c8e4b53f::t_4e2ffdd6aa7f4d 89
+  s_8237c2c8e4b53f::t_8c4fbebd5d3dd1 90
+  s_8237c2c8e4b53f::t_a28f7894b199d7 30
+  s_8237c2c8e4b53f::t_e8e5cc8d8c929c 22
+  s_8237c2c8e4b53f::t_539a8b31806a5c 1-21,23-29,31,33-52,55-88,91-147
+  s_8237c2c8e4b53f::t_e29db6e6f75a79 32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "b4a5db4fc70987db46810b2e17f84acc68ef851f",
+  "prompts": {},
+  "sessions": {
+    "s_8237c2c8e4b53f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c45945a9-5cd6-44eb-b305-303c0968800e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
