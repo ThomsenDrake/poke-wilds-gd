@@ -20,6 +20,7 @@ const NightSystem := preload("res://scripts/runtime/night_system.gd")
 const MaterialDrops := preload("res://scripts/domain/material_drops.gd")
 const CraftingRuntime := preload("res://scripts/runtime/crafting_runtime.gd")
 const CampingRuntime := preload("res://scripts/runtime/camping_runtime.gd")
+const FieldMoveRuntime := preload("res://scripts/runtime/field_move_runtime.gd")
 
 # Emitted per successful harvest so the view can re-render the tile without a world rebuild.
 signal world_overridden(tile: Vector2i)
@@ -39,9 +40,9 @@ var _biome_encounters = BiomeEncounters.new()
 var night_system = NightSystem.new()
 var crafting_runtime = CraftingRuntime.new()
 var camping_runtime = CampingRuntime.new()
+var field_move_runtime = FieldMoveRuntime.new()
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
-
 
 func _ready() -> void:
 	_rng.randomize()
@@ -54,6 +55,7 @@ func _ready() -> void:
 	night_system.setup(session, catalog, trace, Callable(_world_gen, "placements_for_save"), Callable(_biome_encounters, "is_battle_viable"), _rng)
 	crafting_runtime.setup(session, catalog, trace)
 	camping_runtime.setup(session, trace)
+	field_move_runtime.setup(session, catalog, trace, _world_gen, night_system, _rng, world_overridden.emit)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
 	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
@@ -110,19 +112,16 @@ func warn(source: String, message: String, payload: Dictionary = {}) -> void:
 
 func get_world_seed() -> int: return session.world_seed
 
-
 func get_player_tile() -> Vector2i: return session.player_tile
-
 
 func set_player_tile(tile_position: Vector2i) -> void:
 	session.player_tile = tile_position
 
-
-# One completed overworld step: lifetime counter plus one minute of clock time.
+# One completed overworld step: lifetime counter + one clock minute. The session
+# step also decays the Phase 4 repel counter (session_state.note_step_taken).
 func note_player_step() -> void:
 	session.note_step_taken()
 	session.advance_time(1)
-
 
 func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
@@ -206,6 +205,7 @@ func seed_for_smoke(seed: int) -> void:
 
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
+	if field_move_runtime.repel_suppresses(): return {} # repel short-circuits BEFORE any encounter rng is consumed
 	var species_id = _pick_encounter_species(biome)
 	var species_entry = {}
 	if not species_id.is_empty():

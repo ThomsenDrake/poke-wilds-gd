@@ -39,7 +39,7 @@ In the overworld, `Z` acts on the tile you're facing. The game checks the follow
 
 Enter build mode by pressing `Z` on open ground with a Build-capable Pokémon, or by choosing the FIELD: Build move from the party screen. You build on the tile you were facing — the target tile is locked in when you enter, and you can't move while building.
 
-- **Cycle structures with the movement keys**: Left or Up = previous, Right or Down = next, wrapping around the full list: wall, door, roof, partition, fence, campfire, storage box, bed, torch. The wall is selected by default.
+- **Cycle structures with the movement keys**: Left or Up = previous, Right or Down = next, wrapping around the full list: wall, door, roof, partition, fence, campfire, storage box, bed, torch, way stone. The wall is selected by default.
 - A ghost preview shows whether the spot works: **white** = placeable, **magenta** = not, along with a hint of the materials you have versus what's needed. A door placed beside a fence previews as a gate.
 - **`Z`** places the selected structure. Success exits build mode; if placement is refused, the reason is shown and the mode stays open so you can try again.
 - **`X`** exits without placing anything.
@@ -77,7 +77,7 @@ Actions:
 - **SWAP LEAD** — make this Pokémon the lead. Always available.
 - **MOVE** — reorder the party (only with two or more Pokémon): Up/Down live-swaps the member with wrap-around, **`Z`** commits the new order, and **`X`** cancels and restores the original order.
 - **SUMMARY** — shows stats; `Z` or `X` returns to the action menu.
-- **FIELD: \<move\>** — one entry per eligible field move. Build enters build mode with that Pokémon; Cut / Smash / Dig harvest the tile you're facing; using a move where nothing needs it simply says so.
+- **FIELD: \<move\>** — one entry per eligible field move. Build enters build mode with that Pokémon; Cut / Smash / Dig harvest the tile you're facing; **Ride** mounts (and dismounts) a rideable Pokémon for faster travel; **Fly** flies you to the last [way stone](#traversal--utility-field-moves) you registered; using a move where nothing needs it simply says so. (The menu lists only the moves a Pokémon explicitly knows — so Fly and Ride show here for Pokémon that know them. Cut/Smash/Dig and Build also resolve from the overworld `Z` action; Surf and Flash are passive; and Teleport/Repel/Power/Attack/Charm are type-based and don't appear in this menu in the current roster — see [Traversal & utility field moves](#traversal--utility-field-moves).)
 - **DEPOSIT** — sends the Pokémon to a storage box. Appears only while you stand next to a placed storage box; if it's refused, the hint line explains why.
 - **RETRIEVE: \<name\>** — takes back the oldest Pokémon held at your campsite. Appears when something is being held and your party has fewer than six.
 - **CANCEL**
@@ -123,9 +123,22 @@ One general rule: **the press that closes a menu, confirms a choice, or ends a b
 Some party abilities simply work, with no keypress:
 
 - **Water crossing (Surf)** — if your party contains a Surf-capable Pokémon (a fully evolved Water type), water tiles are walkable, no action needed. Otherwise water stops you, with a hint that a Surf-capable Pokémon could cross.
-- **Light at night (Flash)** — any Fire-type party member gives your party light at night. This is passive — there is no Flash move to use.
+- **Light at night (Flash)** — any Fire-type party member gives your party light at night, lighting the tiles around you out to the same range as a campfire (4 tiles). This is passive — faithful to the original, Flash "can't be selected like Cut"; its overworld effect simply IS the light (see [Traversal & utility field moves](#traversal--utility-field-moves)).
 - **Campfire and torch light** — a lit campfire or placed torch within 4 tiles also keeps you in the light. Torches are always lit; a campfire counts as lit unless you extinguished it from the camp menu. Lit campfires and torches glow at night.
 - **If you're in the dark at night**, about half of encounters become shadow ghosts — and you cannot run from them. Only victory, capture, or blackout ends the battle.
+
+## Traversal & utility field moves
+
+Beyond harvesting (Cut/Smash/Dig) and building, your party's field moves cover travel and a few overworld tasks. The harvesting moves (Cut/Smash/Dig) and Build resolve from the overworld `Z` context action; the travel moves (Ride, Fly) are chosen from the [party screen](#party-screen-keyboard-only)'s FIELD move list. **Activation reality:** the FIELD list shows only the moves a Pokémon explicitly knows, so in the current roster only Fly and Ride appear there; Surf and Flash are passive (they simply work — see [Passive Abilities](#passive-abilities)); and the type-based moves (Teleport, Repel, Power, Attack, Charm) have working callers but don't surface in the menu — they fire from the FIELD list only if a Pokémon explicitly knows one, and are otherwise exercised by the automated test harness (surfacing them more broadly is tracked as tech debt).
+
+- **Way stones** — a buildable structure (the last entry in the [Build Mode](#build-mode) cycle). Building one registers it as a warp point you can return to. Way stones are the targets of Teleport and Fly.
+- **Ride** — mount a rideable Pokémon (FIELD: Ride) to move noticeably faster than running; choose it again (or the dismount action) to get back on foot. Ride speeds up travel only — it does not climb ledges.
+- **Fly** — FIELD: Fly flies you straight to the last way stone you registered. You can only fly to way stones you've already reached (registered); a selection menu over your stones is a later addition.
+- **Teleport** — return to your registered way stone. (Type-based — Psychic — so it doesn't surface in the FIELD menu for most parties in the current roster; see the activation-reality note above. Reaches way stones within the same world only; traveling between worlds is a later feature.)
+- **Repel** — wild encounters stop for a number of steps, then resume. (Type-based — Poison — so it doesn't surface in the FIELD menu for most parties in the current roster; see the activation-reality note above. Simplified from the original, where Repel is a crafted item that only wards off low-level Pokémon.)
+- **Power** — shove a boulder one tile out of the way (boulders are the movable rocks, distinct from the cliffs Smash breaks apart). The move is wired, but boulders don't appear in the world yet — they arrive with a later landmark update; until then Power has nothing to act on. (Type-based — Electric — so it doesn't surface in the FIELD menu for most parties in the current roster; see the activation-reality note above.)
+- **Flash** — see [Passive Abilities](#passive-abilities): a Fire-type lights the area around you automatically.
+- **Attack / Charm** — overworld moves for dealing with wild Pokémon you can see in the field (Attack engages a hostile one; Charm calms a timid one, more reliably at higher levels). The visible overworld Pokémon they act on arrive in a later update; until then these moves have nothing to target.
 
 ## Mouse
 
@@ -144,4 +157,7 @@ Keyboard only: the party screen, the bag item list, and confirm dialogs (`Z` / `
 - **One key, two jobs**: `X` handles both cancel and run (separate buttons in the original); the two never apply at once.
 - **Night ghost battles**: the original held you "until dawn"; here the clock stands still during battles, so a ghost battle lasts until you win, capture, or black out.
 - **Release is permanent** right now — a released Pokémon does not appear in the overworld.
-- **This slice**: the battle menu offers Fight, Item, and Run only (no party switching), and Surf and Flash exist as passive abilities rather than moves you trigger in the field.
+- **Surf and Flash stay passive**: as in the original, a Surf-capable Pokémon simply makes water walkable, and a Fire-type simply lights the area around you (Flash "can't be selected like Cut"). Ride, Fly, Teleport, Repel, and Power are active field moves here (with working callers) — though in the current roster only Fly and Ride surface in the FIELD menu for most parties (see [Traversal & utility field moves](#traversal--utility-field-moves)).
+- **Repel** is a field move that wards off all encounters for a number of steps; in the original it is a crafted item (and a Max Repel) that only repels low-level Pokémon.
+- **Way stones vs. beacons**: warp points within a world are way stones (the targets of Teleport and Fly). The original's edge-of-world "Teleport Beacons" for traveling between worlds are not in yet.
+- **This slice**: the battle menu offers Fight, Item, and Run only (no party switching); Attack and Charm are wired but have no visible overworld Pokémon to act on yet.

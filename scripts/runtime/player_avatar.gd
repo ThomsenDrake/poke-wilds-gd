@@ -18,6 +18,9 @@ const LEGACY_WALK_SHEET_PATH := "res://pokewilds/player/kris-walking.png"
 @export var start_tile = Vector2i(0, 0)
 @export var walk_step_seconds = 0.16
 @export var run_step_seconds = 0.09
+# Phase 4 Ride: a mounted party member moves faster than the hold-to-run gait
+# (faithful "outrun foes faster"). Deterministic — a step duration, never a clock.
+@export var mount_step_seconds = 0.05
 @export var encounter_chance = 0.12
 @export var run_encounter_modifier = 0.65
 
@@ -29,6 +32,7 @@ var input_enabled = true
 
 var _moving = false
 var _move_running = false
+var _mounted = false # Phase 4 Ride: set by the field_move_runtime via set_mounted.
 var _move_elapsed = 0.0
 var _move_duration = 0.16
 var _move_from = Vector2.ZERO
@@ -65,6 +69,10 @@ func setup(world_renderer) -> void:
 
 
 func set_tile_position(new_tile_position: Vector2i) -> void:
+	# Cancel any in-flight step so a warp (teleport/fly) can never be undone
+	# by a frozen step tween resuming after input re-enables.
+	_moving = false
+	_move_elapsed = 0.0
 	tile_position = new_tile_position
 	if world == null:
 		position = Vector2(tile_position.x * TILE_SIZE, tile_position.y * TILE_SIZE)
@@ -95,6 +103,27 @@ func facing_tile() -> Vector2i:
 # this so Z cannot fire mid-step with a stale faced tile.
 func is_moving() -> bool:
 	return _moving
+
+
+# Phase 4 Ride mount mode: while mounted the avatar uses the faster mount_step
+# gait and the run-stride sprite as the mount visual (no dedicated mount art ships
+# in the submodule, so the run sheet is the documented fallback; real mount art can
+# replace it without touching the speed logic). A flag, never a clock, so the mode
+# is assertable deterministically.
+func set_mounted(mounted: bool) -> void:
+	if _mounted == mounted:
+		return
+	_mounted = mounted
+	_set_sprite_state(_facing, false)
+
+
+func is_mounted() -> bool:
+	return _mounted
+
+
+# Mounted behaves like running for gait/encounter purposes (riding outruns foes).
+func _is_fast_gait() -> bool:
+	return _mounted or _move_running
 
 
 func _process(delta: float) -> void:
@@ -138,7 +167,8 @@ func _try_start_step(step_direction: Vector2i) -> void:
 		return
 
 	_move_running = Input.is_action_pressed(ACTION_RUN)
-	_move_duration = run_step_seconds if _move_running else walk_step_seconds
+	# Ride (Phase 4): a mount outruns the hold-to-run gait; mounted beats run.
+	_move_duration = mount_step_seconds if _mounted else (run_step_seconds if _move_running else walk_step_seconds)
 	_move_elapsed = 0.0
 	_move_from = position
 	_move_to = world.map_to_world(next_tile)
@@ -170,7 +200,7 @@ func _try_trigger_encounter() -> void:
 	if not world.is_encounter_tile(tile_position):
 		return
 	var trigger_chance = encounter_chance
-	if _move_running:
+	if _is_fast_gait():
 		trigger_chance *= run_encounter_modifier
 	if _rng.randf() <= trigger_chance:
 		encounter_requested.emit(tile_position)
@@ -191,12 +221,14 @@ func _can_step(step_direction: Vector2i) -> bool:
 
 func _set_sprite_state(direction: Vector2i, moving: bool) -> void:
 	var animation_name := String(_direction_to_animation(direction))
-	if moving and _move_running:
+	# Mounted rides the run-stride frames as the mount visual (documented fallback
+	# until dedicated mount art lands); running and mounting share the fast gait.
+	if moving and _is_fast_gait():
 		animation_name = "run_" + animation_name
 	if _sprite.animation != animation_name:
 		_sprite.animation = animation_name
 	if moving:
-		_sprite.speed_scale = 1.8 if _move_running else 1.0
+		_sprite.speed_scale = 1.8 if _is_fast_gait() else 1.0
 		_sprite.play(animation_name)
 	else:
 		_sprite.stop()

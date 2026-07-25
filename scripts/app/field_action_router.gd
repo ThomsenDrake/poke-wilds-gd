@@ -1,47 +1,43 @@
 extends RefCounted
 
 # App-layer field-action routing extracted from main.gd (same rationale as
-# input_router.gd, whose header says it was extracted so the scene script stays
-# under its line budget). Owns the harvest-vs-build precedence for the overworld
-# context Z and the party-screen FIELD MOVE — consuming the move_id the party
-# screen sends (Phase 0 flagged main.gd ignoring it) — plus build-mode
-# enter/exit bookkeeping. Main forwards its two callbacks here.
+# input_router.gd: the scene script stays under its line budget). Owns the
+# harvest-vs-build precedence for the overworld context Z and the party-screen
+# FIELD MOVE — consuming the move_id the party screen sends (Phase 0 flagged
+# main.gd ignoring it) — plus build-mode enter/exit bookkeeping.
 #
-# Phase 2 camping slice (spec: docs/product-specs/camping-crafting-survival.md):
-# the faced-tile Z gains camp-object precedence — a placed campfire opens the
-# CampMenu (Craft / Extinguish-or-Light / Demolish) and a placed bed rests
-# through camping_runtime.rest("bed"); anything else keeps the harvest-then-
-# build flow below. Demolition STAYS reachable as a CampMenu entry, so the
-# build loop's witness escape is never shadowed by the new precedence (the
-# placement scenarios call try_demolish directly and stay green regardless).
-# Also owns the campfire lit toggle the menu entry dispatches: it mutates the
-# generator's live placement entry ("lit": false when extinguished, ABSENT
-# when lit), traces campfire_lit, and saves — the placement map is canonical,
-# exactly like occupancy. Phase 2 runtime handles (the crafting_runtime /
-# camping_runtime members on GameRuntime) are duck-typed: until they land, a
-# camp-object Z degrades to the Phase 1 harvest/demolish path.
+# Phase 2 camping slice: the faced-tile Z gains camp-object precedence — a placed
+# campfire opens the CampMenu (Craft / Extinguish-or-Light / Demolish) and a placed
+# bed rests through camping_runtime.rest("bed"); anything else keeps the harvest-
+# then-build flow. Demolition STAYS a CampMenu entry, so the build loop's witness
+# escape is never shadowed (placement scenarios call try_demolish directly). The
+# campfire lit toggle mutates the generator's live placement entry ("lit": false
+# when extinguished, ABSENT when lit), traces campfire_lit, saves — the placement
+# map is canonical, like occupancy.
 #
-# Phase 3 storage slice (spec: docs/product-specs/storage-and-party.md): the
-# faced-tile Z gains a storage_box arm mirroring the campfire one — disable the
-# avatar, open the StorageScreen on that box's tile, and on its `closed` signal
-# re-enable the avatar + save (every box mutation persists). The closing X
-# press feeds input_router's generalized latch via main.gd's bind_ui_consumers
-# (it cannot re-fire the polls); the _overlay_open early-return (registry-
-# mandated name, subsystems.toml) neutralizes the context poll while ANY overlay owns the screen.
+# Phase 3 storage slice: the faced-tile Z gains a storage_box arm mirroring the
+# campfire one — disable the avatar, open the StorageScreen on that box's tile, and
+# on its `closed` signal re-enable + save. The closing X press feeds input_router's
+# generalized latch; _overlay_open neutralizes the context poll while ANY overlay
+# owns the screen.
+#
+# Phase 4 field-move slice: the eight new moves route to field_move_actions.gd ->
+# runtime/field_move_runtime.gd (budget split; the router only delegates).
+
+const FieldMoveActions := preload("res://scripts/app/field_move_actions.gd")
 
 const BUILD_MOVE := "build"
 const CAMPFIRE_ID := "campfire"
 const BED_ID := "bed"
 const BOX_ID := "storage_box"
-# The ONLY field moves with a live overworld effect from the party screen; the
-# rest render as capability display (their overworld triggers are future phases —
-# spec: menu-and-save.md FIELD MOVE classification).
+# cut/dig/smash harvest the faced tile; build + the Phase 4 moves route elsewhere.
 const HARVEST_ACTIONS := ["cut", "dig", "smash"]
 
 var _runtime: Node = null
 var _world: Node = null
 var _player: Node = null
 var _structure_layer: Node = null
+var _field_move_actions = FieldMoveActions.new()
 var _camp_menu: Node = null
 var _storage_screen: Node = null
 var _show_message: Callable = Callable()
@@ -53,6 +49,7 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 	_player = player
 	_structure_layer = structure_layer
 	_show_message = show_message
+	_field_move_actions.setup(runtime, world, player, show_message)
 	_camp_menu = camp_menu
 	_storage_screen = storage_screen
 	if _camp_menu != null and _camp_menu.has_signal("closed") and not _camp_menu.closed.is_connected(_on_camp_menu_closed):
@@ -79,11 +76,11 @@ func on_context_action() -> void:
 		_message(result)
 
 
-# Party-screen FIELD MOVE: Build opens build mode constrained to the selected
-# mon (which must itself be capable); cut/dig/smash harvest the faced tile under
-# that mon's constraint (the pre-existing harvest behavior); every other move is
-# capability display only — activating it explains there is nothing here that
-# needs it instead of silently harvesting (overworld triggers: future phases).
+# Party-screen FIELD MOVE: Build opens build mode constrained to the selected mon
+# (which must itself be capable); cut/dig/smash harvest the faced tile under that
+# mon's constraint; the eight Phase 4 moves (flash/teleport/fly/ride/repel/power/
+# attack/charm) delegate to field_move_actions -> field_move_runtime; anything else
+# is capability display ("nothing here needs it") rather than a silent harvest.
 func on_field_move_requested(move_id: String, mon_index: int) -> void:
 	var party: Array = _runtime.get_party_snapshot()
 	var mon: Dictionary = party[mon_index] if mon_index >= 0 and mon_index < party.size() else {}
@@ -94,6 +91,9 @@ func on_field_move_requested(move_id: String, mon_index: int) -> void:
 			_show_message.call("%s can't use that here." % str(mon.get("name", "That Pokemon")), 1.6)
 			return
 		enter_build_mode(mon)
+		return
+	if _field_move_actions.handles(move_id):
+		_field_move_actions.route(move_id)
 		return
 	if not HARVEST_ACTIONS.has(move_id):
 		_show_message.call("%s knows %s, but there's nothing here that needs it." % [str(mon.get("name", "That Pokemon")), _runtime.catalog.get_field_move_name(move_id)], 1.8)

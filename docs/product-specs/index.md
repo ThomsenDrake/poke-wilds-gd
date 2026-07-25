@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-24
+Last verified: 2026-07-25
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 
@@ -9,6 +9,7 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Battle and capture loop: [battle-and-capture.md](battle-and-capture.md)
 - Menu and save loop: [menu-and-save.md](menu-and-save.md)
 - Harvest and mutation loop: [harvest-and-mutation.md](harvest-and-mutation.md)
+- Field moves — traversal & utility (Flash, Teleport/Way Stones, Ride, Fly, Attack/Charm, Repel, Power): [field-moves.md](field-moves.md)
 - Building and placement loop: [building-and-placement.md](building-and-placement.md)
 - Camping, crafting & night survival loop: [camping-crafting-survival.md](camping-crafting-survival.md)
 - Storage boxes & party management loop: [storage-and-party.md](storage-and-party.md)

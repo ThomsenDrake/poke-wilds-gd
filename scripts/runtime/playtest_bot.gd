@@ -263,3 +263,58 @@ func _random_action(snapshot: Dictionary, state: Dictionary) -> Dictionary:
 		options.append({"type": "potion"})
 	options.append({"type": "run"})
 	return options[rng.randi_range(0, options.size() - 1)]
+
+# --- Phase 4 field-move soak band (spec: docs/product-specs/field-moves.md) -----
+# Picks a capable move off the seeded rng, drives the field_move_runtime seam, applies
+# the node effect (avatar warp/mount) via the runner. Pure runtime effects => synchronous
+# + deterministic; a no-capable roll is a no-op, so it never soft-locks.
+const FIELD_SOAK_MOVES := ["flash", "teleport", "ride", "fly", "repel", "power", "charm", "attack"]
+
+func try_random_field_move(runtime, world, player, runner, rng: RandomNumberGenerator, stats: Dictionary) -> String:
+	var fmr = runtime.field_move_runtime
+	_ensure_way_stone(runtime, player, runner)
+	var capable: Array = []
+	for move_id in FIELD_SOAK_MOVES:
+		if runtime.party_has_field_move_ability(move_id):
+			capable.append(move_id)
+	if capable.is_empty():
+		return ""
+	match capable[rng.randi_range(0, capable.size() - 1)]:
+		"flash": fmr.use_flash(player.tile_position)
+		"teleport": _warp(fmr.use_teleport(), world, player, runtime, runner)
+		"ride":
+			var ride: Dictionary = fmr.use_ride()
+			if bool(ride.get("ok", false)):
+				player.set_mounted(bool(ride.get("riding", false)))
+		"fly":
+			var stones: Array = fmr.way_stone_tiles()
+			if not stones.is_empty():
+				_warp(fmr.use_fly(Vector2i(stones[rng.randi_range(0, stones.size() - 1)])), world, player, runtime, runner)
+		"repel": fmr.activate_repel(5)
+		"power": _exercise_power(runtime, player)
+		"charm": fmr.use_charm("RATTATA", 5 if rng.randf() < 0.5 else 999) # both pacify outcomes
+		"attack": fmr.use_attack("RATTATA")
+	stats["field_moves_used"] = int(stats.get("field_moves_used", 0)) + 1
+	return ""
+
+func _warp(result: Dictionary, world, player, runtime, runner) -> void:
+	if bool(result.get("ok", false)):
+		runner.teleport_player(world, player, runtime, Vector2i(result.get("tile", player.tile_position)))
+
+# Teleport/Fly need a registered way stone (register one near the player if absent);
+# Power needs a boulder to push (place one on an open neighbor if none is faced).
+func _ensure_way_stone(runtime, player, runner) -> void:
+	if not runtime.field_move_runtime.way_stone_tiles().is_empty():
+		return
+	for ring in range(1, 8):
+		for tile in runner.ring_around(player.tile_position, ring):
+			if runtime.field_move_runtime.register_way_stone(tile).get("ok", false):
+				return
+
+func _exercise_power(runtime, player) -> void:
+	var fmr = runtime.field_move_runtime
+	for dir in [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP]:
+		var from: Vector2i = player.tile_position + dir
+		if fmr.boulder_tiles().has(from) or fmr.place_boulder(from).get("ok", false):
+			fmr.use_power(from, dir)
+			return

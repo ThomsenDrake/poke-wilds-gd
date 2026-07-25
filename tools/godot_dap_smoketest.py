@@ -207,6 +207,27 @@ SCENARIO_REQUIREMENTS = {
                 "time_evolution_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Phase 4 field-move completion (field-moves.md): the all-list pins the eight
+    # Phase-4 domain traces + the pass marker, not just the pass event.
+    "field_moves_flow": {
+        "all": ["boot_started", "boot_ready", "flash_lit", "teleport_used",
+                "waystone_registered", "mount_summoned", "fly_used", "overworld_attack",
+                "charm_used", "repel_active", "field_moves_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Building playtest (field-moves.md addition B): harvest -> build a house WITH a
+    # door -> demolish with full refund, driven by the all-field-moves party.
+    "build_house_flow": {
+        "all": ["boot_started", "boot_ready", "field_move_used", "structure_placed",
+                "materials_consumed", "structure_demolished", "materials_refunded",
+                "build_house_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Field-move soak (self-guarded playtest_ scenario, like journey/soak).
+    "playtest_field_soak": {
+        "all": ["boot_started", "boot_ready", "playtest_field_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
 }
 
 

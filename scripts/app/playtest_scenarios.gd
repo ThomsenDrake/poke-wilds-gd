@@ -7,6 +7,7 @@ extends Node
 const PlaytestBot := preload("res://scripts/runtime/playtest_bot.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
+const PlaytestFieldSoakScenario := preload("res://scripts/app/playtest_field_soak_scenario.gd")
 
 const SOAK_SEED := 20260717
 const SOAK_ITERATIONS := 150
@@ -86,6 +87,9 @@ func run_soak(ctx: Dictionary) -> void:
 	else:
 		push_error("Playtest soak failed at iteration %d: %s (warnings seen: %d)" % [iterations, fail, int(stats["warnings"])])
 	await get_tree().create_timer(0.1).timeout
+# Field-move soak (Phase 4): driver lives in playtest_field_soak_scenario.gd.
+func run_field_soak(ctx: Dictionary) -> void:
+	var soak := PlaytestFieldSoakScenario.new(); add_child(soak); await soak.run(ctx)
 
 
 # Fresh game through the runtime, then the same world resync main.gd performs.

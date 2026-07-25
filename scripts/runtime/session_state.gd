@@ -1,20 +1,16 @@
 extends RefCounted
 
-# Mutable gameplay session: party, bag, world position, the in-game clock,
-# and the lifetime step counter.
-# Save schema v3 adds `world_overrides` (GameRuntime threads it from the world
-# generator) and drops the v2 `unlocked_field_moves` key (capability comes from
-# the party now). v1/v2 payloads are still accepted; missing keys backfill with
-# new-game defaults. Bag ids are lowercase i18n keys; legacy ids remap on load.
-# v3 also carries campsite_x/campsite_y/campsite_pokemon (additive keys): the
-# non-losing hold for full-party captures, retrievable from the party screen.
-# The build loop's placed structures ride the same additive pattern under a
-# separate "structures" key (older saves lack it -> backfill to {} on load).
-# Save schema v4 (storage boxes; spec: docs/product-specs/storage-and-party.md)
-# is PURELY ADDITIVE over v3: a storage_box placement entry may carry a "contents"
-# array of mons (absent = empty box), riding the "lit" precedent on the entry.
-# Older saves load unchanged; an older build meeting a v4 save refuses
-# non-destructively to .newer.bak (save_store's version gate).
+# Mutable gameplay session: party, bag, world position, the in-game clock, the
+# lifetime step counter and the Phase 4 repel counter. Save schema is ADDITIVE
+# after v2 (SAVE_VERSION is NOT bumped for additive keys — the v3 campsite
+# precedent; missing keys backfill with new-game defaults; v1/v2 payloads still
+# load with legacy bag-id remap; an older build meeting a newer save refuses
+# non-destructively to .newer.bak via save_store's version gate). v3 adds
+# `world_overrides` (GameRuntime threads it from the generator), the campsite hold
+# (campsite_x/y/pokemon) and a "structures" key for placements, and drops v2's
+# `unlocked_field_moves`; v4 lets a storage_box entry carry a "contents" mon array
+# (absent = empty, riding the "lit" precedent); Phase 4 adds "repel_steps" the same
+# way (older saves backfill to 0).
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
@@ -46,6 +42,7 @@ var bag: Dictionary = {}
 var unlocked_field_moves: Dictionary = {}
 var time_of_day_minutes: int = NEW_GAME_TIME_OF_DAY
 var total_steps: int = 0
+var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
 
 
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
@@ -59,6 +56,7 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	bag = STARTING_BAG.duplicate()
 	time_of_day_minutes = NEW_GAME_TIME_OF_DAY
 	total_steps = 0
+	repel_steps = 0
 	if not starter.is_empty():
 		party.append(starter)
 
@@ -77,6 +75,7 @@ func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
 	time_of_day_minutes = _wrap_time(int(data.get("time_of_day_minutes", NEW_GAME_TIME_OF_DAY)))
 	total_steps = maxi(0, int(data.get("total_steps", 0)))
+	repel_steps = maxi(0, int(data.get("repel_steps", 0))) # Phase 4 additive (absent -> 0).
 	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit
 	# scratch space (smoke_scenario_runner pokes it directly).
 	unlocked_field_moves.clear()
@@ -92,6 +91,7 @@ func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dic
 		"bag": bag,
 		"time_of_day_minutes": time_of_day_minutes,
 		"total_steps": total_steps,
+		"repel_steps": repel_steps,
 		"world_overrides": world_overrides,
 		# Split save key for placed structures (canonical: the generator's map).
 		"structures": structures_overrides,
@@ -263,6 +263,7 @@ func time_of_day_label() -> String:
 
 func note_step_taken() -> void:
 	total_steps += 1
+	repel_steps = maxi(0, repel_steps - 1) # Repel counts down one per step (clamped).
 
 
 # Audit scratch accessor: no stored unlock model (the runner pokes the dict).

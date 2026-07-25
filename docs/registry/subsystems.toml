@@ -463,3 +463,75 @@ quality_bucket = "storage"
 # and self-wires via the /root/GameRuntime autoload convention; the ui scene
 # references ui only per check_architecture. See
 # docs/product-specs/camping-crafting-survival.md.
+
+[[subsystems]]
+name = "field_moves"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/runtime/field_move_runtime.gd",
+  "scripts/runtime/field_moves_party.gd",
+  "scripts/app/field_moves_flow_scenario.gd",
+  "scripts/app/field_moves_checks.gd",
+  "scripts/app/field_moves_ground_checks.gd",
+  "scripts/app/build_house_flow_scenario.gd",
+  "scripts/app/build_house_flow_build.gd",
+  "scripts/app/playtest_field_soak_scenario.gd",
+  "scripts/app/field_move_actions.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/field-moves.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario field_moves_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario build_house_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario playtest_field_soak",
+  "python3 tools/run_playtests.py",
+]
+# All eight Phase-4 domain traces are pinned (flash_lit / teleport_used /
+# waystone_registered / mount_summoned / fly_used / overworld_attack / charm_used /
+# repel_active), plus the three scenario pass markers AND their symmetric _failed
+# events (the miss-002 total-exit contract — app_bootstrap's nav_audit /
+# input_gate passed+failed pairing precedent). field_moves_flow + build_house_flow
+# are qa-dispatched; playtest_field_soak routes through smoke_scenarios' playtest_
+# branch (self-guarded by PlaytestBot.backup_save/restore_save) like journey/soak.
+required_trace_events = ["flash_lit", "teleport_used", "waystone_registered", "mount_summoned", "fly_used", "overworld_attack", "charm_used", "repel_active", "field_moves_passed", "field_moves_failed", "build_house_passed", "build_house_failed", "playtest_field_soak_passed", "playtest_field_soak_failed"]
+quality_bucket = "field_moves"
+# CROSS-SUBSYSTEM CO-MODIFICATION: field_moves EXTRACTS its orchestrator into the NEW
+# scripts/runtime/field_move_runtime.gd because scripts/runtime/game_runtime.gd
+# (session_runtime-owned) is AT its 320 budget and must NOT be extended — it gains
+# only same-line instantiation + setup() beside battle_runtime/build_runtime
+# (game_runtime.gd:46-62), injected with the shared _rng so teleport/repel/fly rolls
+# stay deterministic under seed_for_smoke. The capability DOMAIN
+# scripts/domain/field_moves.gd (harvest_loop-owned) is UNCHANGED — the spec records
+# the fly/ride explicit-flag-only fidelity DECISION (no AUTO_TYPES broadening; fly
+# stays 30 species, ride 32; can_perform already returns false on an empty auto-type),
+# so the all-moves party rides explicit flags (Charizard fly=1, Rhyperior ride=1).
+# Player-facing entry rides scripts/app/field_action_router.gd (building_loop-owned,
+# has room) — new on_field_move_requested / on_context_action branches for the eight
+# moves; scripts/app/main.gd (app_bootstrap-owned, 220/220) gets SAME-LINE edits only
+# (wire field_move_runtime, keep the "field_move" smoke callable at :214). The Way
+# Stone structure AND the movable boulder both extend scripts/domain/structures.gd
+# (building_loop-owned): IDS += "way_stone" (WAYSTONE_ID, walkable, cost {hard_stone:1,
+# log:1}) + BOULDER_ID (non-walkable, NO cost — a natural prop PUSHED one tile, not
+# harvested, DISTINCT from Smash's destructible rock_small1.png); both ride the
+# placements map (the additive "structures" save key) so a registered stone / pushed
+# boulder survives save/reload. The way-stone REGISTRY is the placed way_stone entries
+# themselves on that same structures save key — NO separate session_state key. ONLY the
+# repel counter is an ADDITIVE scripts/runtime/session_state.gd (session_runtime-owned)
+# key on SAVE_VERSION 4 (NO bump — v5 is reserved for the Phase-7 world_id world-
+# chaining schema; additive like the campsite_x/y anchor pattern :39-40, :98-100). The
+# active-Flash caller hook touches scripts/runtime/night_system.gd
+# (camping_loop-owned, has room) without diverging from the faithful passive light
+# (LIGHT_RADIUS=4). The Ride mount speed mode + mount sprite extend
+# scripts/runtime/player_avatar.gd (world_runtime-owned: walk/run speed modes :19-20,
+# :140-141, sprite state :216-252) within its budget. playtest_bot.gd
+# (app_bootstrap-owned) gains try_random_field_move + a field-move stats band, and
+# playtest_scenarios.gd grows run_field_soak. Those files stay OWNED BY their
+# subsystems (one owner per file); this subsystem owns field_move_runtime.gd + the
+# scenario/fixture files only. The scenarios drive moves via the overworld Z seam,
+# the new runtime seams, and smoke_context()["field_move"] (the party-screen FIELD
+# MOVE menu lists flag==1 moves only, so for the all-moves party only Fly/Ride/Surf
+# render — field-moves.md § Activation reality). See
+# docs/product-specs/field-moves.md.

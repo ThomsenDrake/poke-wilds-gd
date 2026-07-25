@@ -18,15 +18,26 @@ extends RefCounted
 # cost (4 Log + 1 Soft Bedding) is UNBUILDABLE until Phase 2 adds the Soft Bedding
 # recipe, so it is definition + occupancy + cost only.
 
-# Buildable structure ids. The order doubles as the build-mode cycle order
-# (structure_layer cycles this list); the two Phase 2-3 placeholders trail so a
-# player never lands on an unbuildable entry first. TORCH is APPENDED LAST (after
-# bed) so every existing build-cycle index and placement scenario stays stable.
-const IDS := ["wall", "door", "roof", "partition", "fence", "campfire", "storage_box", "bed", "torch"]
-# The only walkable structure: a door is the opening in a wall line that
-# connects rooms (and, beside a fence, renders as a gate). Every other id is
-# solid and blocks traversal.
-const WALKABLE := {"door": true}
+# Buildable structure ids; the order doubles as the build-mode cycle order
+# (structure_layer cycles this list). TORCH was appended after bed and WAY_STONE
+# after torch — both APPENDED LAST so every existing build-cycle index and
+# placement scenario stays stable. The way stone is a buildable Teleport beacon
+# (faithful: "you must first build teleport beacons", fresh-faq.md:180). The
+# movable BOULDER (Power) is deliberately NOT here: a natural prop the field-move
+# runtime spawns/pushes, never a build entry — yet still a valid PLACEMENT id
+# (is_valid accepts it) so it rides the placements map + save + render boundary.
+const IDS := ["wall", "door", "roof", "partition", "fence", "campfire", "storage_box", "bed", "torch", "way_stone"]
+# Walkable structures: a door opens a wall line (and beside a fence renders as a
+# gate); a way stone is a flat beacon the player stands on to teleport/fly. Every
+# other id is solid and blocks traversal.
+const WALKABLE := {"door": true, "way_stone": true}
+
+# Phase 4 ids (spec: field-moves.md): the way stone is the placeable/registered
+# warp point (Teleport + Fly); the boulder is the movable Power prop — distinct
+# from Smash's destructible rock_small1.png (that rock is HARVESTED, a boulder is
+# PUSHED one tile and rides the placements map).
+const WAYSTONE_ID := "way_stone"
+const BOULDER_ID := "boulder"
 
 # Material costs use the lowercase bag ids the harvest slice already grants
 # (session.add_item("log"/"hard_stone"/"dry_soil"); see harvest_resolver.gd).
@@ -42,6 +53,11 @@ const _DEFAULT_COSTS := {
 	# Original torch = 1 Log + 1 Grass (buildings-scrape.md:286); Grass -> dry_soil is
 	# the documented Phase 1 thatch/daub mapping used across the wood costs above.
 	"torch": {"log": 1, "dry_soil": 1},
+	# Way stone (Phase 4 beacon). The wiki gives no beacon cost, so this modest
+	# harvestable cost (hard_stone = Smash yield, log = Cut yield) is a DOCUMENTED
+	# ASSUMPTION. The movable boulder carries NO cost (absent -> cost_for returns
+	# {}): a natural prop the field-move runtime spawns, never bought.
+	"way_stone": {"hard_stone": 1, "log": 1},
 }
 # Desert homes require Hard Stone for the shell — SOURCED (house-building-scrape.md:
 # "Most homes require Logs and Grass... with the exception of Desert homes which
@@ -71,6 +87,8 @@ const _BLOCK_REASONS := {
 	"storage_box": "A storage box blocks the way.",
 	"bed": "A bed blocks the way.",
 	"torch": "A torch blocks the way.",
+	"way_stone": "",
+	"boulder": "A boulder blocks the way.",
 }
 
 # Sprite families per shell kind. The asset dump ships house1/house5 per-tile
@@ -103,6 +121,11 @@ const GATE_PATH := "res://pokewilds/tiles/fence1gate1.png"
 const _BED_PATH := "res://pokewilds/tiles/buildings/house_bed1.png"
 const _BOX_PATH := "res://pokewilds/tiles/chest1.png"
 const _TORCH_PATH := "res://pokewilds/tiles/torch_sheet1.png"
+# Phase 4 props: odd_keystone2.png is a 16x16 standing stone (the way-stone
+# beacon); tiles/rock1.png is a 16x16 boulder, a DISTINCT path from the smashable
+# rock_small1.png so harvest never mistakes a pushed boulder for a smashable rock.
+const _WAYSTONE_PATH := "res://pokewilds/tiles/odd_keystone2.png"
+const _BOULDER_PATH := "res://pokewilds/tiles/rock1.png"
 # campfire1/chest1 are 2-frame sheets; one 16-wide frame is the static prop.
 # campfire1 is a 32x20 sheet (two 16x20 frames): frame 0 is the unlit base the
 # build loop stamps, frame 1 is the lit fire — pin both so the light layer can swap.
@@ -115,7 +138,9 @@ const _TORCH_REGION := Rect2(0, 0, 16, 20)
 
 
 static func is_valid(id: String) -> bool:
-	return IDS.has(id)
+	# IDS are the build-menu structures; the boulder is a valid PLACEMENT id (rides
+	# the placements map + save + render) but is NOT in IDS, so never a build entry.
+	return IDS.has(id) or id == BOULDER_ID
 
 
 # Material cost for one structure in a biome; a fresh dict the caller may read
@@ -170,6 +195,10 @@ static func sprite_path_for(id: String, biome: String, gate: bool = false) -> St
 			return _BOX_PATH
 		"torch":
 			return _TORCH_PATH
+		"way_stone":
+			return _WAYSTONE_PATH
+		"boulder":
+			return _BOULDER_PATH
 		"wall", "door", "roof":
 			return (_SHELL[_shell_family(biome)] as Dictionary).get(id, "")
 	return ""
@@ -272,3 +301,20 @@ static func is_storage(id: String) -> bool:
 static func box_contents(placement: Dictionary) -> Array:
 	var contents: Variant = placement.get("contents", [])
 	return (contents as Array).duplicate(true) if contents is Array else []
+
+
+# --- Phase 4 field-move hooks (spec: docs/product-specs/field-moves.md) --------
+# Way stone (Teleport/Fly warp point) + movable boulder (Power) classification the
+# field_move_runtime reads so render/traversal/move logic never disagree.
+
+static func is_way_stone(id: String) -> bool:
+	return id == WAYSTONE_ID
+
+
+static func is_boulder(id: String) -> bool:
+	return id == BOULDER_ID
+
+
+# True when a tile-logic dict carries a placed boulder (the Power push target).
+static func tile_has_boulder(logic: Dictionary) -> bool:
+	return str(logic.get("structure_id", "")) == BOULDER_ID

@@ -34,6 +34,7 @@ func run(scenario: String, ctx: Dictionary) -> void:
 			"field_move": await _scenario_field_move()
 			"playtest_journey": await _playtest_scenarios().run_journey(_ctx)
 			"playtest_soak": await _playtest_scenarios().run_soak(_ctx)
+			"playtest_field_soak": await _playtest_scenarios().run_field_soak(_ctx)
 			_:
 				_runtime().warn("SmokeScenarios", "Unknown smoke scenario requested.", {"scenario": scenario})
 				await get_tree().create_timer(0.2).timeout

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-24
+Last verified: 2026-07-25
 Review cadence days: 21
 Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/BagScreen.tscn, scenes/ui/MessageBox.tscn, scripts/ui/start_menu.gd, scripts/ui/party_screen.gd, scripts/ui/bag_screen.gd, scripts/ui/party_rows.gd, scripts/ui/message_box.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/save_store.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd
 
@@ -26,3 +26,9 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
 - `field_move` finds a `cut`-gated tile, drives the party-capability field-move flow (species flags + type auto-ability; there is no stored unlock state), and confirms the tile becomes walkable with the `field_move_used` trace.
 - `save_migration` writes v1 and v2 fixtures plus a future-version fixture to the live save path (inside the runner's backup/restore guard) and drives the runtime's real load path: it asserts v1→v3 and v2→v3 field migration (legacy item id remap, dropped `unlocked_field_moves`, backfilled stats/fields) plus the additive v3→v4 storage-box contents bump, the non-destructive refusal of the future version (empty payload, `.newer.bak` preserved with its contents intact, version-refusal `warning`), a v3 fixture carrying a wall + a door under the additive `structures` key (asserting both round-trip into the generator's placement map while a structures-less v3 save backfills to empty), a v4 fixture carrying a storage box with `contents` (asserting the v3→v4 contents round-trip and load normalization while a contents-less v3 box backfills to an empty box), and emits `save_migration_passed` (payload carries `v4_ok`); it cleans up its `.newer.bak`/`.corrupt.bak`/`.tmp` artifacts so no fixture state leaks into sibling scenarios. `save_recovery` covers the corrupt/absent recovery path.
 - `ui_render_audit` covers the start menu, party, and bag screens against the art-anchored render model.
+
+## Phase 4 field-move completion (cross-subsystem)
+
+Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code only:
+- `scripts/runtime/game_runtime.gd` instantiates + `setup()`s the new `field_move_runtime` beside the other runtimes (injected with the shared `_rng` and a `world_overridden.emit` callback so its way-stone/boulder placements re-render), and `generate_wild_encounter` short-circuits to `{}` while `field_move_runtime.repel_suppresses()` — BEFORE consuming any encounter rng (structural suppression).
+- `scripts/runtime/session_state.gd` gains the additive `repel_steps` counter (reset in `reset_for_new_game`, loaded in `apply_loaded_state`, saved in `to_save_payload`, decremented in `note_step_taken`). `SAVE_VERSION` is NOT bumped — it rides the v3/v4 additive-key pattern.

@@ -29,6 +29,11 @@ const SCENARIOS := {
 	"time_evolution": [preload("res://scripts/app/time_evolution_scenario.gd"), "run", []],
 	# Phase 3 storage box + party-management proof (storage-and-party.md).
 	"storage_flow": [preload("res://scripts/app/storage_flow_scenario.gd"), "run", []],
+	# Phase 4 field-move completion proof (field-moves.md): the eight zero-caller moves
+	# driven by the all-field-moves party; group A + B checks split for the app budget.
+	"field_moves_flow": [preload("res://scripts/app/field_moves_flow_scenario.gd"), "run", []],
+	# Building playtest (field-moves.md addition B): harvest -> house with a door -> refund.
+	"build_house_flow": [preload("res://scripts/app/build_house_flow_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
 	"visual_sweep_camping": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", []],

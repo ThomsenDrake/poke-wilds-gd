@@ -51,6 +51,16 @@ var _pending_shadow := false # set by a ghost roll, consumed at battle start
 var _battle_is_shadow := false
 var _shadow_species_id := ""
 var _retreat_blocked_logged := false
+# Phase 4 active Flash field move: when lit, the player's own tile lights at
+# LIGHT_RADIUS (faithful "same range as a campfire"). This is the active seam the
+# field_move_runtime drives + traces (flash_lit). HONEST SCOPE: has_light_at checks the
+# GLOBAL passive party read (_party_has_flash) FIRST, and use_flash only arms this flag
+# for a Flash-capable party — so in normal play the passive branch already returns true
+# wherever this one could, and the active branch never decides anything a capable party
+# did not already get (the passive read is NOT positional). The faithful effect IS the
+# passive traveling light; this branch is a port convenience, kept and radius-asserted
+# under a non-Flash party in field_moves_checks.check_flash, never a positional upgrade.
+var _active_flash := false
 
 
 func setup(session_state, catalog, trace_logger, get_placements: Callable, is_species_viable: Callable, rng) -> void:
@@ -66,11 +76,26 @@ func is_night() -> bool:
 	return DayPhase.is_night(int(_session.time_of_day_minutes))
 
 
-# True inside the radius of a lit campfire or torch, or with a Flash-capable
-# (Fire-type) party member — the traveling light source.
+# Phase 4 active Flash field-move seam: the field_move_runtime toggles this when a
+# Flash-capable mon lights the area; the player's tile then emits light at
+# LIGHT_RADIUS until cleared. Deterministic (a flag, never a clock or a roll).
+func set_active_flash(on: bool) -> void:
+	_active_flash = on
+
+
+func active_flash_lit() -> bool:
+	return _active_flash
+
+
+# True inside the radius of a lit campfire or torch, with a Flash-capable
+# (Fire-type) party member (the passive traveling light), or under an active Flash.
 func has_light_at(tile: Vector2i) -> bool:
 	if _party_has_flash():
 		return true
+	if _active_flash and _session != null:
+		var player_tile: Vector2i = _session.player_tile
+		if abs(player_tile.x - tile.x) + abs(player_tile.y - tile.y) <= LIGHT_RADIUS:
+			return true
 	var placements = _get_placements.call() if _get_placements.is_valid() else {}
 	if not (placements is Dictionary):
 		return false

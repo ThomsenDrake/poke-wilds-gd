@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-24
+Last verified: 2026-07-25
 Review cadence days: 21
 Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
@@ -86,3 +86,8 @@ DECISION: placements persist in SAVE SCHEMA V3 via a NEW ADDITIVE top-level key 
 - `save_migration` extends its round-trip with a v3 payload carrying one wall + one door under `structures` (loads and re-saves both) plus a v3 payload WITHOUT `structures` (backfills to `{}`). The v3→v4 fixture lands with Phase 3.
 - `visual_sweep` gains a deterministic `13_built_house.png` baseline: under the crafted seed it swaps in a Build-capable mon, crafts the materials, scans outward for the first placeable footprint, and places a fixed wall-ring + door + roof pattern (a small house with a door). Placement is a pure override stamp with no RNG, so the shot is byte-stable.
 - DETERMINISM vs LOADED SAVE: because placements now persist under the `structures` save key, the sweep's `craft_state` WIPES the live generator's clears and placements (after writing the seed-only payload, before `rebuild`) so the crafted world is a pure function of the seed. Without this, a house/structures left in the player's save by prior play would be loaded at boot and — through `rebuild` and each `teleport_player`'s rebuild re-pulling `mutations_for_view()` — render into the overworld/biome shots (01-12), drifting them against the baselines that predate the `structures` key. Real play keeps `rebuild` carrying session mutations (`main.gd` rebuilds the overworld on return), so the wipe is sweep-local, not a change to `rebuild`'s contract.
+
+## Phase 4 field-move completion (cross-subsystem)
+
+Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code only:
+- `scripts/domain/structures.gd` gains the `way_stone` structure (a buildable Teleport beacon: walkable, `odd_keystone2.png`, appended AFTER torch in `IDS` so existing build-cycle indices stay stable) and the movable `boulder` placement id (the Power prop, `rock1.png`). The boulder is a valid PLACEMENT id (`is_valid` accepts it) but is deliberately ABSENT from `IDS`, so it is never a build-menu entry — the field-move runtime spawns and pushes it. Both ride the placements map + `structures` save key and reuse `world_overrides.apply_placement` (no validator changes). The demolition-witness invariant is unaffected (neither way_stone nor boulder is demolished for materials in the build loop).
