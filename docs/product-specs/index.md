@@ -14,4 +14,5 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Camping, crafting & night survival loop: [camping-crafting-survival.md](camping-crafting-survival.md)
 - Storage boxes & party management loop: [storage-and-party.md](storage-and-party.md)
 - Pokémon systems — shinies, breeding, habitat drops & fishing (Phase 5): [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)
+- Overworld Pokémon — roaming entities, recruitment, nests & Alphas (Phase 6): [overworld-pokemon.md](overworld-pokemon.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)

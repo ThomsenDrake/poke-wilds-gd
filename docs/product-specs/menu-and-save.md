@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-26
+Last verified: 2026-07-27
 Review cadence days: 21
 Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/BagScreen.tscn, scenes/ui/MessageBox.tscn, scripts/ui/start_menu.gd, scripts/ui/party_screen.gd, scripts/ui/bag_screen.gd, scripts/ui/party_rows.gd, scripts/ui/message_box.gd, scripts/runtime/game_runtime.gd, scripts/runtime/stone_evolution_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/save_store.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd
 
@@ -40,3 +40,7 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 - `scripts/runtime/session_state.gd` gains the ONE additive `pastures` session key (v4, NO version bump — the campsite/repel_steps precedent; absent -> {}; the breeding runtime owns validation) threading pen state through `to_save_payload`/`apply_loaded_state`.
 - `scripts/runtime/game_runtime.gd` wires the Phase 5 runtimes same-line (breeding/habitat/fishing setup with the shared `_rng`; the shiny roll on wild + starter creation traces `shiny_rolled`; `note_player_step` ticks the breeding + habitat cadences; the fishing pending-encounter seam ahead of the wild draw + `fish_caught` on capture).
 - `scripts/ui/party_rows.gd` / `party_screen.gd` gain the egg slot (eggs ride party slots; species/gender/moveset/shiny visible pre-hatch, HP reads as the step countdown) + the shiny badge (`shiny_palette.gd`).
+
+## Phase 6 integration note (overworld Pokémon)
+
+Phase 6 (`overworld-pokemon.md`) wires `overworld_mons_runtime` into `game_runtime.gd` (setup with NO `_rng` parameter — the derived-hash determinism guarantee is structural; the forced-battle pending seam is taken in `generate_wild_encounter` BEFORE fishing/Repel/ghosts; `note_battle_outcome` rides `_finish_battle`) and spends `smoke_scenario_runner.gd`'s ONE free line on the `scenario_uses_overworld` activation opt-out. Persistence is TRANSIENT by explicit decision: NO new save keys, NO `SAVE_VERSION` bump (v5 stays reserved for the Phase-7 `world_id` chaining; `session_state.gd` untouched at 4) — entities re-derive from `(world_seed, total_steps)` + clock; recruits/taken eggs persist via the existing party channels.

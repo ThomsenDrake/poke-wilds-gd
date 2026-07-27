@@ -17,6 +17,7 @@ var _playtests: Node = null
 
 func run(scenario: String, ctx: Dictionary) -> void:
 	_ctx = ctx
+	_runtime().overworld_mons_runtime.active = SmokeScenarioRunner.scenario_uses_overworld(scenario) # Phase 6 activation gate (baseline protection)
 	var guard_save := not scenario.begins_with("playtest_")
 	if guard_save:
 		_runner.backup_save()

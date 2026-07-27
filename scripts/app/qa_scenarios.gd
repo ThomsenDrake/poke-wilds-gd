@@ -41,6 +41,11 @@ const SCENARIOS := {
 	"shiny_odds": [preload("res://scripts/app/shiny_odds_scenario.gd"), "run", []],
 	"habitat_drops": [preload("res://scripts/app/habitat_drops_scenario.gd"), "run", []],
 	"fishing_flow": [preload("res://scripts/app/fishing_flow_scenario.gd"), "run", []],
+	# Phase 6 overworld mons (overworld-pokemon.md): the gate scenario + the deterministic
+	# 22/23 sweep (shared baseline dir; update never prunes foreign shots).
+	"overworld_mons": [preload("res://scripts/app/overworld_mons_scenario.gd"), "run", []],
+	"visual_sweep_overworld": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", []],
+	"visual_sweep_overworld_update": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", [{"mode": "update"}]],
 	# Pokemon-state shots 20-21 (shared baseline dir; update never prunes foreign shots).
 	"visual_sweep_pokemon": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", []],
 	"visual_sweep_pokemon_update": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", [{"mode": "update"}]],

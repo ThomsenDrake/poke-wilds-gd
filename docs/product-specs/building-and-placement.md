@@ -97,3 +97,7 @@ Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code o
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
 - `scripts/app/field_action_router.gd` gains the fishing Z arm (faced WATER tile + a bagged rod -> `fishing_runtime.try_fish`; the best rod casts; a hooked mon rides the pending-encounter seam through main's normal battle path) ahead of harvest in the context-Z precedence, and the fence Z pen action (`breeding_runtime.interact`: ground-egg pickup first, else the most-recent penned mon withdraws). Fences + gates stay unchanged; a pen IS a fence enclosure (an open gate floods out = no pen).
+
+## Phase 6 integration note (overworld Pokémon)
+
+Phase 6 (`overworld-pokemon.md`) adds ONE node to `scenes/app/Main.tscn` (the EntityLayer render node at child index 2 — after Player, before the UI CanvasLayer; `load_steps` 10→11). Build mode, placements, and demolition are untouched; entity anchors avoid prop/structure tiles at spawn (the audit pins no prop/structure overlap).

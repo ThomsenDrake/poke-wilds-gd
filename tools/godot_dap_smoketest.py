@@ -42,7 +42,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_camping", "visual_sweep_camping_update",
                            "visual_sweep_storage", "visual_sweep_storage_update",
-                           "visual_sweep_pokemon", "visual_sweep_pokemon_update"}
+                           "visual_sweep_pokemon", "visual_sweep_pokemon_update",
+                           "visual_sweep_overworld", "visual_sweep_overworld_update"}
 
 
 def force_headless() -> bool:
@@ -264,6 +265,25 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_pokemon_update": {
         "all": ["visual_sweep_pokemon_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Phase 6 overworld mons (overworld-pokemon.md): the all-list pins the SEVEN
+    # plan-mandated domain traces + the pass marker, not just the pass event
+    # (single-sourced mirror in run_playtests' PLAYTEST_SCENARIOS; miss-002 re-stamp).
+    "overworld_mons": {
+        "all": ["boot_started", "boot_ready", "overworld_mon_spawned",
+                "overworld_mon_despawned", "recruit_attempted", "recruit_succeeded",
+                "nest_found", "egg_stolen", "alpha_provoked", "overworld_mons_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Overworld sweep (shots 22-23, shared baseline dir). Windowed-only like the
+    # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_overworld": {
+        "all": ["visual_sweep_overworld_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_overworld_update": {
+        "all": ["visual_sweep_overworld_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

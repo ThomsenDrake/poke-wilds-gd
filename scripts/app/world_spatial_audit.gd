@@ -12,6 +12,7 @@ const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
 
 const SAMPLE_RADIUS := 20
 const MAX_Z_ORDER_PROPS := 6
+const MAX_Z_ORDER_ENTITIES := 4 # Phase 6 mon sprites ride the same feet-origin contract
 const TILE := 16
 # Model truth independent of the data under test: these props are solid
 # structures, so a walkable tile rendering one is a world-data regression.
@@ -37,7 +38,10 @@ static func textures_match(a: Texture2D, b: Texture2D) -> bool:
 
 
 # North of a tall prop its canopy must draw over the player; south, the
-# player must draw over the prop. Returns {"failures": Array, "checked": int}.
+# player must draw over the prop. Phase 6 extends the scan to mon sprites:
+# entity_layer's sprites must carry a non-NAN y_sort_key (the feet-origin
+# y-sort chain) and hold the identical north/south contract against the
+# player. Returns {"failures": Array, "checked": int}.
 func audit_z_order(world, player, runtime, center: Vector2i, runner) -> Dictionary:
 	var failures: Array = []
 	var checked := 0
@@ -60,7 +64,37 @@ func audit_z_order(world, player, runtime, center: Vector2i, runner) -> Dictiona
 			if not WorldDrawOrder.draws_over(_player_sprite(player), sprite):
 				failures.append({"tile": [tile.x, tile.y], "kind": "z_order_south"})
 			if props >= MAX_Z_ORDER_PROPS:
-				return {"failures": failures, "checked": checked}
+				break
+		if props >= MAX_Z_ORDER_PROPS:
+			break
+	# Phase 6 entity scan (entity_layer.gd exposes get_entity_sprite, the
+	# get_prop_sprite precedent): an off-convention sprite fails red exactly.
+	var layer := _entity_layer(player)
+	if layer != null and layer.has_method("get_entity_sprite"):
+		for _frame in range(4): # settle the presentation lerp onto the logic tiles
+			await (player as Node).get_tree().process_frame
+		var entities := 0
+		for radius in range(0, SAMPLE_RADIUS + 1):
+			for tile in runner.ring_around(center, radius):
+				var entity_sprite: Sprite2D = layer.call("get_entity_sprite", tile)
+				if entity_sprite == null or entity_sprite.texture == null:
+					continue
+				entities += 1
+				checked += 1
+				if is_nan(WorldDrawOrder.y_sort_key(entity_sprite)):
+					failures.append({"tile": [tile.x, tile.y], "kind": "entity_y_sort_chain"})
+				runner.teleport_player(world, player, runtime, tile + Vector2i.UP)
+				if not WorldDrawOrder.draws_over(entity_sprite, _player_sprite(player)):
+					failures.append({"tile": [tile.x, tile.y], "kind": "entity_z_north"})
+				runner.teleport_player(world, player, runtime, tile + Vector2i.DOWN)
+				if not WorldDrawOrder.draws_over(_player_sprite(player), entity_sprite):
+					failures.append({"tile": [tile.x, tile.y], "kind": "entity_z_south"})
+				if entities >= MAX_Z_ORDER_ENTITIES:
+					break
+			if entities >= MAX_Z_ORDER_ENTITIES:
+				break
+		if entities == 0:
+			failures.append({"kind": "entity_z_order_vacuous"}) # self-police: a null sprite for every tile fails LOUD (like the prop lane)
 	return {"failures": failures, "checked": checked}
 
 
@@ -80,6 +114,12 @@ func check_player_rect(world, player) -> Array:
 
 func _player_sprite(player) -> CanvasItem:
 	return player.get_node("AnimatedSprite2D")
+
+
+# The Phase 6 render node: a static child of Main after Player (entity_layer.gd).
+func _entity_layer(player) -> Node:
+	var parent := (player as Node).get_parent()
+	return parent.get_node_or_null("EntityLayer") if parent != null else null
 
 
 # Collision agreement for one tile: step into it from a stand neighbor and

@@ -41,3 +41,18 @@ static func build_starter(catalog, rules, rng: RandomNumberGenerator, get_move: 
 	if fallback_id.is_empty():
 		return {}
 	return rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, get_move, rng)
+
+
+# The grass-stream species pick, extracted from game_runtime._pick_encounter_species for
+# the Phase 6 game_runtime budget (the runtime keeps the night-ghost check + a forwarder).
+# Rides the injected shared _rng exactly as before; the fallback warning keeps the exact
+# "GameRuntime" source string (pin-safe).
+static func pick_wild_species(catalog, biome_encounters, biome: String, time_label: String, rng: RandomNumberGenerator, trace_logger) -> String:
+	if not biome.is_empty():
+		var filtered: Dictionary = biome_encounters.filter_species_ids(catalog.species, biome, time_label)
+		if bool(filtered.get("used_fallback", false)) and trace_logger != null:
+			trace_logger.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.", {"biome": biome, "reason": str(filtered.get("reason", ""))})
+		var ids: Variant = filtered.get("ids", [])
+		if ids is Array and not (ids as Array).is_empty():
+			return str((ids as Array)[rng.randi_range(0, (ids as Array).size() - 1)])
+	return catalog.get_random_encounter_species(rng)

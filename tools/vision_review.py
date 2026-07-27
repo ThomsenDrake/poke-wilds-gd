@@ -738,6 +738,7 @@ RUBRIC_GROUPS = [
     ("menu", "Menu states"),
     ("battle", "Battle states"),
     ("camping", "Camping states"),
+    ("overworld_mons", "Overworld mon states"),
     ("display_matrix", "Display-matrix states"),
 ]
 
@@ -786,14 +787,18 @@ QUESTION_ANSWERERS = {
         ("glow visible around the fire", [KIND_MODEL]),
         ("recipe names + ingredient counts legible", [KIND_MODEL]),
     ],
+    "overworld_mons": [
+        ("roaming mons visibly y-sort", [KIND_MODEL]),
+        ("ground nest ring", [KIND_MODEL]),
+    ],
 }
 
 # Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
 # parsed inventory drifts from these counts the run records a loud warning
 # (advisory in this slice; a RED check_repo_contracts backstop is the documented
-# follow-up). Totals: 6 + 2 + 5 + 5 + 2 + 1 = 21 rubric questions.
+# follow-up). Totals: 6 + 2 + 5 + 5 + 2 + 2 + 1 = 23 rubric questions.
 EXPECTED_QUESTION_COUNTS = {
-    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "camping": 2, "display_matrix": 1,
+    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "camping": 2, "overworld_mons": 2, "display_matrix": 1,
 }
 
 ANSWER_VERDICTS = ("yes", "no")
@@ -824,6 +829,8 @@ def _shot_group(name: str) -> str | None:
         return "day_night"
     if stem.startswith(("15", "16", "17")):
         return "camping"
+    if stem.startswith(("22", "23")):
+        return "overworld_mons"
     if stem.startswith("matrix"):
         return "display_matrix"
     if stem.startswith(("01", "02", "03")):

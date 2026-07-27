@@ -56,8 +56,26 @@ func _invoke(fm: Variant, move_id: String, player_tile: Vector2i) -> Dictionary:
 			return result
 		"repel": return fm.activate_repel()
 		"power": return fm.use_power(_player.facing_tile(), _player.facing_tile() - player_tile)
-		"attack": return fm.use_attack("")
-		"charm": return fm.use_charm("", 1)
+		"attack":
+			# Phase 6: resolve the real target off the faced tile (the overworld entity
+			# runtime registers field_move_runtime's hooks; an egg is the :248 shiny-check
+			# + clear inside attack_entity, a mon is a forced battle, provoked:false :280).
+			var faced_attack: Vector2i = _player.facing_tile()
+			var entities: Variant = _runtime.get("overworld_mons_runtime")
+			entities.call("note_faced_tile", faced_attack)
+			var attack_target: Dictionary = entities.call("entity_at", faced_attack)
+			if attack_target.is_empty():
+				return fm.use_attack("")
+			var attack_result: Dictionary = fm.use_attack(str(attack_target.get("species_id", "")))
+			if str(attack_target.get("kind", "")) == "egg" and bool(attack_result.get("ok", false)):
+				attack_result["egg_verdict"] = "shiny" if bool(attack_target.get("is_shiny", false)) else "plain"
+			return attack_result
+		"charm":
+			var faced_charm: Vector2i = _player.facing_tile()
+			var charm_entities: Variant = _runtime.get("overworld_mons_runtime")
+			charm_entities.call("note_faced_tile", faced_charm)
+			var charm_target: Dictionary = charm_entities.call("entity_at", faced_charm)
+			return fm.use_charm(str(charm_target.get("species_id", "")), int(charm_target.get("level", 1))) if not charm_target.is_empty() else fm.use_charm("", 1)
 	return {"ok": false, "reason": "unknown"}
 
 
@@ -67,6 +85,7 @@ func _invoke(fm: Variant, move_id: String, player_tile: Vector2i) -> Dictionary:
 func _warp(tile: Vector2i) -> void:
 	_runtime.set_player_tile(tile)
 	_player.set_tile_position(tile)
+	_runtime.get("overworld_mons_runtime").call("note_warp", tile) # Phase 6: a warp ends every chase (:278 counter-play)
 	if _world != null:
 		_world.sync_visible(tile)
 
@@ -80,7 +99,11 @@ func _message_for(move_id: String, result: Dictionary) -> String:
 			"ride": return "You dismounted." if not bool(result.get("riding", true)) else "You mounted up. It's faster now!"
 			"repel": return "Repel's effect settled in."
 			"power": return "The boulder rolled aside!"
-			"attack": return "Attack!"
+			"attack":
+				match str(result.get("egg_verdict", "")): # Attack-on-egg shiny verdict (:248)
+					"shiny": return "The egg gleams oddly... It's SHINY!"
+					"plain": return "The egg breaks apart. It was not shiny."
+				return "Attack!"
 			"charm": return "Charm!"
 	match str(result.get("reason", "")):
 		"not_capable": return "No party Pokemon can do that here."

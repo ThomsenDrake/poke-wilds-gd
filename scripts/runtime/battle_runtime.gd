@@ -52,6 +52,8 @@ func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 	_enemy_mon = wild_mon.duplicate(true)
 	_rules.reset_stages(_player_mon)
 	_rules.reset_stages(_enemy_mon)
+	if int(_enemy_mon.get("attack_stages", 0)) > 0: # Phase 6 provoked-mon buff (:284); entry-stamped by overworld_mons_runtime, never rolled
+		_enemy_mon["stages"] = {"atk": clampi(int(_enemy_mon.get("attack_stages", 0)), 0, 6)} # ensure_stages fills the rest
 	_active = true
 	return _response("A wild %s appeared!" % str(_enemy_mon.get("name", "Pokemon")), "action")
 

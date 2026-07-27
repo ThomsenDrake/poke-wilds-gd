@@ -777,3 +777,84 @@ quality_bucket = "fishing"
 # MOVE menu lists flag==1 moves only, so for the all-moves party only Fly/Ride/Surf
 # render — field-moves.md § Activation reality). See
 # docs/product-specs/field-moves.md.
+
+[[subsystems]]
+name = "overworld_mons"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/overworld_mons.gd",
+  "scripts/runtime/overworld_mons_runtime.gd",
+  "scripts/runtime/overworld_mons_sim.gd",
+  "scripts/runtime/overworld_mons_probe.gd",
+  "scripts/runtime/entity_layer.gd",
+  "scripts/app/overworld_entity_actions.gd",
+  "scripts/app/overworld_mons_scenario.gd",
+  "scripts/app/overworld_mons_checks.gd",
+  "scripts/app/overworld_mons_battle_checks.gd",
+  "scripts/app/world_entity_audit.gd",
+  "scripts/app/visual_sweep_overworld.gd",
+]
+scene_paths = ["scenes/app/Main.tscn"]
+spec_doc = "docs/product-specs/overworld-pokemon.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario overworld_mons",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_overworld",
+]
+# The SEVEN plan-mandated domain traces (source "OverworldMonsRuntime"): spawn/despawn
+# lifecycle, the recruit path, nest + egg-theft + Alpha provocation; plus the scenario's
+# symmetric passed/failed pair (miss-002) and the deterministic 22/23 sweep marker.
+# egg_cleared / mon_provoked are documented payload-variant auxiliaries (trace-events.md),
+# NOT registry-required; charm_used / overworld_attack stay pinned on field_moves.
+required_trace_events = ["overworld_mon_spawned", "overworld_mon_despawned", "recruit_attempted", "recruit_succeeded", "nest_found", "egg_stolen", "alpha_provoked", "overworld_mons_passed", "overworld_mons_failed", "visual_sweep_overworld_passed"]
+quality_bucket = "overworld_mons"
+# CROSS-SUBSYSTEM CO-MODIFICATION (true file:line cites; files stay OWNED BY their home
+# subsystem — one owner per file, never double-listed in code_paths):
+#   scenes/app/Main.tscn:12,36 — the EntityLayer Node2D ext_resource + node, a STATIC child
+#     inserted AFTER Player (the same-feet-Y tree-order tie draws the entity over the player;
+#     main.gd 220/220 gets ZERO lines — the layer self-wires via /root/GameRuntime, the
+#     world_view/CampMenu convention). Owned by world_runtime/app_bootstrap.
+#   scripts/runtime/game_runtime.gd (319/320, EXTRACTION FIRST) — :17 EncounterSelection
+#     preload, :27 OverworldMonsRuntime preload, :50 instantiation, :70-71 setup() WITHOUT an
+#     _rng argument (the determinism guarantee is STRUCTURAL) + the encounter_requested bridge
+#     connect, :134 note_player_step (after habitat/breeding), :213 take_pending_encounter
+#     BEFORE the fishing seam (Repel/night ghosts never touch a provoked battle), :223/229/239/
+#     304 EncounterSelection forwarders, :270 note_battle_outcome in _finish_battle, :276 the
+#     fishing_runtime.note_battle_finished delegation that freed the fish_caught block. Owned
+#     by session_runtime.
+#   scripts/domain/encounter_selection.gd:50 — absorbed pick_wild_species from game_runtime
+#     (the night-ghost check stays a 2-line runtime call). Owned by camping_loop/world_runtime.
+#   scripts/runtime/fishing_runtime.gd:128 — absorbed its own fish_caught trace via
+#     note_battle_finished (game_runtime:276 keeps the 1-line caller); take_pending_encounter /
+#     consume_fishing_battle untouched. Owned by fishing.
+#   scripts/app/field_action_router.gd:58,136 — the entity-FIRST context-Z precedence line
+#     (entities -> camp objects -> fishing -> harvest -> build) + the fence pen_action
+#     delegation (moved VERBATIM into overworld_entity_actions.pen_action). Owned by
+#     building_loop.
+#   scripts/app/field_move_actions.gd:63-78,88 — the REAL Attack/Charm targets resolved via
+#     overworld_mons_runtime.entity_at(facing_tile) (replacing the empty-target placeholders)
+#     + note_warp on warp (a warp ends every chase/flee, :278 counter-play). Owned by
+#     field_moves.
+#   scripts/runtime/field_move_runtime.gd:52-53,240-241,256-257 — CONSUME-ONLY at its 320/320
+#     wall: the overworld_attack_hook / overworld_charm_hook public vars get registered by the
+#     entity runtime and called post-trace; zero added lines. Owned by field_moves.
+#   scripts/runtime/smoke_scenario_runner.gd:18 — the ONE activation opt-out line:
+#     scenario_uses_overworld() = {overworld_mons, visual_sweep_overworld(+update)}; every
+#     other scenario runs entities INERT, so the 26 committed baselines stay byte-identical.
+#     Owned by app_bootstrap.
+#   scripts/app/world_consistency_audit.gd:18,42-48,53 — the clears/mutation lane EXTRACTED
+#     OUT to world_entity_audit.gd (the 220/220 wall paid by extraction) and the entity lane
+#     folded back in via a 2-line add_child+setup + awaited run_overrides/run_entity_lane calls
+#     (the world_spatial_audit fold precedent). Owned by world_runtime.
+#   scripts/app/world_spatial_audit.gd:70-90 — audit_z_order's entity z-scan (is_nan on
+#     WorldDrawOrder.y_sort_key + the draws_over north/south contract vs the player) reading
+#     entity_layer.get_entity_sprite. Owned by world_runtime.
+#   battle_runtime.gd:53-56 consumes the entry-stamped attack_stages (the :284 +3 provoked
+#     buff) post reset_stages — consume-only, owned by battle_loop.
+# UNTOUCHED by design: world_view.gd, player_avatar.gd, session_state.gd (NO save key — the
+# subsystem is TRANSIENT: entities re-derive from (world_seed, total_steps) + clock at load;
+# recruits/taken eggs persist via the existing party channels; v5 stays reserved for Phase 7).
+# Repel interaction is ZERO-CODE by construction: entity spawns never enter
+# generate_wild_encounter, so the grass-stream suppression needs no carve-out.

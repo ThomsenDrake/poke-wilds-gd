@@ -48,3 +48,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
 - `scripts/domain/pokemon_rules.gd` gains the additive `is_shiny` instance field: `roll_shiny` (1/256 on the injected rng; the original FAQ's user-adjustable-odds hook rides `Breeding.set_shiny_odds`), `create_pokemon_instance`'s optional rng parameter, and `normalize_loaded_mon`'s absent->false backfill + evolution preservation.
 - `scripts/ui/battle_surface.gd` (+ layout) gains the shiny battle frame (front.pal -> shiny.pal exact-match remap over the full strip before the AtlasTexture crop) + the one-shot sparkle overlay; overworld shinies render identically to normals for wild mons (faithful — battle/status surfaces only).
+
+## Phase 6 integration note (overworld Pokémon)
+
+Phase 6 (`overworld-pokemon.md`) consumes the provoked-mon buff in `battle_runtime.start_wild_battle`: an entry-stamped `attack_stages` (set by `overworld_mons_runtime._force_battle` — chase-catch/provoked +3 per :284; player-initiated Attack 0 per :280) becomes `stages.atk` AFTER `reset_stages`, so ordinary encounters are unchanged. The forced battle itself rides the pending-encounter seam through `game_runtime.generate_wild_encounter` (the fishing precedent) and the normal presentation path.

@@ -5,14 +5,17 @@ extends Node
 # bucketed per biome and category so rare classes cannot slip past a flat cap;
 # for every sample the generator logic, the rendered scene textures, and the
 # collision/movement answers must agree. The spatial + movement halves and the
-# shared solid-prop/texture helpers live in world_spatial_audit.gd. Expectations
-# anchor to source art, never to the code under test. Two mutation lanes stamp
-# one real override each — a cut (clears) and a wall+door (build) — then
-# cross-check every mutated tile across logic/render/collision. Save guard: dispatcher.
+# shared solid-prop/texture helpers live in world_spatial_audit.gd; the clears
+# mutation lane + the Phase 6 ENTITY lane live in world_entity_audit.gd
+# (extracted at this file's 220 wall; the _spatial fold precedent). Expectations
+# anchor to source art, never to the code under test. The build lane stamps a
+# wall+door then cross-checks every mutated tile across logic/render/collision.
+# Save guard: dispatcher.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
 const WorldSpatialAudit := preload("res://scripts/app/world_spatial_audit.gd")
+const WorldEntityAudit := preload("res://scripts/app/world_entity_audit.gd")
 
 const SAMPLE_RADIUS := 20
 const SAMPLES_PER_CATEGORY := 4
@@ -36,12 +39,18 @@ func run(ctx: Dictionary) -> void:
 	var center: Vector2i = _player().tile_position
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
+	var entity_audit := WorldEntityAudit.new(); add_child(entity_audit); entity_audit.setup(_ctx, _runner, _failures)
 	await _audit_tiles(center)
-	await _audit_overridden_tiles(center)
+	await entity_audit.run_overrides(center)
+	await entity_audit.run_entity_lane(center) # leaves entities active + synced for the z-order entity scan
+	_tiles_checked += entity_audit.tiles_checked
+	_movement_checked += entity_audit.movement_checked
+	_spatial_checked += entity_audit.spatial_checked
 	await _audit_placed_structures(center)
-	var z_result: Dictionary = _spatial.audit_z_order(_world(), _player(), _runtime(), center, _runner)
+	var z_result: Dictionary = await _spatial.audit_z_order(_world(), _player(), _runtime(), center, _runner)
 	_failures.append_array(z_result["failures"])
 	_spatial_checked += int(z_result["checked"])
+	entity_audit.restore_inactive()
 	_player().encounter_chance = saved_chance
 	if _failures.is_empty():
 		_runtime().emit_trace("world_consistency_audit_passed", "SmokeScenarios", {
@@ -72,42 +81,6 @@ func _audit_tiles(center: Vector2i) -> void:
 			await _check_movement_probe(tile)
 			if _failures.size() > MAX_FAILURES:
 				return
-
-
-# Clears lane: stamps one real override through the resolver (a cut-capable
-# party on a tree), then cross-checks every tile in the generator's clears-only
-# overrides_for_save() across logic (mutated, walkable, no prop, no block
-# reason), render (no prop sprite, matching ground), and collision (step in).
-# Iterating the clears-only map keeps the build placements from contaminating it.
-func _audit_overridden_tiles(center: Vector2i) -> void:
-	var party_before: Array = _runner.swap_party(_runtime(), ["BULBASAUR"])
-	var found := _runner.find_harvest_target(_world(), center, SAMPLE_RADIUS, "cut")
-	if found.is_empty():
-		_failures.append({"kind": "override_target_missing", "note": "no cut target within %d tiles" % SAMPLE_RADIUS})
-	elif not bool(_runtime().harvest_tile(found["tile"]).get("ok", false)):
-		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_harvest_refused"})
-	elif not _runtime()._world_gen.overrides_for_save().has("%d,%d" % [found["tile"].x, found["tile"].y]):
-		_failures.append({"tile": [found["tile"].x, found["tile"].y], "kind": "override_not_saved"})
-	_runner.restore_party(_runtime(), party_before)
-	var overridden: Array = []
-	for key in _runtime()._world_gen.overrides_for_save().keys():
-		var parts := str(key).split(",")
-		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
-			overridden.append(Vector2i(parts[0].to_int(), parts[1].to_int()))
-	for tile in overridden:
-		_tiles_checked += 1
-		var logic: Dictionary = _world().get_tile_logic(tile)
-		if not bool(logic.get("mutated", false)) or not bool(logic.get("walkable", false)) or not str(logic.get("prop_path", "")).is_empty():
-			_failures.append({"tile": [tile.x, tile.y], "kind": "override_logic_disagree"})
-		elif not str(logic.get("block_reason", "")).is_empty() or not _world().get_traversal_block_reason(tile).is_empty():
-			_failures.append({"tile": [tile.x, tile.y], "kind": "override_block_reason"})
-	for tile in _runner.even_samples(overridden, SAMPLES_PER_CATEGORY):
-		_world().sync_visible(tile)
-		if _world().get_tile_prop_texture(tile) != null:
-			_failures.append({"tile": [tile.x, tile.y], "kind": "override_prop_rendered"})
-		if not WorldSpatialAudit.textures_match(_world().get_tile_base_texture(tile), _tex_cache.base_texture(_world().get_tile_render_data(tile))):
-			_failures.append({"tile": [tile.x, tile.y], "kind": "override_base_mismatch"})
-		await _check_movement_probe(tile)
 
 
 # Build lane: places a wall + a door (a Build-capable Machop party on granted
@@ -184,7 +157,12 @@ func _check_tile(tile: Vector2i) -> void:
 		elif not WorldSpatialAudit.textures_match(shown_prop, _tex_cache.prop_texture(render)):
 			_failures.append({"tile": [tile.x, tile.y], "kind": "prop_texture_mismatch"})
 	var walkable: bool = _world().is_tile_walkable(tile)
-	if walkable != bool(logic.get("walkable", true)):
+	# Model truth = traversable by the CURRENT party: surf-gated water reads walkable
+	# with a surf-capable party (is_tile_walkable semantics), so the raw logic flag must
+	# be lifted the same way before the logic/view comparison (latent pre-Phase-6 bug:
+	# a surf-capable save false-reds every sampled water tile).
+	var expected_walkable: bool = bool(logic.get("walkable", true)) or (str(logic.get("requires_field_move", "")) == "surf" and _runtime().party_has_field_move_ability("surf"))
+	if walkable != expected_walkable:
 		_failures.append({"tile": [tile.x, tile.y], "kind": "walkable_mismatch", "logic": logic.get("walkable"), "view": walkable})
 	if not walkable and _world().get_traversal_block_reason(tile).is_empty():
 		_failures.append({"tile": [tile.x, tile.y], "kind": "block_without_reason"})

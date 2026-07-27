@@ -158,3 +158,7 @@ Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code o
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
 - `scripts/domain/encounter_selection.gd` gains `build_starter` (extracted verbatim from `game_runtime._build_starter` for the Phase 5 wiring budget; game_runtime keeps a thin forwarder; the shiny roll applies to starters).
 - `scripts/domain/material_drops.gd` flips to the documented SECONDARY material source: the faithful happy-Pokemon habitat drops (`habitat_drops.gd` / `habitat_runtime.gd`, `item_dropped`) are the PRIMARY; the battle-end table stays as the secondary and the demolition-witness invariant (never log/hard_stone) extends over BOTH tables.
+
+## Phase 6 integration note (overworld Pokémon)
+
+Phase 6 (`overworld-pokemon.md`) extracts `_pick_encounter_species`'s body from `game_runtime` into `scripts/domain/encounter_selection.gd` (`pick_wild_species` static — the night-ghost check stays a two-line runtime call, warning source unchanged at `"GameRuntime"`), paying the game_runtime budget for the overworld wiring. The grass encounter stream's behavior is unchanged — the night system's shared `_rng` guarantee holds (the overworld subsystem consumes no rng).

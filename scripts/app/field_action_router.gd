@@ -1,19 +1,21 @@
 extends RefCounted
 
 # App-layer field-action routing extracted from main.gd (scene-script line budget).
-# Overworld context Z precedence: placed camp objects (campfire -> CampMenu — demolition
-# STAYS in the menu so the witness escape is never shadowed; bed -> rest; storage_box ->
-# StorageScreen; fence -> Phase 5 pen action); then FISHING (Phase 5: faced water + a
-# bagged rod -> fishing_runtime.try_fish; a hooked mon rides game_runtime's pending-
-# encounter seam through main's normal battle path); then harvest; then build mode on a
-# walkable faced tile with a Build-capable mon. The campfire lit toggle mutates the live
-# placement entry ("lit": false when extinguished, ABSENT when lit — map is canonical).
+# Overworld context Z precedence: Phase 6 overworld ENTITIES (overworld_entity_actions:
+# mon -> dialogue recruit, wild egg -> TAKE); then placed camp objects (campfire ->
+# CampMenu — demolition STAYS in the menu so the witness escape is never shadowed; bed ->
+# rest; storage_box -> StorageScreen; fence -> Phase 5 pen action); then FISHING (Phase 5:
+# faced water + a bagged rod -> fishing_runtime.try_fish; a hooked mon rides game_runtime's
+# pending-encounter seam through main's normal battle path); then harvest; then build mode
+# on a walkable faced tile with a Build-capable mon. The campfire lit toggle mutates the
+# live placement entry ("lit": false when extinguished, ABSENT when lit — map is canonical).
 # Party-screen FIELD MOVE: Build -> constrained build mode; cut/dig/smash -> constrained
 # harvest; Phase 4 moves -> field_move_actions; else capability display (never a silent
 # harvest). Any overlay the router opened owns Z/X while visible (closing press feeds
 # input_router's generalized latch).
 
 const FieldMoveActions := preload("res://scripts/app/field_move_actions.gd")
+const OverworldEntityActions := preload("res://scripts/app/overworld_entity_actions.gd")
 
 const BUILD_MOVE := "build"
 const CAMPFIRE_ID := "campfire"
@@ -26,6 +28,7 @@ var _world: Node = null
 var _player: Node = null
 var _structure_layer: Node = null
 var _field_move_actions = FieldMoveActions.new()
+var _entity_actions = OverworldEntityActions.new()
 var _camp_menu: Node = null
 var _storage_screen: Node = null
 var _show_message: Callable = Callable()
@@ -38,6 +41,7 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 	_structure_layer = structure_layer
 	_show_message = show_message
 	_field_move_actions.setup(runtime, world, player, show_message)
+	_entity_actions.setup(runtime, player, show_message)
 	_camp_menu = camp_menu
 	_storage_screen = storage_screen
 	if _camp_menu != null and _camp_menu.has_signal("closed") and not _camp_menu.closed.is_connected(_on_camp_menu_closed):
@@ -46,11 +50,13 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 		_storage_screen.closed.connect(_on_storage_screen_closed)
 
 
-# Overworld context Z: camp objects, then fishing (faced water), then harvest, then build mode (header precedence).
+# Overworld context Z: entities, camp objects, then fishing (faced water), then harvest, then build mode (header precedence).
 func on_context_action() -> void:
 	if _overlay_open():
 		return # an overlay owns Z/X while open; the Main poll still fires
 	var faced: Vector2i = _player.facing_tile()
+	if _entity_actions.route_entity(faced):
+		return
 	if _route_camp_object(faced):
 		return
 	if _try_fish(faced):
@@ -127,18 +133,8 @@ func _route_camp_object(tile: Vector2i) -> bool:
 		BOX_ID:
 			return _open_storage_screen(tile)
 		"fence":
-			return _pen_action(tile)
+			return _entity_actions.pen_action(tile)
 	return false
-
-
-# Phase 5 breeding: fence Z picks up a pen egg (priority) or withdraws the latest penned mon
-# (breeding_runtime.interact reads the interior beyond the fence); empty message falls through.
-func _pen_action(tile: Vector2i) -> bool:
-	if _runtime == null or not _runtime.has_method("breeding_interact"): return false
-	var result: Variant = _runtime.call("breeding_interact", _player.tile_position, tile)
-	if not (result is Dictionary) or str((result as Dictionary).get("message", "")).is_empty(): return false
-	_message(result as Dictionary)
-	return true
 
 
 # Any overlay the router opened owns Z/X while visible (main.gd's poll carries the same check).

@@ -75,6 +75,15 @@ The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-
 - In `16_craft_menu`, are the recipe names + ingredient counts legible (no
   clipping, no overlap, affordable and missing rows distinct)?
 
+## Overworld mon states (`22_roaming_mons`, `23_nest_alpha`)
+
+- In `22_roaming_mons`, do the roaming mons visibly y-sort against props and the
+  player (a mon south of a prop/player draws over it, north draws under), with
+  species sprites intact (no blank tiles, no placeholder where an ow-sheet exists)?
+- In `23_nest_alpha`, are the woven ground nest ring, the two wild eggs, and the
+  Alpha guardian with its red badge all legible and distinct (eggs carry NO shiny
+  sparkle — the faithful :230 decision; the badge is a generated diamond, not a tint)?
+
 ## Display-matrix states (`matrix/<w>x<h>_battle.png`)
 
 - At EVERY window size: is the text pixel-crisp (uniform stroke widths, no

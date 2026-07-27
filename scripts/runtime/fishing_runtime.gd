@@ -121,6 +121,15 @@ func consume_fishing_battle() -> bool:
 	return was_fishing
 
 
+# Battle-end consumption extracted from game_runtime._finish_battle (its line budget):
+# fish_caught traces on a fishing capture. The mark resets on EVERY finished battle (the
+# consume_fishing_battle precedent — no leak into an ordinary encounter). Source stays
+# "GameRuntime" exactly as the absorbed trace emitted it (pin-safe).
+func note_battle_finished(outcome: String, species_id: String) -> void:
+	if consume_fishing_battle() and outcome.begins_with("caught"):
+		_trace.emit_event("fish_caught", "GameRuntime", {"species_id": species_id, "rod_id": last_rod_used})
+
+
 # Domain table pass-throughs so the app layer (scenarios/audits — forbidden from
 # preloading scripts/domain) can assert the tier gate without the layer violation.
 static func tier_pool(tier: int) -> Array:

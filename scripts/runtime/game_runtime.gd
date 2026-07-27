@@ -24,6 +24,7 @@ const FieldMoveRuntime := preload("res://scripts/runtime/field_move_runtime.gd")
 const HabitatRuntime := preload("res://scripts/runtime/habitat_runtime.gd")
 const FishingRuntime := preload("res://scripts/runtime/fishing_runtime.gd")
 const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
+const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 
 signal world_overridden(tile: Vector2i) # per harvest/placement so the view re-renders the tile in place
 
@@ -46,6 +47,7 @@ var field_move_runtime = FieldMoveRuntime.new()
 var habitat_runtime = HabitatRuntime.new()
 var fishing_runtime = FishingRuntime.new()
 var breeding_runtime = BreedingRuntime.new()
+var overworld_mons_runtime = OverworldMonsRuntime.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
@@ -65,6 +67,8 @@ func _ready() -> void:
 	habitat_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen)
 	fishing_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, Callable(catalog, "get_move"))
 	breeding_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, world_overridden.emit, self)
+	overworld_mons_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _biome_encounters, field_move_runtime) # Phase 6: NO _rng — the derived-hash stream (spec § Determinism)
+	overworld_mons_runtime.encounter_requested.connect(_on_entity_encounter) # forced-battle presentation bridge (zero main.gd lines)
 	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
@@ -121,12 +125,13 @@ func get_player_tile() -> Vector2i: return session.player_tile
 
 func set_player_tile(tile_position: Vector2i) -> void: session.player_tile = tile_position
 
-# One overworld step: lifetime counter + one clock minute + the repel decay (session) + the Phase 5 habitat + breeding ticks.
+# One overworld step: lifetime counter + one clock minute + the repel decay (session) + the Phase 5 habitat + breeding ticks + the Phase 6 entity tick.
 func note_player_step() -> void:
 	session.note_step_taken()
 	session.advance_time(1)
 	habitat_runtime.note_step()
 	breeding_runtime.tick() # party-egg hatch countdown + rate-limited pen lay scan
+	overworld_mons_runtime.note_player_step(int(session.total_steps), session.player_tile, DayPhase.time_of_day_label(session.time_of_day_minutes)) # Phase 6: after habitat/breeding
 
 func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
@@ -205,6 +210,8 @@ func seed_for_smoke(seed: int) -> void:
 
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
+	var provoked_mon := overworld_mons_runtime.take_pending_encounter() # Phase 6: a provoked/attacked entity rides the seam FIRST...
+	if not provoked_mon.is_empty(): return provoked_mon # ...so repel + night ghosts never touch a forced battle (fishing precedent)
 	var hooked := fishing_runtime.take_pending_encounter() # Phase 5 fishing: a just-hooked mon rides this seam...
 	if not hooked.is_empty(): return hooked # ...BEFORE the wild draw, so repel + night ghosts never touch fishing
 	if field_move_runtime.repel_suppresses(): return {} # repel short-circuits BEFORE any encounter rng is consumed
@@ -229,16 +236,7 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 func _pick_encounter_species(biome: String) -> String:
 	# Night danger: unlit-night draws may become shadow ghosts (night_system rolls the shared _rng; empty by day or in light).
 	var ghost := night_system.try_ghost_species(session.player_tile)
-	if not ghost.is_empty(): return ghost
-	if not biome.is_empty():
-		var filtered = _biome_encounters.filter_species_ids(catalog.species, biome, DayPhase.time_of_day_label(session.time_of_day_minutes))
-		if bool(filtered.get("used_fallback", false)):
-			trace.warning("GameRuntime", "Biome encounter filter fell back to the full catalog.",
-				{"biome": biome, "reason": str(filtered.get("reason", ""))})
-		var ids = filtered.get("ids", [])
-		if ids is Array and not (ids as Array).is_empty():
-			return str(ids[_rng.randi_range(0, (ids as Array).size() - 1)])
-	return catalog.get_random_encounter_species(_rng)
+	return ghost if not ghost.is_empty() else EncounterSelection.pick_wild_species(catalog, _biome_encounters, biome, DayPhase.time_of_day_label(session.time_of_day_minutes), _rng, trace)
 
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
@@ -263,19 +261,19 @@ func run_from_battle() -> Dictionary:
 	return _finish_battle(battle_runtime.run_from_battle())
 
 
-# Battle-end: grant the interim type drop on victory/capture; trace fish_caught on a fishing capture; then save.
+# Battle-end: grant the interim type drop on victory/capture; the Phase 5 fishing + Phase 6
+# entity marks consume here (each runtime owns its own trace); then save.
 func _finish_battle(response: Dictionary) -> Dictionary:
 	if not bool(response.get("finished", false)): return response
 	var outcome := str(response.get("outcome", ""))
 	var enemy: Dictionary = battle_runtime.get_snapshot().get("enemy_mon", {})
-	var was_fishing := fishing_runtime.consume_fishing_battle() # resets on EVERY finished battle (no leak)
+	overworld_mons_runtime.note_battle_outcome(outcome, enemy) # reset on EVERY finished battle; removes on ko/catch (:288)
 	if ["victory", "caught", "caught_box_full"].has(outcome):
 		var drop := MaterialDrops.drop_for(catalog.get_species(str(enemy.get("species_id", ""))))
 		if not drop.is_empty():
 			session.add_item(drop, 1)
 			trace.emit_event("material_dropped", "GameRuntime", {"species_id": str(enemy.get("species_id", "")), "item_id": drop})
-	if was_fishing and outcome.begins_with("caught"):
-		trace.emit_event("fish_caught", "GameRuntime", {"species_id": str(enemy.get("species_id", "")), "rod_id": fishing_runtime.last_rod_used})
+	fishing_runtime.note_battle_finished(outcome, str(enemy.get("species_id", ""))) # fish_caught on a fishing capture
 	save_game()
 	return response
 
@@ -317,3 +315,6 @@ func _tile_payload(tile_position: Vector2i) -> Array: return [tile_position.x, t
 func placed_structures() -> Dictionary: return _world_gen.placements_for_save()
 
 func _retreat_allowed() -> bool: return night_system.retreat_allowed() # injected into battle_runtime.setup (shadow battles block retreat)
+func _on_entity_encounter(tile: Vector2i) -> void: # Phase 6 forced-battle bridge: the normal presentation path, zero main.gd lines
+	var player = get_node_or_null("/root/Main/Player") # absent (headless scenarios) ⇒ no-op; _in_battle guards double emission
+	if player != null: player.encounter_requested.emit(tile) # main._on_encounter_requested takes the pending mon
