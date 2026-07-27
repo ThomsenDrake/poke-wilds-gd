@@ -153,6 +153,14 @@ func run_charm_case(runtime) -> bool:
 		"level": int(friendly.level), "is_shiny": bool(friendly.is_shiny), "party_size": 6}), "charm: recruit_succeeded lost the spawn-time rolls") and ok
 	_note_shiny(cursor_r)
 	recruited_species.append(str(friendly.species_id))
+	# REFUSAL BRANCH (deep-dive T6 pin): an over-leveled target FAILS the gate — pacified:false,
+	# charm_used{level_gate_met:false}, and no calm window on the entity (a charm-pacifies-
+	# anything regression must red HERE, not ship certified green).
+	var cursor_ref := _runner.trace_log_line_count()
+	var over_leveled: Dictionary = runtime.field_move_runtime.use_charm(str(timid.species_id), int(timid.level) + 50)
+	if not _ensure(bool(over_leveled.get("ok", false)) and not bool(over_leveled.get("pacified", true)), "charm: an over-leveled target was pacified (level-gate refusal unpinned)"): return false
+	_ensure(_runner.trace_log_has_since("charm_used", cursor_ref, {"level_gate_met": false}), "charm: no charm_used{level_gate_met:false} refusal trace")
+	_ensure(int((mons.call("entity_at", timid.tile) as Dictionary).get("pacify_steps", 0)) == 0, "charm: a refused charm left a calm window")
 	# Charm pacifies (Dedenne 50 >= the band level); the calm window holds the flee at SPOOK range.
 	_stand_by(runtime, mons, timid.tile) # adjacency (1) <= SPOOK_RADIUS(3): uncharmed, it would flee on a step
 	var cursor_c := _runner.trace_log_line_count()

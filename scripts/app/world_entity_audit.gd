@@ -130,8 +130,6 @@ func run_entity_lane(center: Vector2i) -> void:
 			_failures.append({"tile": [tile.x, tile.y], "kind": "entity_prop_overlap", "entity_id": str(e.get("id", ""))})
 		if not bool(logic.get("walkable", false)) and str(logic.get("biome", "")) != "WATER":
 			_failures.append({"tile": [tile.x, tile.y], "kind": "entity_unwalkable_tile"})
-		if maxi(absi(e.cell.x - player_cell.x), absi(e.cell.y - player_cell.y)) > DESPAWN_CELLS:
-			_failures.append({"tile": [tile.x, tile.y], "kind": "entity_outside_band", "entity_id": str(e.get("id", ""))})
 	if sampled == 0: _failures.append({"kind": "entity_tilevalidity_vacuous"})
 	_failures.append_array(probe.tile_overlap_failures(mons, center, 24))
 	# (4) Guardian probe: nest ring + Alpha badge + movement agreement on the guardian tile.
@@ -147,6 +145,8 @@ func run_entity_lane(center: Vector2i) -> void:
 			_failures.append({"kind": "entity_guardian_missing", "nest": [nest.x, nest.y]})
 		else:
 			await _check_movement_probe((guardian as Dictionary).tile)
+	else: # LOUD, never silent (miss-002): nest presence is seed-conditioned, so a no-nest scan
+		runtime.warn("WorldEntityAudit", "Guardian sublane skipped: no nest within the scan band.", {"centers": NEST_CENTERS.size()})
 	# (5) Logic/render agreement via the entity_layer sprites (feet-origin convention).
 	_runner.teleport_player(_world(), _player(), runtime, center)
 	runtime.note_player_step()

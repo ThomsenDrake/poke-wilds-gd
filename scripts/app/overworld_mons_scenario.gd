@@ -67,6 +67,8 @@ func run(ctx: Dictionary) -> void:
 	# Tally AFTER the save case (its recruit is the final instance build of the run).
 	var shiny_total := _probe.trace_count(_start_cursor, "shiny_rolled", {"origin": "overworld"})
 	_oks["shiny_ok"] = bool(checks.shiny_ok) and shiny_ref[0] and shiny_total == EXPECTED_OVERWORLD_BUILDS
+	if not _oks["shiny_ok"]: # miss-002 loudness: a payload boolean must never bury a failure (deep-dive finding)
+		_failures.append("shiny: the every-creation shiny_rolled contract broke (checks %s, egg %s, total %d vs expected %d)" % [bool(checks.shiny_ok), shiny_ref[0], shiny_total, EXPECTED_OVERWORLD_BUILDS])
 	if _failures.is_empty():
 		var payload: Dictionary = _oks.duplicate(); payload["seed"] = SEED
 		runtime.emit_trace("overworld_mons_passed", "SmokeScenarios", payload)
