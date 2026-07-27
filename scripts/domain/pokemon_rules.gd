@@ -5,15 +5,17 @@ const BattleStatus := preload("res://scripts/domain/battle_status.gd")
 const DEFAULT_HAPPINESS := 70
 const HAPPINESS_EVOLUTION_THRESHOLD := 220
 const DEFAULT_BASE_EXP := 64
+# Shiny odds at instance creation (FAQ "1 in 256. This may be adjustable by the
+# user in a subsiquent update" — a static var so Breeding.set_shiny_odds, the
+# user-adjustment hook, can flip it live; reads stay class-scoped).
+static var shiny_odds := 256
 const GENDER_MALE := "male"
 const GENDER_FEMALE := "female"
 const GENDERLESS := "genderless"
 const GENDER_RATIO_PREFIX := "GENDER_F"
 
-# Per-instance nonce varying probabilistic gender rolls between created mons while
-# staying deterministic for a given creation sequence (no injected rng in domain).
+# Per-instance nonce varying probabilistic gender rolls between created mons while staying deterministic for a given creation sequence (no injected rng in domain).
 var _gender_nonce := 0
-
 func experience_for_level(level: int, growth_rate: String = "MEDIUM_FAST") -> int:
 	var n = clampi(level, 1, 100)
 	match normalize_growth_rate(growth_rate):
@@ -43,8 +45,14 @@ func experience_yield(species_entry: Dictionary, defeated_level: int) -> int:
 	var base_exp = int(species_entry.get("base_exp", DEFAULT_BASE_EXP))
 	return maxi(1, base_exp * clampi(defeated_level, 1, 100) / 7)
 
-# Gender from the species gender_ratio (GENDER_F0/F12_5/.../F100, GENDER_UNKNOWN). Fixed
-# ratios are deterministic; probabilistic ratios hash seed_hint (creation has no rng).
+# Shiny roll at instance creation: 1/shiny_odds on the injected rng (wild/egg creation
+# paths; seed_for_smoke pins the shared stream), else a nonce hash (still deterministic).
+func roll_shiny(rng) -> bool:
+	if rng != null:
+		return rng.randi_range(1, shiny_odds) == 1
+	return absi(hash("shiny:%d" % _gender_nonce)) % shiny_odds == 0
+
+# Gender from the species gender_ratio (GENDER_F0/F12_5/.../F100, GENDER_UNKNOWN). Fixed ratios are deterministic; probabilistic ratios hash seed_hint (creation has no rng).
 func resolve_gender(gender_ratio: String, seed_hint: String = "") -> String:
 	var ratio = gender_ratio.strip_edges().to_upper()
 	if not ratio.begins_with(GENDER_RATIO_PREFIX):
@@ -66,8 +74,7 @@ func _gender_compatible(gender: String, gender_ratio: String) -> bool:
 	return gender == GENDER_MALE or gender == GENDER_FEMALE
 
 func build_stats(base_stats: Dictionary, level: int) -> Dictionary:
-	var hp = int(floor((2.0 * int(base_stats.get("hp", 45)) * level) / 100.0)) + level + 10
-	return {
+	var hp = int(floor((2.0 * int(base_stats.get("hp", 45)) * level) / 100.0)) + level + 10; return {
 		"hp": max(1, hp),
 		"atk": max(1, int(floor((2.0 * int(base_stats.get("atk", 49)) * level) / 100.0)) + 5),
 		"def": max(1, int(floor((2.0 * int(base_stats.get("def", 49)) * level) / 100.0)) + 5),
@@ -76,7 +83,9 @@ func build_stats(base_stats: Dictionary, level: int) -> Dictionary:
 		"sdf": max(1, int(floor((2.0 * int(base_stats.get("sdf", 49)) * level) / 100.0)) + 5),
 	}
 
-func create_pokemon_instance(species_entry: Dictionary, level: int, move_lookup: Callable) -> Dictionary:
+# `rng` (optional shared RandomNumberGenerator) drives the 1/SHINY_ODDS shiny roll;
+# omitted callers stay deterministic via the nonce-hash fallback.
+func create_pokemon_instance(species_entry: Dictionary, level: int, move_lookup: Callable, rng = null) -> Dictionary:
 	if species_entry.is_empty(): return {}
 
 	var safe_level = clampi(level, 1, 100)
@@ -87,8 +96,7 @@ func create_pokemon_instance(species_entry: Dictionary, level: int, move_lookup:
 
 	if moves.is_empty():
 		var fallback_move = move_lookup.call("TACKLE")
-		if fallback_move is Dictionary and not (fallback_move as Dictionary).is_empty():
-			moves.append(_create_move_runtime_data(fallback_move))
+		if fallback_move is Dictionary and not (fallback_move as Dictionary).is_empty(): moves.append(_create_move_runtime_data(fallback_move))
 
 	var gender_ratio = str(species_entry.get("gender_ratio", ""))
 	_gender_nonce += 1
@@ -107,10 +115,10 @@ func create_pokemon_instance(species_entry: Dictionary, level: int, move_lookup:
 		"moves": moves,
 		"gender_ratio": gender_ratio,
 		"gender": resolve_gender(gender_ratio, "%s:%d" % [str(species_entry.get("species_id", "")), _gender_nonce]),
+		"is_shiny": roll_shiny(rng),
 		"front_path": str(species_entry.get("front_path", "")),
 		"back_path": str(species_entry.get("back_path", ""))
 	}
-
 func build_move_set(move_ids: Array, move_lookup: Callable) -> Array:
 	var move_set: Array = []
 	for move_id_variant in move_ids:
@@ -146,8 +154,7 @@ func award_experience(mon: Dictionary, species_entry: Dictionary, amount: int, m
 				_add_move_to_mon(updated_mon, move_data)
 
 	updated_mon["exp"] = exp_total
-	return {"mon": updated_mon, "levels_gained": new_level - old_level,
-		"new_level": new_level, "learned_moves": learned_moves}
+	return {"mon": updated_mon, "levels_gained": new_level - old_level, "new_level": new_level, "learned_moves": learned_moves}
 
 func check_level_evolution(mon: Dictionary, get_species: Callable, context: Dictionary = {}) -> Dictionary:
 	var species_entry = _species_entry_for_mon(mon, get_species)
@@ -174,7 +181,6 @@ func check_item_evolution(mon: Dictionary, item_id: String, get_species: Callabl
 		if str(evo.get("method", "")).to_upper() == "ITEM" and not target.is_empty() and str(evo.get("param", "")).to_upper() == wanted:
 			return {"target": target, "method": "ITEM", "param": str(evo.get("param", ""))}
 	return {}
-
 func normalize_loaded_mon(raw_mon: Dictionary) -> Dictionary:
 	var mon = raw_mon.duplicate(true)
 	mon["level"] = int(mon.get("level", 1))
@@ -221,13 +227,11 @@ func normalize_loaded_mon(raw_mon: Dictionary) -> Dictionary:
 			normalized_moves.append(move_data)
 	mon["moves"] = normalized_moves
 	return mon
-
 func _species_entry_for_mon(mon: Dictionary, get_species: Callable) -> Dictionary:
 	var species_id = str(mon.get("species_id", ""))
 	if species_id.is_empty(): return {}
 	var entry = get_species.call(species_id)
 	return entry if entry is Dictionary else {}
-
 func _evolution_list(species_entry: Dictionary) -> Array:
 	var result: Array = []
 	var evolutions = species_entry.get("evolutions", [])
@@ -236,13 +240,11 @@ func _evolution_list(species_entry: Dictionary) -> Array:
 			if evo_variant is Dictionary:
 				result.append(evo_variant)
 	return result
-
 func _time_requirement_met(requirement: String, context: Dictionary) -> bool:
 	var req = requirement.to_upper()
 	var needs_day = req.contains("DAY")
 	var needs_night = req.contains("NITE") or req.contains("NIGHT")
-	if not needs_day and not needs_night:
-		return true
+	if not needs_day and not needs_night: return true
 	var time_of_day = str(context.get("time_of_day", "")).to_upper()
 	return time_of_day.is_empty() or (needs_day and time_of_day == "DAY") or (needs_night and time_of_day == "NIGHT")
 
@@ -260,9 +262,7 @@ func _collect_move_ids_for_level(species_entry: Dictionary, level: int) -> Array
 
 	if candidates.is_empty():
 		return ["TACKLE"]
-	if candidates.size() <= 4:
-		return candidates
-	return candidates.slice(candidates.size() - 4, candidates.size())
+	return candidates if candidates.size() <= 4 else candidates.slice(candidates.size() - 4, candidates.size())
 
 func _collect_newly_learned_moves(species_entry: Dictionary, start_level: int, end_level: int) -> Array:
 	var result: Array = []

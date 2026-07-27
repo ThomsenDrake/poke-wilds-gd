@@ -80,6 +80,8 @@ func deposit(tile: Vector2i, party_index: int) -> Dictionary:
 	if _session.party.size() == 1:
 		return _refuse("deposit", tile, "last_party_member", _species_at(party_index))
 	var mon: Dictionary = _session.party[party_index]
+	if bool(mon.get("is_egg", false)): # Phase 5: eggs are carried, never boxed
+		return _refuse("deposit", tile, "eggs_stay_with_you", "EGG")
 	var stranded := _stranded_move(party_index)
 	if not stranded.is_empty():
 		return _refuse_strand("deposit", tile, mon, stranded)
@@ -149,6 +151,8 @@ func release_from_party(party_index: int) -> Dictionary:
 	if party_index < 0 or party_index >= _session.party.size():
 		return _refuse("release", _session.player_tile, "no_such_mon", "")
 	var mon: Dictionary = _session.party[party_index]
+	if bool(mon.get("is_egg", false)): # Phase 5: eggs are never released (they are unborn mons)
+		return _refuse("release", _session.player_tile, "eggs_stay_with_you", "EGG")
 	var stranded := _stranded_move(party_index)
 	if not stranded.is_empty():
 		return _refuse_strand("release", _session.player_tile, mon, stranded)
@@ -264,6 +268,8 @@ func _refusal_message(reason: String) -> String:
 			return "You can't deposit your last Pokemon."
 		"party_full":
 			return "Your party is already full."
+		"eggs_stay_with_you":
+			return "You keep the Egg with you."
 	return "That can't be done."
 
 

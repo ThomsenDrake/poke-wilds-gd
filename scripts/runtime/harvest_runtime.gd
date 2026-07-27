@@ -2,10 +2,12 @@ extends RefCounted
 
 # Harvest orchestration extracted from game_runtime.gd (Phase 3 storage slice:
 # game_runtime was at its line ceiling and hosting storage_runtime needed room).
-# Behavior is unchanged — callers keep using game_runtime.harvest_tile, which
-# forwards here: one faced tile through the shared resolver (action, capability,
-# override stamp, yield, field_move_used trace), and a built tile routes to
-# build_runtime.try_demolish (Cut refunds everything; hard-stone shells Smash).
+# Callers keep using game_runtime.harvest_tile, which forwards here: one faced tile
+# through the shared resolver (action, capability, override stamp, base yield,
+# field_move_used trace), and a built tile routes to build_runtime.try_demolish
+# (Cut refunds everything; hard-stone shells Smash). A fresh dig additionally draws
+# ONE bonus find (resolver DIG_BONUS_POOLS; step-counter pure — NO rng is injected,
+# game_runtime's setup seam holds; emits dig_item_found, Phase 5 acquisition).
 # The world_overridden signal reaches this runtime as the injected emitter
 # Callable so the view still re-renders the tile in place.
 
@@ -53,7 +55,15 @@ func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary
 	})
 	_tile_overridden.call(tile)
 	var item_name := str(_catalog.get_item(yield_item).get("display_name", yield_item))
-	return {"ok": true, "move_id": action, "message": HarvestResolver.success_message(action, item_name), "yield_item": yield_item}
+	var message := HarvestResolver.success_message(action, item_name)
+	if action == "dig": # BONUS find parallel to the base yield — pure step-counter draw, NO rng (night_system guarantee)
+		var bonus := HarvestResolver.bonus_for(action, logic, tile, _session.total_steps)
+		if not bonus.is_empty():
+			_session.add_item(bonus)
+			# dig_item_found payload keys: tile [x, y], item_id, biome (docs/references/trace-events.md).
+			_trace.emit_event("dig_item_found", "GameRuntime", {"tile": _tile_payload(tile), "item_id": bonus, "biome": str(logic.get("biome", ""))})
+			message += " Also found %s!" % str(_catalog.get_item(bonus).get("display_name", bonus))
+	return {"ok": true, "move_id": action, "message": message, "yield_item": yield_item}
 
 
 # Single capability gate: a constrained mon must itself be able; else any party member.

@@ -1,16 +1,13 @@
 extends RefCounted
 
 # Mutable gameplay session: party, bag, world position, the in-game clock, the
-# lifetime step counter and the Phase 4 repel counter. Save schema is ADDITIVE
-# after v2 (SAVE_VERSION is NOT bumped for additive keys — the v3 campsite
-# precedent; missing keys backfill with new-game defaults; v1/v2 payloads still
-# load with legacy bag-id remap; an older build meeting a newer save refuses
-# non-destructively to .newer.bak via save_store's version gate). v3 adds
-# `world_overrides` (GameRuntime threads it from the generator), the campsite hold
-# (campsite_x/y/pokemon) and a "structures" key for placements, and drops v2's
-# `unlocked_field_moves`; v4 lets a storage_box entry carry a "contents" mon array
-# (absent = empty, riding the "lit" precedent); Phase 4 adds "repel_steps" the same
-# way (older saves backfill to 0).
+# lifetime step counter and the Phase 4 repel counter. Save schema is ADDITIVE after
+# v2 (SAVE_VERSION is NOT bumped for additive keys — missing keys backfill with
+# new-game defaults; v1/v2 payloads still load with legacy bag-id remap; an older
+# build meeting a newer save refuses non-destructively to .newer.bak). v3 adds
+# world_overrides/campsite/structures; v4 adds storage_box "contents", Phase 4
+# "repel_steps", and the Phase 5 "pastures" pen state (breeding EGGS ride the party
+# array as additive mon keys — is_egg + an "egg" payload; absent keys backfill).
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
@@ -30,13 +27,12 @@ const LEGACY_ITEM_IDS := {"pokeball": "poke_ball"}
 
 var world_seed: int = 1337
 var player_tile: Vector2i = Vector2i.ZERO
-# Non-losing overflow hold: a full-party capture relocates the mon to the last
-# campsite (anchor defaults to spawn) — manual retrieval, not Phase 3 boxes.
+# Non-losing overflow hold: a full-party capture relocates the mon to the last campsite (anchor defaults to spawn) — manual retrieval, not Phase 3 boxes.
 var campsite_tile: Vector2i = Vector2i.ZERO
 var campsite_pokemon: Array = []
-# Load-time handoff for placed structures (save-shape "x,y" -> entry) populated
-# by apply_loaded_state; GameRuntime feeds it to the generator's placement map.
+# Load-time handoff for placed structures (save-shape "x,y" -> entry); GameRuntime feeds it to the generator's placement map.
 var structures: Dictionary = {}
+var pastures: Dictionary = {} # Phase 5 breeding pen state (v4 additive; breeding_runtime owns validation)
 var party: Array = []
 var bag: Dictionary = {}
 var unlocked_field_moves: Dictionary = {}
@@ -51,6 +47,7 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	campsite_tile = spawn_tile
 	campsite_pokemon.clear()
 	structures = {}
+	pastures = {}
 	party.clear()
 	unlocked_field_moves.clear()
 	bag = STARTING_BAG.duplicate()
@@ -70,14 +67,16 @@ func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
 	# Absent/invalid structures backfill to {} like the campsite keys (invalid
 	# entries dropped; see _normalize_structures).
 	structures = _normalize_structures(data.get("structures", {}))
+	# v4 additive: breeding pen state (breeding_runtime validates on apply_save_state).
+	var raw_pastures: Variant = data.get("pastures", {})
+	pastures = (raw_pastures as Dictionary).duplicate(true) if raw_pastures is Dictionary else {}
 	party = normalized_party
 	var raw_bag: Variant = data.get("bag", null)
 	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
 	time_of_day_minutes = _wrap_time(int(data.get("time_of_day_minutes", NEW_GAME_TIME_OF_DAY)))
 	total_steps = maxi(0, int(data.get("total_steps", 0)))
 	repel_steps = maxi(0, int(data.get("repel_steps", 0))) # Phase 4 additive (absent -> 0).
-	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit
-	# scratch space (smoke_scenario_runner pokes it directly).
+	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch space (smoke_scenario_runner pokes it directly).
 	unlocked_field_moves.clear()
 
 
@@ -97,7 +96,8 @@ func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dic
 		"structures": structures_overrides,
 		"campsite_x": campsite_tile.x,
 		"campsite_y": campsite_tile.y,
-		"campsite_pokemon": campsite_pokemon
+		"campsite_pokemon": campsite_pokemon,
+		"pastures": pastures
 	}
 
 
@@ -167,8 +167,7 @@ func campsite_count() -> int:
 	return campsite_pokemon.size()
 
 
-# Phase 3 reorder primitive: moves the member at `from_index` to `to_index`
-# (clamped; wrapping left to callers). set_party_lead keeps its name.
+# Phase 3 reorder primitive: moves the member at `from_index` to `to_index` (clamped).
 func move_party_member(from_index: int, to_index: int) -> void:
 	if from_index < 0 or from_index >= party.size():
 		return

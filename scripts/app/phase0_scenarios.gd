@@ -7,8 +7,12 @@ extends Node
 # save_migration: v1/v2->v3->v4 migration, the v3-additive "structures" round-
 # trip (a contents-less storage_box backfills empty; the campsite hold rides the
 # v3 keys), the v4-additive box "contents" round-trip (corrupt contents degrade
-# to an empty box, never a crash), future refusal, corrupt recovery, and the
-# campsite round-trip.
+# to an empty box, never a crash), the v4-additive "pastures" round-trip (a
+# penless pasture RELOCATES its mons to the campsite hold — never loses them —
+# with the per-mon habitat sub-dict {satisfied, last_drop_day, last_stone_day}
+# intact and volatile keys cleared; a ground egg is lost warned; a garbage
+# pasture entry degrades to nothing; a party egg survives load), future
+# refusal, corrupt recovery, and the campsite round-trip.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
@@ -18,6 +22,18 @@ const SCENARIOS := {"wild_battle": "run_wild_battle", "save_migration": "run_sav
 const MIGRATION_MON := {"species_id": "CHIKORITA", "name": "Chikorita", "level": 5, "exp": 125,
 	"max_hp": 20, "current_hp": 20, "status": "PSN", "sleep_turns": 2,
 	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}]}
+# A penned mon with the full habitat sub-dict the Steel-stone cadence rides; the
+# fixture pen has NO fence ring, so load must relocate it to the campsite hold.
+const PASTURE_MON := {"species_id": "EEVEE", "name": "Eevee", "level": 30, "exp": 0,
+	"max_hp": 30, "current_hp": 30, "status": "", "sleep_turns": 2, "happiness": 220,
+	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}],
+	"habitat": {"satisfied": true, "last_drop_day": 3, "last_stone_day": 1}}
+# The additive party-egg shape (Breeding.build_egg): max_hp/current_hp 0, the
+# nested payload carries the child — normalize_loaded_mon passes it by shape.
+const MIGRATION_EGG := {"species_id": "EGG", "name": "Egg", "level": 5, "exp": 0,
+	"max_hp": 0, "current_hp": 0, "status": "", "sleep_turns": 0, "moves": [],
+	"is_shiny": false, "is_egg": true,
+	"egg": {"species_id": "EEVEE", "gender": "female", "is_shiny": false, "moves": ["TACKLE"], "steps_to_hatch": 2560}}
 const MIGRATION_FIXTURES := [
 	{"version": 1, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON], "bag": {"pokeball": 5},
 		"time_of_day_minutes": 700, "total_steps": 10, "unlocked_field_moves": {"cut": 1}},
@@ -31,11 +47,17 @@ const MIGRATION_FIXTURES := [
 	# v4 is PURELY additive over v3: a storage_box entry may carry "contents"
 	# (absent = empty). 12,10 round-trips one mon; 13,10's corrupt "garbage"
 	# contents must normalize to an empty box, never a crash or a torn entry.
-	{"version": 4, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON], "bag": {"poke_ball": 2},
+	# "pastures" is the second v4 additive key: 8,8 has NO fence ring in this
+	# fixture, so its mon must RELOCATE to the campsite hold (never lost, habitat
+	# sub-dict intact, ground egg lost warned); 9,9's garbage entry degrades to
+	# nothing; the party carries an egg that must survive the load normalize.
+	{"version": 4, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON, MIGRATION_EGG], "bag": {"poke_ball": 2},
 		"time_of_day_minutes": 600, "total_steps": 0, "campsite_x": 3, "campsite_y": 4, "campsite_pokemon": [],
 		"structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
 		"12,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": [MIGRATION_MON]},
-		"13,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": "garbage"}}},
+		"13,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": "garbage"}},
+		"pastures": {"8,8": {"anchor": [8, 8], "mons": [PASTURE_MON], "eggs": [{"tile": [8, 9], "egg": MIGRATION_EGG}]},
+		"9,9": "garbage"}},
 ]
 
 static func handles(scenario: String) -> bool:
@@ -132,17 +154,31 @@ func _v3_fields_ok(runtime) -> bool:
 # v4-additive "contents" round-trips on the placement entry: 12,10 keeps its one
 # mon (normalized — sleep_turns cleared, status kept, exactly like the party),
 # while 13,10's corrupt "garbage" contents degrade to an empty box, never a crash.
+# v4-additive "pastures": the fenceless 8,8 pen RELOCATES its EEVEE to the
+# campsite hold (never lost; habitat {satisfied, last_drop_day, last_stone_day}
+# intact; sleep_turns cleared by the same normalize as party mons), its ground
+# egg is dropped (warning-tier, asserted by the empty pasture map), and 9,9's
+# garbage entry degrades to nothing; the party egg survives the load normalize.
 func _v4_fields_ok(runtime) -> bool:
 	var session = runtime.session
 	var placed: Dictionary = runtime._world_gen.placements_for_save()
 	var contents: Array = placed.get("12,10", {}).get("contents", [])
 	var mon: Dictionary = contents[0] if contents.size() == 1 else {}
 	var garbage: Array = placed.get("13,10", {}).get("contents", ["sentinel"])
+	var held: Dictionary = session.get_campsite_pokemon()[0] if session.campsite_count() == 1 else {}
+	var habitat: Dictionary = held.get("habitat", {})
+	var egg: Dictionary = session.party[1] if session.party.size() > 1 else {}
+	var egg_payload: Dictionary = egg.get("egg", {})
 	return str(placed.get("10,10", {}).get("structure_id", "")) == "wall" \
 		and str(mon.get("species_id", "")) == "CHIKORITA" and str(mon.get("status", "")) == "PSN" \
 		and int(mon.get("sleep_turns", -1)) == 0 and int(mon.get("level", 0)) == 5 \
 		and int(mon.get("max_hp", 0)) == 20 and garbage.is_empty() \
-		and session.get_structures().size() == 3 and session.campsite_count() == 0 \
+		and session.get_structures().size() == 3 and session.campsite_count() == 1 \
+		and str(held.get("species_id", "")) == "EEVEE" and int(held.get("sleep_turns", -1)) == 0 \
+		and bool(habitat.get("satisfied", false)) and int(habitat.get("last_drop_day", -1)) == 3 \
+		and int(habitat.get("last_stone_day", -1)) == 1 and session.pastures.is_empty() \
+		and bool(egg.get("is_egg", false)) and str(egg_payload.get("species_id", "")) == "EEVEE" \
+		and int(egg_payload.get("steps_to_hatch", 0)) == 2560 \
 		and int(session.bag.get("poke_ball", 0)) == 2 and session.player_tile == Vector2i(3, 4)
 
 func _write_fixture(payload: Dictionary) -> void:

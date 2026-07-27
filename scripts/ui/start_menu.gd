@@ -27,7 +27,7 @@ const RUNTIME_METHODS := {
 	"new_game": "new_game",
 	"get_campsite_pokemon": "get_campsite_pokemon", "retrieve_campsite_mon": "retrieve_campsite_mon",
 	"deposit_to_nearest": "deposit_to_nearest", "box_tile_near": "box_tile_near",
-	"get_player_tile": "get_player_tile",
+	"get_player_tile": "get_player_tile", "pen_tile_near": "pen_tile_near",
 }
 
 const SESSION_METHODS := {

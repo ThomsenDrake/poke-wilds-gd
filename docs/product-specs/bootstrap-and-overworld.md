@@ -75,3 +75,11 @@ Source paths: scenes/app/Main.tscn, scripts/app/main.gd, scripts/app/input_route
 Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code only:
 - `scripts/app/smoke_scenarios.gd` gains the `playtest_field_soak` match arm; `scripts/app/playtest_scenarios.gd` grows `run_field_soak` (a thin wrapper delegating to the new `playtest_field_soak_scenario.gd`); `scripts/app/qa_scenarios.gd` registers `field_moves_flow` + `build_house_flow`; `scripts/runtime/playtest_bot.gd` gains `try_random_field_move` (the seeded field-move soak band). The fresh-game starter-party `playtest_soak` is untouched (the field soak is its own `playtest_` scenario).
 - `scripts/runtime/player_avatar.gd` gains the Ride mount speed mode (`set_mounted`/`is_mounted`, `mount_step_seconds` faster than the run gait; the run sheet is the documented mount-sprite fallback — no dedicated mount art ships in the submodule). Ledge-climbing is out of scope (traversal speed only).
+
+
+## Phase 5 Pokemon systems co-modification (cross-subsystem)
+
+Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
+- `scripts/app/qa_scenarios.gd` registers the Phase 5 proofs (`breed_flow`, `shiny_odds`, `habitat_drops`, `fishing_flow`, the self-guarded `playtest_breed_soak`) and the pokemon-state sweep (`visual_sweep_pokemon` + `_update`, shots 20-21; the shared `_foreign_shot` prune guard in `visual_sweep_baselines.gd` extends to `20_`/`21_` so the main sweep never prunes them). The runtime adapters + pen/water site helpers live in `scripts/runtime/phase5_support.gd` + `phase5_sites.gd`; the soak band in `scripts/runtime/playtest_bot_breeding.gd`.
+- `scripts/runtime/world_view.gd` renders ground eggs (the breeding runtime's `ground_egg_at` on the prop layer, y-sort contract).
+- `scripts/data/species_file_parser.gd` gains the static `parse_egg_moves` (`SpeciesEggMoves:` label + `db MOVE` lines; absent file -> []); `scripts/data/pokemon_catalog.gd` carries `egg_moves` + the shiny asset paths (front.pal/shiny.pal colors, overworld-shiny path) on the species entry.

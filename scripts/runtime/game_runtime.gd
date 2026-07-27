@@ -21,9 +21,11 @@ const MaterialDrops := preload("res://scripts/domain/material_drops.gd")
 const CraftingRuntime := preload("res://scripts/runtime/crafting_runtime.gd")
 const CampingRuntime := preload("res://scripts/runtime/camping_runtime.gd")
 const FieldMoveRuntime := preload("res://scripts/runtime/field_move_runtime.gd")
+const HabitatRuntime := preload("res://scripts/runtime/habitat_runtime.gd")
+const FishingRuntime := preload("res://scripts/runtime/fishing_runtime.gd")
+const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
 
-# Emitted per successful harvest so the view can re-render the tile without a world rebuild.
-signal world_overridden(tile: Vector2i)
+signal world_overridden(tile: Vector2i) # per harvest/placement so the view re-renders the tile in place
 
 var trace = TraceLogger.new()
 var catalog = PokemonCatalog.new()
@@ -41,6 +43,10 @@ var night_system = NightSystem.new()
 var crafting_runtime = CraftingRuntime.new()
 var camping_runtime = CampingRuntime.new()
 var field_move_runtime = FieldMoveRuntime.new()
+var habitat_runtime = HabitatRuntime.new()
+var fishing_runtime = FishingRuntime.new()
+var breeding_runtime = BreedingRuntime.new()
+var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
 
@@ -56,11 +62,14 @@ func _ready() -> void:
 	crafting_runtime.setup(session, catalog, trace)
 	camping_runtime.setup(session, trace)
 	field_move_runtime.setup(session, catalog, trace, _world_gen, night_system, _rng, world_overridden.emit)
+	habitat_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen)
+	fishing_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, Callable(catalog, "get_move"))
+	breeding_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, world_overridden.emit, self)
+	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
-	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
-	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: world_overridden.emit(tile))
-	# The router lives under this autoload so its lazy player is in the tree and audible.
-	music_router.setup(trace)
+	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
+	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
+	music_router.setup(trace) # under this autoload so its lazy player is in the tree and audible
 	add_child(music_router)
 
 
@@ -74,8 +83,7 @@ func ensure_initialized() -> void:
 			"party_size": session.party.size(), "player_tile": _tile_payload(session.player_tile)})
 		_initialized = true
 		return
-	# A parsed-but-unapplicable save still holds player data; preserve it before new_game().
-	if not payload.is_empty():
+	if not payload.is_empty(): # parsed-but-unapplicable save: preserve player data before new_game()
 		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store.preserve_save(".unusable.bak")})
 	new_game()
 
@@ -93,8 +101,7 @@ func new_game() -> void:
 		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
 
 
-func save_game() -> void:
-	# Split save: clears ("world_overrides") + placements ("structures") stay two keys; the merged map is view-only.
+func save_game() -> void: # split save: clears + placements stay two keys; the merged map is view-only
 	if not save_store.write_payload(session.to_save_payload(_world_gen.overrides_for_save(), _world_gen.placements_for_save())):
 		trace.warning("GameRuntime", "Could not write save file.", {})
 		return
@@ -105,28 +112,26 @@ func save_game() -> void:
 func emit_trace(event_name: String, source: String, payload: Dictionary = {}) -> void:
 	trace.emit_event(event_name, source, payload)
 
-
 func warn(source: String, message: String, payload: Dictionary = {}) -> void:
 	trace.warning(source, message, payload)
 
 
 func get_world_seed() -> int: return session.world_seed
-
 func get_player_tile() -> Vector2i: return session.player_tile
 
-func set_player_tile(tile_position: Vector2i) -> void:
-	session.player_tile = tile_position
+func set_player_tile(tile_position: Vector2i) -> void: session.player_tile = tile_position
 
-# One completed overworld step: lifetime counter + one clock minute. The session
-# step also decays the Phase 4 repel counter (session_state.note_step_taken).
+# One overworld step: lifetime counter + one clock minute + the repel decay (session) + the Phase 5 habitat + breeding ticks.
 func note_player_step() -> void:
 	session.note_step_taken()
 	session.advance_time(1)
+	habitat_runtime.note_step()
+	breeding_runtime.tick() # party-egg hatch countdown + rate-limited pen lay scan
 
 func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
 
-# True when any party member can perform the field move (the single capability check).
+# True when ANY party member can perform the field move (the single capability check).
 func party_has_field_move_ability(move_id: String) -> bool:
 	var get_species := Callable(catalog, "get_species")
 	for mon in session.party:
@@ -135,31 +140,33 @@ func party_has_field_move_ability(move_id: String) -> bool:
 	return false
 
 
-# Campsite hold (Phase 0 defect 0.1) now lives in camping_runtime; these keep callers working.
-func get_campsite_pokemon() -> Array: return camping_runtime.get_campsite_pokemon()
+func get_campsite_pokemon() -> Array: return camping_runtime.get_campsite_pokemon() # campsite hold lives in camping_runtime
 func retrieve_campsite_mon(index: int) -> Dictionary: return camping_runtime.retrieve_campsite_mon(index)
 
 
-# Harvest/demolish orchestration lives in harvest_runtime (extracted for the
-# storage-slice budget); callers keep this name.
+# Harvest/demolish lives in harvest_runtime; callers keep this name.
 func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
 	return harvest_runtime.harvest_tile(tile, mon_constraint)
 
-
-# Storage boxes (Phase 3): party-screen DEPOSIT context callables. Boxes are
-# independent per-placement containers; contents ride the placement entry (v4).
-func deposit_to_nearest(party_index: int) -> Dictionary:
-	return storage_runtime.deposit_to_nearest(party_index)
+func deposit_to_nearest(party_index: int) -> Dictionary: # box first; Phase 5 falls back to the nearest pen
+	var result := storage_runtime.deposit_to_nearest(party_index)
+	return result if str(result.get("reason", "")) != "no_box" else breeding_runtime.deposit_to_nearest_pen(party_index) # Phase 5: no box -> nearest pen
 
 
-# Party-screen DEPOSIT gate context callable (start_menu's RUNTIME_METHODS maps
-# the "box_tile_near" key here): the {found, tile} result, never a tile sentinel.
+# Party-screen DEPOSIT gate callable (RUNTIME_METHODS maps "box_tile_near" here): {found, tile}, never a sentinel.
 func box_tile_near(center: Vector2i) -> Dictionary:
 	return storage_runtime.box_tile_near(center)
 
 
 func nearest_box_tile() -> Dictionary:
 	return storage_runtime.nearest_box_tile()
+
+
+# Phase 5 breeding pen pass-throughs (party-screen DEPOSIT gate, fence-Z action, ground-egg render read).
+func pen_tile_near(center: Vector2i) -> Dictionary: return breeding_runtime.pen_tile_near(center)
+func breeding_interact(faced: Vector2i) -> Dictionary: return breeding_runtime.interact(session.player_tile, faced)
+func ground_egg_at(tile: Vector2i) -> Dictionary: return breeding_runtime.ground_egg_at(tile)
+func use_stone_on_mon(item_id: String, party_index: int) -> Dictionary: return stone_evolution_runtime.use_stone_on_mon(item_id, party_index) # stone slice seam; one of breed_flow_checks.STONE_SEAM_METHODS so run_stone_case auto-arms
 
 
 # Single capability gate for harvest AND build: a constrained mon must itself be able; else any party member.
@@ -169,11 +176,8 @@ func field_move_capable(move_id: String, mon_constraint: Dictionary = {}) -> boo
 	return party_has_field_move_ability(move_id)
 
 
-# MERGED clears + placements (placements shadow) for the world_view mirror; the name mirrors the
-# generator. NEVER feed it to the SAVE (stays split via save_game); clears-only readers use
-# _world_gen.overrides_for_save().
-func mutations_for_view() -> Dictionary:
-	return _world_gen.mutations_for_view()
+# MERGED clears+placements (placements shadow) for the world_view mirror — NEVER the save (split keys).
+func mutations_for_view() -> Dictionary: return _world_gen.mutations_for_view()
 
 
 func apply_world_overrides(saved: Dictionary) -> void:
@@ -186,25 +190,23 @@ func apply_world_overrides(saved: Dictionary) -> void:
 func get_party_snapshot() -> Array:
 	return session.get_party_snapshot()
 
-
 func get_item_count(item_id: String) -> int:
 	return session.get_item_count(item_id)
-
 
 func set_party_lead(index: int) -> void:
 	session.set_party_lead(index)
 
 
-# Smoke determinism seam (house seeding convention; visual_sweep pins
-# battle_runtime._rng directly, playtest_soak its bot): pins BOTH rngs so a
-# scenario's audited inputs are a pure function of (code, save, seed), never
-# the per-process wall-clock seed from _ready's randomize().
+# Smoke determinism seam: pins the shared rngs so a scenario's inputs are a pure function of (code, save, seed),
+# never _ready's wall-clock randomize(). habitat needs no rng (step-driven); fishing + breeding ride _rng.
 func seed_for_smoke(seed: int) -> void:
 	_rng.seed = seed
 	battle_runtime._rng.seed = seed
 
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
+	var hooked := fishing_runtime.take_pending_encounter() # Phase 5 fishing: a just-hooked mon rides this seam...
+	if not hooked.is_empty(): return hooked # ...BEFORE the wild draw, so repel + night ghosts never touch fishing
 	if field_move_runtime.repel_suppresses(): return {} # repel short-circuits BEFORE any encounter rng is consumed
 	var species_id = _pick_encounter_species(biome)
 	var species_entry = {}
@@ -218,7 +220,10 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.",
 			{"fallback_species_id": str(species_entry.get("species_id", ""))})
 	var level = EncounterSelection.level_from_distance(tile_pos, _rng)
-	return pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"))
+	var wild_mon := pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"), _rng)
+	# shiny_rolled fires on EVERY creation (odds provable both directions; the shiny_odds scenario).
+	trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(wild_mon.get("species_id", "")), "is_shiny": bool(wild_mon.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "wild"})
+	return wild_mon
 
 
 func _pick_encounter_species(biome: String) -> String:
@@ -248,28 +253,29 @@ func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 func perform_battle_move(index: int) -> Dictionary:
 	return _finish_battle(battle_runtime.perform_move(index))
 
-
 func use_pokeball() -> Dictionary:
 	return _finish_battle(battle_runtime.use_pokeball())
 
-
 func use_potion() -> Dictionary:
 	return battle_runtime.use_potion()
-
 
 func run_from_battle() -> Dictionary:
 	return _finish_battle(battle_runtime.run_from_battle())
 
 
-# Battle-end: grant the interim type-derived material drop on victory/capture, then save.
+# Battle-end: grant the interim type drop on victory/capture; trace fish_caught on a fishing capture; then save.
 func _finish_battle(response: Dictionary) -> Dictionary:
 	if not bool(response.get("finished", false)): return response
-	if ["victory", "caught", "caught_box_full"].has(str(response.get("outcome", ""))):
-		var enemy: Dictionary = battle_runtime.get_snapshot().get("enemy_mon", {})
+	var outcome := str(response.get("outcome", ""))
+	var enemy: Dictionary = battle_runtime.get_snapshot().get("enemy_mon", {})
+	var was_fishing := fishing_runtime.consume_fishing_battle() # resets on EVERY finished battle (no leak)
+	if ["victory", "caught", "caught_box_full"].has(outcome):
 		var drop := MaterialDrops.drop_for(catalog.get_species(str(enemy.get("species_id", ""))))
 		if not drop.is_empty():
 			session.add_item(drop, 1)
 			trace.emit_event("material_dropped", "GameRuntime", {"species_id": str(enemy.get("species_id", "")), "item_id": drop})
+	if was_fishing and outcome.begins_with("caught"):
+		trace.emit_event("fish_caught", "GameRuntime", {"species_id": str(enemy.get("species_id", "")), "rod_id": fishing_runtime.last_rod_used})
 	save_game()
 	return response
 
@@ -284,37 +290,30 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 	if normalized_party.is_empty():
 		return false
 	session.apply_loaded_state(payload, normalized_party)
-	# Re-seed the generator to the loaded world, then restore saved overrides exactly.
-	_world_gen.setup(session.world_seed)
+	_world_gen.setup(session.world_seed) # re-seed to the loaded world, then restore overrides exactly
 	_world_gen.clear_overrides()
 	var saved_overrides: Variant = payload.get("world_overrides", {})
 	if saved_overrides is Dictionary:
 		apply_world_overrides(saved_overrides)
-	# Placements (v3-additive "structures" key): the session normalized the key
-	# (absent/invalid backfills to {}); feed the generator's placement map.
+	# Placements (v3-additive "structures" key; the session normalized it, absent -> {}): feed the generator's placement map.
 	_world_gen.clear_placements()
 	_world_gen.apply_placements(session.structures)
+	breeding_runtime.apply_save_state(session.pastures) # v4-additive pen state (validates AFTER placements land)
 	return true
 
 
 func _build_starter() -> Dictionary:
-	var starter_species = EncounterSelection.fallback_species_entry(catalog.species)
-	var starter = pokemon_rules.create_pokemon_instance(starter_species, 5, Callable(catalog, "get_move"))
-	if not starter.is_empty():
-		return starter
-
-	var fallback_id = catalog.get_random_encounter_species(_rng)
-	if fallback_id.is_empty():
+	var starter := EncounterSelection.build_starter(catalog, pokemon_rules, _rng, Callable(catalog, "get_move"))
+	if starter.is_empty():
 		trace.warning("GameRuntime", "Species catalog is empty; starting a new game without a starter.", {})
-		return {}
-	return pokemon_rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, Callable(catalog, "get_move"))
+	else:
+		trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(starter.get("species_id", "")), "is_shiny": bool(starter.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "starter"})
+	return starter
 
 
 func _tile_payload(tile_position: Vector2i) -> Array: return [tile_position.x, tile_position.y]
 
-
 # Live placements (save shape, incl. the additive "lit" field) for the night system's light read.
 func placed_structures() -> Dictionary: return _world_gen.placements_for_save()
-
 
 func _retreat_allowed() -> bool: return night_system.retreat_allowed() # injected into battle_runtime.setup (shadow battles block retreat)

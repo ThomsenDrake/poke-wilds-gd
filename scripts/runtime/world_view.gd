@@ -3,10 +3,10 @@ extends Node2D
 const TILE_SIZE := 16
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
+const EGG_SHEET_PATH := "res://pokewilds/phione-egg.png" # Phase 5 ground-egg sprite (16x16 cells)
 const RuntimePath := "/root/GameRuntime"
 const TIME_OF_DAY_DEFAULT := 720
-# Piecewise-linear tint keyframes (minute of day, color): midnight blue holds
-# through the night, warms at dawn, neutral through midday, warms at dusk.
+# Piecewise-linear tint keyframes (minute, color): midnight blue, dawn warmth, neutral midday, dusk warmth.
 const TIME_OF_DAY_KEYFRAMES := [
 	[0, Color(0.26, 0.28, 0.48)],
 	[270, Color(0.26, 0.28, 0.48)],
@@ -30,6 +30,8 @@ var _texture_cache = TileTextureCache.new()
 var _tile_cache: Dictionary = {} # bounded to the synced window (_evict_tile_cache)
 var _ground_nodes: Dictionary = {}
 var _prop_nodes: Dictionary = {}
+var _egg_nodes: Dictionary = {} # Phase 5 breeding: ground eggs in pens
+var _egg_texture: Texture2D = null
 var _last_biome := ""
 var _canvas_modulate: CanvasModulate = null
 
@@ -46,12 +48,8 @@ func _ready() -> void:
 	rebuild(world_seed)
 
 
-# Y-sort delivers the north/south depth contract: prop sprites sort by their
-# tile bottom, the player sprite by its feet (player_avatar.gd), and ground
-# tiles stay at z -1 below every actor (Godot sorts by z_index first, then by
-# Y within one z_index). Every canvas ancestor must be y-sort-enabled or its
-# subtree renders as a single block, so the parent (Main, which also parents
-# the player sibling) joins the chain here.
+# Y-sort depth contract: props sort by tile bottom, the player by its feet, ground tiles
+# stay at z -1. Every canvas ancestor must be y-sort-enabled, so Main joins the chain here.
 func _setup_canvas_order() -> void:
 	y_sort_enabled = true
 	_ground_layer.y_sort_enabled = true
@@ -76,14 +74,11 @@ func sync_visible(center_tile: Vector2i) -> void:
 func map_to_world(map_pos: Vector2i) -> Vector2:
 	return Vector2(map_pos.x * TILE_SIZE, map_pos.y * TILE_SIZE)
 
-
 func is_tile_walkable(map_pos: Vector2i) -> bool:
 	var tile = _get_tile_data(map_pos)
 	if bool(tile.get("walkable", false)):
 		return true
-	# Surf is the only traversal gate that opens passively, via party
-	# capability; cut/smash-gated tiles open only by being cleared.
-	if str(tile.get("requires_field_move", "")) != "surf":
+	if str(tile.get("requires_field_move", "")) != "surf": # surf opens passively via party capability; cut/smash only by clearing
 		return false
 	var runtime = _runtime_or_null()
 	if runtime == null:
@@ -94,14 +89,12 @@ func is_tile_walkable(map_pos: Vector2i) -> bool:
 func is_encounter_tile(map_pos: Vector2i) -> bool:
 	return _get_tile_data(map_pos)["encounter"]
 
-
 func get_tile_biome(map_pos: Vector2i) -> String:
 	return str(_get_tile_data(map_pos).get("biome", ""))
 
 
-# Traversal block reason shown when the player bumps this tile. Gated tiles
-# get a hint: harvestable gates (cut/smash) name the clearing move, water
-# points at a SURF-capable party member.
+# Traversal block reason when the player bumps this tile; gated tiles get a hint
+# (cut/smash name the clearing move; water points at a SURF-capable party member).
 func get_traversal_block_reason(map_pos: Vector2i) -> String:
 	var tile := _get_tile_data(map_pos)
 	var reason := str(tile.get("block_reason", ""))
@@ -119,35 +112,29 @@ func get_traversal_block_reason(map_pos: Vector2i) -> String:
 func tile_requires_field_move(map_pos: Vector2i) -> String:
 	return str(_get_tile_data(map_pos).get("requires_field_move", ""))
 
-
-# Generator logic for one tile (biome, walkable, prop, gate, encounter).
-# Audits cross-check it against the rendered scene and the collision answer;
-# the view's generator is the one seeded from the session.
+# Generator logic for one tile (audits cross-check it against the rendered scene).
 func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 	return _generator.get_tile_logic(map_pos)
 
 
-# Full render data the view cached for one tile (textures, colors, paths).
+# Full cached render data for one tile (textures, colors, paths).
 func get_tile_render_data(map_pos: Vector2i) -> Dictionary:
 	return _get_tile_data(map_pos)
 
 
-# The texture the tile's ground sprite currently shows; null while the tile
-# sits outside the synced window.
+# The tile's current ground texture; null outside the synced window.
 func get_tile_base_texture(map_pos: Vector2i) -> Texture2D:
 	var node: Sprite2D = _ground_nodes.get(map_pos, null)
 	return node.texture if node != null else null
 
 
-# The texture the tile's prop sprite currently shows; null when the tile
-# renders no prop (or sits outside the synced window).
+# The tile's current prop texture; null when it renders no prop (or is off-window).
 func get_tile_prop_texture(map_pos: Vector2i) -> Texture2D:
 	var node: Sprite2D = _prop_nodes.get(map_pos, null)
 	return node.texture if node != null else null
 
 
-# The live prop sprite for one tile (null when none); z-order audits read its
-# canvas ordering relative to the player.
+# The live prop sprite for one tile (null when none; z-order audits read its ordering).
 func get_prop_sprite(map_pos: Vector2i) -> Sprite2D:
 	return _prop_nodes.get(map_pos, null)
 
@@ -156,9 +143,7 @@ func validate_world_invariants() -> Dictionary:
 	return _generator.validate_invariants(world_seed)
 
 
-# Presentational day/night tint. Nothing calls this yet (wave 2 wires the
-# clock); the default keeps boot appearance unchanged (white == no tint).
-# Calling it repeatedly with advancing minutes yields a smooth gradient.
+# Presentational day/night tint; repeated calls with advancing minutes yield a smooth gradient.
 func set_time_of_day(minutes_0_1439: int) -> void:
 	if _canvas_modulate == null:
 		return
@@ -184,10 +169,7 @@ func _time_of_day_color(minutes: int) -> Color:
 func rebuild(seed_value: int) -> void:
 	world_seed = seed_value
 	_generator.setup(world_seed)
-	# The runtime owns the canonical override map; mirror it so rendering and
-	# traversal see harvested tiles. Clear first: stale entries must never leak
-	# across seeds or a New Game (setup() alone keeps the old map).
-	_generator.clear_overrides()
+	_generator.clear_overrides() # mirror the runtime's canonical map; clear first so stale entries never leak across seeds
 	var runtime := _runtime_or_null()
 	if runtime != null:
 		_generator.apply_overrides(runtime.mutations_for_view())
@@ -196,12 +178,9 @@ func rebuild(seed_value: int) -> void:
 	_clear_rendered_nodes()
 
 
-# Live mutation sync: the runtime just changed an override on this tile, so
-# mirror the map, drop the tile's cached data, and re-render it in place when
-# it sits inside the synced window (the ground texture too — dug tiles lose
-# their tall-grass overlay). Off-window tiles refresh on the next sync_visible.
-# Clear-then-apply (same shape as rebuild): demolition REMOVES entries, so a
-# merge alone would keep a demolished structure rendered + colliding.
+# Live mutation sync: mirror the map, drop the tile's cache, re-render it in place when it
+# sits inside the synced window (ground too — dug tiles lose their tall-grass overlay).
+# Clear-then-apply (like rebuild): demolition REMOVES entries, a merge alone would keep it.
 func _on_world_overridden(tile: Vector2i) -> void:
 	var runtime := _runtime_or_null()
 	if runtime == null:
@@ -241,9 +220,8 @@ func _ensure_tile_nodes(map_pos: Vector2i) -> void:
 			var prop_sprite = Sprite2D.new()
 			prop_sprite.centered = false
 			prop_sprite.texture = prop_texture
-			# Origin at the tile bottom (the prop's base) so y-sort orders it
-			# against the player's feet; offset keeps the draw position
-			# unchanged, extending tall canopies into the tile above.
+			# Origin at the tile bottom (the prop's base) so y-sort orders it against the
+			# player's feet; offset keeps the draw position, extending tall canopies up.
 			prop_sprite.position = map_to_world(map_pos) + Vector2(0, TILE_SIZE)
 			prop_sprite.offset = Vector2(0, -prop_texture.get_height())
 			_prop_layer.add_child(prop_sprite)
@@ -251,6 +229,37 @@ func _ensure_tile_nodes(map_pos: Vector2i) -> void:
 	elif _prop_nodes.has(map_pos):
 		_prop_nodes[map_pos].queue_free()
 		_prop_nodes.erase(map_pos)
+	_sync_egg_node(map_pos)
+
+
+# Phase 5 breeding: a ground egg laid in a pen renders on the prop layer (y-sorts with the
+# fence ring); shiny eggs carry a gold sparkle child (visible pre-hatch, faithful).
+func _sync_egg_node(map_pos: Vector2i) -> void:
+	var runtime := _runtime_or_null()
+	var egg: Dictionary = runtime.ground_egg_at(map_pos) if runtime != null and runtime.has_method("ground_egg_at") else {}
+	if bool(egg.get("has_egg", false)):
+		if _egg_nodes.has(map_pos):
+			return
+		var egg_sprite := Sprite2D.new()
+		egg_sprite.centered = false; egg_sprite.texture = _egg_frame()
+		egg_sprite.position = map_to_world(map_pos) + Vector2(0, TILE_SIZE); egg_sprite.offset = Vector2(0, -TILE_SIZE)
+		if bool(egg.get("is_shiny", false)):
+			var sparkle := Sprite2D.new()
+			sparkle.centered = false; sparkle.texture = load("res://pokewilds/shiny_inverse.png"); sparkle.modulate = Color(1.0, 0.85, 0.2)
+			egg_sprite.add_child(sparkle)
+		_prop_layer.add_child(egg_sprite)
+		_egg_nodes[map_pos] = egg_sprite
+	elif _egg_nodes.has(map_pos):
+		_egg_nodes[map_pos].queue_free()
+		_egg_nodes.erase(map_pos)
+
+func _egg_frame() -> Texture2D:
+	if _egg_texture == null and ResourceLoader.exists(EGG_SHEET_PATH):
+		var sheet = load(EGG_SHEET_PATH)
+		if sheet is Texture2D:
+			_egg_texture = AtlasTexture.new()
+			_egg_texture.atlas = sheet; _egg_texture.region = Rect2(0, 0, TILE_SIZE, TILE_SIZE)
+	return _egg_texture
 
 
 func _cleanup_inactive_nodes(active_tiles: Dictionary) -> void:
@@ -262,12 +271,15 @@ func _cleanup_inactive_nodes(active_tiles: Dictionary) -> void:
 		if not active_tiles.has(tile):
 			_prop_nodes[tile].queue_free()
 			_prop_nodes.erase(tile)
+	for tile in _egg_nodes.keys():
+		if not active_tiles.has(tile):
+			_egg_nodes[tile].queue_free()
+			_egg_nodes.erase(tile)
 
 
-# Tile data cache eviction: runs AFTER the node cleanup (never mid-pass) and
-# bounds _tile_cache to the synced window, so out-of-window entries from older
-# windows or off-window audit queries are reclaimed on the very next sync.
-# Without it the cache grows by a window-edge per step, unbounded.
+# Tile data cache eviction: runs AFTER the node cleanup (never mid-pass) and bounds
+# _tile_cache to the synced window, so out-of-window entries are reclaimed next sync
+# (without it the cache grows by a window-edge per step, unbounded).
 func _evict_tile_cache(active_tiles: Dictionary) -> void:
 	for tile in _tile_cache.keys():
 		if not active_tiles.has(tile):
@@ -281,6 +293,9 @@ func _clear_rendered_nodes() -> void:
 	for tile in _prop_nodes.keys():
 		_prop_nodes[tile].queue_free()
 	_prop_nodes.clear()
+	for tile in _egg_nodes.keys():
+		_egg_nodes[tile].queue_free()
+	_egg_nodes.clear()
 
 
 func _emit_biome_entered(center_tile: Vector2i) -> void:

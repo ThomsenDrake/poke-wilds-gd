@@ -1,18 +1,16 @@
 extends Control
 
-# Bag screen: item list with the highlighted item's description. POTION opens
-# a party picker and heals the chosen member; the SLEEPING BAG rests the party
-# through camping_runtime (Phase 2 camping seam); anything else reports that it
-# cannot be used here. Data comes from the injected context (see start_menu.gd).
+# Bag screen: item list + description. POTION heals and EVOLUTION STONES evolve a party-picked
+# member (stones confirm through GameRuntime's use_stone_on_mon; eggs refused); SLEEPING BAG rests.
 
 signal closed
 
 const PartyRows := preload("res://scripts/ui/party_rows.gd")
+const StoneEvolutionRuntime := preload("res://scripts/runtime/stone_evolution_runtime.gd") # STONE_ITEM_IDS single-sourced off the runtime module: routing + validation can never disagree
 
 const POTION_ITEM_ID := "potion"
 const POTION_HEAL_AMOUNT := 20
-# Phase 2 camping slice (spec: camping-crafting-survival.md): a REUSABLE key item
-# (never consumed) — its Z entry routes to camping_runtime.rest("bag").
+# Phase 2 camping: a REUSABLE key item (never consumed); Z routes to camping_runtime.rest("bag").
 const SLEEPING_BAG_ITEM_ID := "sleeping_bag"
 const STATE_ITEMS := "items"
 const STATE_PARTY_PICK := "party_pick"
@@ -29,6 +27,7 @@ var _entries: Array = []
 var _party: Array = []
 var _selected := 0
 var _party_selected := 0
+var _pending_item := ""
 var _state := STATE_ITEMS
 
 func _ready() -> void:
@@ -77,7 +76,7 @@ func _move(direction: int) -> void:
 
 func _confirm() -> void:
 	if _state == STATE_PARTY_PICK:
-		_apply_potion()
+		_apply_potion() if _pending_item == POTION_ITEM_ID else _apply_stone()
 	else:
 		_activate_item()
 
@@ -106,7 +105,8 @@ func _activate_item() -> void:
 	if _entries.is_empty() or _selected >= _entries.size():
 		return
 	var item_id := str((_entries[_selected] as Dictionary).get("item_id", ""))
-	if item_id == POTION_ITEM_ID:
+	if item_id == POTION_ITEM_ID or StoneEvolutionRuntime.STONE_ITEM_IDS.has(item_id):
+		_pending_item = item_id
 		_open_party_pick()
 	elif item_id == SLEEPING_BAG_ITEM_ID:
 		_use_sleeping_bag()
@@ -134,6 +134,9 @@ func _apply_potion() -> void:
 	if _party.is_empty() or _party_selected >= _party.size():
 		return
 	var mon: Dictionary = (_party[_party_selected] as Dictionary).duplicate(true)
+	if bool(mon.get("is_egg", false)): # eggs_stay_with_you: a healed egg would be a battle-active empty-moveset lead
+		_message_box.show_message("You keep the Egg with you.", 1.4)
+		return
 	var max_hp := maxi(1, int(mon.get("max_hp", 1)))
 	var current_hp := int(mon.get("current_hp", 0))
 	if current_hp >= max_hp:
@@ -146,12 +149,19 @@ func _apply_potion() -> void:
 	_close_party_pick()
 	_refresh_items()
 
-# Sleeping bag (Phase 2 camping slice; spec: camping-crafting-survival.md): a
-# reusable key item, so the count never decrements. camping_runtime.rest("bag")
-# owns the heal, the time advance and the campsite trail — the SAME semantics as
-# the faced-bed path field_action_router routes; the screen only surfaces the
-# message, resyncs the world tint to the advanced clock, and saves. Self-wires
-# through the /root/GameRuntime autoload (camp_menu's convention).
+func _apply_stone() -> void: # confirms through /root/GameRuntime (sleeping-bag convention); picker stays open on no-effect (like Potion), closes on success
+	if _party_selected >= _party.size():
+		return
+	var runtime := get_node_or_null("/root/GameRuntime")
+	var result: Variant = runtime.call("use_stone_on_mon", _pending_item, _party_selected) if runtime != null and runtime.has_method("use_stone_on_mon") else {}
+	var response: Dictionary = result if result is Dictionary else {}
+	_message_box.show_message(str(response.get("message", "Can't use that here.")), 1.6)
+	if bool(response.get("ok", false)):
+		_close_party_pick()
+		_refresh_items()
+
+# Sleeping bag (Phase 2): a reusable key item (count never decrements). camping_runtime.rest("bag")
+# owns the heal/time/campsite; the screen surfaces the message, resyncs the tint, saves.
 func _use_sleeping_bag() -> void:
 	var runtime := get_node_or_null("/root/GameRuntime")
 	var camping: Variant = runtime.get("camping_runtime") if runtime != null else null
@@ -160,8 +170,7 @@ func _use_sleeping_bag() -> void:
 		return
 	var result: Variant = camping.call("rest", "bag")
 	var response: Dictionary = result if result is Dictionary else {}
-	var text := str(response.get("message", ""))
-	_message_box.show_message(text if not text.is_empty() else "You rested for a while.", 2.2)
+	_message_box.show_message("You rested for a while." if str(response.get("message", "")).is_empty() else str(response.get("message", "")), 2.2)
 	if bool(response.get("ok", false)) and runtime != null:
 		var world := get_node_or_null("/root/Main/World")
 		if world != null and world.has_method("set_time_of_day"):
@@ -187,14 +196,12 @@ func _item_display_name(item_id: String) -> String:
 		return display_name.capitalize()
 	return item_id.capitalize()
 
-
 func _catalog_item(item_id: String) -> Dictionary:
 	var accessor: Callable = _context.get("get_item", Callable())
 	if not accessor.is_valid():
 		return {}
 	var item: Variant = accessor.call(item_id.strip_edges().to_lower())
 	return item if item is Dictionary else {}
-
 
 func _update_description() -> void:
 	_description.text = ""
@@ -204,7 +211,7 @@ func _update_description() -> void:
 	_description.text = str(_catalog_item(item_id).get("description", ""))
 
 func _update_hint() -> void:
-	_hint.text = "Z: Heal   X: Back" if _state == STATE_PARTY_PICK else "Z: Use   X: Back"
+	_hint.text = "Z: Heal   X: Back" if _state == STATE_PARTY_PICK and _pending_item == POTION_ITEM_ID else "Z: Use   X: Back"
 
 func _call_context(key: String, args: Array = []) -> Variant:
 	var accessor: Callable = _context.get(key, Callable())

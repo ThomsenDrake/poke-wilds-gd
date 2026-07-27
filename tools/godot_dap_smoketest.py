@@ -29,7 +29,8 @@ ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "ERROR: ")
 # windowed subprocesses. Single-sourced here; run_playtests.py imports it.
 WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update",
                                  "visual_sweep_camping", "visual_sweep_camping_update",
-                                 "visual_sweep_storage", "visual_sweep_storage_update"}
+                                 "visual_sweep_storage", "visual_sweep_storage_update",
+                                 "visual_sweep_pokemon", "visual_sweep_pokemon_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -40,7 +41,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 # runnable under force-headless.
 WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_camping", "visual_sweep_camping_update",
-                           "visual_sweep_storage", "visual_sweep_storage_update"}
+                           "visual_sweep_storage", "visual_sweep_storage_update",
+                           "visual_sweep_pokemon", "visual_sweep_pokemon_update"}
 
 
 def force_headless() -> bool:
@@ -226,6 +228,42 @@ SCENARIO_REQUIREMENTS = {
     # Field-move soak (self-guarded playtest_ scenario, like journey/soak).
     "playtest_field_soak": {
         "all": ["boot_started", "boot_ready", "playtest_field_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Breeding/drops/fishing soak (self-guarded playtest_ scenario; Workstream L.6).
+    "playtest_breed_soak": {
+        "all": ["boot_started", "boot_ready", "playtest_breed_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Phase 5 breeding / shinies / habitat drops / fishing proofs
+    # (breeding-shinies-drops-fishing.md). The all-lists pin the DOMAIN traces
+    # each scenario must emit, not just the pass marker (craft_flow precedent).
+    "breed_flow": {
+        "all": ["boot_started", "boot_ready", "egg_laid", "egg_hatched",
+                "breed_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "shiny_odds": {
+        "all": ["boot_started", "boot_ready", "shiny_rolled", "shiny_odds_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "habitat_drops": {
+        "all": ["boot_started", "boot_ready", "habitat_happiness_changed",
+                "item_dropped", "habitat_drops_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "fishing_flow": {
+        "all": ["boot_started", "boot_ready", "fish_hooked", "fishing_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Pokemon-state sweep (shots 20-21, shared baseline dir). Windowed-only like
+    # the other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_pokemon": {
+        "all": ["visual_sweep_pokemon_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_pokemon_update": {
+        "all": ["visual_sweep_pokemon_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

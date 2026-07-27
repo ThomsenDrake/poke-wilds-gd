@@ -20,6 +20,12 @@ const RUNTIME_ITEM_SUPPLEMENTS := {
 	"potion": {
 		"display_name": "Potion",
 		"description": "Restores 20 HP."
+	},
+	# Phase 5 habitat drops: Miltank's faithful Moo Moo Milk (wiki-materials species
+	# special) — the source game hardcodes it, so item.properties has no entry.
+	"moo_moo_milk": {
+		"display_name": "Moo Moo Milk",
+		"description": "Fresh milk from a happy Miltank."
 	}
 }
 
@@ -132,6 +138,10 @@ func _load_species_folder(folder_name: String) -> bool:
 	var front_path := "%s/front.png" % base_path
 	var back_path := "%s/back.png" % base_path
 	var overworld_path := "%s/overworld.png" % base_path
+	# Phase 5 shiny/breeding data: the recolor overworld sheet (579/990 folders)
+	# and the father-inheritance egg moves (359/990 folders; absent -> empty).
+	var shiny_overworld_path := "%s/overworld-shiny.png" % base_path
+	var egg_moves_path := "%s/egg_moves.asm" % base_path
 	var base_stats_path := "%s/base_stats.asm" % base_path
 	var evos_attacks_path := "%s/evos_attacks.asm" % base_path
 	var wilds_data_path := "%s/wilds_data.asm" % base_path
@@ -160,6 +170,9 @@ func _load_species_folder(folder_name: String) -> bool:
 	var evolutions: Array = []
 	if FileAccess.file_exists(evos_attacks_path):
 		evolutions = SpeciesFileParser.parse_evolutions(_read_text_file(evos_attacks_path))
+	var egg_moves := PackedStringArray()
+	if FileAccess.file_exists(egg_moves_path):
+		egg_moves = SpeciesFileParser.parse_egg_moves(_read_text_file(egg_moves_path))
 
 	var dex_number := int(wilds_data.get("dex_number", 0))
 	if dex_number <= 0:
@@ -181,6 +194,7 @@ func _load_species_folder(folder_name: String) -> bool:
 		"growth_rate": str(base_data.get("growth_rate", "")),
 		"gender_ratio": str(base_data.get("gender_ratio", "")),
 		"egg_groups": base_data.get("egg_groups", PackedStringArray()),
+		"egg_moves": egg_moves,
 		"tmhm": base_data.get("tmhm", PackedStringArray()),
 		"spawn_biomes": wilds_data.get("spawn_biomes", PackedStringArray()),
 		"field_moves": wilds_data.get("field_moves", {}),
@@ -190,7 +204,8 @@ func _load_species_folder(folder_name: String) -> bool:
 		"height_m": float(wilds_data.get("height_m", 0.0)),
 		"front_path": front_path if has_front else "",
 		"back_path": back_path if has_back else "",
-		"overworld_path": overworld_path if FileAccess.file_exists(overworld_path) else ""
+		"overworld_path": overworld_path if FileAccess.file_exists(overworld_path) else "",
+		"shiny_overworld_path": shiny_overworld_path if FileAccess.file_exists(shiny_overworld_path) else ""
 	}
 
 	# Wild encounters require battle-viable species: battle sprites, real base

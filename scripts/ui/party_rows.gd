@@ -3,6 +3,9 @@ extends RefCounted
 # Shared party-member row builder used by PartyScreen and by BagScreen's
 # party picker, so both render name/level/HP/status identically.
 
+const ShinyPalette := preload("res://scripts/ui/shiny_palette.gd")
+const SHINY_BADGE_COLOR := Color(1.0, 0.85, 0.2) # gold, like the GSC sparkle
+
 const HP_BAR_SIZE := Vector2(72.0, 10.0)
 # Fill floor (as a ratio) keeps a sliver visible at 1/max HP instead of an
 # invisible bar; colors follow the classic green/orange/red HP thresholds.
@@ -26,11 +29,41 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 	marker.custom_minimum_size = Vector2(MARKER_WIDTH, 0.0)
 	row.add_child(marker)
 
+	# Phase 5 eggs ride party slots: an egg icon + the pre-hatch status (faithful —
+	# species/gender/moveset/shiny are visible before hatch; HP reads as the step countdown).
+	var is_egg := bool(mon.get("is_egg", false))
+	if is_egg:
+		var egg_icon := TextureRect.new()
+		egg_icon.texture = ShinyPalette.egg_frame()
+		egg_icon.custom_minimum_size = Vector2(16.0, 16.0)
+		egg_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		row.add_child(egg_icon)
+
 	var name_label := Label.new()
-	name_label.text = "%s  Lv.%d" % [str(mon.get("name", "Pokemon")), int(mon.get("level", 1))]
+	if is_egg:
+		name_label.text = "Egg (%s)" % str(mon.get("egg", {}).get("display_name", "?"))
+	else:
+		name_label.text = "%s  Lv.%d" % [str(mon.get("name", "Pokemon")), int(mon.get("level", 1))]
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.clip_text = true
 	row.add_child(name_label)
+
+	if bool(mon.get("is_shiny", false)): # the status-screen shiny symbol (top-right in the original)
+		var shiny_badge := TextureRect.new()
+		shiny_badge.texture = ShinyPalette.shiny_icon()
+		shiny_badge.custom_minimum_size = Vector2(8.0, 8.0)
+		shiny_badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		shiny_badge.modulate = SHINY_BADGE_COLOR
+		row.add_child(shiny_badge)
+
+	if is_egg:
+		var steps_label := Label.new()
+		steps_label.text = "Steps: %d" % int(mon.get("egg", {}).get("steps_to_hatch", 0))
+		row.add_child(steps_label)
+		var egg_tag := Label.new()
+		egg_tag.text = "EGG"
+		row.add_child(egg_tag)
+		return row
 
 	var max_hp := maxi(1, int(mon.get("max_hp", 1)))
 	var current_hp := clampi(int(mon.get("current_hp", 0)), 0, max_hp)
@@ -80,6 +113,8 @@ static func set_selected(row: HBoxContainer, selected: bool) -> void:
 
 
 static func status_abbrev(mon: Dictionary) -> String:
+	if bool(mon.get("is_egg", false)):
+		return "EGG"
 	if int(mon.get("current_hp", 0)) <= 0:
 		return "FNT"
 	return str(mon.get("status", "")).strip_edges().to_upper().left(3)
@@ -89,6 +124,14 @@ static func status_abbrev(mon: Dictionary) -> String:
 # EXP to next level when the catalog/rules accessors are injected.
 static func summary_text(mon: Dictionary, get_species: Callable, exp_for_level: Callable) -> String:
 	var lines := PackedStringArray()
+	if bool(mon.get("is_egg", false)): # faithful pre-hatch status: everything is visible
+		var payload: Dictionary = mon.get("egg", {})
+		lines.append("Egg — %s%s" % [str(payload.get("display_name", "?")), "  (SHINY)" if bool(payload.get("is_shiny", false)) else ""])
+		lines.append("Gender: %s" % str(payload.get("gender", "?")))
+		lines.append("Steps to hatch: %d" % int(payload.get("steps_to_hatch", 0)))
+		var egg_moves: Variant = payload.get("moves", [])
+		lines.append("Moves: %s" % (", ".join(egg_moves) if egg_moves is Array and not (egg_moves as Array).is_empty() else "-"))
+		return "\n".join(lines)
 	lines.append("%s  Lv.%d   Type: %s" % [str(mon.get("name", "Pokemon")), int(mon.get("level", 1)), _type_text(mon.get("types", []))])
 	lines.append("HP: %d/%d" % [int(mon.get("current_hp", 0)), maxi(1, int(mon.get("max_hp", 1)))])
 	var stats: Dictionary = mon.get("stats", {})

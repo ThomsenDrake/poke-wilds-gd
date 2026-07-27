@@ -1,15 +1,13 @@
 extends Control
 
-# Party screen: d-pad list of party members; confirming opens an action menu
-# (SWAP LEAD / MOVE / SUMMARY / FIELD MOVE / DEPOSIT / RETRIEVE / CANCEL); SUMMARY
-# shows a compact stats panel. FIELD MOVE entries are capability display: only
-# cut/dig/smash (and Build) act; other moves surface an explanatory message. MOVE
-# reorders arbitrarily: up/down move the member live (session.move_party_member),
-# Z commits, X restores the pre-MOVE order (session.set_party_order). DEPOSIT moves
-# the selected member into the box beside the player (offered only while one exists;
-# refusals flash the Hint). RETRIEVE pulls the oldest campsite-held mon in while the
-# hold is non-empty with party room. FIELD MOVE emits field_move_requested and
-# closes so the app layer applies it. Data: injected context (see start_menu.gd).
+# Party screen: d-pad list of party members; confirming opens an action menu (SWAP LEAD /
+# MOVE / SUMMARY / FIELD MOVE / DEPOSIT / RETRIEVE / CANCEL); SUMMARY shows a compact stats
+# panel. FIELD MOVE entries are capability display: only cut/dig/smash (and Build) act. MOVE
+# reorders arbitrarily (up/down live, Z commits, X restores). DEPOSIT moves the selected
+# member into the box beside the player — falling back to a breeding PEN (Phase 5) — offered
+# only while one exists (refusals flash the Hint). RETRIEVE pulls the oldest campsite-held
+# mon. EGGS ride the list with a pre-hatch status (no field moves, no FNT). Data: injected
+# context (see start_menu.gd).
 
 signal closed
 signal field_move_requested(move_id: String)
@@ -153,7 +151,8 @@ func _open_actions() -> void:
 	var held: Variant = _call_context("get_campsite_pokemon")
 	var player_tile: Variant = _call_context("get_player_tile")
 	var box: Variant = _call_context("box_tile_near", [player_tile]) if player_tile is Vector2i else {}
-	var has_box: bool = box is Dictionary and bool((box as Dictionary).get("found", false))
+	var pen: Variant = _call_context("pen_tile_near", [player_tile]) if player_tile is Vector2i else {} # Phase 5: DEPOSIT falls back to a pen
+	var has_box: bool = (box is Dictionary and bool((box as Dictionary).get("found", false))) or (pen is Dictionary and bool((pen as Dictionary).get("found", false)))
 	_actions = PartyActions.build_action_entries(_party[_selected], _eligible_field_moves(_party[_selected]),
 		_context.get("get_field_move_name", Callable()), held if held is Array else [],
 		_party.size(), has_box)
@@ -199,6 +198,8 @@ func _activate_action() -> void:
 
 func _eligible_field_moves(mon: Dictionary) -> Array:
 	var move_ids: Array = []
+	if bool(mon.get("is_egg", false)): # eggs perform no field moves
+		return move_ids
 	var get_species: Callable = _context.get("get_species", Callable())
 	if not get_species.is_valid():
 		return move_ids

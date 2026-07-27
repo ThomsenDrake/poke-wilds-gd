@@ -26,3 +26,18 @@ static func fallback_species_entry(species_dict: Dictionary) -> Dictionary:
 		if species_entry is Dictionary and not (species_entry as Dictionary).is_empty():
 			return species_entry
 	return {}
+
+
+# Starter construction, extracted verbatim from game_runtime.gd's _build_starter for
+# the Phase 5 drops/fishing wiring budget (game_runtime keeps a thin forwarder). The
+# catalog + rules arrive injected so the domain layer keeps its no-data-dependency
+# contract; the empty-catalog warning stays with the caller.
+static func build_starter(catalog, rules, rng: RandomNumberGenerator, get_move: Callable) -> Dictionary:
+	var starter = fallback_species_entry(catalog.species)
+	var instance: Dictionary = rules.create_pokemon_instance(starter, 5, get_move, rng)
+	if not instance.is_empty():
+		return instance
+	var fallback_id = catalog.get_random_encounter_species(rng)
+	if fallback_id.is_empty():
+		return {}
+	return rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, get_move, rng)

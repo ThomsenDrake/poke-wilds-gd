@@ -1,6 +1,7 @@
 extends Control
 
 const BattleSurfaceLayout := preload("res://scripts/ui/battle_surface_layout.gd")
+const ShinyPalette := preload("res://scripts/ui/shiny_palette.gd")
 const ACTION_BG_PATH := "res://pokewilds/battle/battle_screen2.png"
 const MOVE_BG_PATH := "res://pokewilds/menu/attack_screen1.png"
 const BLANK_BG_PATH := "res://pokewilds/battle/battle_bg1.png"
@@ -37,6 +38,7 @@ var _enemy_status: Label
 var _player_status: Label
 var _glyph_covers: Control
 var _layout := BattleSurfaceLayout.new()
+var _shiny_palette := ShinyPalette.new()
 var _battle_font: Font
 
 func _ready() -> void:
@@ -52,14 +54,12 @@ func _ready() -> void:
 	}
 	_enemy_status = _layout.build_status_label(true)
 	_player_status = _layout.build_status_label(false)
-	add_child(_enemy_status)
-	add_child(_player_status)
+	add_child(_enemy_status); add_child(_player_status)
 	_glyph_covers = _layout.build_glyph_covers()
 	add_child(_glyph_covers)
 	move_child(_glyph_covers, 2)
 	_cursor.texture = load(ARROW_PATH)
-	for node in [_background, _overlay, _enemy_sprite, _player_sprite, _cursor]:
-		node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	for node in [_background, _overlay, _enemy_sprite, _player_sprite, _cursor]: node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_configure_theme()
 	_show_move_info(false)
 
@@ -170,8 +170,9 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 	_player_hp.text = "%d/%d" % [int(player_mon.get("current_hp", 0)), int(player_mon.get("max_hp", 1))]
 	_set_hp_bar(_enemy_hp_fill, enemy_mon, ENEMY_HP_BAR_WIDTH)
 	_set_hp_bar(_player_hp_fill, player_mon, PLAYER_HP_BAR_WIDTH)
-	_enemy_sprite.texture = _layout.pokemon_frame(str(enemy_mon.get("front_path", "")))
-	_player_sprite.texture = _layout.pokemon_frame(str(player_mon.get("back_path", "")))
+	# Shiny = the species' alternate palette + a standing sparkle badge (GSC model); normals keep the cached frame.
+	_shiny_palette.apply_sprite(_enemy_sprite, enemy_mon, str(enemy_mon.get("front_path", "")), Callable(_layout, "pokemon_frame"), "enemy")
+	_shiny_palette.apply_sprite(_player_sprite, player_mon, str(player_mon.get("back_path", "")), Callable(_layout, "pokemon_frame"), "player")
 
 func _set_hp_bar(fill: ColorRect, mon: Dictionary, width: float) -> void:
 	var max_hp = max(1, int(mon.get("max_hp", 1)))

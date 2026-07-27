@@ -41,3 +41,10 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 
 - `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal).
 - `time_evolution` (Phase 2) proves the time-of-day evolution gate in both directions under `seed_for_smoke`: EEVEE at happiness 255, exp poked to one seeded victory from level — a DAY battle (time 600) leaves it EEVEE with `evolution_time_gate{time_of_day:"DAY", evolved:""}`, and the same setup at NIGHT (time 1380) evolves it to UMBREON with `evolution_time_gate{evolved:"UMBREON"}` (SNOM→FROSMOTH rides the identical `TR_NITE` gate). The shadow-retreat block is proven by `night_cycle` (run refused once with `retreat_blocked`, then victory), not here.
+
+
+## Phase 5 Pokemon systems co-modification (cross-subsystem)
+
+Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
+- `scripts/domain/pokemon_rules.gd` gains the additive `is_shiny` instance field: `roll_shiny` (1/256 on the injected rng; the original FAQ's user-adjustable-odds hook rides `Breeding.set_shiny_odds`), `create_pokemon_instance`'s optional rng parameter, and `normalize_loaded_mon`'s absent->false backfill + evolution preservation.
+- `scripts/ui/battle_surface.gd` (+ layout) gains the shiny battle frame (front.pal -> shiny.pal exact-match remap over the full strip before the AtlasTexture crop) + the one-shot sparkle overlay; overworld shinies render identically to normals for wild mons (faithful — battle/status surfaces only).

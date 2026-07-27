@@ -34,6 +34,19 @@ const SCENARIOS := {
 	"field_moves_flow": [preload("res://scripts/app/field_moves_flow_scenario.gd"), "run", []],
 	# Building playtest (field-moves.md addition B): harvest -> house with a door -> refund.
 	"build_house_flow": [preload("res://scripts/app/build_house_flow_scenario.gd"), "run", []],
+	# Phase 5 breeding / shinies / habitat drops / fishing proofs
+	# (breeding-shinies-drops-fishing.md); dispatcher save-guarded like every
+	# non-playtest entry.
+	"breed_flow": [preload("res://scripts/app/breed_flow_scenario.gd"), "run", []],
+	"shiny_odds": [preload("res://scripts/app/shiny_odds_scenario.gd"), "run", []],
+	"habitat_drops": [preload("res://scripts/app/habitat_drops_scenario.gd"), "run", []],
+	"fishing_flow": [preload("res://scripts/app/fishing_flow_scenario.gd"), "run", []],
+	# Pokemon-state shots 20-21 (shared baseline dir; update never prunes foreign shots).
+	"visual_sweep_pokemon": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", []],
+	"visual_sweep_pokemon_update": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", [{"mode": "update"}]],
+	# Breeding/drops/fishing soak (self-guarded like journey/soak; the playtest_
+	# prefix makes the dispatcher skip its save guard).
+	"playtest_breed_soak": [preload("res://scripts/app/playtest_breed_soak_scenario.gd"), "run", []],
 	"visual_sweep": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", []],
 	"visual_sweep_update": [preload("res://scripts/app/visual_sweep.gd"), "run_sweep", [{"mode": "update"}]],
 	"visual_sweep_camping": [preload("res://scripts/app/visual_sweep_camping.gd"), "run_sweep", []],

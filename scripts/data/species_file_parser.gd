@@ -1,8 +1,7 @@
 extends RefCounted
 
-# Pure-text parsers for the per-species data files under
-# pokewilds/pokemon/pokemon/<slug>/. Malformed input yields partial or empty
-# results instead of an error, so the catalog can count failures per species.
+# Pure-text parsers for the per-species data files under pokewilds/pokemon/
+# pokemon/<slug>/. Malformed input yields partial/empty results, never an error.
 
 const TYPE_VOCAB := {
 	"NORMAL": true, "FIRE": true, "WATER": true, "GRASS": true, "ELECTRIC": true,
@@ -21,8 +20,8 @@ const FIELD_MOVE_ORDER: PackedStringArray = [
 const OVERWORLD_BEHAVIOR_ORDER: PackedStringArray = ["swim_only", "flee", "lunge", "aggression"]
 
 
-# Parses base_stats.asm. Returns {} when the species declaration, the stat
-# line, or the type line is missing; every other field degrades to a default.
+# Parses base_stats.asm: {} when the species declaration, stat line, or type line is
+# missing; every other field degrades to a default.
 static func parse_base_stats(text: String) -> Dictionary:
 	if text.is_empty():
 		return {}
@@ -136,9 +135,8 @@ static func parse_base_stats(text: String) -> Dictionary:
 	}
 
 
-# Parses the evolution block of evos_attacks.asm, which sits above the
-# level-up learnset and ends at `db 0 ; no more evolutions`. Line shape:
-# `db EVOLVE_<METHOD>, <param|empty>, <TARGET>`.
+# Parses the evolution block of evos_attacks.asm (above the level-up learnset, ending at
+# `db 0 ; no more evolutions`). Line shape: `db EVOLVE_<METHOD>, <param|empty>, <TARGET>`.
 static func parse_evolutions(text: String) -> Array:
 	var evolutions: Array = []
 	if text.is_empty():
@@ -168,6 +166,19 @@ static func parse_evolutions(text: String) -> Array:
 				param = _evolution_param(raw_param)
 		evolutions.append({"method": method, "param": param, "target": target})
 	return evolutions
+
+
+# Parses egg_moves.asm: bare `db MOVE_ID` lines (label lines are non-db and skip); absent
+# file degrades to empty (631/990 species have none); malformed lines drop.
+static func parse_egg_moves(text: String) -> PackedStringArray:
+	var moves := PackedStringArray()
+	for raw_line in text.split("\n"):
+		var line := raw_line.strip_edges()
+		if line.begins_with("db "):
+			var move_id := _csv_tail(line, 3).split(" ")[0].strip_edges()
+			if not move_id.is_empty():
+				moves.append(move_id)
+	return moves
 
 
 # Parses wilds_data.asm. Missing sections degrade to empty/zero defaults.
@@ -204,9 +215,8 @@ static func parse_wilds_data(text: String) -> Dictionary:
 	return result
 
 
-# wilds_data.asm is Windows-1252/ISO-8859 encoded (e.g. the é in "Pokémon"),
-# which FileAccess.get_as_text() would mangle as invalid UTF-8. Decode high
-# bytes as Latin-1 so dex entries survive intact.
+# wilds_data.asm is Windows-1252/ISO-8859 encoded (e.g. the é in "Pokémon"), which
+# FileAccess.get_as_text() would mangle; decode high bytes as Latin-1 instead.
 static func read_latin1_text(path: String) -> String:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -225,9 +235,8 @@ static func read_latin1_text(path: String) -> String:
 	return out.get_string_from_utf8()
 
 
-# Normalizes a species constant (BULBASAUR, HO-OH, MR. MIME, NIDORAN{) to a
-# dictionary-safe id: uppercase alphanumerics with any other run collapsed
-# to a single underscore, no leading/trailing separators.
+# Normalizes a species constant (BULBASAUR, HO-OH, MR. MIME, NIDORAN{) to a dictionary-
+# safe id: uppercase alphanumerics, other runs collapsed to one underscore.
 static func sanitize_species_id(raw: String) -> String:
 	var id := ""
 	var pending_separator := false
@@ -268,8 +277,7 @@ static func _csv_tail(line: String, skip: int) -> String:
 	return body
 
 
-# Extracts the <...> dex entry text starting at lines[start]; tolerates the
-# closing bracket landing on a later line.
+# Extracts the <...> dex entry text at lines[start]; the closing bracket may land later.
 static func _bracket_text(lines: PackedStringArray, start: int) -> String:
 	var text := lines[start]
 	var guard := 0
@@ -296,8 +304,7 @@ static func _db_word_list(line: String) -> PackedStringArray:
 	return words
 
 
-# Collects order.size() numeric db lines from lines[start] onward and maps
-# them, in fixed order, onto the given keys.
+# Collects order.size() numeric db lines from lines[start] onward, in fixed order, onto keys.
 static func _ordered_db_ints(lines: PackedStringArray, start: int, order: PackedStringArray, number_re: RegEx) -> Dictionary:
 	var values := {}
 	var slot := 0

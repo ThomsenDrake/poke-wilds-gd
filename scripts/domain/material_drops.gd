@@ -13,15 +13,23 @@ extends RefCounted
 # keeps ONLY the five materials a Phase 2 recipe consumes (charcoal excluded — no
 # Phase 2 recipe uses it) and derives the material from the species' type, walking
 # primary-then-secondary so dual-type mons match the wiki (Pidgey's Soft Feather
-# comes from its secondary FLYING type). Phase 5 replaces this with faithful
-# happy-Pokemon habitat drops (tech-debt-tracker.md + spec handoff retire it).
+# comes from its secondary FLYING type).
+#
+# PHASE 5 STATUS: the faithful happy-Pokemon habitat drops (habitat_drops.gd +
+# habitat_runtime.gd — penned mons producing by type once per in-game day) are the
+# PRIMARY material source; this battle-end table is KEPT as the documented
+# SECONDARY source (tech-debt-tracker.md records the interim's retirement path).
 #
 # WITNESS INVARIANT (load-bearing, asserted by craft_flow every run via
-# crafting_runtime.drop_witness_clean): the table
-# NEVER yields "log" or "hard_stone". Those are the build-loop witness materials
-# (log->Cut, hard_stone->Smash); a shop / gift / battle source for either would turn
-# a permitted wall-ring seal into a permanent self-trap
-# (build_runtime.unwitnessed_demolish_moves). Keep this table free of both.
+# crafting_runtime.drop_witness_clean, extended over the habitat table by
+# habitat_drops.witness_clean and over the dig bonus pools by
+# harvest_resolver.stone_pool_contract_clean): the drop economy NEVER yields "log"
+# or "hard_stone". Those are the build-loop witness materials (log->Cut,
+# hard_stone->Smash); a shop / gift / battle / habitat / dig source for either would
+# turn a permitted wall-ring seal into a permanent self-trap
+# (build_runtime.unwitnessed_demolish_moves). Faithful Rock -> Hard Stone is
+# therefore WITHHELD from the habitat table too (Rock-type mons contribute their
+# other type's material, or nothing). Keep every table clean.
 
 # Uppercase type -> lowercase bag id (every id is in pokewilds/i18n/item.properties).
 const TYPE_MATERIALS := {

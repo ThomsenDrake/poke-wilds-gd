@@ -17,12 +17,15 @@ extends Node
 # cover all 13 ported moves against the LIVE catalog, so any catalog/AUTO_TYPES drift
 # fails LOUD instead of vacuously passing on a silently-short party. Per-move checks
 # live in field_moves_checks.gd (flash/teleport/ride/fly) + field_moves_ground_checks.gd
-# (repel/power/charm+attack); each asserts a happy path AND a refusal.
+# (repel/power/charm+attack) + field_moves_dig_checks.gd (Phase 5 dig acquisition:
+# Beach pool faithful / divergent pool pinned / PLAINS control); each asserts a happy
+# path AND a refusal.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const FieldMovesParty := preload("res://scripts/runtime/field_moves_party.gd")
 const FieldMovesChecks := preload("res://scripts/app/field_moves_checks.gd")
 const FieldMovesGroundChecks := preload("res://scripts/app/field_moves_ground_checks.gd")
+const FieldMovesDigChecks := preload("res://scripts/app/field_moves_dig_checks.gd")
 
 const SEED := 2026072501
 const DAY_MINUTES := 600
@@ -45,10 +48,12 @@ func run(ctx: Dictionary) -> void:
 		_failures.append("fixture: %s" % problem)
 	var checks_a := FieldMovesChecks.new(); add_child(checks_a); checks_a.setup(_ctx, _runner, _failures, SEED)
 	var checks_b := FieldMovesGroundChecks.new(); add_child(checks_b); checks_b.setup(_ctx, _runner, _failures, SEED)
+	var checks_c := FieldMovesDigChecks.new(); add_child(checks_c); checks_c.setup(_ctx, _runner, _failures)
 	var plan := [[checks_a, "check_flash", "flash_ok"], [checks_a, "check_teleport_waystone", "teleport_ok"],
 		[checks_a, "check_ride", "ride_ok"], [checks_a, "check_fly", "fly_ok"],
 		[checks_b, "check_repel", "repel_ok"], [checks_b, "check_power", "power_ok"],
-		[checks_b, "check_attack", "attack_ok"], [checks_b, "check_charm", "charm_ok"]]
+		[checks_b, "check_attack", "attack_ok"], [checks_b, "check_charm", "charm_ok"],
+		[checks_c, "check_dig_acquisition", "dig_acquisition_ok"]] # LAST: its step shifts sit downstream of every other check
 	for entry in plan:
 		if not _failures.is_empty():
 			break

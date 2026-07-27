@@ -31,6 +31,7 @@ layer = "runtime"
 code_paths = [
   "scripts/core/trace_logger.gd",
   "scripts/runtime/game_runtime.gd",
+  "scripts/runtime/stone_evolution_runtime.gd",
   "scripts/runtime/session_state.gd",
   "scripts/runtime/save_store.gd",
   "scripts/runtime/music_router.gd",
@@ -99,9 +100,32 @@ spec_doc = "docs/product-specs/battle-and-capture.md"
 validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario breed_flow",
 ]
-required_trace_events = ["warning"]
+required_trace_events = ["warning", "evolution_stone_used"]
 quality_bucket = "progression"
+# Phase 5 (docs/product-specs/breeding-shinies-drops-fishing.md § Evolution
+# stones): check_item_evolution (pokemon_rules.gd:176-183) is WIRED — the new
+# scripts/runtime/stone_evolution_runtime.gd (session_runtime code_paths;
+# game_runtime instantiates + delegates via the one-line use_stone_on_mon seam,
+# the exact breed_flow_checks.STONE_SEAM_METHODS name so run_stone_case auto-
+# arms) calls it: validate -> consume -> swap -> trace (a refused decrement is
+# the distinct no_item refusal and applies nothing; stats/max_hp/current_hp/
+# catch_rate RECOMPUTE off the target entry — the exact level-evolution path,
+# battle_runtime._try_evolve). evolution_stone_used {item_id, species_id,
+# evolved} emits with source string "GameRuntime" on success only; a no-effect
+# use shows "It would have no effect.", consumes nothing, and emits no trace
+# (the Potion precedent). The event stays REQUIRED
+# here — now with a live caller — so it cannot leave trace-events.md + code
+# silently. bag_screen routes stones through the existing party picker (potion
+# precedent). Stone ACQUISITION is RESOLVED (tech-debt item 11; the faithful
+# Beach-Dig Water Stone pool + flagged port additions — the other-biome Dig pools
+# on harvest_loop/field_moves and the Steel-type shiny_stone cadence drop on
+# breeding_loop; ice/dawn stones stay scenario-grant-only, the item-11 residual).
+# The additive is_shiny
+# instance key + normalize preservation rides create_pokemon_instance /
+# normalize_loaded_mon in this file (breeding_loop's co-modification note); the
+# file stays AT its 320 budget.
 
 [[subsystems]]
 name = "battle_loop"
@@ -173,6 +197,27 @@ validation_commands = [
 ]
 required_trace_events = ["field_move_used", "harvest_flow_passed"]
 quality_bucket = "harvest"
+# STONE ACQUISITION (Phase 5; spec: breeding-shinies-drops-fishing.md § Evolution
+# stones; tech-debt item 11 RESOLVED): the resolver gained a DIG BONUS POOL parallel
+# to the byte-untouched DIG_BIOME_ITEMS base yield (harvest_resolver.DIG_BONUS_POOLS +
+# bonus_for + _dig_draw, a pure step-counter SplitMix over total_steps+tile — NO shared
+# _rng consumed, the night_system determinism guarantee holds; harvest_runtime.harvest_tile's
+# dig branch emits dig_item_found {tile [x,y], item_id, biome} alongside the unchanged
+# field_move_used). FAITHFUL ONLY for biome SAND = the beach (fresh-beach.md "## Dig Items"
+# pool {big_pearl, water_stone, clear_glass, revive}, exact wiki order — NOT a divergence).
+# DIVERGENCE (flagged per-key in code + spec; the scrapes cite NO non-Beach stone source):
+# GRASSLAND [leaf_stone], FOREST [leaf_stone, moon_stone], SAVANNA [fire_stone, thunderstone],
+# DESERT [sun_stone], SWAMP [dusk_stone]; the rate DIG_BONUS_RARITY := 8 is invented even
+# for the faithful Beach pool (wiki documents membership, no rate). PLAINS is deliberately
+# ABSENT (dry_soil-only — keeps harvest_flow's PLAINS digs byte-identical, the regression
+# guard). ice_stone / dawn_stone are UNASSIGNED by design (SNOW is not a diggable biome;
+# both stay scenario-grant-only — the item-11 residual). stone_pool_contract_clean()
+# preloads stone_evolution_runtime.gd for the STONE_ITEM_IDS CONST ONLY (single-source
+# mandate; fails on hard_stone / a misspelled thunder_stone / any stone outside the set).
+# dig_item_found is PINNED on the field_moves subsystem (witnessed by field_moves_flow's
+# field_moves_dig_checks.gd dig group — Beach pool faithful / divergent pool pinned to the
+# SHIPPED table / PLAINS negative control), NOT here: harvest_flow digs PLAINS only, so it
+# never emits dig_item_found.
 
 [[subsystems]]
 name = "building_loop"
@@ -474,6 +519,7 @@ code_paths = [
   "scripts/app/field_moves_flow_scenario.gd",
   "scripts/app/field_moves_checks.gd",
   "scripts/app/field_moves_ground_checks.gd",
+  "scripts/app/field_moves_dig_checks.gd",
   "scripts/app/build_house_flow_scenario.gd",
   "scripts/app/build_house_flow_build.gd",
   "scripts/app/playtest_field_soak_scenario.gd",
@@ -496,8 +542,204 @@ validation_commands = [
 # input_gate passed+failed pairing precedent). field_moves_flow + build_house_flow
 # are qa-dispatched; playtest_field_soak routes through smoke_scenarios' playtest_
 # branch (self-guarded by PlaytestBot.backup_save/restore_save) like journey/soak.
-required_trace_events = ["flash_lit", "teleport_used", "waystone_registered", "mount_summoned", "fly_used", "overworld_attack", "charm_used", "repel_active", "field_moves_passed", "field_moves_failed", "build_house_passed", "build_house_failed", "playtest_field_soak_passed", "playtest_field_soak_failed"]
+# Phase 5 stone acquisition: the dig group (field_moves_dig_checks.gd, wired LAST into
+# field_moves_flow's plan — its step shifts sit downstream of every other check) proves the
+# harvest resolver's dig bonus pool end to end and is the WITNESS for dig_item_found (emitted
+# by harvest_runtime, owned by harvest_loop): the stone_pool_contract_clean witness, a Beach
+# SAND water_stone hunt predicted via resolver.bonus_for at session.total_steps (faithful
+# pool), the first-found divergent biome pinned to the SHIPPED DIG_BONUS_POOLS table (a
+# flagged port divergence — the assert pins the shipped table, never the wiki), and a PLAINS
+# negative control (no dig_item_found, all ten stone bags unchanged, dry_soil +1). The
+# divergent biome CONTENT + the DIG_BONUS_RARITY rate are port inventions (see harvest_loop's
+# note); dig_acquisition_ok rides field_moves_passed's payload.
+required_trace_events = ["flash_lit", "teleport_used", "waystone_registered", "mount_summoned", "fly_used", "overworld_attack", "charm_used", "repel_active", "dig_item_found", "field_moves_passed", "field_moves_failed", "build_house_passed", "build_house_failed", "playtest_field_soak_passed", "playtest_field_soak_failed"]
 quality_bucket = "field_moves"
+
+[[subsystems]]
+name = "breeding_loop"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/breeding.gd",
+  "scripts/domain/habitat_drops.gd",
+  "scripts/runtime/breeding_runtime.gd",
+  "scripts/runtime/habitat_runtime.gd",
+  "scripts/app/breed_flow_scenario.gd",
+  "scripts/app/breed_flow_checks.gd",
+  "scripts/app/breed_flow_habitat_checks.gd",
+  "scripts/app/shiny_odds_scenario.gd",
+  "scripts/app/habitat_drops_scenario.gd",
+  "scripts/app/habitat_drops_checks.gd",
+  "scripts/runtime/phase5_support.gd",
+  "scripts/runtime/phase5_sites.gd",
+  "scripts/runtime/playtest_bot_breeding.gd",
+  "scripts/app/playtest_breed_soak_scenario.gd",
+  "scripts/ui/shiny_palette.gd",
+  "scripts/app/visual_sweep_pokemon.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/breeding-shinies-drops-fishing.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario breed_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario shiny_odds",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario habitat_drops",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_pokemon",
+  "python3 tools/run_playtests.py",
+]
+# The Phase-5 domain traces: shiny_rolled (GameRuntime wild/starter +
+# BreedingRuntime egg/hatch — payload source field), egg_laid / egg_hatched /
+# egg_picked_up / mon_penned / breeding_refused
+# (BreedingRuntime), habitat_happiness_changed / item_dropped /
+# pasture_deposited / pasture_withdrawn / pasture_refused (HabitatRuntime),
+# plus the scenario pass markers AND their symmetric _failed events (the
+# miss-002 total-exit contract — app_bootstrap's nav_audit / input_gate
+# passed+failed pairing precedent). The pen-lost-on-load recovery (mons to
+# the campsite hold, never lost) rides the warning tier (trace-events.md
+# warning case), not a dedicated event. The pen-withdrawal mon_withdrawn reuses the
+# storage subsystem's event (pen-keyed payload variant documented in
+# trace-events.md) and is NOT re-listed here. evolution_stone_used is pinned on
+# pokemon_progression (the domain check lives in pokemon_rules.gd; the emission
+# site is stone_evolution_runtime.gd, source string "GameRuntime").
+# breed_flow / shiny_odds / habitat_drops are qa-dispatched;
+# visual_sweep_pokemon is windowed-only (transport-skipped honestly like
+# visual_sweep_camping / visual_sweep_storage). The scenario SHARED HELPERS
+# live in scripts/runtime/ (phase5_support.gd — the contract witness + crafted
+# state; phase5_sites.gd — pen-site construction), preloaded by all four
+# scenarios; scripts/ui/shiny_palette.gd is the front.pal->shiny.pal remap
+# helper battle_surface_layout keys on.
+required_trace_events = ["shiny_rolled", "egg_laid", "egg_hatched", "egg_picked_up", "mon_penned", "breeding_refused", "habitat_happiness_changed", "item_dropped", "pasture_deposited", "pasture_withdrawn", "pasture_refused", "breed_flow_passed", "breed_flow_failed", "shiny_odds_passed", "shiny_odds_failed", "habitat_drops_passed", "habitat_drops_failed", "visual_sweep_pokemon_passed"]
+quality_bucket = "breeding"
+# STONE ACQUISITION — Steel-type habitat drop (Phase 5; spec: breeding-shinies-drops-fishing.md
+# § Evolution stones; tech-debt item 11 RESOLVED). DIVERGENCE (port-invented, uncited; flagged
+# in code + spec): on each Steel-type mon's drop day the SAME happy/comfortable crossed-day gate
+# also cadence-drops ONE shiny_stone — habitat_drops.STEEL_STONE_DROP := "shiny_stone" /
+# STEEL_STONE_CADENCE := 4 (one stone per >= 4 in-game-day window), a SECOND gate in
+# habitat_runtime._day_tick that NEVER touches drops_for's daily path (TYPE_MATERIALS["STEEL"]
+# stays EXACTLY [metal_coat]; wiki-materials.md:393 documents the Steel drop as Metal Coat ONLY,
+# and the exec plan's :149 "Steel-type drops" is uncited design intent — the stone choice + the
+# cadence are inventions). It REUSES item_dropped (same HabitatRuntime source + {species_id,
+# item_id, tile [x,y], day} keys — NO new habitat event, so required_trace_events is unchanged).
+# Witness-safe by construction (shiny_stone is neither log nor hard_stone; witness_clean() stays
+# true; is_habitat_drop_material walks the stone so the audit is honest). Pure step-counter draw
+# (steel_stone_due over types+day+last_stone_day; the per-mon last_stone_day rides the additive
+# habitat sub-dict, -CADENCE at deposit so the first drop day is stone-due, loaded mons self-heal
+# via the .get default — no sanitizer, no save-schema bump); NO shared _rng consumed. Witnessed by
+# habitat_drops' run_steel_drop_control (steel_ok in habitat_drops_passed). The Dig half of stone
+# acquisition (dig_item_found, the faithful Beach pool + the divergent biome pools) lives in the
+# harvest_loop / field_moves notes.
+# CROSS-SUBSYSTEM CO-MODIFICATION: breeding_loop OWNS the NEW pure-domain
+# scripts/domain/breeding.gd (pairing / Ditto rule / egg payload + hatch data /
+# pen enclosure detection; the habitat comfort gate lives SOLELY in
+# habitat_drops.gd — the breeding lay scan calls it, one table never two;
+# ALLOW_UNDISCOVERED_BREEDING := false is the FAITHFUL default shipped —
+# genderless/Undiscovered do NOT breed even with Ditto — and the exec plan's
+# workaround stays one flagged const flip away, witnessed by breed_flow's
+# unbreedable group) +
+# scripts/domain/habitat_drops.gd (type->tile habitat table, type->material
+# drop table + species overrides incl. the moo_moo_milk milk, the
+# witness_clean() audit, and pen_habitat_tags — the ONE interior+ring scan
+# shared by drops AND the breeding lay gate), and the NEW scripts/runtime/
+# breeding_runtime.gd (pen flood-fill detection, pasture deposit/withdraw/egg-
+# pickup, the lay + hatch ticks) + scripts/runtime/habitat_runtime.gd (comfort
+# evaluation, the crossed-day-boundary happiness/drop tick) — the two runtimes
+# share ONE pasture store BY REFERENCE (breeding_runtime._pastures IS
+# session.pastures; habitat reads/writes the same dicts in place, so its daily
+# +10 reaches the 220 lay gate the same step — no save roundtrip) because the budget-owned files it touches must
+# NOT grow: scripts/domain/pokemon_rules.gd (pokemon_progression-owned, 320/320)
+# gains ONLY the shiny roll (SHINY_ODDS := 256, roll_shiny(rng) with a
+# deterministic nonce fallback, the optional rng parameter on
+# create_pokemon_instance + the additive is_shiny dict key + the
+# normalize_loaded_mon backfill/evolution preservation — extract a helper FIRST
+# if even that does not fit); scripts/runtime/game_runtime.gd
+# (session_runtime-owned, 320/320) gains only same-line instantiation + setup()
+# beside the other runtimes (shared _rng injected into breeding/fishing;
+# habitat is step-driven, no rng) + the per-step tick delegation
+# (note_player_step) + the fish_caught capture trace; scripts/app/main.gd
+# (app_bootstrap-owned, 220/220) gets SAME-LINE wiring only (the tick already
+# flows through _on_player_tile_changed :63-69); scripts/runtime/session_state.gd
+# (session_runtime-owned) gains the ONE additive v4 "pastures" top-level key
+# (absent -> {}; validation lives in breeding_runtime.apply_save_state — a
+# pen lost to demolition relocates its mons to the campsite hold, never loses
+# them; NO SAVE_VERSION bump, v5 stays reserved for Phase 7); scripts/data/
+# species_file_parser.gd (pokemon_data-owned) gains the static parse_egg_moves
+# (SpeciesEggMoves: label + `db MOVE` lines; absent -> []; malformed skipped
+# per the partial-result convention) and scripts/data/pokemon_catalog.gd
+# (pokemon_data-owned) gains egg_moves + the shiny asset paths (front.pal /
+# shiny.pal colors, overworld-shiny path) on the species entry plus the
+# moo_moo_milk RUNTIME_ITEM_SUPPLEMENTS entry (the potion precedent, :19-24);
+# scripts/ui/battle_surface.gd + battle_surface_layout.gd (battle_loop-owned)
+# gain the shiny frame selection (front.pal -> shiny.pal exact-match remap over
+# the full strip BEFORE the AtlasTexture crop, cached in the existing
+# _frame_cache) + the one-shot shiny_inverse.png sparkle overlay;
+# scripts/ui/party_rows.gd / party_screen.gd (menu_ui-owned) gain the egg slot
+# + the shiny badge + the DROP party-screen action (routes to
+# breeding_runtime.deposit_to_nearest_pen — the DEPOSIT precedent);
+# scripts/runtime/battle_runtime.gd (battle_loop-owned) preserves is_shiny
+# through use_pokeball capture + _try_evolve's path swap;
+# scripts/runtime/player_avatar.gd (world_runtime-owned) swaps
+# overworld-shiny.png for a shiny Ride mount (fallback normal);
+# scripts/runtime/world_view.gd (world_runtime-owned) renders pen ground eggs
+# via breeding_runtime.ground_egg_at on the prop layer (world_draw_order
+# y-sort contract — the "egg in pen" baseline). scripts/domain/material_drops.gd
+# (crafting-owned) is NOT retired — its header flips to the documented
+# SECONDARY source (the faithful habitat drops are the primary) and the witness
+# audit extends over the habitat drop table via HabitatDrops.witness_clean()
+# (NEVER log/hard_stone — the building_loop region-seal escape; Rock-type
+# drops are WITHHELD, see the spec § Witness invariant). scripts/domain/
+# structures.gd (building_loop-owned) is UNCHANGED — pens are the existing
+# fence. See docs/product-specs/breeding-shinies-drops-fishing.md.
+
+[[subsystems]]
+name = "fishing"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/fishing.gd",
+  "scripts/runtime/fishing_runtime.gd",
+  "scripts/app/fishing_flow_scenario.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/breeding-shinies-drops-fishing.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario fishing_flow",
+]
+# fishing_cast (every rng-consuming cast, with the bite flag AND the rod tier),
+# fish_hooked (the hook-up: rod + species + level + tile), fishing_refused (no_rod /
+# no_water / no_species — never silent), fish_caught (GameRuntime, a fishing
+# battle ending in capture) + the scenario's symmetric passed/failed pair
+# (miss-002).
+required_trace_events = ["fishing_cast", "fish_hooked", "fishing_refused", "fish_caught", "fishing_flow_passed", "fishing_flow_failed"]
+quality_bucket = "fishing"
+# CROSS-SUBSYSTEM CO-MODIFICATION: fishing OWNS the NEW scripts/domain/
+# fishing.gd (rod tiers, per-tier bite chances + FIXED per-tier level bands
+# (TIER_LEVEL_RANGE: Old 3-7 / Good 8-14 / Super 15-22), the cumulative five-
+# species tier pools (MAGIKARP/TENTACOOL/HORSEA/CORSOLA/QWILFISH — the
+# documented Beach-anchored approximation) + scripts/runtime/
+# fishing_runtime.gd (rod pick, water check, bite roll on the injected shared
+# _rng, the pending-encounter seam) because scripts/runtime/game_runtime.gd
+# (session_runtime-owned) is AT its 320 budget — it gains only the same-line
+# instantiation + setup() plus the pending-encounter consumption in
+# generate_wild_encounter (the hooked mon returns BEFORE the wild draw, so
+# Repel + unlit-night ghosts never touch fishing) and the fish_caught trace in
+# _finish_battle (consume_fishing_battle resets on EVERY finished battle — the
+# mark never leaks). Player-facing entry rides scripts/app/field_action_router.gd
+# (building_loop-owned, has room): a fishing arm in on_context_action AHEAD of
+# the "There is nothing left here." fall-through (water check:
+# field_action_router.gd:71 via world_view.get_tile_biome :92 == "WATER" —
+# fishing works FROM SHORE, no Surf gate, water tiles are walkable=false / encounter=false,
+# biome_defs.gd:62). A bag rod-USE entry is NOT wired (bag_screen routes
+# potion / evolution stones / sleeping bag only) — the overworld Z is the ONLY
+# trigger. Water
+# tiles spawn NO encounters otherwise (biome_defs :62 encounter=false), so
+# fishing is PURELY ADDITIVE. Rods already craft into the bag
+# (recipes.gd:40-42, Phase 2); levels ride Fishing.TIER_LEVEL_RANGE's fixed
+# per-tier bands (the level_from_distance + tier-bonus model the design first
+# sketched was dropped). See
+# docs/product-specs/breeding-shinies-drops-fishing.md.
 # CROSS-SUBSYSTEM CO-MODIFICATION: field_moves EXTRACTS its orchestrator into the NEW
 # scripts/runtime/field_move_runtime.gd because scripts/runtime/game_runtime.gd
 # (session_runtime-owned) is AT its 320 budget and must NOT be extended — it gains

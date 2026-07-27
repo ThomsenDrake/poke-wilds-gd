@@ -91,3 +91,9 @@ DECISION: placements persist in SAVE SCHEMA V3 via a NEW ADDITIVE top-level key 
 
 Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code only:
 - `scripts/domain/structures.gd` gains the `way_stone` structure (a buildable Teleport beacon: walkable, `odd_keystone2.png`, appended AFTER torch in `IDS` so existing build-cycle indices stay stable) and the movable `boulder` placement id (the Power prop, `rock1.png`). The boulder is a valid PLACEMENT id (`is_valid` accepts it) but is deliberately ABSENT from `IDS`, so it is never a build-menu entry — the field-move runtime spawns and pushes it. Both ride the placements map + `structures` save key and reuse `world_overrides.apply_placement` (no validator changes). The demolition-witness invariant is unaffected (neither way_stone nor boulder is demolished for materials in the build loop).
+
+
+## Phase 5 Pokemon systems co-modification (cross-subsystem)
+
+Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
+- `scripts/app/field_action_router.gd` gains the fishing Z arm (faced WATER tile + a bagged rod -> `fishing_runtime.try_fish`; the best rod casts; a hooked mon rides the pending-encounter seam through main's normal battle path) ahead of harvest in the context-Z precedence, and the fence Z pen action (`breeding_runtime.interact`: ground-egg pickup first, else the most-recent penned mon withdraws). Fences + gates stay unchanged; a pen IS a fence enclosure (an open gate floods out = no pen).
