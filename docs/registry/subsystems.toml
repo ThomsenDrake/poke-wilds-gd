@@ -858,3 +858,13 @@ quality_bucket = "overworld_mons"
 # recruits/taken eggs persist via the existing party channels; v5 stays reserved for Phase 7).
 # Repel interaction is ZERO-CODE by construction: entity spawns never enter
 # generate_wild_encounter, so the grass-stream suppression needs no carve-out.
+# DEEP-DIVE HOLE-FIX (post-Phase-6 mutation lane, six sabotages each reverted clean):
+#   overworld_mons_checks.gd — the Charm LEVEL-GATE REFUSAL case (an over-leveled target:
+#     charm_used{level_gate_met:false} + pacified:false + no calm window) — the refusal
+#     branch had ZERO witnesses (pacified:=true passed byte-identical); overworld_mons_
+#     scenario.gd — a broken shiny tally is now a NAMED _failures entry (it was payload-
+#     buried; emission-deletion was silent) — both holes re-proven sabotage-red.
+#   world_entity_audit.gd — the geometrically-dead entity_outside_band assert REMOVED
+#     (probe.live's radius caps samples at DESPAWN_CELLS cells; despawn hygiene rides the
+#     scenario timeline hash) + the guardian sublane warns LOUD on a no-nest skip (seed-
+#     conditioned: never red, never silent). Required-trace list unchanged.
