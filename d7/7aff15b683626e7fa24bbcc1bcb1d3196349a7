@@ -1,0 +1,22 @@
+scenes/app/Main.tscn
+  s_b053a329cf705a::t_6a7fb3540bf934 1
+  s_b053a329cf705a::t_b44490cd993533 12
+  s_b053a329cf705a::t_e39ab05f8c8fe0 36-37
+  s_b053a329cf705a::t_a9c0fa122e4c57 38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "d77aff15b683626e7fa24bbcc1bcb1d3196349a7",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
