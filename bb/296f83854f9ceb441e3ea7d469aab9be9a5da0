@@ -1,0 +1,25 @@
+docs/QUALITY_SCORE.md
+  s_b053a329cf705a::t_f09c7a4a7c5dee 27
+docs/RELIABILITY.md
+  s_b053a329cf705a::t_ca113332980e42 138
+docs/product-specs/overworld-pokemon.md
+  s_b053a329cf705a::t_cbd891b1e2d855 125
+docs/registry/subsystems.toml
+  s_b053a329cf705a::t_6e3f7f10035fbf 861-870
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.16",
+  "base_commit_sha": "bb296f83854f9ceb441e3ea7d469aab9be9a5da0",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
