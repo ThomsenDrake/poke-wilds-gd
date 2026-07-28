@@ -49,6 +49,9 @@ const SCENARIOS := {
 	# Pokemon-state shots 20-21 (shared baseline dir; update never prunes foreign shots).
 	"visual_sweep_pokemon": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", []],
 	"visual_sweep_pokemon_update": [preload("res://scripts/app/visual_sweep_pokemon.gd"), "run_sweep", [{"mode": "update"}]],
+	# Fishing-state shots 26-27 (seed 2026072804; shared baseline dir; windowed-only).
+	"visual_sweep_fishing": [preload("res://scripts/app/visual_sweep_fishing.gd"), "run_sweep", []],
+	"visual_sweep_fishing_update": [preload("res://scripts/app/visual_sweep_fishing.gd"), "run_sweep", [{"mode": "update"}]],
 	# Breeding/drops/fishing soak (self-guarded like journey/soak; the playtest_
 	# prefix makes the dispatcher skip its save guard).
 	"playtest_breed_soak": [preload("res://scripts/app/playtest_breed_soak_scenario.gd"), "run", []],
@@ -59,6 +62,13 @@ const SCENARIOS := {
 	# Storage-state shots 18-19 (shared baseline dir; update never prunes foreign shots).
 	"visual_sweep_storage": [preload("res://scripts/app/visual_sweep_storage.gd"), "run_sweep", []],
 	"visual_sweep_storage_update": [preload("res://scripts/app/visual_sweep_storage.gd"), "run_sweep", [{"mode": "update"}]],
+	# Pre-Phase-7 suite expansion: the joint rng pin, v4 save stability (golden fixture
+	# at docs/generated/golden-saves/v4_golden.json; update rewrites it), and the
+	# Phase-6 entity soak (self-guarded: the playtest_ prefix skips the save guard).
+	"rng_joint_pin": [preload("res://scripts/app/rng_joint_pin_scenario.gd"), "run", []],
+	"save_stability": [preload("res://scripts/app/save_stability_scenario.gd"), "run", []],
+	"save_stability_update": [preload("res://scripts/app/save_stability_scenario.gd"), "run", [{"mode": "update"}]],
+	"playtest_entity_soak": [preload("res://scripts/app/playtest_entity_soak_scenario.gd"), "run", []],
 }
 
 

@@ -10,13 +10,20 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const PlaytestScenarios := preload("res://scripts/app/playtest_scenarios.gd")
 const QaScenarios := preload("res://scripts/app/qa_scenarios.gd")
 const Phase0Scenarios := preload("res://scripts/app/phase0_scenarios.gd")
+const SmokeBiomeScenarios := preload("res://scripts/app/smoke_biome_scenarios.gd")
+
+# Determinism pin for the three inline smokes (the house convention: seed BEFORE any
+# draw — boot/overworld_step steps ride the avatar trigger stream, menu_save the save).
+const SMOKE_SEED := 2026072801
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
 var _playtests: Node = null
+var _biome: Node = null
 
 func run(scenario: String, ctx: Dictionary) -> void:
 	_ctx = ctx
+	_runtime().emit_trace("smoke_scenario_dispatched", "SmokeScenarios", {"scenario": scenario}) # double-run lane boundary: everything before this line is BOOT (wall-clock world seed), never scenario behavior
 	_runtime().overworld_mons_runtime.active = SmokeScenarioRunner.scenario_uses_overworld(scenario) # Phase 6 activation gate (baseline protection)
 	var guard_save := not scenario.begins_with("playtest_")
 	if guard_save:
@@ -27,11 +34,13 @@ func run(scenario: String, ctx: Dictionary) -> void:
 		await Phase0Scenarios.run(scenario, self, _ctx)
 	else:
 		match scenario:
-			"boot": await get_tree().create_timer(0.4).timeout
+			"boot":
+				_runtime().seed_for_smoke(SMOKE_SEED)
+				await get_tree().create_timer(0.4).timeout
 			"overworld_step": await _scenario_overworld_step()
 			"menu_save": await _scenario_menu_save()
-			"biome_probe": await _scenario_biome_probe()
-			"biome_traverse": await _scenario_biome_traverse()
+			"biome_probe": await _biome_scenarios().run("biome_probe", _ctx)
+			"biome_traverse": await _biome_scenarios().run("biome_traverse", _ctx)
 			"field_move": await _scenario_field_move()
 			"playtest_journey": await _playtest_scenarios().run_journey(_ctx)
 			"playtest_soak": await _playtest_scenarios().run_soak(_ctx)
@@ -44,6 +53,7 @@ func run(scenario: String, ctx: Dictionary) -> void:
 	get_tree().quit()
 
 func _scenario_overworld_step() -> void:
+	_runtime().seed_for_smoke(SMOKE_SEED) # pins the avatar trigger stream the steps below ride
 	await get_tree().create_timer(0.2).timeout
 	var steps := 0
 	for _i in range(5):
@@ -62,6 +72,7 @@ func _scenario_overworld_step() -> void:
 
 # NEW GAME: confirm box opens; X cancels with menu + game intact; Z confirms.
 func _scenario_menu_save() -> void:
+	_runtime().seed_for_smoke(SMOKE_SEED) # the confirm path's new_game draws ride the pinned stream
 	await get_tree().create_timer(0.2).timeout
 	var cursor := _runner.trace_log_line_count()
 	_call("toggle_menu")
@@ -111,73 +122,6 @@ func _scenario_field_move() -> void:
 	else:
 		_runtime().warn("SmokeScenarios", "Field move smoke scenario failed: %s." % fail, {"tile": [tile.x, tile.y]})
 
-func _scenario_biome_probe() -> void:
-	await get_tree().create_timer(0.2).timeout
-	var result = _world().validate_world_invariants()
-	if bool(result.get("ok", false)):
-		_runtime().emit_trace("biome_probe_passed", "SmokeScenarios", {"seed": int(result.get("seed", 0)), "spawn": result.get("spawn", []), "reachable": int(result.get("reachable", 0))})
-	else:
-		_runtime().warn("SmokeScenarios", "Biome probe failed invariants.", {"seed": int(result.get("seed", 0)), "failures": result.get("failures", [])})
-	await get_tree().create_timer(0.2).timeout
-
-func _scenario_biome_traverse() -> void:
-	await get_tree().create_timer(0.2).timeout
-	var start_biome = _world().get_tile_biome(_player().tile_position)
-	var crossed = await _walk_until_biome_change(start_biome, 30)
-	if not crossed:
-		_force_biome_crossing(start_biome)
-	_trigger_traversal_gate()
-	var biome = _world().get_tile_biome(_player().tile_position)
-	var wild_mon = _runtime().generate_wild_encounter(_player().tile_position, biome)
-	if wild_mon.is_empty():
-		_runtime().warn("SmokeScenarios", "Biome traverse could not create a wild encounter.", {})
-		return
-	await _run_smoke_battle(wild_mon)
-
-func _run_smoke_battle(wild_mon: Dictionary) -> void:
-	_call("set_battle", [true])
-	_message_box().hide_message()
-	_music_router().play_battle_track("wild")
-	_battle_view().start_wild_battle(wild_mon)
-	await get_tree().create_timer(0.2).timeout
-	_battle_view().run_smoke_turn()
-	await get_tree().create_timer(0.2).timeout
-	if _battle_view().visible:
-		_battle_view().run_smoke_escape()
-		await get_tree().create_timer(0.2).timeout
-
-func _walk_until_biome_change(start_biome: String, max_steps: int) -> bool:
-	var player = _player()
-	var saved_encounter = player.encounter_chance
-	player.encounter_chance = 0.0
-	var crossed = false
-	for _step in range(max_steps):
-		var direction = _runner.find_walkable_step_direction(_world(), player.tile_position)
-		if direction == Vector2i.ZERO or not player.smoke_step(direction):
-			break
-		await player.tile_changed
-		crossed = _world().get_tile_biome(player.tile_position) != start_biome
-		if crossed:
-			break
-	player.encounter_chance = saved_encounter
-	return crossed
-
-func _force_biome_crossing(start_biome: String) -> void:
-	var center = _player().tile_position
-	for radius in range(12, 26):
-		for tile in _runner.ring_around(center, radius):
-			if _world().is_tile_walkable(tile) and _world().get_tile_biome(tile) != start_biome:
-				_runner.teleport_player(_world(), _player(), _runtime(), tile)
-				return
-
-func _trigger_traversal_gate() -> void:
-	var pair = _runner.find_gated_pair(_world(), _player().tile_position, 20)
-	if pair.is_empty():
-		_runtime().warn("SmokeScenarios", "Biome traverse could not find a gated tile to block on.", {})
-		return
-	_runner.teleport_player(_world(), _player(), _runtime(), pair["from_tile"])
-	_player().smoke_step(pair["direction"])
-
 func _call(key: String, args: Array = []) -> void:
 	var callable: Callable = _ctx.get(key, Callable())
 	if callable.is_valid():
@@ -209,6 +153,13 @@ func _playtest_scenarios() -> Node:
 		_playtests = PlaytestScenarios.new()
 		add_child(_playtests)
 	return _playtests
+
+# The biome probe/traverse scenarios live in smoke_biome_scenarios.gd (budget split).
+func _biome_scenarios() -> Node:
+	if _biome == null:
+		_biome = SmokeBiomeScenarios.new()
+		add_child(_biome)
+	return _biome
 
 func _world() -> Node: return _ctx["world"]
 func _player() -> Node: return _ctx["player"]

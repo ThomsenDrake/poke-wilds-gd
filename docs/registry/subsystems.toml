@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -19,10 +19,42 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario battle_end_input",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_migration",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario rng_joint_pin",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_stability",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed"]
 quality_bucket = "bootstrap"
+# PRE-PHASE-7 SUITE EXPANSION (user-approved full deep-dive expansion; the four new
+# scenarios are miss-002-compliant: symmetric <name>_passed / <name>_failed{reasons}
+# markers). rng_joint_pin + save_stability live HERE (the SmokeScenarios home; the
+# save_migration_passed precedent) — rng_joint_pin pins ONE seed_for_smoke seed over a
+# FIXED interleaving of encounter draws + fishing casts (fishing shares game_runtime._rng)
+# + harvest dig steps (step-pure, NO shared _rng) and asserts the exact species/item
+# sequence byte-stable across two in-scenario runs; save_stability drives scripted
+# v4-surface mutations (deposit/withdraw, craft, repel_steps, pastures, stone/rod bag) →
+# save → reload → save → byte-compare of the CANONICALIZED save JSON (key-sorted,
+# ts/version-stripped) and commits ONE golden v4 fixture at docs/generated/golden-saves/
+# v4_golden.json (load(golden) + canonical-form stability asserted). Their scenario files
+# (rng_joint_pin_scenario.gd, save_stability_scenario.gd — single file, no checks split)
+# join code_paths above. CO-MODIFICATION (tools; files stay owned by their homes):
+#   tools/run_playtests.py — the region-gate post-step gains a RED sidecar
+#     crafted_state.world_seed / shot_seq EQUALITY gate (a seed/sequence drift is refused,
+#     never diffed; --update mode validates the SOURCE sidecar BEFORE the baseline
+#     rewrite) plus a per-soak WARNING-COUNT TRIPWIRE (each soak ≤ the committed pin file
+#     under docs/generated/ the builder creates; exceedance RED with the warning list);
+#     visual_sweep_fishing(+_update) joins PLAYTEST_SCENARIOS / WINDOWED_SUBPROCESS_SCENARIOS /
+#     WINDOWED_ONLY_SCENARIOS in tools/godot_dap_smoketest.py.
+#   tools/verify_all.py — S9 gains the four satellite sweep families (shots 15-23
+#     windowed-diffed one command) + the fishing satellite, and a DOUBLE-RUN determinism
+#     lane lands AFTER S6: the six rng-consumer scenarios (playtest_journey, playtest_soak,
+#     overworld_mons, shiny_odds, fishing_flow, breed_flow) twice headless, ts-stripped
+#     canonical trace JSONL + payloads compared via a new determinism_verify.py cmp verb
+#     (extending the previously unwired cmd_cmp); ≤90s budget; miss-002 mismatch payload.
+#   tools/check_repo_contracts.py — gains the static rule banning RandomNumberGenerator in
+#     *_sim.gd setup signatures (codifying overworld_mons_sim.gd:11) and a shot-numbering
+#     COMPLETENESS check consuming the single-sourced shot-range registry (whitelist
+#     retired 17 only). See vision_fidelity + session_runtime co-mod notes below.
 
 [[subsystems]]
 name = "session_runtime"
@@ -47,6 +79,12 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# PRE-PHASE-7 SUITE EXPANSION co-modification: game_runtime.gd:207 seed_for_smoke now
+# ALSO pins player_avatar._rng (wall-clock-seeded today at player_avatar.gd:42,47; the
+# trigger draw is :205), so the determinism seam covers the FULL rng surface (encounter +
+# battle + avatar) — real play still never calls it; boot / overworld_step / menu_save
+# gain seed_for_smoke calls in smoke_scenarios.gd. save_stability (app_bootstrap registry
+# entry) is the v4 save-surface byte-stability witness for this subsystem's save schema.
 
 [[subsystems]]
 name = "world_runtime"
@@ -265,7 +303,7 @@ quality_bucket = "building"
 name = "vision_fidelity"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py", "tools/vision_review.py", "tools/art_geometry.py", "tools/check_art_anchors.py", "tools/vlm_reviewer.py"]
+code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/render_palette.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py", "tools/vision_review.py", "tools/art_geometry.py", "tools/check_art_anchors.py", "tools/vlm_reviewer.py"]
 scene_paths = []
 spec_doc = "docs/product-specs/vision-fidelity.md"
 validation_commands = [
@@ -316,6 +354,18 @@ quality_bucket = "vision"
 #     anchor_drift signal rides check_art_anchors.py (--live) plus the static gate, and the anchor:<id>
 #     region row in vision-review-rubric.md is the pre-pinned contract. Optionally split this concern into a
 #     dedicated vision_fidelity_anchors subsystem with its own QUALITY_SCORE.md row.
+#   PRE-PHASE-7 SUITE EXPANSION — snapshot_capture.gd is consumed UNCHANGED by the new
+#     visual_sweep_fishing satellite (fishing subsystem entry; windowed-only like the
+#     other satellites, seed 2026072804, encounter_chance 0, pending seam disarmed at
+#     capture). SHOT NUMBERING is single-sourced in a shot-range REGISTRY const in
+#     scripts/app/visual_sweep_baselines.gd (app_bootstrap code_paths): per-sweep number
+#     ranges + per-sweep seeds + retired numbers (17 formally RETIRED — camping-reserved,
+#     never committed — the sole whitelisted numbering gap); the satellites' _foreign_shot
+#     prune/compare guards DERIVE from this registry (no second hardcoded range) and a
+#     biome-shots floor (≥3) fails loud. The run_playtests region-gate post-step gains the
+#     RED sidecar crafted_state.world_seed / shot_seq equality gate (refused, never diffed;
+#     --update validates the SOURCE sidecar before the baseline rewrite); the shot-count
+#     prose lives in RELIABILITY.md § Visual verification + vision-fidelity.md § Sidecars.
 
 [[subsystems]]
 name = "camping_loop"
@@ -524,6 +574,7 @@ code_paths = [
   "scripts/app/build_house_flow_build.gd",
   "scripts/app/playtest_field_soak_scenario.gd",
   "scripts/app/field_move_actions.gd",
+  "scripts/app/field_moves_fly_checks.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/field-moves.md"
@@ -609,7 +660,7 @@ validation_commands = [
 # state; phase5_sites.gd — pen-site construction), preloaded by all four
 # scenarios; scripts/ui/shiny_palette.gd is the front.pal->shiny.pal remap
 # helper battle_surface_layout keys on.
-required_trace_events = ["shiny_rolled", "egg_laid", "egg_hatched", "egg_picked_up", "mon_penned", "breeding_refused", "habitat_happiness_changed", "item_dropped", "pasture_deposited", "pasture_withdrawn", "pasture_refused", "breed_flow_passed", "breed_flow_failed", "shiny_odds_passed", "shiny_odds_failed", "habitat_drops_passed", "habitat_drops_failed", "visual_sweep_pokemon_passed"]
+required_trace_events = ["shiny_rolled", "egg_laid", "egg_hatched", "egg_picked_up", "mon_penned", "breeding_refused", "habitat_happiness_changed", "item_dropped", "pasture_deposited", "pasture_withdrawn", "pasture_refused", "breed_flow_passed", "breed_flow_failed", "shiny_odds_passed", "shiny_odds_failed", "habitat_drops_passed", "habitat_drops_failed", "visual_sweep_pokemon_passed", "visual_sweep_fishing_passed"]
 quality_bucket = "breeding"
 # STONE ACQUISITION — Steel-type habitat drop (Phase 5; spec: breeding-shinies-drops-fishing.md
 # § Evolution stones; tech-debt item 11 RESOLVED). DIVERGENCE (port-invented, uncited; flagged
@@ -699,6 +750,7 @@ code_paths = [
   "scripts/domain/fishing.gd",
   "scripts/runtime/fishing_runtime.gd",
   "scripts/app/fishing_flow_scenario.gd",
+  "scripts/app/visual_sweep_fishing.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/breeding-shinies-drops-fishing.md"
@@ -706,14 +758,21 @@ validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario fishing_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_fishing",
 ]
 # fishing_cast (every rng-consuming cast, with the bite flag AND the rod tier),
 # fish_hooked (the hook-up: rod + species + level + tile), fishing_refused (no_rod /
 # no_water / no_species — never silent), fish_caught (GameRuntime, a fishing
 # battle ending in capture) + the scenario's symmetric passed/failed pair
 # (miss-002).
-required_trace_events = ["fishing_cast", "fish_hooked", "fishing_refused", "fish_caught", "fishing_flow_passed", "fishing_flow_failed"]
+required_trace_events = ["fishing_cast", "fish_hooked", "fishing_refused", "fish_caught", "fishing_flow_passed", "fishing_flow_failed", "visual_sweep_fishing_passed", "visual_sweep_fishing_failed"]
 quality_bucket = "fishing"
+# PRE-PHASE-7 SUITE EXPANSION: the visual_sweep_fishing SATELLITE (shots 26_fishing_cast +
+# 27_fishing_bite, frozen date-shaped seed 2026072804, a fixed Beach water tile via
+# ring-scan, an Old Rod crafted through the REAL resolver, encounter_chance 0, the
+# pending-encounter seam DISARMED at capture) lands here — the visual_sweep_pokemon_passed
+# → breeding_loop precedent for satellite sweep markers; windowed-only, transport-skipped
+# honestly, in PLAYTEST_SCENARIOS + WINDOWED_SUBPROCESS_SCENARIOS + WINDOWED_ONLY_SCENARIOS.
 # CROSS-SUBSYSTEM CO-MODIFICATION: fishing OWNS the NEW scripts/domain/
 # fishing.gd (rod tiers, per-tier bite chances + FIXED per-tier level bands
 # (TIER_LEVEL_RANGE: Old 3-7 / Good 8-14 / Super 15-22), the cumulative five-
@@ -794,6 +853,9 @@ code_paths = [
   "scripts/app/overworld_mons_battle_checks.gd",
   "scripts/app/world_entity_audit.gd",
   "scripts/app/visual_sweep_overworld.gd",
+  "scripts/runtime/playtest_bot_entity.gd",
+  "scripts/app/playtest_entity_soak_scenario.gd",
+  "scripts/app/overworld_mons_disposition_checks.gd",
 ]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/overworld-pokemon.md"
@@ -802,14 +864,24 @@ validation_commands = [
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario overworld_mons",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_overworld",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario playtest_entity_soak",
 ]
 # The SEVEN plan-mandated domain traces (source "OverworldMonsRuntime"): spawn/despawn
 # lifecycle, the recruit path, nest + egg-theft + Alpha provocation; plus the scenario's
 # symmetric passed/failed pair (miss-002) and the deterministic 22/23 sweep marker.
 # egg_cleared / mon_provoked are documented payload-variant auxiliaries (trace-events.md),
 # NOT registry-required; charm_used / overworld_attack stay pinned on field_moves.
-required_trace_events = ["overworld_mon_spawned", "overworld_mon_despawned", "recruit_attempted", "recruit_succeeded", "nest_found", "egg_stolen", "alpha_provoked", "overworld_mons_passed", "overworld_mons_failed", "visual_sweep_overworld_passed"]
+required_trace_events = ["overworld_mon_spawned", "overworld_mon_despawned", "recruit_attempted", "recruit_succeeded", "nest_found", "egg_stolen", "alpha_provoked", "overworld_mons_passed", "overworld_mons_failed", "visual_sweep_overworld_passed", "playtest_entity_soak_passed", "playtest_entity_soak_failed"]
 quality_bucket = "overworld_mons"
+# PRE-PHASE-7 SUITE EXPANSION: playtest_entity_soak rides a NEW bot band
+# (scripts/runtime/playtest_bot_entity.gd — the main playtest_bot.gd is AT its 320 budget,
+# EXTRACTED exactly like playtest_bot_breeding.gd was): steal-egg / provoke-Alpha /
+# charm-recruit / flee-despawn loops over hundreds of seeded iterations; postconditions —
+# sprite count bounded, y-sort keys never NaN, the pending-encounter seam never left
+# armed, despawn hygiene (no entity past DESPAWN_CELLS), zero entity_at on the player's
+# tile. Marker lands HERE (the playtest_field_soak → field_moves precedent). The
+# visual_sweep_overworld satellite additionally captures 30_night_roamers (tod=0, entities
+# ACTIVE — closing the night×entities×tint triple 04_night leaves entity-inert).
 # CROSS-SUBSYSTEM CO-MODIFICATION (true file:line cites; files stay OWNED BY their home
 # subsystem — one owner per file, never double-listed in code_paths):
 #   scenes/app/Main.tscn:12,36 — the EntityLayer Node2D ext_resource + node, a STATIC child

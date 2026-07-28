@@ -1,13 +1,10 @@
 extends Node
 
-# Breed flow scenario (Phase 5; spec: docs/product-specs/breeding-shinies-
-# drops-fishing.md). A sealed FENCE ring from EARNED materials (Cut/Dig resolver
-# + top-up); a compatible EEVEE pair penned on basic ground (shared habitat gate;
-# happiness poked via the documented seam); the seeded cadence laying an egg
-# VISIBLE before hatch (mother's species/gender, the father's EGG MOVE CHARM, the
-# shiny flag), hatching on the step clock into a level-5 child carrying both.
-# Ditto / UNBREEDABLE / WRONG-GROUP / stone / save ride breed_flow_checks.gd;
-# FLYING / WATER habitat pens ride breed_flow_habitat_checks.gd (app split).
+# Breed flow scenario (Phase 5; spec: docs/product-specs/breeding-shinies-drops-fishing.md).
+# Earned-material fence ring, compatible EEVEE pair penned on basic ground, seeded cadence
+# laying a VISIBLE egg hatched on the step clock into a level-5 child. Ditto / UNBREEDABLE /
+# WRONG-GROUP / stone / save ride breed_flow_checks.gd; FLYING / WATER habitat pens ride
+# breed_flow_habitat_checks.gd (app split).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const Phase5 := preload("res://scripts/runtime/phase5_support.gd")
@@ -21,8 +18,7 @@ const EGG_MOVE_ID := "CHARM" # eevee/egg_moves.asm; the father passes it
 const PEN_SCAN_RADIUS := 160
 const LAY_STEP_CAP := 6000
 const LAY_BATCH := 60
-const HATCH_STEPS := 2688 # DEFAULT_STEPS_TO_HATCH (2560) + headroom
-const DAY_MINUTES := 600
+const HATCH_STEPS := 2688; const DAY_MINUTES := 600 # DEFAULT_STEPS_TO_HATCH (2560) + headroom
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -37,9 +33,13 @@ func run(ctx: Dictionary) -> void:
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
 	runtime.seed_for_smoke(SEED)
+	runtime.new_game() # self-contained: the world + spawn derive from the PINNED seed (boot-save dependence was the headless flying-site failure; the double-run lane needs a pure function of (code, seed))
+	_world().rebuild(runtime.get_world_seed()) # the view owns its own generator: re-seed it or every far _world() logic read answers from the BOOT world (the _fresh_game precedent)
 	runtime.session.time_of_day_minutes = DAY_MINUTES
-	var saved_chance: float = _player().encounter_chance
-	_player().encounter_chance = 0.0
+	# Spawn is the world origin (open water in the radial seed world): relocate to the nearest BUILDABLE tree pen site so the harvest/pen/habitat witnesses find terrain (siting validated the stand ring walkable, so +3 needs no re-check).
+	var tree_site := Sites.find_feature_pen_site(runtime._world_gen, _player().tile_position, 600, "tree")
+	if tree_site != Vector2i.ZERO: _runner.teleport_player(_world(), _player(), runtime, tree_site + Vector2i(3, 0))
+	var saved_chance: float = _player().encounter_chance; _player().encounter_chance = 0.0
 	var party_before: Array = _runner.swap_party(runtime, ["MACHOP", "CALYREX", "RHYPERIOR"], PAIR_LEVEL) # build + cut + dig capability for the resolver witnesses
 	_witness_base(runtime)
 	if _failures.is_empty():
@@ -56,8 +56,8 @@ func run(ctx: Dictionary) -> void:
 		_oks["unbreedable_ok"] = checks.run_unbreedable_case(runtime)
 		_oks["wrong_group_ok"] = checks.run_wrong_group_case(runtime)
 		var habitat_checks := BreedFlowHabitatChecks.new(); add_child(habitat_checks); habitat_checks.setup(_ctx, _runner, _failures)
-		_oks["flying_ok"] = habitat_checks.run_flying_case(runtime)
-		_oks["water_ok"] = habitat_checks.run_water_case(runtime)
+		_oks["flying_ok"] = habitat_checks.run_flying_case(runtime); _oks["water_ok"] = habitat_checks.run_water_case(runtime)
+		_oks["egg_cap_ok"] = habitat_checks.run_egg_cap_case(runtime)
 		_oks["stone_ok"] = checks.run_stone_case(runtime)
 		_oks["save_ok"] = checks.run_save_case(runtime)
 	if _failures.is_empty():
@@ -69,10 +69,8 @@ func run(ctx: Dictionary) -> void:
 		runtime.warn("BreedFlowScenario", "Breed flow failed.", {})
 	if _pen_center != Vector2i.ZERO: Sites.demolish_pen(runtime, _pen_center)
 	_runner.restore_party(runtime, party_before)
-	_player().encounter_chance = saved_chance
-	_player().input_enabled = true
-	runtime.session.repel_steps = 0
-	runtime.session.time_of_day_minutes = DAY_MINUTES
+	_player().encounter_chance = saved_chance; _player().input_enabled = true
+	runtime.session.repel_steps = 0; runtime.session.time_of_day_minutes = DAY_MINUTES
 
 
 func _witness_base(runtime) -> void:
@@ -100,6 +98,7 @@ func _earn_and_grant_materials(runtime) -> void:
 	_ensure(_runner.trace_log_has_since("field_move_used", cursor, {"move_id": "cut", "yield": "log"}), "harvest: no field_move_used{cut,log} trace")
 	_ensure(_runner.trace_log_has_since("field_move_used", cursor, {"move_id": "dig"}), "harvest: no field_move_used{dig} trace")
 	Sites.grant_pen_materials(runtime)
+	runtime.session.add_item("hard_stone", 64) # desert-band fence rings cost the hard_stone SHELL, which grant_pen_materials never provides (the save_stability precedent)
 
 
 func _build_the_pen(runtime) -> void:

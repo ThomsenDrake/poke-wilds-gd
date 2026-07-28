@@ -1,15 +1,11 @@
 extends Node
 
 # Deterministic overworld-mon driver for the visual sweep (Phase 6; spec: docs/product-specs/
-# overworld-pokemon.md § Smoke validation). STANDALONE (camping / storage / pokemon pattern): a
-# seeded walk band with live roamers mid-window (22), then a seeded nest — ground ring + two wild
-# eggs + the stationary Alpha guardian (23). Reconciles ONLY its own shots: the update pass copies
-# captures WITHOUT pruning other sweeps' baselines (the shared _foreign_shot guard learns 22_ / 23_).
-# Shots CONTINUE after 21_shiny_battle (the leading 09-12 stay battle-reserved by the sidecar
-# canary contract). NO rng in the capture path: entities are pure step functions of
-# (world_seed, total_steps, slot) and the walk is a fixed safe-step script on a seeded world, so
-# every shot is byte-stable. The subsystem is opted IN for this sweep (smoke_scenario_runner's
-# activation opt-out skips the opt-in set), and run_sweep sets it active defensively regardless.
+# overworld-pokemon.md § Smoke validation). STANDALONE: a seeded walk band with live roamers (22),
+# a seeded nest — ring + eggs + Alpha guardian (23), and night×entities×tint at tod=0 (30; the
+# main sweep's 04_night is entity-inert). Reconciles ONLY its own shots (shared _foreign_shot
+# guard DERIVES from SHOT_REGISTRY; update never prunes). NO rng in the capture path: byte-stable.
+# Entities are opted IN; captures WAIT on the entity-rest + player-lerp probe (sidecar-stamped).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
@@ -27,6 +23,7 @@ const CRAFTED_STATE := {
 }
 const SHOT_ROAMING := "22_roaming_mons.png"
 const SHOT_NEST := "23_nest_alpha.png"
+const SHOT_NIGHT_ROAMERS := "30_night_roamers.png"
 
 var _ctx: Dictionary = {}
 var _crafted: Dictionary = {}
@@ -60,13 +57,13 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	var saved_active: bool = _set_entities_active(true) # opt in for the shots; restored after
 	await _roaming_shot()
 	await _nest_shot()
+	await _night_roamers_shot()
 	_set_entities_active(saved_active)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()
 
 
-# A seeded walk band from spawn with live roamers mid-window, honoring the y-sort depth contract.
 func _roaming_shot() -> void:
 	for _i in range(WALK_STEPS):
 		var direction: Vector2i = _runner.find_safe_step_direction(_world(), _player(), _runtime())
@@ -80,8 +77,6 @@ func _roaming_shot() -> void:
 	await _capture(SHOT_ROAMING)
 
 
-# A seeded nest: ask the runtime for a nest cell's center (it owns the domain nest roll + the
-# Manhattan-from-origin ring), then stand on it so the guardian + eggs + ground ring materialize.
 func _nest_shot() -> void:
 	var center := _find_nest_center()
 	if center == Vector2i.ZERO:
@@ -94,10 +89,14 @@ func _nest_shot() -> void:
 	await _capture(SHOT_NEST)
 
 
-# The runtime's deterministic nest finder (overworld_mons_runtime owns the domain roll; app may not
-# reach domain directly): the center tile of the first nest cell ringed outward from spawn, or
-# Vector2i.ZERO when none lies in range (the shot is skipped, never faked; cell centers are never
-# (0,0), so ZERO is a safe sentinel).
+func _night_roamers_shot() -> void:
+	_crafted["night_tile"] = [_player().tile_position.x, _player().tile_position.y]
+	_world().set_time_of_day(0)
+	_world().sync_visible(_player().tile_position)
+	await _capture(SHOT_NIGHT_ROAMERS)
+
+
+# Runtime nest finder (domain roll owned below the app): first nest cell in range, else ZERO.
 func _find_nest_center() -> Vector2i:
 	var runtime := _runtime()
 	var mons: Object = runtime.get("overworld_mons_runtime") if runtime != null and "overworld_mons_runtime" in runtime else null
@@ -107,9 +106,6 @@ func _find_nest_center() -> Vector2i:
 	return result if result is Vector2i else Vector2i.ZERO
 
 
-# Read/set the subsystem activation gate off the runtime (the runtime is RefCounted, so use the
-# Object get/set API; a missing runtime/var is a no-op, so the sweep degrades to entity-free shots
-# rather than crashing before the runtime lane lands).
 func _set_entities_active(active: bool) -> bool:
 	var runtime := _runtime()
 	var mons: Object = runtime.get("overworld_mons_runtime") if runtime != null and "overworld_mons_runtime" in runtime else null
@@ -127,8 +123,7 @@ func _finish() -> void:
 		_runtime().warn("SmokeScenarios", "Overworld sweep captured no shots; nothing verified.", {}); return
 	if _nest_skipped and FileAccess.file_exists("%s/%s" % [VisualSweepBaselines.BASELINE_DIR, SHOT_NEST]):
 		push_error("Overworld sweep skipped the nest shot but a %s baseline exists on disk; refusing a silent partial pass." % SHOT_NEST); return
-	# Update (or first run, missing baselines) copies ONLY this sweep's shots + sidecars (never
-	# prunes); reconcile then compares this run's captures.
+	# Update (or missing baselines) copies ONLY this sweep's shots; reconcile then compares.
 	if _mode == VisualSweepBaselines.MODE_UPDATE or not _missing_baselines().is_empty():
 		var errors := _copy_baselines()
 		if not errors.is_empty():
@@ -136,7 +131,6 @@ func _finish() -> void:
 			return
 		_baselines_copied = true
 	var result: Dictionary = _baselines.reconcile(_shots, _base_dir, VisualSweepBaselines.MODE_COMPARE, _threshold_pct)
-	# Rescope the shared differ's whole-dir uncaptured flag to THIS sweep (the pokemon precedent).
 	var per_shot: Dictionary = result.get("per_shot", {})
 	var compared_all := not _shots.is_empty()
 	for shot in _shots:
@@ -163,13 +157,9 @@ func _report(result: Dictionary) -> void:
 
 
 func _missing_baselines() -> Array:
-	var missing: Array = []
-	for shot in _shots:
-		if not FileAccess.file_exists("%s/%s" % [VisualSweepBaselines.BASELINE_DIR, str(shot)]): missing.append(shot)
-	return missing
+	return _shots.filter(func(shot): return not FileAccess.file_exists("%s/%s" % [VisualSweepBaselines.BASELINE_DIR, str(shot)]))
 
 
-# Copies captures + sidecars over the committed baselines; never prunes (each sweep owns its prune).
 func _copy_baselines() -> Array:
 	var errors: Array = []
 	if DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(VisualSweepBaselines.BASELINE_DIR)) != OK: return ["baseline directory is not writable"]
@@ -190,11 +180,33 @@ func _capture(filename: String) -> void:
 	await _settle(8) # let the entity layer reconcile + lerp-snap onto logic tiles (byte-stable rest)
 	var metadata: Dictionary = RenderIntrospection.collect(_ctx, filename, _crafted)
 	var result: Dictionary = await _captures.capture(_runtime(), get_viewport(), filename,
-		{"save_path": "%s/%s" % [_base_dir, filename], "metadata": metadata})
+		{"save_path": "%s/%s" % [_base_dir, filename], "metadata": metadata, "rest_probe": Callable(self, "_rest_state")})
 	if not result.ok:
 		_failures.append("%s: %s (%s)" % [filename, result.kind, result.detail])
 		return
 	_shots.append(filename)
+
+
+# Capture-rest probe (SnapshotCapture waits + stamps it): entities at rest = two identical
+# position samples; player done = not mid-step; inactive layer = rest (nothing can move).
+var _rest_sample := {}
+
+func _rest_state() -> Dictionary:
+	var at_rest := true
+	var scene: Node = get_tree().current_scene
+	var layer: Node = scene.get_node_or_null("EntityLayer") if scene != null else null
+	# "active" lives on the RUNTIME, never the layer: Node.get of a missing property is Nil, and Godot 4.6 has no bool(Nil) constructor (the 600s rest-probe crash).
+	var mons: Object = _runtime().get("overworld_mons_runtime")
+	if layer != null and mons != null and bool(mons.get("active")):
+		var nodes: Dictionary = layer.get("_entity_nodes")
+		var sample := {}
+		for id in nodes:
+			var sprite: Sprite2D = (nodes[id] as Dictionary).get("sprite")
+			if sprite != null:
+				sample[id] = sprite.position
+		at_rest = not _rest_sample.is_empty() and sample == _rest_sample
+		_rest_sample = sample
+	return {"entities_at_rest": at_rest, "player_lerp_complete": not _player().is_moving()}
 
 
 func _settle(frames: int) -> void:

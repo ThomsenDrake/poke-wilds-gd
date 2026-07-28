@@ -314,6 +314,8 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
     issues.extend(miss_postmortem_issues(root))
+    issues.extend(sim_rng_setup_issues(root))
+    issues.extend(shot_numbering_issues(root))
 
     return issues
 
@@ -552,6 +554,154 @@ def seed_convention_advisories(root: Path | None = None) -> list[str]:
             "class (miss-002): the pass event rides the per-process wall-clock "
             "seed (advisory, never red)")
     return advisories
+
+
+def _sim_gd_files(root: Path) -> list[Path]:
+    return sorted(root.glob("scripts/**/*_sim.gd"))
+
+
+def sim_rng_setup_issues(root: Path) -> list[str]:
+    """Static determinism rule codifying overworld_mons_sim.gd's NO-rng contract
+    (overworld-pokemon.md § Determinism): a *_sim.gd step engine is a pure function
+    of derived SplitMix hashes of (world_seed, cell, slot, step), so its setup
+    signature must never receive a RandomNumberGenerator and the file must never
+    construct one. A sim that takes/owns an rng can silently consume the shared
+    wild-encounter stream and break the pinned scenarios + canary."""
+    issues: list[str] = []
+    for path in _sim_gd_files(root):
+        rel = relative_path(path, root)
+        text = path.read_text(encoding="utf-8")
+        # (1) the setup signature must not take a RandomNumberGenerator parameter
+        # ([^)]* spans multi-line signatures; a character class, not '.', so it
+        # crosses newlines without DOTALL).
+        for match in re.finditer(r"(?:static\s+)?func\s+setup\s*\(([^)]*)\)", text):
+            params = match.group(1)
+            if "RandomNumberGenerator" in params:
+                issues.append(
+                    f"{rel}: setup() takes a RandomNumberGenerator ({params.strip()}); "
+                    "*_sim.gd step engines must be rng-free (derived hashes only)")
+        # (2) the file must never construct its own rng.
+        if re.search(r"RandomNumberGenerator\s*\.\s*new\s*\(", text):
+            issues.append(
+                f"{rel}: constructs RandomNumberGenerator.new(); *_sim.gd step "
+                "engines must be rng-free (derived SplitMix hashes only)")
+    return issues
+
+
+# Single-sourced shot-range registry parsed by shot_numbering_issues. The visuals
+# builder owns the const (scripts/app/visual_sweep_baselines.gd); its value is a
+# GDScript dict literal that is ALSO valid Python, so ast.literal_eval parses it
+# directly. Format contract (see SHOT_REGISTRY):
+#   {"<sweep>": {"range": [lo, hi], "extra": [..], "seed": <int>}, ..., "retired": [..]}
+SHOT_REGISTRY_REL = Path("scripts") / "app" / "visual_sweep_baselines.gd"
+RETIRED_WHITELIST = {17}  # shot 17 is the SOLE whitelisted numbering gap
+BIOME_SHOT_FLOOR = 3      # committed 03_biome_* shots; loud-fail below this
+
+
+def _parse_shot_registry(root: Path) -> tuple[dict | None, str | None]:
+    """(registry, error). (None, None) = file/const absent (progressive arming,
+    mirrors art_anchor_issues); (None, msg) = present but unparseable (LOUD)."""
+    path = root / SHOT_REGISTRY_REL
+    if not path.exists():
+        return None, None
+    text = path.read_text(encoding="utf-8")
+    marker = text.find("const SHOT_REGISTRY")
+    if marker < 0:
+        return None, None  # not defined yet -- arms once the visuals builder lands it
+    open_brace = text.find("{", marker)
+    if open_brace < 0:
+        return None, "SHOT_REGISTRY has no opening brace"
+    depth = 0
+    literal = None
+    for i in range(open_brace, len(text)):
+        char = text[i]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                literal = text[open_brace:i + 1]
+                break
+    if literal is None:
+        return None, "SHOT_REGISTRY braces are unbalanced"
+    try:
+        registry = ast.literal_eval(literal)
+    except (ValueError, SyntaxError) as exc:
+        return None, f"SHOT_REGISTRY is not a parseable dict literal: {exc}"
+    if not isinstance(registry, dict):
+        return None, "SHOT_REGISTRY is not a dictionary"
+    return registry, None
+
+
+def shot_numbering_issues(root: Path) -> list[str]:
+    """Shot-numbering completeness against the single-sourced SHOT_REGISTRY.
+
+    Every registered shot number (a sweep's range + extra) must be a committed
+    baseline (NN_*.png) or formally retired; the ONLY retired number allowed is 17;
+    committed shots must themselves be registered; and the biome group (03_biome_*)
+    must hold >= BIOME_SHOT_FLOOR shots (loud-fail). Arms progressively until
+    SHOT_REGISTRY exists (cross-builder dependency on the visuals builder)."""
+    registry, error = _parse_shot_registry(root)
+    if error:
+        return [f"SHOT_REGISTRY parse failure in {SHOT_REGISTRY_REL}: {error}"]
+    if registry is None:
+        return []  # progressive arming
+
+    issues: list[str] = []
+    registered: dict[int, str] = {}
+    retired: set[int] = set()
+    for sweep, entry in registry.items():
+        if sweep == "retired":
+            if isinstance(entry, list):
+                retired = {int(n) for n in entry}
+            continue
+        if not isinstance(entry, dict):
+            continue
+        span = entry.get("range")
+        if isinstance(span, (list, tuple)) and len(span) == 2:
+            for number in range(int(span[0]), int(span[1]) + 1):
+                registered.setdefault(number, sweep)
+        for number in entry.get("extra") or []:
+            registered.setdefault(int(number), sweep)
+
+    # (1) retired whitelist: only shot 17 may be retired.
+    for number in sorted(retired):
+        if number not in RETIRED_WHITELIST:
+            issues.append(f"SHOT_REGISTRY retires shot {number}, but only "
+                          f"{sorted(RETIRED_WHITELIST)} is the whitelisted numbering gap")
+
+    # Committed baseline shot numbers + biome count.
+    baseline_dir = root / "docs" / "generated" / "visual-baselines"
+    committed: set[int] = set()
+    biome_count = 0
+    if baseline_dir.is_dir():
+        for png in baseline_dir.glob("*.png"):
+            match = re.match(r"^(\d+)_(.*)$", png.stem)
+            if not match:
+                continue
+            committed.add(int(match.group(1)))
+            if match.group(2).startswith("biome"):
+                biome_count += 1
+
+    # (2) completeness: every registered number is committed or retired.
+    for number in sorted(registered):
+        if number in committed or number in retired:
+            continue
+        issues.append(f"SHOT_REGISTRY registers shot {number} ({registered[number]}) "
+                      f"but no committed baseline {number:02d}_*.png exists and it is not retired")
+
+    # (3) no orphan committed shots (every committed number is registered or retired).
+    for number in sorted(committed):
+        if number not in registered and number not in retired:
+            issues.append(f"committed baseline shot {number:02d} is not in SHOT_REGISTRY "
+                          "(register its sweep range/extra or retire it)")
+
+    # (4) biome floor (loud-fail).
+    if biome_count < BIOME_SHOT_FLOOR:
+        issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
+                      f"shot(s) < required {BIOME_SHOT_FLOOR}")
+
+    return issues
 
 
 def main() -> int:

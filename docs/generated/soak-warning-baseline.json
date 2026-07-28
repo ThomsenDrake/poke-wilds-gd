@@ -1,0 +1,29 @@
+{
+  "playtest_breed_soak": {
+    "count": 1,
+    "messages": [
+      "Species catalog load complete."
+    ]
+  },
+  "playtest_entity_soak": {
+    "count": 1,
+    "messages": [
+      "Species catalog load complete."
+    ]
+  },
+  "playtest_field_soak": {
+    "count": 1,
+    "messages": [
+      "Species catalog load complete."
+    ]
+  },
+  "playtest_soak": {
+    "count": 4,
+    "messages": [
+      "Species catalog load complete.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle."
+    ]
+  }
+}

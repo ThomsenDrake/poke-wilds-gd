@@ -748,11 +748,15 @@ RUBRIC_GROUPS = [
 # REORDERING, while REWORDING a question breaks its fingerprint -> the question
 # falls through to "unassigned" (a COUNTED state), surfacing the id rotation
 # instead of silently keeping a stale answerer. A brand-new question nobody mapped
-# is likewise counted. The deterministic sidecar-consistency reviewer answers ONLY
-# the two battle questions its classes mechanically implement (cursor row centering
-# via cursor_*, name/level presence via label_*); the HP-bar art-fidelity question
-# needs the art-anchor class, and every judgment / non-baked-UI question needs the
-# model reviewer -- exactly the 13/19 an art anchor is structurally blind to.
+# is likewise counted. The deterministic sidecar-consistency reviewer answers the
+# two battle questions its classes mechanically implement (cursor row centering
+# via cursor_*, name/level presence via label_*), the HP-bar art-fidelity question
+# via the art-anchor class, AND the five menu-group questions via the menu
+# sidecars' expected_regions.strings (every menu label's window-space ink rect +
+# UiRenderModel's curated per-shot texts; the expected_region_changed class diffs
+# them baseline-vs-fresh, so row-alignment / clipping / presence drift is a
+# finding). The two overworld_mons questions stay MODEL-ONLY — banked on VLM
+# restoration (no deterministic class implements y-sort / nest-ring judgment).
 QUESTION_ANSWERERS = {
     "battle": [
         ("cursor vertically centered", [KIND_DETERMINISTIC, KIND_MODEL]),
@@ -774,11 +778,11 @@ QUESTION_ANSWERERS = {
         ("hint bar", [KIND_MODEL]),
     ],
     "menu": [
-        ("uniformly dimmed", [KIND_MODEL]),
-        ("panels framed and readable", [KIND_MODEL]),
-        ("every row align its name", [KIND_MODEL]),
-        ("hp bars visible and color-graded", [KIND_MODEL]),
-        ("clipped, overlapping, or escaping", [KIND_MODEL]),
+        ("uniformly dimmed", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("panels framed and readable", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("every row align its name", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("hp bars visible and color-graded", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("clipped, overlapping, or escaping", [KIND_DETERMINISTIC, KIND_MODEL]),
     ],
     "display_matrix": [
         ("every window size", [KIND_MODEL]),
@@ -819,17 +823,18 @@ def _question_id(text: str) -> str:
 
 def _shot_group(name: str) -> str | None:
     """Map a shot name to its rubric group key (shares _rubric_section's prefix
-    map). None for a name no group claims."""
+    map). None for a name no group claims (satellite shots 18-21 + the fishing
+    26-27 carry no rubric group -- counted ungrouped, never faked)."""
     stem = str(name).split(".")[0]
     if stem.startswith(("09", "10", "11", "12")):
         return "battle"
-    if stem.startswith(("06", "07", "08")):
+    if stem.startswith(("06", "07", "08", "28", "29")):
         return "menu"
-    if stem.startswith(("04", "05")):
+    if stem.startswith(("04", "05", "24", "25")):
         return "day_night"
     if stem.startswith(("15", "16", "17")):
         return "camping"
-    if stem.startswith(("22", "23")):
+    if stem.startswith(("22", "23", "30")):
         return "overworld_mons"
     if stem.startswith("matrix"):
         return "display_matrix"
@@ -904,6 +909,8 @@ def _unanswered_reason(group_key: str, capable: list[str]) -> str:
     base = f"no fresh reviewer of kind [{' / '.join(capable)}] ran this pass"
     if group_key == "overworld":
         base += "; overworld shots carry zero groundable regions"
+    if group_key == "overworld_mons":
+        base += "; model-only questions banked on VLM restoration (no deterministic class implements y-sort / nest-ring judgment)"
     return base
 
 

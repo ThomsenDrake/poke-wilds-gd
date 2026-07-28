@@ -24,8 +24,7 @@ func run_journey(ctx: Dictionary) -> void:
 	_ctx = ctx
 	await get_tree().create_timer(0.2).timeout
 	_bot.backup_save()
-	var outcome := ""
-	var save_ok := false
+	var outcome := ""; var save_ok := false
 	var fail := _fresh_game()
 	if fail.is_empty():
 		fail = await _journey_steps()
@@ -94,6 +93,7 @@ func run_field_soak(ctx: Dictionary) -> void:
 
 # Fresh game through the runtime, then the same world resync main.gd performs.
 func _fresh_game() -> String:
+	_runtime().seed_for_smoke(SOAK_SEED) # determinism lane: journey/soak replay byte-identical — pin the shared rng BEFORE the new_game world-seed draw (previously wall-clock: the double-run divergence this closes)
 	_runtime().new_game()
 	_world().rebuild(_runtime().get_world_seed())
 	_runner.teleport_player(_world(), _player(), _runtime(), _runtime().get_player_tile())

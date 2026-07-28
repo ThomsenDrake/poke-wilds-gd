@@ -20,6 +20,8 @@ const PAIR_LEVEL := 30
 const SITE_SCAN_RADIUS := 160
 const LAY_STEP_CAP := 6000
 const LAY_BATCH := 60
+const EGG_GROUND_CAP := 7 # mirrors breeding_runtime's faithful cap
+const CAP_FILL_STEPS := 3000 # the refusal window (half of LAY_STEP_CAP, where the pair above laid)
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -54,6 +56,76 @@ func run_water_case(runtime) -> Variant:
 		runtime.warn("BreedFlowHabitatChecks", "No pond pen site in the seeded world; water rode the domain proof only.", {"site": "water"})
 		return "skipped_no_water_site" if domain_ok else false
 	return _pen_pair_case(runtime, center, "MAGIKARP", "water") and domain_ok
+
+
+# The 7-EGG CAP refusal pin: build a tree-centered pen with a PROVEN pair (the donor
+# egg must land first), fill the pen to exactly EGG_GROUND_CAP with cloned eggs (shape
+# held; hatch-count ints poked far out of the window; placeholder tiles OUTSIDE the pen
+# so the under-cap lay still finds free tiles), then drive the step clock past a lay
+# window — the gate must REFUSE (no egg_laid, the count unchanged); with one egg
+# removed, the same clock must LAY (so the refusal is the cap, never the gate inputs).
+func run_egg_cap_case(runtime) -> bool:
+	if not _failures.is_empty():
+		return false
+	var center := Sites.find_feature_pen_site(_world(), _player().tile_position, SITE_SCAN_RADIUS, "tree")
+	if not _ensure(center != Vector2i.ZERO, "egg_cap: no tree-centered pen site within %d rings" % SITE_SCAN_RADIUS):
+		return false
+	Sites.grant_pen_materials(runtime)
+	var built: Dictionary = Sites.build_pen(runtime, center)
+	if not _ensure(bool(built.get("ok", false)), "egg_cap: pen build refused (%s)" % str(built.get("reason", ""))):
+		return false
+	Phase5.invalidate_pen_cache(runtime)
+	var anchor := Phase5.pen_key_for(runtime, center + Vector2i.RIGHT)
+	if not _ensure(not anchor.is_empty(), "egg_cap: no pen detected around the feature tile"):
+		return false
+	var pair: Dictionary = Phase5.gendered_instances(runtime, "PIDGEY", PAIR_LEVEL, ["female", "male"])
+	if not _ensure(pair.size() == 2, "egg_cap: no male+female PIDGEY within 128 creations"):
+		return false
+	runtime.session.party = [runtime.session.party[0], runtime.session.party[1], pair["female"], pair["male"]]
+	_runner.teleport_player(_world(), _player(), runtime, center)
+	for _i in range(2):
+		var result: Dictionary = Phase5.pasture_deposit(runtime, 2)
+		if not _ensure(bool(result.get("ok", false)), "egg_cap: deposit refused (%s)" % str(result.get("reason", ""))):
+			return false
+	if not _ensure(Phase5.poke_pasture_happiness(runtime, anchor, 255), "egg_cap: the happiness poke found no penned pair"):
+		return false
+	var donor: Dictionary = Phase5.wait_for_pen_egg(runtime, anchor, LAY_STEP_CAP, LAY_BATCH)
+	if not _ensure(not donor.is_empty(), "egg_cap: the proven pair laid no donor egg within %d steps" % LAY_STEP_CAP):
+		return false
+	var store: Variant = runtime.session.pastures.get(anchor, {})
+	var eggs: Variant = (store as Dictionary).get("eggs", []) if store is Dictionary else []
+	if not _ensure(eggs is Array and not (eggs as Array).is_empty(), "egg_cap: the pen store exposes no eggs array"):
+		return false
+	var egg_list: Array = eggs as Array
+	var donor_egg: Variant = (egg_list[0] as Dictionary).get("egg", {})
+	if not _ensure(donor_egg is Dictionary and not (donor_egg as Dictionary).is_empty(), "egg_cap: the donor egg carries no egg payload"):
+		return false
+	var filler: Dictionary = (donor_egg as Dictionary).duplicate(true)
+	for key in filler.keys():
+		if filler[key] is int and str(key) != "level":
+			filler[key] = 999999 # any hatch countdown rides far out of the pin's window
+	while egg_list.size() < EGG_GROUND_CAP:
+		egg_list.append({"tile": [-1, -egg_list.size() - 1], "egg": filler.duplicate(true)})
+	var cursor := _runner.trace_log_line_count()
+	_tick_clock(runtime, CAP_FILL_STEPS)
+	var ok := _ensure(not _runner.trace_log_has_since("egg_laid", cursor), "egg_cap: a lay fired AT the %d-egg cap" % EGG_GROUND_CAP)
+	ok = _ensure(egg_list.size() == EGG_GROUND_CAP, "egg_cap: the egg count moved at the cap (%d)" % egg_list.size()) and ok
+	egg_list.pop_back() # 6 eggs: the same pair + happiness must now lay
+	var lay_cursor := _runner.trace_log_line_count()
+	_tick_clock(runtime, CAP_FILL_STEPS)
+	ok = _ensure(_runner.trace_log_has_since("egg_laid", lay_cursor), "egg_cap: the under-cap lay never fired (the gate inputs, not the cap, would be broken)") and ok
+	var spot: Dictionary = Sites.pen_stand_spot(_world(), center)
+	if not spot.is_empty():
+		for _i in range(9): # ground eggs first, then the pair — leave the pen empty
+			Phase5.pasture_interact(runtime, spot["stand"], spot["faced"])
+	Sites.demolish_pen(runtime, center)
+	Phase5.invalidate_pen_cache(runtime)
+	return ok
+
+
+func _tick_clock(runtime, steps: int) -> void:
+	for _i in range(steps):
+		runtime.note_player_step()
 
 
 # Build a pen around `center` (a solid/unwalkable feature tile; the flood keeps

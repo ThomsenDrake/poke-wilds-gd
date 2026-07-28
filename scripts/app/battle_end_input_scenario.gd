@@ -30,6 +30,7 @@ extends Node
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
 
 const SEED := 2026072402
 
@@ -100,7 +101,7 @@ func _part_a_escape_does_not_refire(cut_tile: Vector2i) -> void:
 	_expect(not _runner.trace_log_has_since("structure_placed", cursor), "A: a structure was placed on the re-fired press")
 	_expect(not _runner.trace_log_has_since("materials_consumed", cursor), "A: materials were consumed on the re-fired press")
 	_expect(not _structure_layer().is_active(), "A: build mode opened on the escape frame")
-	_expect(_world().tile_requires_field_move(cut_tile) == "cut", "A: the faced tree fell on the escape frame")
+	_expect(_tree_stands(cut_tile), "A: the faced tree fell on the escape frame")
 	_expect(runtime.session.bag == bag_before, "A: the bag changed on the escape frame (a harvest yield leaked)")
 	_expect(player.tile_position == tile_before, "A: the player moved")
 	_expect(player.input_enabled, "A: the avatar stayed disabled after the battle ended")
@@ -137,7 +138,7 @@ func _part_c_capture_does_not_refire(cut_tile: Vector2i) -> void:
 	_expect(_toast_text().begins_with("Gotcha!"), "C: the capture toast '%s' was superseded by a re-fired context action" % _toast_text())
 	_expect(not _runner.trace_log_has_since("field_move_used", cursor), "C: a harvest re-fired on the faced tile on the capture frame")
 	_expect(not _runner.trace_log_has_since("structure_placed", cursor), "C: a structure was placed on the re-fired press")
-	_expect(_world().tile_requires_field_move(cut_tile) == "cut", "C: the faced tree fell on the capture frame")
+	_expect(_tree_stands(cut_tile), "C: the faced tree fell on the capture frame")
 	_expect(player.tile_position == tile_before, "C: the player moved")
 	_expect(player.input_enabled, "C: the avatar stayed disabled after the battle ended")
 
@@ -193,6 +194,12 @@ func _set_battle(active: bool) -> void:
 	if callable.is_valid():
 		callable.call(active)
 
+
+# Faced cut target still stands (not harvested on the battle-end frame) — the dual of how
+# _face_cut_tile picked it. NOT tile_requires_field_move: a standing cactus has field_move=""
+# in biome_defs yet is cut-harvestable, so that read false-fails on cactus targets.
+func _tree_stands(tile: Vector2i) -> bool:
+	return HarvestResolver.action_for_tile(_world().get_tile_logic(tile)) == "cut"
 
 func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; returns ok for witness early-returns
 	if not ok:

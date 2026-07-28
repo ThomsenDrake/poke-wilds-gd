@@ -15,11 +15,14 @@ const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const VisualSweepBuild := preload("res://scripts/app/visual_sweep_build.gd")
+const VisualSweepBattle := preload("res://scripts/app/visual_sweep_battle.gd")
+const VisualSweepDayMenu := preload("res://scripts/app/visual_sweep_day_menu.gd")
+const VisualSweepReport := preload("res://scripts/app/visual_sweep_report.gd")
 
 const WALK_STEPS := 4
 const MAX_BIOME_SHOTS := 5
+const BIOME_SHOTS_FLOOR := 3 # loud-fail when the seeded spawn sees fewer biomes than this
 const BIOME_SCAN_RADIUS := 40
-const BATTLE_SHOTS := ["09_battle.png", "10_battle_moves.png", "11_battle_after_attack.png", "12_battle_items.png"]
 # Determinism contract: change only with a baseline update; DECIDUEYE's 13-frame strip front.png is the sprite-loader regression canary.
 const CRAFTED_STATE := {
 	"world_seed": 20260717,
@@ -74,12 +77,19 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	await _capture("05_dawn.png")
 	_world().set_time_of_day(CRAFTED_STATE["time_of_day"])
 	await _menu_shots()
-	await _battle_shots()
+	# Battle shots 09-12 live in visual_sweep_battle.gd (app budget extraction).
+	var battle := VisualSweepBattle.new()
+	add_child(battle)
+	await battle.craft_battle(_ctx, _crafted, Callable(self, "_capture"), _failures)
 	# Deterministic build: a small house + door (see visual_sweep_build.gd). Runs
-	# last so it cannot perturb shots 01-12; adds 13_built_house + 14_build_ghost.
+	# before the 24-29 states so it cannot perturb shots 01-12; adds 13+14.
 	var build := VisualSweepBuild.new()
 	add_child(build)
 	await build.craft_build(_ctx, _runner, _crafted, Callable(self, "_capture"))
+	# Day/night 24-25 + menu 28-29 (visual_sweep_day_menu.gd): tod-restored, menus closed.
+	var day_menu := VisualSweepDayMenu.new()
+	add_child(day_menu)
+	await day_menu.craft_day_menu(_ctx, _crafted, Callable(self, "_capture"), _failures)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()
@@ -131,6 +141,8 @@ func _sweep_biomes(spawn_biome: String) -> void:
 			found += 1
 			_runner.teleport_player(_world(), _player(), _runtime(), tile)
 			await _capture("03_biome_%s.png" % biome.to_lower())
+	if found < BIOME_SHOTS_FLOOR:
+		_failures.append("biome shots: found %d biomes, floor is %d (seed %d spawn too sparse)" % [found, BIOME_SHOTS_FLOOR, CRAFTED_STATE["world_seed"]])
 
 
 func _menu_shots() -> void:
@@ -149,56 +161,11 @@ func _menu_shots() -> void:
 	_call("toggle_menu")
 
 
-func _battle_shots() -> void:
-	if not _start_battle():
-		for shot in BATTLE_SHOTS:
-			_failures.append("%s: could not start a wild battle" % shot)
-		return
-	var view := _battle_view()
-	await _capture("09_battle.png")
-	view._set_menu_state("action")
-	view._selection = "fight"
-	view._activate_selection()
-	await _capture("10_battle_moves.png")
-	view._selection = _baselines.damaging_move_id(_runtime())
-	view._activate_selection()
-	await _baselines.await_battle_idle(get_tree(), view)
-	await _capture("11_battle_after_attack.png")
-	if not view.visible and not _start_battle():
-		_failures.append("12_battle_items.png: battle ended and no new battle could start")
-		return
-	await _baselines.await_battle_idle(get_tree(), view)
-	view._set_menu_state("action")
-	view._selection = "item"
-	view._activate_selection()
-	await _capture("12_battle_items.png")
-	if view.visible:
-		view.run_smoke_escape()
-		await _settle(2)
-
-
-# Forces a fixed wild species (strip-sprite canary) and reseeds the battle RNG so damage rolls, move picks, and messages are reproducible.
-func _start_battle() -> bool:
-	var runtime = _runtime()
-	runtime.battle_runtime._rng.seed = BATTLE_RNG_SEED
-	var entry: Dictionary = runtime.catalog.get_species(WILD_SPECIES)
-	if entry.is_empty():
-		return false
-	var wild_mon = runtime.pokemon_rules.create_pokemon_instance(entry, WILD_LEVEL, Callable(runtime.catalog, "get_move"))
-	if wild_mon.is_empty():
-		return false
-	_call("set_battle", [true])
-	_message_box().hide_message()
-	_music_router().play_battle_track("wild")
-	_battle_view().start_wild_battle(wild_mon)
-	return _battle_view().visible
-
-
 func _finish() -> void:
 	if not _failures.is_empty():
 		push_error("Visual sweep failed captures: %s" % "; ".join(PackedStringArray(_failures)))
 		return
-	_baselines.report(_runtime(), _shots, _base_dir, _mode, _threshold_pct, _captures.dup_checked, _captures.invalid)
+	VisualSweepReport.new().report(_runtime(), _baselines, _shots, _base_dir, _mode, _threshold_pct, _captures.dup_checked, _captures.invalid)
 
 
 func _call(key: String, args: Array = []) -> void:

@@ -25,6 +25,7 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const OverworldMonsProbe := preload("res://scripts/runtime/overworld_mons_probe.gd")
 const OverworldMonsChecks := preload("res://scripts/app/overworld_mons_checks.gd")
 const OverworldMonsBattleChecks := preload("res://scripts/app/overworld_mons_battle_checks.gd")
+const OverworldMonsDispositionChecks := preload("res://scripts/app/overworld_mons_disposition_checks.gd")
 
 const SEED := 2026072711 # calibrated world seed (all 11 biome bands incl. LAVA ring ~976 + nest sequence)
 const DAY_MINUTES := 600 # noon: the DAY label holds across the walks (no DAY<->NIGHT recompute)
@@ -64,6 +65,9 @@ func run(ctx: Dictionary) -> void:
 		_oks["egg_ok"] = await battle_checks.run_egg_case(runtime, shiny_ref)
 	if _failures.is_empty() and bool(_oks.get("egg_ok", false)):
 		_oks["save_ok"] = await _run_save_case(runtime, checks, battle_checks)
+	if _failures.is_empty():
+		var disp_checks := OverworldMonsDispositionChecks.new(); add_child(disp_checks); disp_checks.setup(_ctx, _runner, _failures, SEED)
+		_oks["disposition_ok"] = disp_checks.run_cases(runtime, mons)
 	# Tally AFTER the save case (its recruit is the final instance build of the run).
 	var shiny_total := _probe.trace_count(_start_cursor, "shiny_rolled", {"origin": "overworld"})
 	_oks["shiny_ok"] = bool(checks.shiny_ok) and shiny_ref[0] and shiny_total == EXPECTED_OVERWORLD_BUILDS

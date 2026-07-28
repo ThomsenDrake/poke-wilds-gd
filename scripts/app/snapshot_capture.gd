@@ -4,15 +4,16 @@ extends RefCounted
 # vision-fidelity.md): a RenderingServer.frame_post_draw readback guard ADDED
 # AFTER callers' existing settle waits (never a substitute — resized windows
 # must present, and the battle SubViewport redraws only while visible); a
-# validity oracle (undersize / blank / uniform / magenta — the Godot 4.6
-# #115402 SubViewport signature, fixed only in 4.7 — with transport-vs-
-# regression classification); and an opt-in duplicate-capture hook whose
-# nonzero deltas emit a quarantine-tier nondeterministic_pair trace.
-# Slice 3: non-empty options.metadata makes capture() inject the capture-side
-# fields and write the canonical <shot>.sidecar.json next to the PNG.
+# validity oracle (undersize / blank / uniform / magenta — the Godot 4.6 #115402
+# SubViewport signature, fixed only in 4.7 — with transport-vs-regression
+# classification); an opt-in duplicate-capture hook whose nonzero deltas emit a
+# quarantine-tier nondeterministic_pair trace. Non-empty options.metadata makes
+# capture() inject the capture-side fields (plus options.rest_probe booleans) and
+# write the canonical <shot>.sidecar.json next to the PNG.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
+const RenderPalette := preload("res://scripts/app/render_palette.gd")
 
 const MIN_SHOT_BYTES := 5120      # PNG bytes; below => undersize (only when a save_path wrote one)
 const LUMINANCE_FLOOR := 0.01     # Rec.709 mean luminance (0-1); below => blank
@@ -21,6 +22,7 @@ const MAGENTA_CHANNEL_TOL := 8    # r >= 255-tol && g <= tol && b >= 255-tol => 
 const MAGENTA_RATIO := 0.5        # magenta sample share at/above => magenta frame
 const SAMPLE_BUDGET := 4096       # even-stride pixel samples per validity pass
 const DUPCHECK_ENV := "PLAYTEST_CAPTURE_DUPCHECK"
+const REST_WAIT_FRAMES := 240 # rest-probe poll budget before an honest stamp anyway
 
 var shot_seq := 0     # 1-based per instance; capture order within one sweep
 var dup_checked := 0  # duplicate checks performed (feeds visual_sweep_passed)
@@ -62,15 +64,20 @@ func trace_invalid(runtime: Node, shot: String, verdict: Dictionary, extra_detai
 		"kind": str(verdict.get("kind", "")), "classification": str(verdict.get("classification", "")),
 		"luminance": float(verdict.get("luminance", 0.0)), "detail": detail})
 
-# Full pipeline: guard -> trace_cursor (join key, sampled before readback) ->
-# readback -> optional PNG write -> classify -> on valid, sidecar write (when
-# metadata non-empty) + snapshot_captured (record lands at cursor+1); on
-# invalid, capture_invalid. options: save_path / shot_seq / dup_check /
-# metadata (sidecar content; capture injects the capture-side fields).
+# Full pipeline: rest-probe wait -> guard -> trace_cursor (join key, sampled
+# before readback) -> readback -> optional PNG write -> classify -> on valid,
+# sidecar write (when metadata non-empty) + snapshot_captured (cursor+1); on
+# invalid, capture_invalid. options: save_path/shot_seq/dup_check/metadata/
+# rest_probe (capture injects the capture-side fields + rest booleans).
 func capture(runtime: Node, viewport: Viewport, shot: String, options: Dictionary = {}) -> Dictionary:
 	var metadata := {}
 	if options.get("metadata", {}) is Dictionary:
 		metadata = options.get("metadata", {})
+	var rest_probe: Callable = options.get("rest_probe", Callable())
+	if rest_probe.is_valid():
+		var rest: Dictionary = await _await_rest(rest_probe)
+		if not metadata.is_empty():
+			metadata.merge(rest)
 	await guard_readback()
 	var trace_cursor: int = SmokeScenarioRunner.new().trace_log_line_count()
 	var ts: int = Time.get_ticks_msec()
@@ -97,7 +104,7 @@ func capture(runtime: Node, viewport: Viewport, shot: String, options: Dictionar
 	if kind == "" and not save_path.is_empty() and not metadata.is_empty():
 		metadata.merge({"shot": shot, "shot_seq": seq, "ts_msec": ts, "trace_cursor": trace_cursor,
 			"window": [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y],
-			"palettes": RenderIntrospection.palettes_from_image(image, metadata.get("palette_regions", {})),
+			"palettes": RenderPalette.palettes_from_image(image, metadata.get("palette_regions", {})),
 			"validity": {"luminance": float(verdict.get("luminance", 0.0)), "uniform": false, "bytes": png_bytes}}, true)
 		metadata.erase("palette_regions")
 		sidecar_path = _write_sidecar(save_path, metadata)
@@ -109,8 +116,7 @@ func capture(runtime: Node, viewport: Viewport, shot: String, options: Dictionar
 		invalid += 1
 		trace_invalid(runtime, shot, verdict, "")
 		return result
-	# No RenderingServer.get_current_renderer() in 4.6.1 (verified); the
-	# project setting resolves per platform and names the active method.
+	# No RenderingServer.get_current_renderer() in 4.6.1; the setting names the method.
 	runtime.emit_trace("snapshot_captured", "App.SnapshotCapture", {"shot": shot, "shot_seq": seq,
 		"ts_msec": ts, "trace_cursor": trace_cursor,
 		"window": [DisplayServer.window_get_size().x, DisplayServer.window_get_size().y],
@@ -132,34 +138,25 @@ func _write_sidecar(save_path: String, metadata: Dictionary) -> String:
 	file.close()
 	return path
 
-# Root-viewport crop fallback for the battle SubViewport (#115402 stale/
-# magenta readback): same geometry as display_matrix's _display_crop —
-# BattleDisplay's global rect scaled by frame / visible rect, clamped. Pure,
-# no traces; RGBA8 crop at window texel scale, empty when unavailable.
-func crop_battle_display(root_viewport: Viewport, battle_view: Node) -> Image:
-	var frame: Image = root_viewport.get_texture().get_image()
-	var display := battle_view.get_node_or_null("BattleDisplay") as Control
-	if frame == null or frame.is_empty() or display == null:
-		return Image.new()
-	var visible_size: Vector2 = root_viewport.get_visible_rect().size
-	if visible_size.x <= 0.0 or visible_size.y <= 0.0:
-		return Image.new()
-	var texel_scale := Vector2(frame.get_size()) / visible_size
-	var rect: Rect2 = display.get_global_rect()
-	var crop := Rect2i(Vector2i((rect.position * texel_scale).round()), Vector2i((rect.size * texel_scale).round()))
-	crop = crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))
-	if crop.size.x <= 0 or crop.size.y <= 0:
-		return Image.new()
-	var image := frame.get_region(crop)
-	image.convert(Image.FORMAT_RGBA8)
-	return image
+# Polls the rest probe (Callable -> {entities_at_rest, player_lerp_complete})
+# up to REST_WAIT_FRAMES frames until both are true, then returns the final
+# booleans for the sidecar stamp. ADDED AFTER caller settles (like the readback
+# guard), never a substitute; a probe that never rests stamps its honest state.
+func _await_rest(probe: Callable) -> Dictionary:
+	var state := {}
+	for _i in range(REST_WAIT_FRAMES):
+		var sample: Variant = probe.call()
+		state = sample if sample is Dictionary else {}
+		if bool(state.get("entities_at_rest", false)) and bool(state.get("player_lerp_complete", false)):
+			break
+		await (Engine.get_main_loop() as SceneTree).process_frame
+	return {"entities_at_rest": bool(state.get("entities_at_rest", false)), "player_lerp_complete": bool(state.get("player_lerp_complete", false))}
 
-# Duplicate hook: a second guard + readback of the same quiesced viewport, one
-# newly rendered frame later (no game state advances between the pair; the two
-# readbacks DO span one rendered frame — catching exactly that is the point).
-# Any nonzero delta emits a quarantine-tier nondeterministic_pair trace with an
-# identified cause; the primary capture stays canonical (ok=true) and the pair
-# is never saved. Triggered by options.dup_check or DUPCHECK env; default OFF.
+# Duplicate hook: a second guard + readback one rendered frame later (no game
+# state advances between the pair — spanning a frame IS the point). Nonzero
+# delta emits a quarantine-tier nondeterministic_pair trace with an identified
+# cause; the primary stays canonical and the pair is never saved.
+# options.dup_check or DUPCHECK env; default OFF.
 func _duplicate_check(runtime: Node, viewport: Viewport, shot: String, primary: Image, luminance: float) -> void:
 	dup_checked += 1
 	await guard_readback()

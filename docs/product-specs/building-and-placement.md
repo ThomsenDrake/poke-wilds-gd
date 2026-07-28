@@ -101,3 +101,7 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 ## Phase 6 integration note (overworld Pokémon)
 
 Phase 6 (`overworld-pokemon.md`) adds ONE node to `scenes/app/Main.tscn` (the EntityLayer render node at child index 2 — after Player, before the UI CanvasLayer; `load_steps` 10→11). Build mode, placements, and demolition are untouched; entity anchors avoid prop/structure tiles at spawn (the audit pins no prop/structure overlap).
+
+## Pre-Phase-7 suite expansion (co-modification note)
+
+The user-approved pre-Phase-7 expansion touched `scripts/app/field_action_router.gd` (this subsystem owns it) as part of the suite-growth wiring only — the expansion's approved scope adds verification lanes and scenarios, no building behavior: costs, occupancy, the would-trap guard, the demolition/refund rules, and the demolition-witness invariant are unchanged, and the save schema stays v4. The new lanes (double-run determinism, satellite sweeps in S9, soak warning tripwire, the sidecar `crafted_state.world_seed`/`shot_seq` equality gate) are documented in [../RELIABILITY.md](../RELIABILITY.md) and the exec plan.

@@ -7,8 +7,10 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
+  S6.5   double-run     six rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
+                        + the four satellite sweep families (shots 15-23)
   S10    legibility     generate_legibility_report.py (generate-only, NOT gated)
 
 then runs post-refusals R1-R6 (head_sha==HEAD, stamp shape, windowed stamps vs
@@ -64,6 +66,26 @@ DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
 STAMP_KEYS = ("head_sha", "godot_version", "window", "renderer")
 OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
+
+# Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
+# six rng-consumer scenarios run twice headless, each run persisting its ordered
+# trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
+# two trace sets (timing-stripped, key-sorted, order-sensitive). Total lane budget
+# <=90s (two bounded runs + the compare); a mismatch reds with the divergent
+# event + both canonical payloads as the named cause (miss-002).
+DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
+                        "shiny_odds", "fishing_flow", "breed_flow"]
+DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:3], DOUBLE_RUN_SCENARIOS[3:]]
+DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — two groups of three, not one run of six
+DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
+
+# S9 windowed satellite sweep families (shots 15-23, windowed-diffed one-command
+# alongside the main visual_sweep). visual_sweep_fishing (26-27) is registered in
+# the smoke list + windowed sets but is NOT one of these four families per the
+# frozen contract's "shots 15-23" wording -- it runs via the PLAYTEST_SCENARIOS path.
+SATELLITE_SWEEP_SCENARIOS = ["visual_sweep_camping", "visual_sweep_storage",
+                             "visual_sweep_pokemon", "visual_sweep_overworld"]
 
 # "warn" maps to GREEN on purpose: a warn-tier refusal (R6 vision-review
 # freshness under --skip-windowed) is recorded + printed but NEVER escalates
@@ -308,6 +330,10 @@ class Runner:
                 if self.fail_fast_stop:
                     break
 
+        # --- S6.5: double-run determinism lane (six rng-consumers x2, <=90s) ---
+        if not self.fail_fast_stop:
+            self._run_double_determinism_lane(bin_)
+
         # --- S7: headless full suite (transport-honest) ---
         certified: list[Path] = []  # reports whose producing step actually ran
         if not self.fail_fast_stop:
@@ -346,27 +372,38 @@ class Runner:
                         extra={"report": str(audit_report.relative_to(ROOT))})
                     if entry["status"] in ("pass", "fail"):
                         certified.append(audit_report)
-                # --- S9: windowed visual_sweep (RUN LAST: freshest shots/review) ---
+                # --- S9: windowed visual_sweep + the four satellite sweep families
+                # (shots 15-23 windowed-diffed one-command; RUN LAST: freshest
+                # shots/review). The main sweep keeps sweep_report (post-refusals
+                # R4 + stamps key off it); each satellite gets its own report. ---
                 if not self.fail_fast_stop:
-                    if args.skip_windowed:
-                        self.record_skip("run_playtests:windowed:visual_sweep", "windowed",
-                                         "windowed lane skipped (--skip-windowed)")
-                    elif self.binary_missing:
-                        self.record_skip("run_playtests:windowed:visual_sweep", "windowed",
-                                         "godot binary missing (run_playtests exit 2)")
-                    else:
-                        entry = self.run_tool(
-                            "run_playtests:windowed:visual_sweep", "windowed",
-                            py("run_playtests.py") + ["--scenario", "visual_sweep",
-                                                      "--report", str(sweep_report.relative_to(ROOT)),
-                                                      "--timeout", str(args.windowed_timeout),
-                                                      "--godot-bin", bin_],
-                            pop_force_headless=True,
-                            outer_timeout=args.windowed_timeout + 120, retry_once=True,
-                            exit_map=play_map,
-                            extra={"report": str(sweep_report.relative_to(ROOT))})
-                        if entry["status"] in ("pass", "fail"):
-                            certified.append(sweep_report)
+                    sweep_lanes = [("visual_sweep", sweep_report)] + [
+                        (name, SMOKE_DIR / f"verify-{name}.json")
+                        for name in SATELLITE_SWEEP_SCENARIOS]
+                    for scenario, report in sweep_lanes:
+                        if self.fail_fast_stop:
+                            break
+                        if args.skip_windowed:
+                            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
+                                             "windowed lane skipped (--skip-windowed)")
+                        elif self.binary_missing:
+                            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
+                                             "godot binary missing (run_playtests exit 2)")
+                        else:
+                            entry = self.run_tool(
+                                f"run_playtests:windowed:{scenario}", "windowed",
+                                py("run_playtests.py") + ["--scenario", scenario,
+                                                          "--report", str(report.relative_to(ROOT)),
+                                                          "--timeout", str(args.windowed_timeout),
+                                                          "--godot-bin", bin_],
+                                pop_force_headless=True,
+                                outer_timeout=args.windowed_timeout + 120, retry_once=True,
+                                exit_map=play_map,
+                                extra={"report": str(report.relative_to(ROOT))})
+                            if entry["status"] in ("pass", "fail"):
+                                certified.append(report)
+                                if scenario == "visual_sweep":
+                                    self._vision_review_fresh()  # R6 memo: sample freshness the MOMENT the main sweep regenerated the review — later satellite captures land in .godot-smoke/shots and must not pollute the main-only manifest scope
 
         # --- S10: legibility report (generate-only, findings already gated) ---
         if not self.fail_fast_stop:
@@ -391,6 +428,77 @@ class Runner:
         self._write_result(head, args, exit_code, duration, stamps)
         self._print_summary(exit_code, duration, stamps)
         return exit_code
+
+    def _run_double_determinism_lane(self, bin_: str) -> None:
+        """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
+
+        Runs the six rng-consumer scenarios twice headless, each run persisting its
+        ordered trace JSONL (--trace-dir), then canonical-compares the two trace
+        sets with determinism_verify.py's cmp --mode trace. Budget: 2x90s bounded
+        runs + 10s compare (six cold-start headless scenarios incl. journey+soak do
+        not fit the original <=90s total; deviation recorded in the repair report).
+        A trace mismatch reds with the divergent
+        event + both canonical payloads as the named cause (miss-002); a missing
+        binary skips honestly rather than faking a pass.
+        """
+        if self.binary_missing or not Path(bin_).exists():
+            for label in ("run-A", "run-B", "cmp"):
+                self.record_skip(f"determinism:double-run:{label}", "determinism",
+                                 "godot binary missing (double-run lane needs headless runs)")
+            return
+
+        def py(rel: str) -> list[str]:
+            return [sys.executable, f"tools/{rel}"]
+
+        run_a = SMOKE_DIR / "determinism-run-a"
+        run_b = SMOKE_DIR / "determinism-run-b"
+        for directory in (run_a, run_b):  # drop stale traces so a short run can't pass on leftovers
+            if directory.is_dir():
+                for stale in directory.glob("*.jsonl"):
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass
+
+        # Two groups of three (not one run of six) so each run's worst case fits
+        # the outer budget with headroom; traces accumulate per dir across groups
+        # and the single cmp below compares the full six-scenario set.
+        for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
+            scenario_argv = [flag for name in group for flag in ("--scenario", name)]
+            for label, trace_dir, report in (
+                    (f"run-A{group_index}", run_a, SMOKE_DIR / "determinism-run-a-report.json"),
+                    (f"run-B{group_index}", run_b, SMOKE_DIR / "determinism-run-b-report.json")):
+                self.run_tool(
+                    f"determinism:double-run:{label}", "determinism",
+                    py("run_playtests.py") + scenario_argv +
+                    ["--trace-dir", str(trace_dir.relative_to(ROOT)),
+                     "--report", str(report.relative_to(ROOT)),
+                     "--timeout", str(DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S),
+                     "--godot-bin", bin_],
+                    env_override={"PLAYTEST_FORCE_HEADLESS": "1"},
+                    outer_timeout=DOUBLE_RUN_RUN_OUTER_TIMEOUT_S,
+                    exit_map={0: "pass", 1: "fail", 2: "tool_error"},
+                    extra={"scenarios": list(group)})
+                if self.fail_fast_stop:
+                    return
+
+        entry = self.run_tool(
+            "determinism:double-run:cmp", "determinism",
+            py("determinism_verify.py") +
+            ["cmp", "--mode", "trace",
+             "--a", str(run_a.relative_to(ROOT)),
+             "--b", str(run_b.relative_to(ROOT))],
+            outer_timeout=DOUBLE_RUN_CMP_OUTER_TIMEOUT_S,
+            exit_map={0: "pass", 1: "fail", 2: "tool_error"})
+        try:
+            parsed = json.loads(entry.get("output_tail", "").strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            parsed = None
+        if isinstance(parsed, dict):
+            entry["json"] = parsed
+            if parsed.get("mismatches"):
+                # Named cause (miss-002): the divergent event + both canonical forms.
+                entry["mismatches"] = parsed["mismatches"]
 
     def _post_refusals(self, head, certified, headless_report, audit_report,
                        sweep_report, bin_) -> None:

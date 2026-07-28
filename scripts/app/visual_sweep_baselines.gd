@@ -19,6 +19,33 @@ const MODE_UPDATE := "update"
 # Canonical capture window so baselines stay window-size-stable.
 const CANONICAL_WINDOW_SIZE := Vector2i(1152, 648)
 
+# Single-sourced shot numbering (check_repo_contracts parses this literal): per-sweep
+# number ranges + per-sweep crafted seeds + retired holes. The satellite foreign-shot
+# guards DERIVE from it via _foreign_shot, never hand-listed prefixes. "main" owns the
+# battle-reserved 09-12 + build 13-14 inside its range; 17 is camping-reserved but was
+# never committed -- the sole whitelisted numbering gap.
+const SHOT_REGISTRY := {
+	"main": {"range": [1, 14], "extra": [24, 25, 28, 29], "seed": 20260717},
+	"camping": {"range": [15, 16], "seed": 20260723},
+	"storage": {"range": [18, 19], "seed": 2026072404},
+	"pokemon": {"range": [20, 21], "seed": 2026072605},
+	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
+	"fishing": {"range": [26, 27], "seed": 2026072804},
+	"retired": [17],
+}
+
+
+# Every shot number a sweep owns: its range (inclusive) plus any extras.
+static func shot_numbers(sweep: String) -> Array:
+	var entry: Dictionary = SHOT_REGISTRY.get(sweep, {})
+	var numbers: Array = []
+	var bounds: Array = entry.get("range", [])
+	if bounds.size() == 2:
+		for number in range(int(bounds[0]), int(bounds[1]) + 1):
+			numbers.append(number)
+	numbers.append_array(entry.get("extra", []))
+	return numbers
+
 
 # Resizes to CANONICAL_WINDOW_SIZE, returning the prior size (headless: no-op).
 func apply_canonical_window_size() -> Vector2i:
@@ -64,58 +91,6 @@ func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 	return true
 
 
-# First lead-party move with power and PP left; falls back to the first slot.
-func damaging_move_id(runtime) -> String:
-	var party: Array = runtime.get_party_snapshot()
-	if not party.is_empty():
-		var moves: Array = party[0].get("moves", [])
-		for i in range(moves.size()):
-			var move: Dictionary = moves[i]
-			if int(move.get("power", 0)) > 0 and int(move.get("pp", 0)) > 0:
-				return "move_%d" % i
-	return "move_0"
-
-
-# Reconcile + report: push_error per drift/error/lost shot, else visual_sweep_passed.
-func report(runtime, shots: Array, base_dir: String, mode: String, threshold_pct: float, dup_checked: int = 0, invalid: int = 0) -> void:
-	var result: Dictionary = reconcile(shots, base_dir, mode, threshold_pct)
-	# The baseline dir is shared with visual_sweep_camping: its 15-17 baselines
-	# never have captures in THIS sweep, so their uncaptured flag is not a failure
-	# (symmetric mirror of the camping sweep rescoping ours). Own lost shots stay loud.
-	var lost: Array = []
-	for shot in result.get("uncaptured_baselines", []):
-		if not _foreign_shot(str(shot)):
-			lost.append(str(shot))
-	if not bool(result.get("ok", false)) and lost.is_empty() and (result.get("mismatched", []) as Array).is_empty() and (result.get("errors", []) as Array).is_empty():
-		result["ok"] = true # the differ tripped only on the other sweep's baselines
-	if not bool(result.get("ok", false)):
-		var per_shot: Dictionary = result.get("per_shot", {})
-		for shot in result.get("mismatched", []):
-			push_error("Visual sweep drift on %s: %s%% of pixels changed (threshold %s%%)." % [shot, per_shot.get(shot, "?"), threshold_pct])
-		for message in result.get("errors", []):
-			push_error("Visual sweep diff error: %s" % message)
-		for shot in lost:
-			push_error("Visual sweep lost a shot: baseline %s has no capture this run." % shot)
-		return
-	runtime.emit_trace("visual_sweep_passed", "SmokeScenarios", {
-		"shots": shots,
-		"compared": int(result.get("compared", 0)),
-		"mismatched": result.get("mismatched", []),
-		"max_drift_pct": float(result.get("max_drift_pct", 0.0)),
-		"mode": str(result.get("mode", mode)),
-		"auto_update": bool(result.get("auto_update", false)),
-		"updated": result.get("updated", []),
-		"pruned": result.get("pruned", []),
-		"threshold_pct": threshold_pct,
-		"foreign_uncaptured": result.get("uncaptured_baselines", []),
-		"base_dir": base_dir,
-		"window": [CANONICAL_WINDOW_SIZE.x, CANONICAL_WINDOW_SIZE.y],
-		"dup_checked": dup_checked,
-		"invalid_captures": invalid,
-		"sidecar_paths": shots.map(func(shot_name): return "%s/%s%s" % [base_dir, shot_name, RenderIntrospection.SIDECAR_SUFFIX])
-	})
-
-
 # Compare: diff vs baselines via tools/visual_diff.py. Update (or any baseline
 # missing): copy captures over the baselines, pruning stale entries. Keys: ok,
 # mode, auto_update, compared, mismatched, max_drift_pct, per_shot, errors.
@@ -158,10 +133,18 @@ func _missing_baselines(shots: Array) -> Array:
 	return missing
 
 
-# Baselines the shared dir holds for the OTHER sweeps (camping 15-17, storage
-# 18-19, overworld 22-23; 09-12 battle-reserved, 13-14 build): the prune guard (Phase 2 fix) keeps each sweep's update from deleting them, the report guard from failing on them.
+# Baselines the shared dir holds for the OTHER sweeps (derived from SHOT_REGISTRY:
+# camping 15-17 incl. retired, storage 18-19, pokemon 20-21, overworld 22-23 + 30,
+# fishing 26-27): the prune guard keeps each sweep's update from deleting them, the
+# report guard (visual_sweep_report.gd) from failing on them.
 static func _foreign_shot(name: String) -> bool:
-	return name.begins_with("15_") or name.begins_with("16_") or name.begins_with("17_") or name.begins_with("18_") or name.begins_with("19_") or name.begins_with("20_") or name.begins_with("21_") or name.begins_with("22_") or name.begins_with("23_")
+	var number := int(str(name).get_slice("_", 0))
+	for sweep in SHOT_REGISTRY:
+		if sweep == "main" or sweep == "retired":
+			continue
+		if shot_numbers(sweep).has(number):
+			return true
+	return false
 
 
 func _update_baselines(shots: Array, shot_dir: String, auto_update: bool) -> Dictionary:
@@ -212,6 +195,7 @@ func _compare_with_baselines(shot_dir: String, threshold_pct: float) -> Dictiona
 	return verdict
 
 
+# Shared battle-quiesce wait (display_matrix + the main sweep's battle shots).
 func await_battle_idle(tree: SceneTree, view: Node) -> void:
 	for _i in range(240):
 		if not view.visible or not view.is_animating():

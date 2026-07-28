@@ -66,7 +66,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "playtest_breed_soak", "playtest_field_soak"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -102,14 +102,20 @@ class TraceCollector:
     """Accumulates events, warnings, the *_passed payload, the *_failed
     reasons (symmetric failure contract), and snapshot stamps."""
 
-    def __init__(self) -> None:
+    def __init__(self, capture_raw: bool = False) -> None:
         self.events: set[str] = set()
         self.warnings: list[dict[str, Any]] = []
         self.passed_payload: Any = None
         self.failed_events: list[dict[str, Any]] = []
         self.snapshot_payloads: list[dict[str, Any]] = []
+        # Ordered verbatim trace stream, captured ONLY when requested (--trace-dir)
+        # so the double-run determinism lane can canonical-compare two runs. Off by
+        # default so the report never embeds the full stream.
+        self.raw_traces: list[dict[str, Any]] | None = [] if capture_raw else None
 
     def add(self, trace: dict[str, Any]) -> None:
+        if self.raw_traces is not None and isinstance(trace, dict):
+            self.raw_traces.append(trace)
         event = str(trace.get("event", ""))
         if not event:
             return
@@ -344,10 +350,10 @@ def _stop_process(proc: subprocess.Popen, sig: str) -> None:
         pass
 
 
-def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bin: str, windowed: bool = False) -> dict[str, Any]:
+def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bin: str, windowed: bool = False, trace_out: Path | None = None) -> dict[str, Any]:
     started = time.monotonic()
     result = new_result(scenario, "windowed" if windowed else "headless")
-    collector = TraceCollector()
+    collector = TraceCollector(capture_raw=trace_out is not None)
     exceptions: list[str] = []
     # write_smoke_request truncates, so a leftover scenario.json from a crashed
     # run is overwritten rather than merged.
@@ -425,6 +431,22 @@ def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bi
     finally:
         if request_path.exists():
             request_path.unlink()
+    if trace_out is not None and collector.raw_traces is not None:
+        # Persist the ordered verbatim trace stream for the double-run determinism
+        # lane (verify_all). One JSON object per line; determinism_verify's
+        # cmp --mode trace strips timing + sorts keys before comparing.
+        try:
+            trace_out.parent.mkdir(parents=True, exist_ok=True)
+            with trace_out.open("w", encoding="utf-8") as handle:
+                # Boot events (wall-clock world seed, save-dependent spawn) PRECEDE the
+                # scenario boundary marker and are environment, not scenario behavior:
+                # the double-run lane compares from smoke_scenario_dispatched onward.
+                start = next((i for i, t in enumerate(collector.raw_traces)
+                              if t.get("event") == "smoke_scenario_dispatched"), 0)
+                for trace in collector.raw_traces[start:]:
+                    handle.write(json.dumps(trace, separators=(",", ":")) + "\n")
+        except OSError as exc:
+            exceptions.append(f"could not write trace {trace_out}: {exc}")
     return finalize(result, collector, exceptions, started)
 
 
@@ -520,6 +542,107 @@ def _load_region_diff() -> Any:
     return _region_diff_module
 
 
+def _read_sidecar_seeds(sidecar_dir: Path) -> list[tuple[str, Any, Any]]:
+    """[(shot, world_seed, shot_seq)] for every readable sidecar in a dir.
+
+    world_seed lives under crafted_state; shot_seq is a top-level capture-order
+    index that restarts at 1 each sweep. Unreadable/non-dict sidecars are skipped
+    (a broken sidecar is surfaced elsewhere, never silently re-seeded here).
+    """
+    out: list[tuple[str, Any, Any]] = []
+    if not sidecar_dir.is_dir():
+        return out
+    for path in sorted(sidecar_dir.glob("*.sidecar.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        shot = path.name[: -len(".png.sidecar.json")]
+        crafted = data.get("crafted_state")
+        world_seed = crafted.get("world_seed") if isinstance(crafted, dict) else None
+        out.append((shot, world_seed, data.get("shot_seq")))
+    return out
+
+
+def _sidecar_seed_equality_violations(shots_dir: Path, baseline_dir: Path,
+                                      update_mode: bool) -> list[dict[str, Any]]:
+    """RED-tier sidecar determinism gate (see apply_region_gate). A sweep run must
+    capture every shot under ONE world with a strictly ordered shot_seq; any drift
+    means the pixel diff compares different worlds and is meaningless."""
+    fresh = _read_sidecar_seeds(shots_dir)
+    violations: list[dict[str, Any]] = []
+    if not fresh:
+        return violations  # nothing captured (transport-skip handled upstream)
+
+    # (0) every fresh sidecar must carry the determinism stamps — a missing stamp
+    # would vacuously skip the seed/seq checks below, so it fails LOUD instead of
+    # silently passing (miss-002: a gate can never be vacuous).
+    unstamped = sorted(shot for shot, seed, seq in fresh if seed is None or seq is None)
+    if unstamped:
+        violations.append({
+            "kind": "missing_stamp",
+            "detail": ("fresh sidecars lack crafted_state.world_seed and/or "
+                       "shot_seq: %s — un-stamped captures cannot be validated"
+                       % unstamped),
+            "shots": unstamped,
+        })
+
+    # (1) exactly one deterministic world across the fresh set.
+    seeds = sorted({seed for (_shot, seed, _seq) in fresh if seed is not None})
+    if len(seeds) > 1:
+        violations.append({
+            "kind": "mixed_world_seed",
+            "detail": ("fresh sidecars carry %d distinct crafted_state.world_seed "
+                       "values %s; a sweep run must capture under exactly one "
+                       "deterministic world" % (len(seeds), seeds)),
+            "world_seeds": seeds,
+        })
+
+    # (2) shot_seq uniqueness -- a repeated value means two shots landed on the same
+    # capture-order index (ordering drift), so the sequence is no longer canonical.
+    seqs: dict[Any, list[str]] = {}
+    for shot, _seed, seq in fresh:
+        if seq is not None:
+            seqs.setdefault(seq, []).append(shot)
+    for seq, shot_list in sorted(seqs.items(), key=lambda kv: str(kv[0])):
+        if len(shot_list) > 1:
+            violations.append({
+                "kind": "duplicate_shot_seq",
+                "detail": "shot_seq %s shared by %s; capture order drifted" % (
+                    seq, sorted(shot_list)),
+                "shot_seq": seq, "shots": sorted(shot_list),
+            })
+
+    # (3) compare mode only: each fresh sidecar must EQUAL its committed baseline on
+    # world_seed + shot_seq. A mismatch means the baseline was captured under a
+    # different world/order. Update mode skips this (baselines just rewritten from
+    # these very sources -- trivially green).
+    if not update_mode:
+        baseline = {shot: (seed, seq)
+                    for shot, seed, seq in _read_sidecar_seeds(baseline_dir)}
+        for shot, seed, seq in fresh:
+            if shot not in baseline:
+                continue  # brand-new shot; region gate reports sidecar_absent
+            base_seed, base_seq = baseline[shot]
+            if seed is not None and base_seed is not None and seed != base_seed:
+                violations.append({
+                    "kind": "world_seed_mismatch", "shot": shot,
+                    "detail": ("fresh world_seed %s != committed baseline %s "
+                               "(re-seeded under the baseline)" % (seed, base_seed)),
+                    "fresh": seed, "baseline": base_seed,
+                })
+            if seq is not None and base_seq is not None and seq != base_seq:
+                violations.append({
+                    "kind": "shot_seq_mismatch", "shot": shot,
+                    "detail": ("fresh shot_seq %s != committed baseline %s "
+                               "(capture order drifted)" % (seq, base_seq)),
+                    "fresh": seq, "baseline": base_seq,
+                })
+    return violations
+
+
 def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     """Runner-recorded explainable region gate for the visual_sweep scenario.
 
@@ -534,15 +657,43 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     degrades to the global backstop) without
     failing the run. Skipped on transport-skip and in update mode (baselines were
     just rewritten, so the compare is trivially green).
+
+    ALSO carries the sidecar world_seed/shot_seq EQUALITY gate (RED tier), which
+    runs for BOTH visual_sweep and visual_sweep_update -- including update mode,
+    where the other post-steps stand down: policing the promoted source sidecars
+    is its reason to exist (a baseline re-captured under a different world must
+    never be frozen green).
     """
-    if result.get("scenario") != "visual_sweep":
+    scenario = result.get("scenario")
+    if scenario not in VISUAL_SWEEP_SCENARIOS:
         return
     if result.get("transport") == "skipped-headless":
         return  # transport honesty: nothing was captured to gate
     payload = result.get("passed_payload")
     if not isinstance(payload, dict):
         payload = {}
-    if payload.get("mode") == "update" or payload.get("auto_update"):
+    update_mode = payload.get("mode") == "update" or payload.get("auto_update")
+
+    # Sidecar world_seed/shot_seq equality gate (RED tier). Reads the fresh per-run
+    # SOURCE sidecars the sweep just wrote to .godot-smoke/shots (these are copied
+    # into the committed baselines in update mode -- visual_sweep_baselines.gd
+    # _update_baselines). Enforces ONE deterministic world + a unique capture order
+    # across the run, and -- compare mode only -- equality against the committed
+    # baseline per shot so a silent re-seed cannot move pixels for reasons unrelated
+    # to the change under test. In update mode the per-shot baseline compare is
+    # trivially green (just rewritten from these sources) and skipped; validating the
+    # source set IS the "validate before the baseline rewrite" guarantee, and the
+    # structural restore of a frozen baseline stays the anchor gate's snapshot job.
+    seed_violations = _sidecar_seed_equality_violations(
+        project / ".godot-smoke" / "shots", _baseline_dir(project), update_mode)
+    if seed_violations:
+        result["sidecar_seed_violations"] = seed_violations
+        result["ok"] = False
+
+    # The explainable region diff below is compare-mode main-sweep only.
+    if scenario != "visual_sweep":
+        return
+    if update_mode:
         return
     try:
         verdict = _load_region_diff().run_region_diff(
@@ -930,6 +1081,109 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
                   f"live {item['live_rect']} vs art anchor {item['stage_rect']}")
 
 
+# Soak warning-count tripwire pin (deep-dive suite expansion). Each soak scenario
+# must not regress its warning count past the pinned baseline. The pin is a
+# COMMITTED file the scenarios builder's soaks populate; the gate only READS it in
+# steady state. BOOTSTRAP SEMANTICS (documented here, load-bearing): on the first
+# run where the pin file (or a soak's key in it) is absent, the gate WRITES the
+# observed count with a LOUD warning instead of failing red -- a brand-new soak has
+# no baseline to regress against, so reding would be a false cause (miss-002). Once
+# pinned, any count ABOVE the baseline is RED with the warning list as the payload.
+SOAK_WARNING_PIN_REL = Path("docs") / "generated" / "soak-warning-baseline.json"
+
+
+def _soak_warning_pin_path(project: Path) -> Path:
+    return project / SOAK_WARNING_PIN_REL
+
+
+def _load_soak_warning_pin(project: Path) -> tuple[dict[str, Any] | None, list[str]]:
+    """(pin_dict_or_None, errors). A missing file returns (None, []) -- the caller
+    bootstraps. A present-but-unreadable/corrupt pin is an error (never silently
+    re-baselined, which would hide a regression)."""
+    path = _soak_warning_pin_path(project)
+    if not path.exists():
+        return None, []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, [f"soak warning pin unreadable ({path.name}): {exc}"]
+    if not isinstance(data, dict):
+        return None, [f"soak warning pin is not a JSON object: {path.name}"]
+    return data, []
+
+
+def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
+    """RED-tier per-soak warning-count tripwire (see SOAK_WARNING_PIN_REL)."""
+    scenario = result.get("scenario", "")
+    if "soak" not in scenario:
+        return
+    if result.get("transport") == "skipped-headless":
+        return  # nothing ran; never bootstrap or enforce off empty data
+    if not result.get("ok", False):
+        # A FAILING soak must neither bootstrap nor enforce the pin: bootstrapping
+        # off a red run bakes its failure messages into the expected baseline (the
+        # poison path the deep-dive review caught), and enforcing a stale pin
+        # against a failing run adds noise on top of the failure that already reds.
+        return
+    warnings = result.get("warnings") or []
+    count = len(warnings)
+    messages = [str(w.get("message", "")) for w in warnings if isinstance(w, dict)]
+
+    pin, errors = _load_soak_warning_pin(project)
+    if errors:
+        # A corrupt committed pin is a real defect, not a bootstrap -- red with cause.
+        result.setdefault("exceptions", []).extend(errors)
+        result["ok"] = False
+        return
+
+    pin_path = _soak_warning_pin_path(project)
+    if pin is None:
+        # BOOTSTRAP: first run, no committed pin. Write it and WARN LOUDLY (never red).
+        bootstrap = {scenario: {"count": count, "messages": messages}}
+        try:
+            pin_path.parent.mkdir(parents=True, exist_ok=True)
+            pin_path.write_text(json.dumps(bootstrap, indent=2, sort_keys=True) + "\n",
+                                encoding="utf-8")
+            print(f"  WARNING: soak warning pin absent -- bootstrapped {pin_path.name} "
+                  f"with {scenario}={count} (commit it; later runs red above this count)")
+        except OSError as exc:
+            # Could not persist the bootstrap: report honestly, do not pretend pinned.
+            result.setdefault("exceptions", []).append(
+                f"soak warning pin bootstrap write failed: {exc}")
+            result["ok"] = False
+        result["soak_warning_tripwire"] = {
+            "scenario": scenario, "count": count, "pinned": None, "bootstrapped": True}
+        return
+
+    entry = pin.get(scenario)
+    if not isinstance(entry, dict) or "count" not in entry:
+        # BOOTSTRAP a newly-added soak into an existing pin (still loud, never red).
+        pin[scenario] = {"count": count, "messages": messages}
+        try:
+            pin_path.write_text(json.dumps(pin, indent=2, sort_keys=True) + "\n",
+                                encoding="utf-8")
+            print(f"  WARNING: soak warning pin had no `{scenario}` entry -- added "
+                  f"{scenario}={count} to {pin_path.name} (commit it)")
+        except OSError as exc:
+            result.setdefault("exceptions", []).append(
+                f"soak warning pin update failed: {exc}")
+            result["ok"] = False
+        result["soak_warning_tripwire"] = {
+            "scenario": scenario, "count": count, "pinned": None, "bootstrapped": True}
+        return
+
+    pinned = int(entry["count"])
+    result["soak_warning_tripwire"] = {
+        "scenario": scenario, "count": count, "pinned": pinned, "bootstrapped": False}
+    if count > pinned:
+        # REGRESSION: more warnings than pinned -- RED with the warning list payload.
+        result["soak_warning_tripwire"]["warnings"] = messages
+        result.setdefault("exceptions", []).append(
+            f"soak warning tripwire: {scenario} emitted {count} warning(s) > pinned "
+            f"baseline {pinned}: {messages}")
+        result["ok"] = False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-smoke", action="store_true", help="also run the 7 smoke scenarios")
@@ -943,6 +1197,9 @@ def main() -> int:
     parser.add_argument("--project", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="per-scenario wall-clock budget in seconds")
     parser.add_argument("--report", default=None, help="report path (default: .godot-smoke/playtest-report.json)")
+    parser.add_argument("--trace-dir", default=None,
+                        help="write each scenario's ordered trace JSONL (<scenario>.jsonl) here; "
+                             "used by verify_all's double-run determinism lane")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--godot-bin", default=os.environ.get("GODOT_BIN", DEFAULT_GODOT_BIN))
@@ -988,24 +1245,28 @@ def main() -> int:
     print(f"{'scenario':<18} {'transport':<16} {'dur_s':>7} {'result':<6} {'events':>6} {'warn':>5} {'exc':>4}")
 
     results: list[dict[str, Any]] = []
+    trace_dir = Path(args.trace_dir).expanduser() if args.trace_dir else None
     for scenario in scenarios:
         # Snapshot committed baselines BEFORE the sweep so apply_anchor_gate can
         # restore them if a regenerated baseline freezes an anchored misalignment
         # (the ONLY post-step that also runs in update mode). {} for other shots.
         anchor_snapshot = prepare_anchor_gate(project, scenario)
+        # Ordered trace JSONL for the double-run determinism lane (only when asked).
+        trace_out = trace_dir / f"{scenario}.jsonl" if trace_dir else None
         if scenario in WINDOWED_ONLY_SCENARIOS and force_headless():
             result = skip_windowed_scenario(scenario)
         elif scenario in WINDOWED_SUBPROCESS_SCENARIOS and not force_headless():
-            result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, windowed=True)
+            result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, windowed=True, trace_out=trace_out)
         elif transport == "dap":
             result = run_scenario_dap(project, scenario, args.timeout, args.host, args.port)
         else:
-            result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin)
+            result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, trace_out=trace_out)
         results.append(result)
         apply_region_gate(project, result)
         apply_contrast_cvd(project, result)
         apply_vision_review(project, result)
         apply_anchor_gate(project, result, anchor_snapshot)
+        apply_soak_warning_tripwire(project, result)
         print_row(result)
 
     failed = [result for result in results if not result["ok"]]
@@ -1023,6 +1284,9 @@ def main() -> int:
                 print(f"  {name}: failed event {failure['event']}: {failure['payload']}")
             for failure in result.get("region_failures", [])[:8]:
                 print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
+            for failure in result.get("sidecar_seed_violations", [])[:8]:
+                print(f"  {name}: sidecar-seed [{failure['kind']}] "
+                      f"{failure.get('shot', '')}: {failure['detail']}")
             for finding in result.get("region_quarantine", [])[:4]:
                 print(f"  {name}: quarantine [{finding['kind']}] {finding['shot']}: {finding['detail']}")
             for finding in result.get("contrast_findings", [])[:4]:

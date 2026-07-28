@@ -1,10 +1,8 @@
 extends RefCounted
 
 # Slice 3 semantic sidecar collector (vision-fidelity.md, snapshot-sidecar.md):
-# per-shot sidecar CONTENT from the live scene through ctx (main.gd untouched) — labels,
-# draw order (WorldDrawOrder), expected regions + cursor pairs, canary/palette specs,
-# capture env, crafted state. SnapshotCapture.capture() injects the rest (shot/seq/ts/
-# window/validity + readback palettes). Int rects; byte-stable lists per seed (ts_msec).
+# per-shot sidecar CONTENT from the live scene through ctx; SnapshotCapture.capture()
+# injects the rest. Byte-stable per seed (ts_msec/trace_cursor excepted).
 
 const UiRenderModel := preload("res://scripts/app/ui_render_model.gd")
 const UiRenderArt := preload("res://scripts/app/ui_render_art.gd")
@@ -12,14 +10,13 @@ const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
 
 const SIDECAR_SUFFIX := ".sidecar.json"
 
-# Battle 09-12, menu 06-08, else overworld. Overworld collects NO labels: shown() stops at Viewport boundaries, so the hidden battle view would leak stale labels.
 static func collect(ctx: Dictionary, shot: String, crafted: Dictionary) -> Dictionary:
 	var result := {"crafted_state": crafted.duplicate(true), "capture_env": _capture_env(), "labels": [],
 		"draw_order": [], "cursor_pairs": [], "canary_rect": [], "palette_regions": {"canary": [], "hud": []},
 		"expected_regions": {"ink": [], "forbidden": [], "strings": []}}
 	match _shot_kind(shot):
 		"battle": _collect_battle(ctx, result)
-		"menu": _collect_menu(ctx, result)
+		"menu": _collect_menu(ctx, result, shot)
 		"overworld": _collect_world(ctx, result)
 	return result
 
@@ -44,7 +41,6 @@ static func _collect_battle(ctx: Dictionary, result: Dictionary) -> void:
 	result["palette_regions"] = {"canary": result["canary_rect"], "hud": _hud_palette_regions(state, display_rect)}
 	_collect_draw_order(stage.get_children(), result, func(item): return _stage_path(stage, item), true)
 
-# Battle labels map stage -> display px; menu labels map identity (mapped=false).
 static func _collect_labels(root: Control, result: Dictionary, display_rect: Rect2, mapped: bool) -> void:
 	for label in UiRenderModel.visible_labels(root):
 		var stage_rect := _int_rect(UiRenderModel.ink_rect(label))
@@ -53,11 +49,22 @@ static func _collect_labels(root: Control, result: Dictionary, display_rect: Rec
 			if mapped else stage_rect})
 	_sort_labels(result["labels"])
 
-static func _collect_menu(ctx: Dictionary, result: Dictionary) -> void:
+static func _collect_menu(ctx: Dictionary, result: Dictionary, shot: String) -> void:
 	var menu: Control = ctx.get("start_menu")
 	if menu == null:
 		return
 	_collect_labels(menu, result, Rect2(), false)
+	# Menu expected strings: visible labels' ink rects + curated texts (menu rubric answerer).
+	var texts := {}
+	for label in UiRenderModel.visible_labels(menu):
+		texts[str(label.text)] = _int_rect(UiRenderModel.ink_rect(label))
+	var strings := []
+	for text in texts:
+		strings.append({"text": str(text), "region": texts[text], "mode": "box", "avoid": []})
+	for text in UiRenderModel.menu_expected_texts(_menu_state(shot), _menu_snapshot(ctx)):
+		if not texts.has(str(text)):
+			strings.append({"text": str(text), "region": [], "mode": "box", "avoid": []})
+	result["expected_regions"] = {"ink": [], "forbidden": [], "strings": strings}
 
 static func _map_expected(result: Dictionary, model: Dictionary, display_rect: Rect2) -> void:
 	var strings := []
@@ -80,7 +87,6 @@ static func _collect_pairs(result: Dictionary, stage: Control, model: Dictionary
 			"cursor": UiRenderModel.map_region(pair["cursor"], display_rect),
 			"row": UiRenderModel.map_region(pair["row"], display_rect)})
 
-# HUD palette rects (display px): msg+action interiors / side+move-list interiors.
 static func _hud_palette_regions(state: String, display_rect: Rect2) -> Array:
 	var interiors: Array = []
 	match state:
@@ -99,8 +105,6 @@ static func _collect_world(ctx: Dictionary, result: Dictionary) -> void:  # draw
 	_collect_draw_order(nodes, result,
 		func(item): return str(root.get_path_to(item)) if root != null else str(item.name))
 
-# Canvas items bottom-to-top via WorldDrawOrder; rect = int stage-global rect for Controls
-# ([] for Node2D); texture = baked path. `recursive` (battle-only) folds in CanvasItem DESCENDANTS (the one sort keeps per-subtree order); world stays direct — no hidden-view leak.
 static func _collect_draw_order(items: Array, result: Dictionary, namer: Callable, recursive: bool = false) -> void:
 	var canvas := []
 	for item in items:
@@ -123,12 +127,10 @@ static func _collect_draw_order(items: Array, result: Dictionary, namer: Callabl
 			"y_sort": null if is_nan(sort_y) else sort_y, "texture": texture,
 			"rect": _int_rect((item as Control).get_global_rect()) if item is Control else []})
 
-# Auto-named nodes (@Class@id) get run-varying ids — use class + sibling index.
 static func _node_label(item: Node) -> String:
 	var node_name := str(item.name)
 	return node_name if not node_name.begins_with("@") else "%s_%d" % [item.get_class(), item.get_index()]
 
-# Stage-relative node id — the art-anchors.toml `nodes` key space (direct child = bare name, nested = Parent/Child; per-segment _node_label keeps runtime nodes byte-stable).
 static func _stage_path(stage: Node, item: Node) -> String:
 	var parts: Array = []
 	var node: Node = item
@@ -139,7 +141,18 @@ static func _stage_path(stage: Node, item: Node) -> String:
 static func _shot_kind(shot: String) -> String:
 	if shot.contains("battle"):
 		return "battle"
-	return "menu" if ["06_", "07_", "08_"].any(func(prefix): return shot.begins_with(prefix)) else "overworld"
+	return "menu" if ["06_", "07_", "08_", "28_", "29_"].any(func(prefix): return shot.begins_with(prefix)) else "overworld"
+
+
+static func _menu_state(shot: String) -> String:
+	if shot.begins_with("28_"): return "stone_picker"
+	return "party_egg_summary" if shot.begins_with("29_") else ""
+
+static func _menu_snapshot(ctx: Dictionary) -> Dictionary:
+	var runtime: Node = ctx.get("runtime")
+	var party: Array = runtime.get_party_snapshot() if runtime != null else []
+	var egg: Dictionary = (party[0].get("egg", {}) if bool(party[0].get("is_egg", false)) else {}) if not party.is_empty() else {}
+	return {"party": party, "egg": egg}
 
 static func _battle_state(view: Node) -> String:
 	match str(view._menu_state):
@@ -165,38 +178,26 @@ static func _sort_labels(labels: Array) -> void:
 static func _int_rect(rect: Rect2) -> Array:
 	return [int(rect.position.x), int(rect.position.y), int(rect.size.x), int(rect.size.y)]
 
-# Distinct "#rrggbb" colors inside rect (display px), sorted, alpha dropped (manual scan: Image.get_used_colors() absent in 4.6.1). Capped at canary + hud.
-static func palette_colors(image: Image, rect: Rect2i) -> Array:
-	if image == null or image.is_empty():
-		return []
-	var clipped := rect.intersection(Rect2i(Vector2i.ZERO, image.get_size()))
-	if clipped.size.x <= 0 or clipped.size.y <= 0:
-		return []
-	var region := image.get_region(clipped)
-	region.convert(Image.FORMAT_RGBA8)
-	var data := region.get_data()
-	var seen := {}
-	for offset in range(0, data.size(), 4):
-		seen["#%02x%02x%02x" % [data[offset], data[offset + 1], data[offset + 2]]] = true
-	var colors: Array = seen.keys()
-	colors.sort()
-	return colors
+# Root-viewport crop fallback for the battle SubViewport (#115402 readback):
+# BattleDisplay rect scaled by frame / visible rect; pure; empty when unavailable.
+static func crop_battle_display(root_viewport: Viewport, battle_view: Node) -> Image:
+	var frame: Image = root_viewport.get_texture().get_image()
+	var display := battle_view.get_node_or_null("BattleDisplay") as Control
+	if frame == null or frame.is_empty() or display == null:
+		return Image.new()
+	var visible_size: Vector2 = root_viewport.get_visible_rect().size
+	if visible_size.x <= 0.0 or visible_size.y <= 0.0:
+		return Image.new()
+	var texel_scale := Vector2(frame.get_size()) / visible_size
+	var rect: Rect2 = display.get_global_rect()
+	var crop := Rect2i(Vector2i((rect.position * texel_scale).round()), Vector2i((rect.size * texel_scale).round()))
+	crop = crop.intersection(Rect2i(Vector2i.ZERO, frame.get_size()))
+	if crop.size.x <= 0 or crop.size.y <= 0:
+		return Image.new()
+	var image := frame.get_region(crop)
+	image.convert(Image.FORMAT_RGBA8)
+	return image
 
-# Sidecar "palettes": canary colors plus the sorted union of hud rect colors.
-static func palettes_from_image(image: Image, regions: Dictionary) -> Dictionary:
-	var hud_seen := {}
-	for rect in regions.get("hud", []):
-		for color in palette_colors(image, _as_recti(rect)):
-			hud_seen[color] = true
-	var hud: Array = hud_seen.keys()
-	hud.sort()
-	return {"canary": palette_colors(image, _as_recti(regions.get("canary", []))), "hud": hud}
-
-static func _as_recti(int_rect: Array) -> Rect2i:
-	return Rect2i() if int_rect.size() < 4 else \
-		Rect2i(int(int_rect[0]), int(int_rect[1]), int(int_rect[2]), int(int_rect[3]))
-
-# Baseline sync helpers (budget escape hatch): sidecars ride their PNGs on update + prune. prune_sidecars' optional foreign guard keeps the shared-dir main sweep from deleting the camping sweep's 15-17 sidecars.
 static func copy_sidecar(shot_dir: String, shot_name: String, baseline_dir: String) -> bool:
 	var source := "%s/%s%s" % [shot_dir, shot_name, SIDECAR_SUFFIX]
 	if not FileAccess.file_exists(source):

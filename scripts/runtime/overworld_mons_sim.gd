@@ -79,9 +79,10 @@ func step_roam(total_steps: int, player_tile: Vector2i) -> void:
 		if not OverworldMons.should_roam(str(entity.species_id), total_steps):
 			continue
 		var open: Array = []
+		var home: Vector2i = OverworldMons.cell_center(entity.cell) # roamers stay on their home cell (faithful: spawn-leashed, never a continent-wide drift the distance gate cannot see — it measures cells, roam measures tiles)
 		for direction in DIRS:
 			var next: Vector2i = entity.tile + direction
-			if next != player_tile and _rt_ref.get_ref().entity_at(next).is_empty() and is_open(next, bool(entity.swim_only)):
+			if next != player_tile and _rt_ref.get_ref().entity_at(next).is_empty() and is_open(next, bool(entity.swim_only)) and absi(next.x - home.x) <= OverworldMons.CELL_SIZE / 2 - 1 and absi(next.y - home.y) <= OverworldMons.CELL_SIZE / 2 - 1: # leashed INSIDE the home cell (never crosses a cell boundary, so the cell-based distance gate + hygiene audits and the tile position can never disagree)
 				open.append(next)
 		if not open.is_empty(): # blocked on all sides: mons never phase through props, stack on an entity, or stand on the player
 			entity["tile"] = open[OverworldMons.roam_neighbor_index(int(_rt_ref.get_ref()._session.world_seed), entity.cell, int(entity.slot), str(entity.species_id), total_steps, open.size())]

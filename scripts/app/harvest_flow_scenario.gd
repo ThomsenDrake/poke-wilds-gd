@@ -14,6 +14,10 @@ extends Node
 #   (d) smash a rock -> hard_stone;
 #   (e) save, reload via save_store.load_payload + the runtime apply path,
 #       rebuild: all three tiles still read cleared/dug.
+# The world is a SEEDED fresh game (SEED below), NOT the boot wall-clock world:
+# the smash target is an elevation cliff, and spawn sits in a flat basin, so the
+# nearest cliff is heavy-tailed in distance and a fixed-radius scan of the boot
+# world flakes. The fresh game guarantees cut/dig/smash within SCAN_RADIUS.
 # Party crafting uses direct session writes via the runner's swap_party /
 # restore_party rather than visual_sweep_baselines' full-payload craft: that
 # path resets bag/clock/steps and never re-seeds the runtime generator, which
@@ -23,6 +27,15 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 
 const SCAN_RADIUS := 40
+# Determinism pin (distinct from every other scenario seed). The smash target is
+# an elevation>0.55 cliff, and spawn always sits in a flat walkable basin, so on
+# the BOOT wall-clock world the nearest smashable cliff is heavy-tailed (measured
+# 48-82+ rings away across seeds) — a fixed scan radius flakes. Seed a fresh game
+# (the playtest _fresh_game idiom) so cut/dig/smash all land within SCAN_RADIUS of
+# spawn on every run: pin the shared rng BEFORE new_game's world-seed draw, then
+# resync the view like main.gd. Observed targets for this seed: cut + dig within
+# 1 ring of spawn, the smash cliff at ring ~27 — comfortably inside SCAN_RADIUS.
+const SEED := 2026072807
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -32,6 +45,15 @@ var _failures: Array = []
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
 	await get_tree().create_timer(0.2).timeout
+	# Deterministic world (see SEED): reseed a fresh game so cut/dig/smash targets
+	# are guaranteed within SCAN_RADIUS of spawn. On the BOOT wall-clock world the
+	# smash target is an elevation cliff far from the flat spawn basin (heavy-tailed
+	# distance), so a fixed-radius scan flakes. Playtest _fresh_game idiom; resync
+	# the view like main.gd. Runs in its own process, so the reseed never leaks.
+	_runtime().seed_for_smoke(SEED)
+	_runtime().new_game()
+	_world().rebuild(_runtime().get_world_seed())
+	_runner.teleport_player(_world(), _player(), _runtime(), _runtime().get_player_tile())
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var cut := _runner.find_harvest_target(_world(), _player().tile_position, SCAN_RADIUS, "cut")

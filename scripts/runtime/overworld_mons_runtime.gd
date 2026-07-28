@@ -109,7 +109,11 @@ func find_nest_center_near(center: Vector2i, radius: int) -> Vector2i:
 # window at the destination (warping never advances the step clock).
 func note_warp(tile: Vector2i) -> void:
 	for entity in _live_list():
-		if ["chasing", "fleeing"].has(str(entity.get("state", "idle"))):
+		var state := str(entity.get("state", "idle"))
+		if state == "fleeing" and OverworldMons.cell_for_tile(entity.tile) != entity.cell:
+			_remove_entity(entity, OverworldMons.REASON_FLED) # a warp loses a far-fled mon past recovery: never strand it idle far from its home cell (the cell-based distance gate would keep it forever)
+			continue
+		if ["chasing", "fleeing"].has(state):
 			entity["state"] = "idle"; entity["flee_steps"] = 0
 	if active:
 		_sim.sync_window(tile, DayPhase.time_of_day_label(int(_session.time_of_day_minutes)))

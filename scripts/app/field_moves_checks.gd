@@ -18,6 +18,7 @@ extends Node
 # night_system.active_flash_lit() seam. The passive light IS the faithful effect.
 
 const FieldMovesParty := preload("res://scripts/runtime/field_moves_party.gd")
+const FieldMovesFlyChecks := preload("res://scripts/app/field_moves_fly_checks.gd")
 
 const WAYSTONE_ID := "way_stone" # structures.gd literal (app cannot preload domain)
 const NIGHT_MINUTES := 1380
@@ -157,6 +158,7 @@ func check_fly() -> void:
 	cursor = _runner.trace_log_line_count()
 	_ensure(not bool(runtime.field_move_runtime.use_fly(_way_stone + Vector2i(5, 5)).get("ok", true)), "fly: an unvisited tile accepted a flight")
 	_ensure(_runner.trace_log_has_since("field_move_refused", cursor, {"move_id": "fly", "reason": "unvisited_way_stone"}), "fly: no unvisited_way_stone refusal trace")
+	FieldMovesFlyChecks.new().run(_ctx, _runner, _failures, runtime, _way_stone) # lifecycle tails: ordering, demolition, the structures round-trip
 
 
 # --- shared helpers -----------------------------------------------------------

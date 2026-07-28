@@ -6,6 +6,8 @@ extends Node
 # expectations. Windowed runs add the pixel half, routed per GRADUATED_STATES.
 
 const UiRenderModel := preload("res://scripts/app/ui_render_model.gd")
+const UiRenderFixtures := preload("res://scripts/app/ui_render_fixtures.gd")
+const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const TextOracle := preload("res://scripts/app/text_oracle.gd")
 
@@ -31,7 +33,7 @@ func run(ctx: Dictionary) -> void:
 	TextOracle.reset_stats()
 	await _settle(2)
 	var catalog = _runtime().get("catalog")
-	var snapshot: Dictionary = UiRenderModel.worst_snapshot(catalog)
+	var snapshot: Dictionary = UiRenderFixtures.worst_snapshot(catalog)
 	await _audit_battle(snapshot)
 	await _audit_menus(catalog)
 	if _failures.is_empty():
@@ -128,9 +130,9 @@ func _audit_menus(catalog) -> void:
 	var menu := _start_menu()
 	var original: Dictionary = menu._raw_context
 	var injected := original.duplicate()
-	var species := UiRenderModel.worst_entry(catalog.species.values(), "display_name")
-	injected["get_party_snapshot"] = func(): return UiRenderModel.worst_party(species)
-	injected["get_bag_snapshot"] = func(): return UiRenderModel.worst_bag(catalog)
+	var species := UiRenderFixtures.worst_entry(catalog.species.values(), "display_name")
+	injected["get_party_snapshot"] = func(): return UiRenderFixtures.worst_party(species)
+	injected["get_bag_snapshot"] = func(): return UiRenderFixtures.worst_bag(catalog)
 	menu.setup(injected)
 	_ctx["toggle_menu"].call()
 	await _settle(2)
@@ -143,7 +145,7 @@ func _audit_menus(catalog) -> void:
 	menu._activate_entry(1)
 	await _settle(2)
 	var bag_screen: Control = menu.get_node("BagScreen")
-	_check_menu_state("bag", bag_screen, bag_screen.get_node("Panel").get_global_rect(), UiRenderModel.bag_names(catalog))
+	_check_menu_state("bag", bag_screen, bag_screen.get_node("Panel").get_global_rect(), UiRenderFixtures.bag_names(catalog))
 	bag_screen.close_screen()
 	var storage: Control = menu.get_node_or_null("../StorageScreen")
 	if storage != null and storage.has_method("open_screen"):
@@ -188,7 +190,7 @@ func _pixel_half(state: String, model: Dictionary) -> void:
 	var verdict := _snap.classify(image, -1)
 	if verdict.kind == "magenta":
 		_snap.trace_invalid(_runtime(), state, verdict, "root_viewport_crop fallback engaged")
-		image = _snap.crop_battle_display(get_viewport(), _battle_view())
+		image = RenderIntrospection.crop_battle_display(get_viewport(), _battle_view())
 		if not image.is_empty():
 			image.resize(160, 144, Image.INTERPOLATE_NEAREST)
 	elif not verdict.kind.is_empty():

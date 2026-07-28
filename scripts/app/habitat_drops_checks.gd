@@ -128,6 +128,33 @@ func run_steel_drop_control(runtime) -> bool:
 	return ok
 
 
+# The DUAL-TYPE EMPTY-TABLE witness (wiki-materials.md): TYPE_MATERIALS["ROCK"] is
+# deliberately EMPTY, so Hard Stone is WITHHELD — a pure Rock mon drops nothing and a
+# Rock/Ground mon drops EXACTLY the Ground half (the union contributes no rock-class
+# material). Pinned through the live domain oracle (no domain preload — Phase5 carries
+# it) against synthesized type entries PLUS a live-catalog Rock/Ground mon (RHYPERIOR).
+func run_rock_ground_witness(runtime) -> bool:
+	if not _failures.is_empty():
+		return false
+	var domain = Phase5.habitat_drops_domain(runtime)
+	if domain == null:
+		return _ensure(false, "rock_ground: the habitat_drops domain module is missing")
+	var rock_drops: Array = domain.call("drops_for", {"species_id": "QA_ROCK_ONLY", "types": ["ROCK"]})
+	var ground_drops: Array = domain.call("drops_for", {"species_id": "QA_GROUND_ONLY", "types": ["GROUND"]})
+	var dual_drops: Array = domain.call("drops_for", {"species_id": "QA_ROCK_GROUND", "types": ["ROCK", "GROUND"]})
+	var ok := _ensure(rock_drops.is_empty(), "rock_ground: TYPE_MATERIALS[ROCK] yielded %s (must stay EMPTY — the Hard Stone witness)" % str(rock_drops))
+	ok = _ensure(not ground_drops.is_empty(), "rock_ground: the GROUND half dropped nothing (no contrast for the union)") and ok
+	ok = _ensure(dual_drops == ground_drops, "rock_ground: Rock/Ground drops %s != Ground-only %s (the ROCK half leaked into the union)" % [str(dual_drops), str(ground_drops)]) and ok
+	ok = _ensure(not dual_drops.has("hard_stone"), "rock_ground: hard_stone surfaced through a Rock/Ground mon") and ok
+	var entry: Dictionary = runtime.catalog.get_species("RHYPERIOR")
+	ok = _ensure(not entry.is_empty() and entry.get("types", PackedStringArray()).has("ROCK") and entry.get("types", PackedStringArray()).has("GROUND"), "rock_ground: RHYPERIOR lost its ROCK/GROUND typing (catalog drift)") and ok
+	if not entry.is_empty():
+		var live_drops: Array = domain.call("drops_for", entry)
+		ok = _ensure(not live_drops.has("hard_stone") and not live_drops.has("rock"), "rock_ground: live RHYPERIOR drops surface a rock-class material (%s)" % str(live_drops)) and ok
+	ok = _ensure(bool(domain.call("witness_clean")), "rock_ground: the habitat drop witness invariant broke") and ok
+	return ok
+
+
 # habitat_runtime's pastures live on the session key — the ONE shared store
 # breeding_runtime holds by reference (its snapshot deep-copies this dict).
 func _snapshot_mons(runtime) -> Array:

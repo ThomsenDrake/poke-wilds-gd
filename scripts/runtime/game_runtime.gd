@@ -49,6 +49,7 @@ var fishing_runtime = FishingRuntime.new()
 var breeding_runtime = BreedingRuntime.new()
 var overworld_mons_runtime = OverworldMonsRuntime.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
+var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
 
@@ -202,12 +203,11 @@ func set_party_lead(index: int) -> void:
 	session.set_party_lead(index)
 
 
-# Smoke determinism seam: pins the shared rngs so a scenario's inputs are a pure function of (code, save, seed),
-# never _ready's wall-clock randomize(). habitat needs no rng (step-driven); fishing + breeding ride _rng.
+# Smoke determinism seam: pins EVERY shared rng (encounter _rng, battle, the avatar's trigger-draw stream) so a scenario's inputs are a pure function of (code, save, seed), never _ready's wall-clock randomize().
 func seed_for_smoke(seed: int) -> void:
 	_rng.seed = seed
 	battle_runtime._rng.seed = seed
-
+	if player_avatar != null: player_avatar._rng.seed = seed
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
 	var provoked_mon := overworld_mons_runtime.take_pending_encounter() # Phase 6: a provoked/attacked entity rides the seam FIRST...

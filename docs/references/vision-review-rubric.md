@@ -40,19 +40,21 @@ The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-
 - Is anything rendered as an untextured solid-color or repeated-ghost blob?
 - Is the player sprite intact (no clipped frames, no direction mismatch)?
 
-## Day/night states (`04_night`, `05_dawn`)
+## Day/night states (`04_night`, `05_dawn`, `24_dusk`, `25_night_boundary`)
 
 - Is the tint plausibly nighttime (dark blue) / dawn (warm) without text or the
   player becoming unreadable?
 - Does UI (hint bar) stay untinted?
 
-## Menu states (`06_menu`, `07_party_screen`, `08_bag_screen`)
+## Menu states (`06_menu`, `07_party_screen`, `08_bag_screen`, `28_stone_picker`, `29_party_egg_summary`)
 
 - Is the world uniformly dimmed behind the UI with no undimmed band?
 - Are panels framed and readable against the dim?
 - Does every row align its name, level, HP bar, and counts on one line?
 - Are HP bars visible and color-graded (green/orange/red)?
 - Is any text clipped, overlapping, or escaping its panel?
+
+NOTE: all five menu questions also have DETERMINISTIC answerers now: menu sidecars carry `expected_regions.strings` (every visible label's window-space ink rect + `UiRenderModel.menu_expected_texts`' curated per-shot texts — the 29 Egg-summary extension included), and the default reviewer diffs those rects baseline-vs-fresh (row-alignment / clipping / presence drift is an `expected_region_changed` finding). The model reviewer stays declared alongside; a deterministic pass answers the group without it.
 
 ## Battle states (`09_battle` … `12_battle_items`)
 
@@ -68,14 +70,16 @@ The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-
   tol_px whenever a changed battle shot is reviewed; model-qwen3-vl keeps the
   single-slash number JUDGMENT)
 
-## Camping states (`15_camp_night_lit`, `16_craft_menu`, `17_dawn_after_rest`)
+## Camping states (`15_camp_night_lit`, `16_craft_menu` — `17_dawn_after_rest` is formally RETIRED: camping-reserved, never committed, the sole whitelisted numbering gap in the shot-range registry)
 
 - In `15_camp_night_lit`, is a warm glow visible around the fire (campfire and
   torch) over the night tint, with no glow where the fire is extinguished?
 - In `16_craft_menu`, are the recipe names + ingredient counts legible (no
   clipping, no overlap, affordable and missing rows distinct)?
 
-## Overworld mon states (`22_roaming_mons`, `23_nest_alpha`)
+## Overworld mon states (`22_roaming_mons`, `23_nest_alpha`, `30_night_roamers`)
+
+NOTE: both questions below remain MODEL-ONLY, banked on VLM restoration — no deterministic class implements y-sort / nest-ring judgment; while the model is down they are counted UNANSWERED (first-class, never faked).
 
 - In `22_roaming_mons`, do the roaming mons visibly y-sort against props and the
   player (a mon south of a prop/player draws over it, north draws under), with
@@ -121,7 +125,7 @@ Per-shot-kind coverage (verified from the committed sidecars):
 | Battle 09-12 | ALL kinds (richest; the validation plant lives here) |
 | Menu 06-08 | `label:<i>` ONLY (06: MENU + hint labels; 07 party: 7 labels incl. the `'>'` cursor-label; 08 bag: 3 labels; cursor_pairs [], draw_order [], palettes empty) |
 | Overworld 01-05 | ZERO groundable regions (canary [], labels [], expected_regions empty, cursor_pairs [], palettes empty, draw rects []) — reviewers emit NO findings there; sidecar deltas (e.g. 04_night Player y_sort/order) are counted as `ungroundable_deltas` context |
-| Camping 15-17 | ZERO groundable regions (committed sidecars carry empty canary/labels/cursor_pairs/expected_regions) — the two camping questions are model-only judgment, counted UNANSWERED offline like every model-only question |
+| Camping 15-16 | ZERO groundable regions (committed sidecars carry empty canary/labels/cursor_pairs/expected_regions; shot 17 retired) — the two camping questions are model-only judgment, counted UNANSWERED offline like every model-only question |
 
 Consequence: Lane-4 coverage is battle-heavy by current sidecar contents (matching the pilot `_review` note that overworld y-sort has no pixel canary). Extending sidecars (e.g. a `dynamic_zones`/mapped overworld rect field) is a future slice, not a rubric change; the plant for any validation pass must live on a battle shot (or a menu label).
 
@@ -226,7 +230,7 @@ For each shot whose fresh PNG bytes differ from its baseline bytes (`visual_regi
 2. `crop_NNN_<tag>.png` — NATIVE-RESOLUTION crops (capped full frames hide small diffs — the point of the crops): one base|fresh twin per `clusters.json` cluster (cluster bbox + 8px padding, clamped to frame, 4px gap, panels labeled via `png_canvas.text`), built with `visual_diff.decode_png_rgba` + `png_canvas` blit/box/text; region crops for grounded findings are added post-review as each finding's `evidence_crop` (cited region rect + padding, base|fresh twin).
 3. `som_before.png` / `som_after.png` — Set-of-Mark overlays (arXiv 2310.11441): full-frame copies with EVERY groundable region outlined (1px box, color per kind: canary red, string/ink/label amber, cursor cyan, anchor green, draw gray, palette:canary magenta) plus a NUMBER at each box (`png_canvas` 3x5 font); numbering is deterministic (kind priority then region-id), and the number→region_id legend ships in the reviewer's stdin JSON (`som_legend`), not pixels-only. SoM frames require a decode→blit of 746,496 px (pure-Python loop, ~1-2 s/frame; bounded — only changed shots get SoM; never downscale SoM, since capped frames are the exact failure mode).
 4. `expected_strings.json` — the expected-strings manifest: fresh sidecar `expected_regions.strings` + `labels[]` (text, region, mode, avoid).
-5. `rubric.txt` — this rubric's section for the shot's state group (prefix map: 01-03 overworld, 04-05 day/night, 06-08 menu, 09-12 battle, matrix/ display-matrix).
+5. `rubric.txt` — this rubric's section for the shot's state group (prefix map: 01-03 overworld, 04-05 + 24-25 day/night, 06-08 + 28-29 menu, 09-12 battle, 15-16 camping (17 retired), 22-23 + 30 overworld_mons, matrix/ display-matrix; 26-27 are the fishing satellite's shots — windowed-diffed against baselines, no rubric section of their own since the pre-Phase-7 expansion mints no new questions).
 6. `context.json` — shot kind, crafted_state, window, clusters summary (bbox + changed + tier + sentence), the computed sidecar delta list, the region table (id → {kind, rects, source sidecar}), and the number→region_id `som_legend` (the same dict that ships in the stdin JSON).
 
 REVIEWER INVOCATION: a `--reviewer-cmd` plugin gets stdin JSON `{shot, shot_kind, paths{before, after, som_before, som_after, crops[], expected_strings, rubric, context}, reviewer_params, finding_schema, region_table, window, clusters, som_legend, grounding_rules}` and must return stdout `{"findings": [...]}` (subprocess with `shlex.split`, NO `shell=True`, timeout default 300s; non-zero/timeout/invalid JSON = tool error → exit 2 / runner exception red, fail-closed — a hung or garbage plugin is never a silent pass). `window` (frame bounds), `clusters` (change regions), and `som_legend` (the SoM number→region_id join) ride in stdin — not only the on-disk `context.json` — so the plugin can build in-frame, groundable bboxes from stdin alone. The deterministic default is an in-process function with the SAME (stdin-dict → findings-list) signature — the interface is honored, the subprocess is skipped. Returned findings then go through schema validate/repair → grounding enforcement → finding_id minting → write.
@@ -283,7 +287,7 @@ The mechanized version of the pilot's RETIRED `_review` coverage-gap pseudo-row 
 - **Stable question ids.** `question_id = "q1-"` + the first 8 hex of sha256 over the canonical (whitespace-collapsed) question text — stable across REORDERING; REWORDING rotates the id (surfaced as an UNASSIGNED question, never a silent loss), and a brand-new question nobody mapped is likewise counted. (The `vr1-` `finding_id` convention applied to questions.)
 - **Answered predicate.** A question is `answered` iff a CAPABLE reviewer kind RAN this pass (`_kinds_that_ran`: the configured reviewer plus every kind that self-tagged an emitted finding or a returned answer — a composite VLM/art-anchor wrapper self-tags, so its coverage registers without any pipeline change), OR a returned `answers[]` entry addressed its id.
 - **Unanswered is a first-class COUNTED state** — never faked as answered, never red (advisory-loud). A shot-group with unanswered questions emits a `rubric_coverage_gap [<group>]: N of M rubric question(s) have no fresh reviewer pass (needs [...])` line that rides the manifest `warnings[]`, the legibility report, and `verify_all`'s WARN surface (degrading under `--skip-windowed` like R6). Overworld reports its reason as "no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions" — the honest, mechanized form of the pilot's "overworld y-sort has no pixel canary" note.
-- **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, camping 2, display_matrix 1 (21 total) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
+- **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, camping 2, overworld_mons 2, display_matrix 1 (23 total; the pre-Phase-7 menu conversion changes KINDS, not counts) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
 - **Freshness.** `rubric_coverage` rides the sha256 manifest, so `review_is_fresh` covers it; the lane-4 staleness refusal (§ Staleness) applies unchanged.
 
 ### Answerers table (`QUESTION_ANSWERERS`)
@@ -305,16 +309,18 @@ Matching is by CONTENT (a distinctive lowercase fingerprint substring of the can
 | overworld | player sprite intact | model-qwen3-vl |
 | day_night | tint plausibly | model-qwen3-vl |
 | day_night | hint bar | model-qwen3-vl |
-| menu | uniformly dimmed | model-qwen3-vl |
-| menu | panels framed and readable | model-qwen3-vl |
-| menu | every row align its name | model-qwen3-vl |
-| menu | hp bars visible and color-graded | model-qwen3-vl |
-| menu | clipped, overlapping, or escaping | model-qwen3-vl |
+| menu | uniformly dimmed | deterministic-sidecar-consistency, model-qwen3-vl |
+| menu | panels framed and readable | deterministic-sidecar-consistency, model-qwen3-vl |
+| menu | every row align its name | deterministic-sidecar-consistency, model-qwen3-vl |
+| menu | hp bars visible and color-graded | deterministic-sidecar-consistency, model-qwen3-vl |
+| menu | clipped, overlapping, or escaping | deterministic-sidecar-consistency, model-qwen3-vl |
 | camping | glow visible around the fire | model-qwen3-vl |
 | camping | recipe names + ingredient counts legible | model-qwen3-vl |
+| overworld_mons | roaming mons visibly y-sort | model-qwen3-vl |
+| overworld_mons | ground nest ring | model-qwen3-vl |
 | display_matrix | every window size | model-qwen3-vl |
 
-Consequence: the deterministic sidecar-consistency reviewer answers ONLY the two battle questions its classes mechanically implement; the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the 15 judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to (the two camping questions ride the same model-only tier: the 15-17 sidecars carry zero groundable regions). Offline (no model run), those 15 are counted UNANSWERED with reason, never faked.
+Consequence: the deterministic sidecar-consistency reviewer answers the two battle questions its classes mechanically implement PLUS — since the pre-Phase-7 expansion — the FIVE menu questions, answered over the menu sidecars' `expected_regions.strings` (no new machinery: the existing string/label classes; no new model questions minted — the conversion changes KINDS, not counts); the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the remaining TEN judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to (the two camping questions ride the same model-only tier: the 15-16 sidecars carry zero groundable regions; the two `overworld_mons` questions stay FLAGGED model-only with a bank-on-VLM-restoration note — overworld shots carry zero groundable regions, so their answer is deferred to the restoration of a capable VLM pass rather than faked deterministic). Offline (no model run), those ten are counted UNANSWERED with reason, never faked.
 
 ### `answers[]` contract (additive `--reviewer-cmd` seam)
 

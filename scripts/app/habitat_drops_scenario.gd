@@ -64,15 +64,19 @@ func run(ctx: Dictionary) -> void:
 		witness_ok = _check_witness(runtime)
 	var unsatisfied_ok := false
 	var steel_ok := false
+	var rock_ground_ok := false
 	if _failures.is_empty():
 		var checks := HabitatDropsChecks.new(); add_child(checks); checks.setup(_ctx, _runner, _failures, _pen_center, _anchor)
 		unsatisfied_ok = checks.run_unsatisfied_control(runtime)
 		if _failures.is_empty():
 			steel_ok = checks.run_steel_drop_control(runtime)
+		if _failures.is_empty():
+			rock_ground_ok = checks.run_rock_ground_witness(runtime)
 	if _failures.is_empty():
 		runtime.emit_trace("habitat_drops_passed", "SmokeScenarios", {"satisfied_ok": satisfied_ok,
 			"drop_ok": drop_ok, "milk_ok": milk_ok, "cadence_ok": cadence_ok,
-			"unsatisfied_ok": unsatisfied_ok, "steel_ok": steel_ok, "witness_ok": witness_ok, "seed": SEED})
+			"unsatisfied_ok": unsatisfied_ok, "steel_ok": steel_ok, "rock_ground_ok": rock_ground_ok,
+			"witness_ok": witness_ok, "seed": SEED})
 	else:
 		runtime.emit_trace("habitat_drops_failed", "SmokeScenarios", {"failures": _failures, "seed": SEED})
 		push_error("HabitatDropsScenario failed: %s" % "; ".join(PackedStringArray(_failures)))

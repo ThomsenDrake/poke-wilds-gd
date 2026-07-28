@@ -40,6 +40,7 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 	_player = player
 	_structure_layer = structure_layer
 	_show_message = show_message
+	runtime.player_avatar = player # seed_for_smoke pins the avatar's trigger-draw rng through this wire
 	_field_move_actions.setup(runtime, world, player, show_message)
 	_entity_actions.setup(runtime, player, show_message)
 	_camp_menu = camp_menu

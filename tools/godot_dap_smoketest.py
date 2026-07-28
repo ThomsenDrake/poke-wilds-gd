@@ -30,7 +30,8 @@ ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "ERROR: ")
 WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update",
                                  "visual_sweep_camping", "visual_sweep_camping_update",
                                  "visual_sweep_storage", "visual_sweep_storage_update",
-                                 "visual_sweep_pokemon", "visual_sweep_pokemon_update"}
+                                 "visual_sweep_pokemon", "visual_sweep_pokemon_update",
+                                 "visual_sweep_fishing", "visual_sweep_fishing_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -43,7 +44,8 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_camping", "visual_sweep_camping_update",
                            "visual_sweep_storage", "visual_sweep_storage_update",
                            "visual_sweep_pokemon", "visual_sweep_pokemon_update",
-                           "visual_sweep_overworld", "visual_sweep_overworld_update"}
+                           "visual_sweep_overworld", "visual_sweep_overworld_update",
+                           "visual_sweep_fishing", "visual_sweep_fishing_update"}
 
 
 def force_headless() -> bool:
@@ -241,7 +243,7 @@ SCENARIO_REQUIREMENTS = {
     # each scenario must emit, not just the pass marker (craft_flow precedent).
     "breed_flow": {
         "all": ["boot_started", "boot_ready", "egg_laid", "egg_hatched",
-                "breed_flow_passed"],
+                "evolution_stone_used", "breed_flow_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     "shiny_odds": {
@@ -284,6 +286,52 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_overworld_update": {
         "all": ["visual_sweep_overworld_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Pre-Phase-7 joint-RNG determinism pin (deep-dive suite expansion): one
+    # seed_for_smoke seed drives a FIXED interleaving of encounter draws + fishing
+    # casts (fishing shares game_runtime._rng) + harvest dig steps; the scenario
+    # itself byte-compares the exact species/item sequence across two in-scenario
+    # runs, so the requirements pin the boot events + the self-guarded pass marker
+    # (playtest_-style symmetry; the comparison is internal, miss-002-compliant).
+    "rng_joint_pin": {
+        "all": ["boot_started", "boot_ready", "rng_joint_pin_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Pre-Phase-7 v4 save-stability pin: scripted v4-surface mutations -> save ->
+    # reload -> save -> byte-compare canonicalized save JSON, plus a committed
+    # golden v4 fixture load + canonical-stability proof. Pins the boot events +
+    # the save_written domain trace (the scenario saves at least twice) + marker.
+    "save_stability": {
+        "all": ["boot_started", "boot_ready", "save_written", "save_stability_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # On-demand golden-regeneration variant (mode=update): rewrites the committed
+    # golden fixture from the live canonical save. Run ONLY after an intentional
+    # save-surface change; the verify-mode scenario then pins against it.
+    "save_stability_update": {
+        "all": ["boot_started", "boot_ready", "save_written", "save_stability_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Pre-Phase-7 entity soak (playtest_bot_entity.gd, extracted from the at-budget
+    # playtest_bot.gd): steal-egg/provoke-Alpha/charm-recruit/flee-despawn loops
+    # over hundreds of seeded iterations with bounded-sprite / NaN-y-sort /
+    # disarmed-pending-seam / despawn-hygiene postconditions. Self-guarded playtest_
+    # scenario, so the requirements mirror playtest_field_soak (boot + pass marker).
+    "playtest_entity_soak": {
+        "all": ["boot_started", "boot_ready", "playtest_entity_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Fishing satellite sweep (shots 26_fishing_cast + 27_fishing_bite, seed
+    # 2026072804, fixed Beach water tile, Old Rod via the real resolver,
+    # encounter_chance 0, pending seam disarmed). Windowed-only like the other
+    # sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_fishing": {
+        "all": ["visual_sweep_fishing_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_fishing_update": {
+        "all": ["visual_sweep_fishing_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

@@ -6,7 +6,8 @@ extends Node
 # retrievable (mon_relocated / mon_retrieved), and a blackout heal restores full
 # HP AND clears status/sleep_turns. Dispatch stays in phase0_scenarios (the
 # `wild_battle` name is stable for the transports); phase0's forwarder adds this
-# node to the smoke host so get_tree() and the host's _run_smoke_battle resolve.
+# node to the smoke host so get_tree() resolves. The smoke-battle driver lives
+# HERE (self-contained): the host lost _run_smoke_battle to the biome extraction.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
@@ -18,12 +19,12 @@ func run(ctx: Dictionary) -> void:
 	var player: Node = ctx["player"]
 	var runner := SmokeScenarioRunner.new()
 	var fail := ""
+	var set_battle: Callable = ctx.get("set_battle", Callable())
 	var wild_mon: Dictionary = runtime.generate_wild_encounter(player.tile_position, world.get_tile_biome(player.tile_position))
 	if wild_mon.is_empty():
 		fail = "could not create a wild encounter"
 	else:
-		await get_parent()._run_smoke_battle(wild_mon)
-	var set_battle: Callable = ctx.get("set_battle", Callable())
+		await _run_smoke_battle(ctx, set_battle, wild_mon)
 	if set_battle.is_valid():
 		set_battle.call(false)
 	runner.resync_player_tile(world, player, runtime)
@@ -43,6 +44,23 @@ func run(ctx: Dictionary) -> void:
 		runtime.emit_trace("wild_battle_passed", "SmokeScenarios", {"campsite_hold": true, "defeat_heal": true})
 	else:
 		push_error("Wild battle scenario failed: %s" % fail)
+
+
+# The smoke battle driver (extracted FROM the smoke host): gate + battle music +
+# one scripted turn, then escape if the view is still up (miss-002: the downstream
+# encounter_started / battle_finished traces ride this path).
+func _run_smoke_battle(ctx: Dictionary, set_battle: Callable, wild_mon: Dictionary) -> void:
+	if set_battle.is_valid():
+		set_battle.call(true)
+	ctx["message_box"].hide_message()
+	ctx["music_router"].play_battle_track("wild")
+	ctx["battle_view"].start_wild_battle(wild_mon)
+	await get_tree().create_timer(0.2).timeout
+	ctx["battle_view"].run_smoke_turn()
+	await get_tree().create_timer(0.2).timeout
+	if ctx["battle_view"].visible:
+		ctx["battle_view"].run_smoke_escape()
+		await get_tree().create_timer(0.2).timeout
 
 
 func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) -> String:
