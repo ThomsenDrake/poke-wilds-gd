@@ -12,8 +12,10 @@ extends RefCounted
 # biome ids, so direct matching alone wastes most of the table. The alias map
 # below translates each plausible source token to the closest world biome id;
 # tokens with no honest counterpart (PKMNMANSION, RUINS_*, the "//" artifact)
-# stay unmapped and simply never direct-match. Tokens already equal to a world
-# biome id (DESERT, FOREST, SAVANNA, SNOW) pass through unchanged.
+# stay unmapped PORT-WIDE; filter_species_ids' optional landmark_token scope
+# direct-matches them inside footprints ONLY (world-depth.md § dormant tokens —
+# aliasing them here would admit e.g. Beldum to every desert tile). Tokens already
+# equal to a world biome id (DESERT, FOREST, SAVANNA, SNOW) pass through unchanged.
 
 const TYPE_SENTINEL := "TYPE"
 
@@ -79,7 +81,12 @@ func encounter_types_for_biome(biome: String) -> Array:
 
 # time_of_day is additive (default "DAY"): legacy callers keep the exact day
 # pool, so the filter stays deterministic under seed_for_smoke either way.
-func filter_species_ids(species_dict: Dictionary, biome: String, time_of_day := "DAY") -> Dictionary:
+# landmark_token (world-depth.md § dormant tokens) is additive too: when non-empty
+# (the caller stands inside a landmark footprint) the verbatim source token
+# (PKMNMANSION/RUINS_OUTER/RUINS_INNER) direct-matches in addition to the host
+# biome's pool; the TYPE-sentinel fallback keeps keying off the HOST biome below.
+# Outside every footprint the token is "" and the pool is byte-identical to today.
+func filter_species_ids(species_dict: Dictionary, biome: String, time_of_day := "DAY", landmark_token := "") -> Dictionary:
 	var is_night := str(time_of_day).to_upper() == "NIGHT"
 	var type_set: Dictionary = {}
 	for type_name in encounter_types_for_biome(biome):
@@ -97,7 +104,9 @@ func filter_species_ids(species_dict: Dictionary, biome: String, time_of_day := 
 		if not is_night and NIGHT_ONLY_IDS.has(str(key)):
 			continue
 		var spawn_biomes = _spawn_biomes_of(entry as Dictionary)
-		if _spawn_biomes_include(spawn_biomes, biome):
+		if str(landmark_token) != "" and _spawn_biomes_include(spawn_biomes, str(landmark_token)):
+			ids.append(str(key))
+		elif _spawn_biomes_include(spawn_biomes, biome):
 			ids.append(str(key))
 		elif (spawn_biomes.is_empty() or spawn_biomes.has(TYPE_SENTINEL)) and _entry_matches_types(entry as Dictionary, type_set):
 			ids.append(str(key))

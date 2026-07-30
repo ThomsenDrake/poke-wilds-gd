@@ -43,6 +43,26 @@ static func build_starter(catalog, rules, rng: RandomNumberGenerator, get_move: 
 	return rules.create_pokemon_instance(catalog.get_species(fallback_id), 5, get_move, rng)
 
 
+# The species-entry resolution for generate_wild_encounter, extracted verbatim from
+# game_runtime.gd for the Phase 7 Build 1 landmark wiring budget (world-depth.md
+# § Implementation shape: at-cap files pay by EXTRACTION FIRST). Both warnings keep the
+# exact "GameRuntime" source string + wording (pin-safe for the log greps).
+static func species_entry_for(catalog, species_id: String, biome: String, trace_logger) -> Dictionary:
+	var species_entry: Dictionary = {}
+	if not species_id.is_empty():
+		species_entry = catalog.get_species(species_id)
+	if species_entry.is_empty():
+		species_entry = fallback_species_entry(catalog.species)
+		if species_entry.is_empty():
+			if trace_logger != null:
+				trace_logger.warning("GameRuntime", "Species catalog is empty; skipping the wild encounter.", {"biome": biome})
+			return {}
+		if trace_logger != null:
+			trace_logger.warning("GameRuntime", "Encounter species list was empty; using a fallback species.",
+				{"fallback_species_id": str(species_entry.get("species_id", ""))})
+	return species_entry
+
+
 # The grass-stream species pick, extracted from game_runtime._pick_encounter_species for
 # the Phase 6 game_runtime budget (the runtime keeps the night-ghost check + a forwarder).
 # Rides the injected shared _rng exactly as before; the fallback warning keeps the exact

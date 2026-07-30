@@ -31,7 +31,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_camping", "visual_sweep_camping_update",
                                  "visual_sweep_storage", "visual_sweep_storage_update",
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
-                                 "visual_sweep_fishing", "visual_sweep_fishing_update"}
+                                 "visual_sweep_fishing", "visual_sweep_fishing_update",
+                                 "visual_sweep_world_depth", "visual_sweep_world_depth_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -45,7 +46,8 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_storage", "visual_sweep_storage_update",
                            "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                            "visual_sweep_overworld", "visual_sweep_overworld_update",
-                           "visual_sweep_fishing", "visual_sweep_fishing_update"}
+                           "visual_sweep_fishing", "visual_sweep_fishing_update",
+                           "visual_sweep_world_depth", "visual_sweep_world_depth_update"}
 
 
 def force_headless() -> bool:
@@ -286,6 +288,27 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_overworld_update": {
         "all": ["visual_sweep_overworld_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Phase 7 Build 1 landmarks (world-depth.md): the Mansion puzzle solved on seed
+    # 2026072907 — the all-list pins the two frozen plan traces Build 1 emits plus
+    # the auxiliary key_item_used + the symmetric pass marker (the *_failed marker
+    # rides failed_event_entry; single-sourced mirror in run_playtests'
+    # PLAYTEST_SCENARIOS; miss-002 re-stamp). Joins the double-run lane.
+    "landmark_flow": {
+        "all": ["boot_started", "boot_ready", "landmark_entered",
+                "puzzle_state_changed", "key_item_used", "landmark_entity_spawned",
+                "landmark_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # World-depth sweep (shots 31-32, shared baseline dir). Windowed-only like the
+    # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_world_depth": {
+        "all": ["visual_sweep_world_depth_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_world_depth_update": {
+        "all": ["visual_sweep_world_depth_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Pre-Phase-7 joint-RNG determinism pin (deep-dive suite expansion): one

@@ -2,7 +2,7 @@ extends RefCounted
 
 # App-layer field-action routing extracted from main.gd (scene-script line budget).
 # Overworld context Z precedence: Phase 6 overworld ENTITIES (overworld_entity_actions:
-# mon -> dialogue recruit, wild egg -> TAKE); then placed camp objects (campfire ->
+# mon -> dialogue recruit, wild egg -> TAKE); then LANDMARK puzzle arms (Phase 7 landmark_actions: mansion statues/key/journals/loot + ruins decor); then placed camp objects (campfire ->
 # CampMenu — demolition STAYS in the menu so the witness escape is never shadowed; bed ->
 # rest; storage_box -> StorageScreen; fence -> Phase 5 pen action); then FISHING (Phase 5:
 # faced water + a bagged rod -> fishing_runtime.try_fish; a hooked mon rides game_runtime's
@@ -29,6 +29,7 @@ var _player: Node = null
 var _structure_layer: Node = null
 var _field_move_actions = FieldMoveActions.new()
 var _entity_actions = OverworldEntityActions.new()
+var _landmark_actions = preload("res://scripts/app/landmark_actions.gd").new()
 var _camp_menu: Node = null
 var _storage_screen: Node = null
 var _show_message: Callable = Callable()
@@ -43,6 +44,7 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 	runtime.player_avatar = player # seed_for_smoke pins the avatar's trigger-draw rng through this wire
 	_field_move_actions.setup(runtime, world, player, show_message)
 	_entity_actions.setup(runtime, player, show_message)
+	_landmark_actions.setup(runtime, show_message)
 	_camp_menu = camp_menu
 	_storage_screen = storage_screen
 	if _camp_menu != null and _camp_menu.has_signal("closed") and not _camp_menu.closed.is_connected(_on_camp_menu_closed):
@@ -57,6 +59,8 @@ func on_context_action() -> void:
 		return # an overlay owns Z/X while open; the Main poll still fires
 	var faced: Vector2i = _player.facing_tile()
 	if _entity_actions.route_entity(faced):
+		return
+	if _landmark_actions.route_landmark(faced):
 		return
 	if _route_camp_object(faced):
 		return

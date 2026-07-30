@@ -88,7 +88,7 @@ func _check_campfire_phases() -> bool:
 	runtime.session.add_item("log", 4)
 	runtime.session.add_item("dry_soil", 2)
 	var fire_tile := _find_open_tile(runtime.session.player_tile)
-	var placed: Dictionary = runtime.build_runtime.try_place(fire_tile, "campfire", {}) if fire_tile != Vector2i.ZERO else {"ok": false, "reason": "no_site"}
+	var placed: Dictionary = runtime.build_runtime.try_place(fire_tile, "campfire", {}) if fire_tile != Vector2i.MAX else {"ok": false, "reason": "no_site"}
 	if not bool(placed.get("ok", false)):
 		_failures.append("lit: campfire refused (%s)" % str(placed.get("reason", "")))
 		return false
@@ -117,7 +117,7 @@ func _check_torch() -> bool:
 	runtime.session.add_item("log", 1)
 	runtime.session.add_item("dry_soil", 1)
 	var torch_tile := _find_open_tile(runtime.session.player_tile)
-	var placed: Dictionary = runtime.build_runtime.try_place(torch_tile, "torch", {}) if torch_tile != Vector2i.ZERO else {"ok": false, "reason": "no_site"}
+	var placed: Dictionary = runtime.build_runtime.try_place(torch_tile, "torch", {}) if torch_tile != Vector2i.MAX else {"ok": false, "reason": "no_site"}
 	if not bool(placed.get("ok", false)):
 		_failures.append("torch: placement refused (%s)" % str(placed.get("reason", "")))
 		return false
@@ -187,14 +187,14 @@ func _draw_until_shadow() -> Dictionary:
 	return {}
 
 
-func _find_open_tile(center: Vector2i) -> Vector2i:
-	for ring in range(1, 9):
+func _find_open_tile(center: Vector2i) -> Vector2i: # not-found = MAX (never ZERO — (0,0) is a real open tile); ring 24 out-reaches any landmark footprint
+	for ring in range(1, 25):
 		for tile in _runner.ring_around(center, ring):
 			var logic: Dictionary = _world().get_tile_logic(tile)
 			if bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() \
 				and str(logic.get("structure_id", "")).is_empty():
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX
 
 
 func _world() -> Node: return _ctx["world"]

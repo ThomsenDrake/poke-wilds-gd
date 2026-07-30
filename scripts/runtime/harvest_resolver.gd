@@ -52,6 +52,8 @@ const DIG_BONUS_RARITY := 8
 static func action_for_tile(logic: Dictionary) -> String:
 	if bool(logic.get("mutated", false)):
 		return ""
+	if str(logic.get("landmark_id", "")) != "":
+		return "" # landmark tiles are immutable world features (world-depth.md § Landmarks): NO cut/dig/smash mutation ever lands on a footprint tile
 	var prop := str(logic.get("prop_path", ""))
 	for tree_prop in TREE_PROPS:
 		if prop.ends_with(tree_prop):

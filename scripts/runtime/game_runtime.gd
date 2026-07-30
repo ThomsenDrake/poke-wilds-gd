@@ -25,6 +25,7 @@ const HabitatRuntime := preload("res://scripts/runtime/habitat_runtime.gd")
 const FishingRuntime := preload("res://scripts/runtime/fishing_runtime.gd")
 const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
+const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
 
 signal world_overridden(tile: Vector2i) # per harvest/placement so the view re-renders the tile in place
 
@@ -48,6 +49,7 @@ var habitat_runtime = HabitatRuntime.new()
 var fishing_runtime = FishingRuntime.new()
 var breeding_runtime = BreedingRuntime.new()
 var overworld_mons_runtime = OverworldMonsRuntime.new()
+var landmark_runtime = LandmarkRuntime.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
@@ -70,6 +72,8 @@ func _ready() -> void:
 	breeding_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, world_overridden.emit, self)
 	overworld_mons_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _biome_encounters, field_move_runtime) # Phase 6: NO _rng — the derived-hash stream (spec § Determinism)
 	overworld_mons_runtime.encounter_requested.connect(_on_entity_encounter) # forced-battle presentation bridge (zero main.gd lines)
+	landmark_runtime.setup(session, catalog, trace, _world_gen, _biome_encounters, overworld_mons_runtime, music_router) # Phase 7 Build 1: entry/puzzle/scope; state ONLY via the frozen seam
+	_world_gen.landmark_resolver = Callable(landmark_runtime, "tile_logic_for_active") # footprints + the door overlay at the single mutation boundary
 	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
@@ -94,13 +98,13 @@ func ensure_initialized() -> void:
 
 
 func new_game() -> void:
-	_world_gen.clear_overrides()
-	_world_gen.clear_placements()
 	var starter = _build_starter()
 	var seed = int(_rng.randi() & 0x7fffffff)
+	_world_gen.clear_overrides(); _world_gen.clear_placements()
+	session.world_seed = seed; session.landmark_state = {} # BEFORE the scan: the landmark resolver seam reads
+	# both off the SESSION (footprints + the door overlay), so a pre-reset scan rates candidates against the PREVIOUS world's footprints and can commit a walled spawn; find_walkable_spawn's own setup(seed) reseeds the generator (no explicit setup here), and the scan draws no shared _rng.
 	var spawn = _world_gen.find_walkable_spawn(seed)
-	session.reset_for_new_game(seed, starter, spawn)
-	_initialized = true
+	session.reset_for_new_game(seed, starter, spawn); _initialized = true
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,
 		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
@@ -133,6 +137,7 @@ func note_player_step() -> void:
 	habitat_runtime.note_step()
 	breeding_runtime.tick() # party-egg hatch countdown + rate-limited pen lay scan
 	overworld_mons_runtime.note_player_step(int(session.total_steps), session.player_tile, DayPhase.time_of_day_label(session.time_of_day_minutes)) # Phase 6: after habitat/breeding
+	landmark_runtime.note_player_step(session.player_tile) # Phase 7: entry traces + tower music + ruins guardian (after the Phase 6 tick)
 
 func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
@@ -215,18 +220,12 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 	var hooked := fishing_runtime.take_pending_encounter() # Phase 5 fishing: a just-hooked mon rides this seam...
 	if not hooked.is_empty(): return hooked # ...BEFORE the wild draw, so repel + night ghosts never touch fishing
 	if field_move_runtime.repel_suppresses(): return {} # repel short-circuits BEFORE any encounter rng is consumed
-	var species_id = _pick_encounter_species(biome)
-	var species_entry = {}
-	if not species_id.is_empty():
-		species_entry = catalog.get_species(species_id)
+	var scope: Dictionary = landmark_runtime.encounter_scope_for(tile_pos, biome) # Phase 7: footprint-local token scope ("" outside -> byte-identical stream)
+	var species_id = landmark_runtime.pick_species_for(scope, _biome_encounters, DayPhase.time_of_day_label(session.time_of_day_minutes), _rng) if str(scope.get("token", "")) != "" else _pick_encounter_species(biome)
+	var species_entry: Dictionary = EncounterSelection.species_entry_for(catalog, species_id, str(scope.get("biome", biome)), trace)
 	if species_entry.is_empty():
-		species_entry = EncounterSelection.fallback_species_entry(catalog.species)
-		if species_entry.is_empty():
-			trace.warning("GameRuntime", "Species catalog is empty; skipping the wild encounter.", {"biome": biome})
-			return {}
-		trace.warning("GameRuntime", "Encounter species list was empty; using a fallback species.",
-			{"fallback_species_id": str(species_entry.get("species_id", ""))})
-	var level = EncounterSelection.level_from_distance(tile_pos, _rng)
+		return {}
+	var level = landmark_runtime.level_for_scope(scope, species_id, tile_pos, _rng)
 	var wild_mon := pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"), _rng)
 	# shiny_rolled fires on EVERY creation (odds provable both directions; the shiny_odds scenario).
 	trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(wild_mon.get("species_id", "")), "is_shiny": bool(wild_mon.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "wild"})

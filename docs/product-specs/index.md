@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-27
+Last verified: 2026-07-29
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 
@@ -15,4 +15,5 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Storage boxes & party management loop: [storage-and-party.md](storage-and-party.md)
 - Pokémon systems — shinies, breeding, habitat drops & fishing (Phase 5): [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)
 - Overworld Pokémon — roaming entities, recruitment, nests & Alphas (Phase 6): [overworld-pokemon.md](overworld-pokemon.md)
+- World depth — landmarks, legendaries & world chaining (Phase 7): [world-depth.md](world-depth.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)

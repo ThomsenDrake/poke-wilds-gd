@@ -92,7 +92,7 @@ func check_flash() -> void:
 func check_teleport_waystone() -> void:
 	var runtime = _runtime()
 	_way_stone = _find_open_tile(runtime.session.player_tile)
-	if _way_stone == Vector2i.ZERO:
+	if _way_stone == Vector2i.MAX:
 		_failures.append("teleport: no open tile for a way stone within scan"); return
 	var cursor: int = _runner.trace_log_line_count()
 	var reg: Dictionary = runtime.field_move_runtime.register_way_stone(_way_stone)
@@ -144,7 +144,7 @@ func check_ride() -> void:
 
 func check_fly() -> void:
 	var runtime = _runtime()
-	if _way_stone == Vector2i.ZERO:
+	if _way_stone == Vector2i.MAX:
 		_failures.append("fly: no visited way stone (the teleport check did not register one)"); return
 	_runner.teleport_player(_world(), _player(), runtime, runtime.session.player_tile + FAR_OFFSET)
 	_ensure(_player().tile_position != _way_stone, "fly: the player already stands on the way stone")
@@ -196,7 +196,7 @@ func _find_open_tile(center: Vector2i) -> Vector2i:
 		for tile in _runner.ring_around(center, ring):
 			if _open(tile):
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX # never ZERO — (0,0) is a real open tile
 
 
 func _open(tile: Vector2i) -> bool:

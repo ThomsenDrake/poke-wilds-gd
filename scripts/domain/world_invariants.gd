@@ -26,6 +26,10 @@ static func validate_invariants(gen, seed_value: int) -> Dictionary:
 	var failures: Array = []
 	var gen2 = gen.get_script().new()
 	gen2.setup(seed_value)
+	# The landmark resolver is WIRING, not setup state: the invariant compares two
+	# LIKE-WIRED generators, so the seam rides both (outside every footprint the
+	# resolver is a no-op; inside, both stamp the identical footprint logic).
+	gen2.landmark_resolver = gen.landmark_resolver
 
 	for pos in _invariant_sample_positions():
 		var a = gen.get_tile_logic(pos)

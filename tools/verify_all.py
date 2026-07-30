@@ -7,7 +7,8 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     six rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
+  S6.5   double-run     seven rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
+                        (Build 3's world_chain completes the spec's eight, [4,4])
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
                         + the four satellite sweep families (shots 15-23)
@@ -68,24 +69,29 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# six rng-consumer scenarios run twice headless, each run persisting its ordered
+# seven rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
 # two trace sets (timing-stripped, key-sorted, order-sensitive). Total lane budget
 # <=90s (two bounded runs + the compare); a mismatch reds with the divergent
-# event + both canonical payloads as the named cause (miss-002).
+# event + both canonical payloads as the named cause (miss-002). Phase 7: the two
+# world-depth scenarios split ACROSS groups — landmark_flow joins group 1 now
+# ([4,3] interim); Build 3's world_chain completes the spec's [4,4] in group 2.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
-                        "shiny_odds", "fishing_flow", "breed_flow"]
-DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:3], DOUBLE_RUN_SCENARIOS[3:]]
+                        "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow"]
+DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:4], DOUBLE_RUN_SCENARIOS[4:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — two groups of three, not one run of six
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — a group of four + a group of three, never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
-# S9 windowed satellite sweep families (shots 15-23, windowed-diffed one-command
+# S9 windowed satellite sweep families (shots 15-23 + 31-32, windowed-diffed one-command
 # alongside the main visual_sweep). visual_sweep_fishing (26-27) is registered in
-# the smoke list + windowed sets but is NOT one of these four families per the
-# frozen contract's "shots 15-23" wording -- it runs via the PLAYTEST_SCENARIOS path.
+# the smoke list + windowed sets but is NOT one of these families per the frozen
+# contract's "shots 15-23" wording -- it runs via the PLAYTEST_SCENARIOS path.
+# world_depth (31-32) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
+# § Smoke validation; its own seed + seeded state setup).
 SATELLITE_SWEEP_SCENARIOS = ["visual_sweep_camping", "visual_sweep_storage",
-                             "visual_sweep_pokemon", "visual_sweep_overworld"]
+                             "visual_sweep_pokemon", "visual_sweep_overworld",
+                             "visual_sweep_world_depth"]
 
 # "warn" maps to GREEN on purpose: a warn-tier refusal (R6 vision-review
 # freshness under --skip-windowed) is recorded + printed but NEVER escalates
@@ -330,7 +336,7 @@ class Runner:
                 if self.fail_fast_stop:
                     break
 
-        # --- S6.5: double-run determinism lane (six rng-consumers x2, <=90s) ---
+        # --- S6.5: double-run determinism lane (seven rng-consumers x2, <=90s) ---
         if not self.fail_fast_stop:
             self._run_double_determinism_lane(bin_)
 
@@ -339,7 +345,7 @@ class Runner:
         if not self.fail_fast_stop:
             entry = self.run_tool(
                 "run_playtests:headless", "playtest",
-                py("run_playtests.py") + ["--include-smoke", "--report",
+                py("run_playtests.py") + ["--include-smoke", "--fresh-save", "--report",
                                           str(headless_report.relative_to(ROOT)),
                                           "--timeout", str(args.timeout),
                                           "--godot-bin", bin_],
@@ -432,7 +438,7 @@ class Runner:
     def _run_double_determinism_lane(self, bin_: str) -> None:
         """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
 
-        Runs the six rng-consumer scenarios twice headless, each run persisting its
+        Runs the seven rng-consumer scenarios twice headless, each run persisting its
         ordered trace JSONL (--trace-dir), then canonical-compares the two trace
         sets with determinism_verify.py's cmp --mode trace. Budget: 2x90s bounded
         runs + 10s compare (six cold-start headless scenarios incl. journey+soak do
@@ -460,8 +466,9 @@ class Runner:
                     except OSError:
                         pass
 
-        # Two groups of three (not one run of six) so each run's worst case fits
-        # the outer budget with headroom; traces accumulate per dir across groups
+        # A group of four + a group of three (not one run of all) so each run's
+        # worst case fits the outer budget with headroom; traces accumulate per
+        # dir across groups
         # and the single cmp below compares the full six-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
@@ -471,7 +478,8 @@ class Runner:
                 self.run_tool(
                     f"determinism:double-run:{label}", "determinism",
                     py("run_playtests.py") + scenario_argv +
-                    ["--trace-dir", str(trace_dir.relative_to(ROOT)),
+                    ["--fresh-save",
+                     "--trace-dir", str(trace_dir.relative_to(ROOT)),
                      "--report", str(report.relative_to(ROOT)),
                      "--timeout", str(DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S),
                      "--godot-bin", bin_],

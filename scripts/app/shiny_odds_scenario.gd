@@ -19,7 +19,9 @@ const Sites := preload("res://scripts/runtime/phase5_sites.gd")
 
 const SEED := 2026072604
 const DRAWS := 1024 # 4 x the 256 denominator
-const EXPECTED := 6 # calibrated shiny count for SEED (pinned; drift fails loud)
+const EXPECTED := 2 # calibrated shiny count for SEED (pinned; drift fails loud). Re-calibrated
+# 6 -> 2 (2026-07-29) when the scenario gained new_game + the spawn teleport: the starter
+# build shifts the pinned stream offset; the count stayed stable across repeated seeded runs.
 const HOOK_DRAWS := 64
 const EXPECTED_HOOK := 31 # calibrated count for odds=2 on SEED + 999
 const EGG_CAP_STEPS := 6000
@@ -34,6 +36,13 @@ func run(ctx: Dictionary) -> void:
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
 	runtime.seed_for_smoke(SEED)
+	runtime.new_game() # self-contained: world + spawn derive from the PINNED seed (the breed_flow
+	# precedent; the double-run lane needs a pure function of (code, seed) — the boot world is
+	# wall-clock, so under the lane's --fresh-save runs the 1024 draws diverged per process)
+	_world().rebuild(runtime.get_world_seed()) # mirror main.gd:_sync_world_from_runtime: new_game reseeds the authoritative generator but never the view
+	_runner.teleport_player(_world(), _player(), runtime, runtime.session.player_tile) # sync the
+	# avatar to the pinned spawn (the node lags the session reseed) — the draws read the tile's
+	# biome, so the trace is byte-stable only once the tile is the pinned one
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	runtime.session.repel_steps = 0
@@ -85,6 +94,9 @@ func _check_egg_emission(runtime) -> void:
 	if center == Vector2i.ZERO:
 		_ensure(false, "egg-trace: no pen site within 160 rings")
 		return
+	_runner.teleport_player(_world(), _player(), runtime, center) # sync the render window to the
+	# pinned site BEFORE building — build-time biome reads follow the synced window, so a remote
+	# build under a wall-clock-synced window is non-deterministic (the double-run lane caught it)
 	if not bool(Sites.build_pen(runtime, center).get("ok", false)):
 		_ensure(false, "egg-trace: the pen build was refused")
 		return

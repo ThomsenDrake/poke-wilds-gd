@@ -3,9 +3,8 @@ extends Node
 # Deterministic overworld-mon driver for the visual sweep (Phase 6; spec: docs/product-specs/
 # overworld-pokemon.md § Smoke validation). STANDALONE: a seeded walk band with live roamers (22),
 # a seeded nest — ring + eggs + Alpha guardian (23), and night×entities×tint at tod=0 (30; the
-# main sweep's 04_night is entity-inert). Reconciles ONLY its own shots (shared _foreign_shot
-# guard DERIVES from SHOT_REGISTRY; update never prunes). NO rng in the capture path: byte-stable.
-# Entities are opted IN; captures WAIT on the entity-rest + player-lerp probe (sidecar-stamped).
+# main sweep's 04_night is entity-inert). Reconciles ONLY its own shots (shared _foreign_shot guard
+# DERIVES from SHOT_REGISTRY; update never prunes). NO rng in the capture path: byte-stable; entities opted IN, captures WAIT on the entity-rest + player-lerp probe (sidecar-stamped).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
@@ -146,6 +145,7 @@ func _report(result: Dictionary) -> void:
 			push_error("Overworld sweep drift on %s: %s%% of pixels changed (threshold %s%%)." % [shot, per_shot.get(shot, "?"), _threshold_pct])
 		for message in result.get("errors", []):
 			push_error("Overworld sweep diff error: %s" % message)
+		_runtime().emit_trace("visual_sweep_overworld_failed", "SmokeScenarios", {"mismatched": result.get("mismatched", []), "per_shot_pct": per_shot, "errors": result.get("errors", []), "threshold_pct": _threshold_pct}) # miss-002 loudness: drift names its shots + percentages in the trace, never stderr-only
 		return
 	_runtime().emit_trace("visual_sweep_overworld_passed", "SmokeScenarios", {
 		"shots": _shots, "mode": str(result.get("mode", VisualSweepBaselines.MODE_COMPARE)),

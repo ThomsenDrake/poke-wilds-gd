@@ -22,7 +22,7 @@ func run(ctx: Dictionary, runner, failures: Array, runtime, first_stone: Vector2
 	var fmr = runtime.field_move_runtime
 	# -- two stones, last-registered ordering ----------------------------------
 	var second := _find_open_tile(first_stone)
-	if not _ensure(second != Vector2i.ZERO, "fly_lifecycle: no open tile for a second way stone"):
+	if not _ensure(second != Vector2i.MAX, "fly_lifecycle: no open tile for a second way stone"):
 		return
 	_ensure(bool(fmr.register_way_stone(second).get("ok", false)), "fly_lifecycle: the second way stone refused registration")
 	_ensure(fmr.way_stone_tiles().size() >= 2, "fly_lifecycle: fewer than two way stones registered")
@@ -59,7 +59,7 @@ func _find_open_tile(first_stone: Vector2i) -> Vector2i:
 			if bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() \
 				and str(logic.get("structure_id", "")).is_empty():
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX # never ZERO — (0,0) is a real open tile
 
 
 func _ensure(ok: bool, label: String) -> bool:

@@ -69,6 +69,13 @@ const SCENARIOS := {
 	"save_stability": [preload("res://scripts/app/save_stability_scenario.gd"), "run", []],
 	"save_stability_update": [preload("res://scripts/app/save_stability_scenario.gd"), "run", [{"mode": "update"}]],
 	"playtest_entity_soak": [preload("res://scripts/app/playtest_entity_soak_scenario.gd"), "run", []],
+	# Phase 7 Build 1 landmarks (world-depth.md): the Mansion puzzle solved on fixed
+	# seed 2026072907 + footprint-local encounter scope (checks split into
+	# world_depth_checks.gd for the app budget; joins the double-run lane). The
+	# world-depth sweep (shots 31-32) is windowed-only like the other satellites.
+	"landmark_flow": [preload("res://scripts/app/landmark_flow_scenario.gd"), "run", []],
+	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
+	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 }
 
 

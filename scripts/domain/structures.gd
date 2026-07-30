@@ -220,16 +220,16 @@ static func sprite_region_for(id: String, _biome: String, _gate: bool = false, l
 	return null
 
 
-# Placement eligibility over a tile's live logic: the tile must be open ground
-# (walkable, no prop, not already carrying a placement). This forces the
-# harvest -> build loop: a tree/rock tile must be cleared before it can hold a
-# structure, while bare or already-cleared ground accepts one directly.
+# Placement eligibility: open ground (walkable, no prop, no placement; the harvest
+# -> build loop) and NEVER a landmark tile (immutable world feature, world-depth.md).
 static func can_place_on(logic: Dictionary) -> bool:
 	if not bool(logic.get("walkable", false)):
 		return false
 	if str(logic.get("prop_path", "")) != "":
 		return false
 	if str(logic.get("structure_id", "")) != "":
+		return false
+	if str(logic.get("landmark_id", "")) != "":
 		return false
 	return true
 

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-27
+Last verified: 2026-07-29
 Review cadence days: 21
 Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/BagScreen.tscn, scenes/ui/MessageBox.tscn, scripts/ui/start_menu.gd, scripts/ui/party_screen.gd, scripts/ui/bag_screen.gd, scripts/ui/party_rows.gd, scripts/ui/message_box.gd, scripts/runtime/game_runtime.gd, scripts/runtime/stone_evolution_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/save_store.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd
 
@@ -48,3 +48,7 @@ Phase 6 (`overworld-pokemon.md`) wires `overworld_mons_runtime` into `game_runti
 ## Pre-Phase-7 suite expansion (co-modification note)
 
 The user-approved pre-Phase-7 expansion (lanes + run-when lists: [../RELIABILITY.md](../RELIABILITY.md); full annotation: [../exec-plans/active/pokewilds-feature-completion.md](../exec-plans/active/pokewilds-feature-completion.md) § Phase 7) touches this subsystem: `seed_for_smoke` (`game_runtime.gd:207`) now ALSO pins `player_avatar._rng` (wall-clock-seeded previously — `player_avatar.gd:42,47`; the trigger draw :205), covering the full rng surface (real play never calls it); the new `save_stability` scenario (registry marker on `app_bootstrap`) pins the v4 save surface byte-stable — scripted v4 mutations (deposit/withdraw, craft, `repel_steps`, pastures, stone/rod bag) → save → reload → save → byte-compare of canonicalized save JSON (keys sorted, ts/version-stripped) — and commits ONE golden v4 fixture at `docs/generated/golden-saves/v4_golden.json`, asserting `load(golden)` succeeds with a stable canonical form. Save schema stays v4 (no bump; v5 remains reserved for Phase 7).
+
+## Phase 7 Build 1 (landmarks) co-modification note
+
+Phase 7 Build 1 ([world-depth.md](world-depth.md) § Persistence) adds the frozen location-keyed STATE seam to `session_state.gd`: `landmark_state_for(chain) -> Dictionary` / `set_landmark_state(chain, state)`. Build 1 resolves BOTH to the v4-ADDITIVE top-level `landmark_state` key (written only when non-empty; SAVE_VERSION stays 4 — Builds 1-2 ride v4; Build 3 later extends the RESOLUTION to `chained_worlds` without rewriting the runtime that reads the seam). `to_save_payload`/`apply_loaded_state`'s world-key marshalling extracts verbatim into `scripts/runtime/session_payload.gd` (the shared home for the three world-depth builds; it does NOT reference `save_migration.gd`, a Build-3 artifact), paying the 320 budget for the seam var + methods. `game_runtime.gd` co-mods for the landmark-runtime wiring only (instantiation + `note_player_step` + the encounter-scope read); the save surface is otherwise byte-stable — the golden v4 fixture is unchanged, and the new key is absent in old saves (→ `{}`).

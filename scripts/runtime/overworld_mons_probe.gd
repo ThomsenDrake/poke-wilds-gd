@@ -52,17 +52,19 @@ func tile_overlap_failures(mons, center: Vector2i, radius: int) -> Array:
 		seen[key] = true
 	return failures
 
-# biome -> stand tile, deterministic: the axis band scan (biome rings ride Manhattan
-# distance from the origin — the world_generator._pick_biome convention), then a local
-# walkable stand tile. WATER stands on LAND within `water_reach` tiles of the patch so
-# water cells enter the spawn window (swim_only mons ride water tiles only).
+# biome -> stand tile, deterministic: the spoke band scan (biome rings ride Manhattan
+# distance from the origin — the world_generator._pick_biome convention; EIGHT spokes —
+# axes + diagonals — because a rare biome (LAVA/SNOW patches) can thread BETWEEN the four
+# axes on some world seeds), then a local walkable stand tile. WATER stands on LAND within
+# `water_reach` tiles of the patch so water cells enter the spawn window (swim_only only).
 func biome_anchors(world, biomes: Array, water_reach: int = 10) -> Dictionary:
 	var first_seen := {}
 	for r in range(0, AXIS_SCAN_MAX, 2):
-		for axis in [Vector2i(r, 0), Vector2i(0, r), Vector2i(-r, 0), Vector2i(0, -r)]:
-			var seen: String = str(world.get_tile_logic(axis).get("biome", ""))
+		for k in range(8):
+			var point := band_point(r, k)
+			var seen: String = str(world.get_tile_logic(point).get("biome", ""))
 			if not first_seen.has(seen):
-				first_seen[seen] = axis
+				first_seen[seen] = point
 	var anchors := {}
 	for biome in biomes:
 		if first_seen.has(str(biome)):

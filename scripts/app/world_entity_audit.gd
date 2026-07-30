@@ -7,8 +7,7 @@ extends Node
 # show >=1 live roamer; named wiki examples checked off the live catalog where seen);
 # tile validity + despawn hygiene; logic/render agreement vs the entity_layer sprites;
 # a guardian probe. The subsystem SELF-ACTIVATES for the lane (the dispatcher leaves the
-# audit inert for baseline protection) and stays synced at center for audit_z_order's
-# entity scan; run()'s restore_inactive() closes the gate afterward.
+# audit inert for baseline protection) and stays synced at center for audit_z_order's entity scan; restore_inactive() closes the gate.
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
 const WorldSpatialAudit := preload("res://scripts/app/world_spatial_audit.gd")
@@ -38,9 +37,8 @@ var movement_checked := 0
 var spatial_checked := 0
 func setup(ctx: Dictionary, runner: SmokeScenarioRunner, failures: Array) -> void:
 	_ctx = ctx; _runner = runner; _failures = failures
-# Clears lane (extracted verbatim from world_consistency_audit._audit_overridden_tiles):
-# stamps one real override through the resolver, cross-checks every cleared tile across
-# logic/render/collision (iterating the clears-only map keeps build placements out).
+# Clears lane (extracted verbatim from world_consistency_audit._audit_overridden_tiles): stamps one real override through the
+# resolver, cross-checks every cleared tile across logic/render/collision (clears-only iteration keeps build placements out).
 func run_overrides(center: Vector2i) -> void:
 	var party_before: Array = _runner.swap_party(_runtime(), ["BULBASAUR"])
 	var found := _runner.find_harvest_target(_world(), center, SAMPLE_RADIUS, "cut")
@@ -126,7 +124,9 @@ func run_entity_lane(center: Vector2i) -> void:
 		if sampled >= MAX_ENTITY_SAMPLES: break
 		sampled += 1; spatial_checked += 1
 		var tile: Vector2i = e.tile; var logic: Dictionary = _world().get_tile_logic(tile)
-		if not str(logic.get("prop_path", "")).is_empty() or not str(logic.get("structure_id", "")).is_empty():
+		# Overlap = sharing an OBSTACLE: a BLOCKING prop (trees/rocks carry a block_reason) or a placement — ground decorations (bushes: walkable, no block_reason) and landmark floor stamps (world-depth.md § Landmarks (a): the guardian stands ON the ruins floor by design) are walkable ground, not obstacles; landmark walls red via the walkable rule below.
+		var prop_blocks := not str(logic.get("prop_path", "")).is_empty() and not str(logic.get("block_reason", "")).is_empty()
+		if str(logic.get("landmark_id", "")) == "" and (prop_blocks or not str(logic.get("structure_id", "")).is_empty()):
 			_failures.append({"tile": [tile.x, tile.y], "kind": "entity_prop_overlap", "entity_id": str(e.get("id", ""))})
 		if not bool(logic.get("walkable", false)) and str(logic.get("biome", "")) != "WATER":
 			_failures.append({"tile": [tile.x, tile.y], "kind": "entity_unwalkable_tile"})

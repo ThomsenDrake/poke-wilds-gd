@@ -112,15 +112,18 @@ static func pen_stand_spot(world, center: Vector2i) -> Dictionary:
 
 
 # First open-ground tile near `center` (campfire siting; craft_flow pattern).
+# Not-found = Vector2i.MAX (NEVER ZERO — (0,0) is a real open tile; the ZERO sentinel
+# conflated a found origin tile with "not found").
 static func find_open_tile(world, center: Vector2i, radius: int) -> Vector2i:
 	var runner := SmokeScenarioRunner.new()
 	for ring in range(1, radius + 1):
 		for tile in runner.ring_around(center, ring):
 			var logic: Dictionary = world.get_tile_logic(tile)
 			if bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() \
-				and str(logic.get("structure_id", "")).is_empty():
+				and str(logic.get("structure_id", "")).is_empty() \
+				and str(logic.get("landmark_id", "")).is_empty(): # footprints are immutable (can_place_on refuses them, so "open" ground may not overlap one — _pen_block_placeable agrees)
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX
 
 
 # First WATER-biome tile with a walkable stand neighbor {"tile", "stand",
@@ -175,7 +178,8 @@ static func _pen_block_placeable(world, center: Vector2i) -> bool:
 				return false
 			if maxi(absi(dx), absi(dy)) <= PEN_RADIUS + 1: # the placeable 5x5 must be open ground
 				if not bool(logic.get("walkable", false)) or not str(logic.get("prop_path", "")).is_empty() \
-					or not str(logic.get("structure_id", "")).is_empty():
+					or not str(logic.get("structure_id", "")).is_empty() \
+					or not str(logic.get("landmark_id", "")).is_empty(): # landmark footprints are immutable (Build 1's can_place_on refuses them, so a pen site may not overlap one)
 					return false
 	return true
 
@@ -210,6 +214,7 @@ static func _feature_pen_placeable(world, center: Vector2i, feature: String) -> 
 				return false
 			if not bool(logic.get("walkable", false)) or not str(logic.get("structure_id", "")).is_empty():
 				return false
-			if maxi(absi(dx), absi(dy)) <= PEN_RADIUS + 1 and not str(logic.get("prop_path", "")).is_empty():
+			if maxi(absi(dx), absi(dy)) <= PEN_RADIUS + 1 \
+				and (not str(logic.get("prop_path", "")).is_empty() or not str(logic.get("landmark_id", "")).is_empty()): # the placeable 5x5 may not overlap a footprint (can_place_on refuses fence on one — _pen_block_placeable agrees)
 				return false
 	return true

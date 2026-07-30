@@ -27,6 +27,7 @@ scenario failures that pass in isolation. Serialize pre-push gate runs.
 from __future__ import annotations
 
 import argparse
+import atexit
 from datetime import datetime, timezone
 import importlib.util
 import json
@@ -34,6 +35,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -66,7 +68,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "landmark_flow", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -1184,9 +1186,28 @@ def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
         result["ok"] = False
 
 
+def _user_save_path(project: Path) -> Path | None:
+    """Resolve user://godot_port_save.json (scripts/runtime/save_store.gd:24) per
+    OS, or None when the project name is unreadable."""
+    try:
+        text = (project / "project.godot").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r'config/name\s*=\s*"([^"]+)"', text)
+    if not match:
+        return None
+    if sys.platform == "darwin":
+        base = Path.home() / "Library/Application Support/Godot/app_userdata"
+    elif sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", "")) / "Godot/app_userdata"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "godot/app_userdata"
+    return base / match.group(1) / "godot_port_save.json"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--include-smoke", action="store_true", help="also run the 7 smoke scenarios")
+    parser.add_argument("--include-smoke", action="store_true", help=f"also run the {len(SMOKE_SCENARIOS)} smoke scenarios")
     parser.add_argument(
         "--scenario",
         action="append",
@@ -1203,6 +1224,14 @@ def main() -> int:
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--godot-bin", default=os.environ.get("GODOT_BIN", DEFAULT_GODOT_BIN))
+    parser.add_argument("--fresh-save", action="store_true",
+                        help="run the scenarios with NO user save present (the user's save is "
+                             "backed up to a disk sibling and restored regardless). Guarantees "
+                             "the FIRST scenario boots save-less; later scenarios may "
+                             "session_load a prior scenario's wall-clock save — the compared "
+                             "trace starts at the smoke_scenario_dispatched boundary and every "
+                             "consumer re-pins its own world, so traces never depend on "
+                             "residual save state (verify lanes pass this)")
     args = parser.parse_args()
 
     project = Path(args.project).expanduser().resolve()
@@ -1243,6 +1272,51 @@ def main() -> int:
     if swept:
         print(f"swept:     {swept} stale result-*.json")
     print(f"{'scenario':<18} {'transport':<16} {'dur_s':>7} {'result':<6} {'events':>6} {'warn':>5} {'exc':>4}")
+
+    # SUITE-LEVEL SAVE GUARD: scenarios legitimately write through to the user's
+    # save (save_written is a pinned event; soaks exercise real persistence), so
+    # a run can leave a polluted party that one-shots LATER runs' battles — the
+    # KO-animation-overrun flake class ("resources still in use at exit", missed
+    # pass events, battle-stall timeouts). Back the save up to a DISK SIBLING
+    # before the first scenario and restore it after the last (restoring ABSENCE
+    # too), so the suite never perturbs the state it verifies against. Disk, not
+    # memory, because verify_all SIGKILLs a lane that overruns its budget and
+    # neither atexit nor a SIGTERM handler runs on SIGKILL: an in-memory backup
+    # died with the process and --fresh-save's delete-first left the user's save
+    # GONE. The sibling self-heals — the next invocation restores a stale one at
+    # startup — and SIGTERM restores inline; only SIGKILL mid-write can still
+    # lose data (the sibling is fully written BEFORE any unlink of the save).
+    save_path = _user_save_path(project)
+    if save_path is not None:
+        backup_path = save_path.with_name(save_path.name + ".verify.bak")
+        if backup_path.exists():  # a SIGKILL'd prior run never restored; do it now
+            try:
+                save_path.write_bytes(backup_path.read_bytes())
+                backup_path.unlink()
+                print(f"note: recovered the user save from a stale {backup_path.name} (a prior run was killed before restoring)")
+            except OSError as exc:
+                print(f"warning: could not recover the user save from {backup_path.name}: {exc}", file=sys.stderr)
+        save_backup = save_path.read_bytes() if save_path.exists() else None
+        if save_backup is not None:
+            backup_path.write_bytes(save_backup)  # on disk BEFORE any unlink: a kill mid-suite can no longer lose the save
+        if args.fresh_save and save_backup is not None:
+            save_path.unlink()  # scenarios run save-less; the disk sibling restores on exit (or at the next startup)
+
+        def _restore_user_save() -> None:  # idempotent: SIGTERM -> SystemExit -> atexit may run it twice
+            try:
+                if save_backup is None:
+                    save_path.unlink(missing_ok=True)
+                else:
+                    source = backup_path.read_bytes() if backup_path.exists() else save_backup
+                    save_path.write_bytes(source)
+                backup_path.unlink(missing_ok=True)  # only after a successful restore
+                print(f"note: user save restored ({save_path.name})")
+            except OSError as exc:
+                print(f"warning: could not restore the user save: {exc}", file=sys.stderr)
+
+        signal.signal(signal.SIGTERM, lambda _signum, _frame: (_restore_user_save(), sys.exit(143))[1])
+        atexit.register(_restore_user_save)
+        print(f"note: user save backed up for the run ({save_path.name})")
 
     results: list[dict[str, Any]] = []
     trace_dir = Path(args.trace_dir).expanduser() if args.trace_dir else None

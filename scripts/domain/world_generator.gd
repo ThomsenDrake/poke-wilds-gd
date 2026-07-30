@@ -3,6 +3,7 @@ extends RefCounted
 const BiomeDefs := preload("res://scripts/domain/biome_defs.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const WorldInvariants := preload("res://scripts/domain/world_invariants.gd")
+const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const TILE_SIZE := 16
 const ROCK_PROP_PATH := "res://pokewilds/rock_small1.png"
 const SPAWN_SEARCH_RADIUS := 24
@@ -20,6 +21,10 @@ var _textures: Dictionary = {}
 # cap; the merged view mirror is built by mutations_for_view().
 var _overrides: Dictionary = {}
 var _placements: Dictionary = {}
+# Phase 7 landmark seam: a pure resolver (a Landmarks.tile_logic_for closure the
+# runtime wires) stamps footprint tiles into the base logic BELOW, before clears/
+# placements; an invalid resolver leaves the base logic byte-identical.
+var landmark_resolver: Callable
 
 
 func setup(seed_value: int) -> void:
@@ -77,7 +82,7 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 
 	var props = def["props"]
 	if props is Array and walkable:
-		var picked: Variant = _pick_prop(map_pos, props)
+		var picked: Variant = Landmarks.pick_prop(map_pos, props, _seed)
 		if picked is Dictionary:
 			prop_path = str(picked["path"])
 			prop_region = picked.get("region", null)
@@ -86,7 +91,7 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 				block_reason = str(picked["reason"])
 				field_move = str(picked["field_move"])
 
-	if elevation > 0.55 and walkable:
+	if Landmarks.is_rock_cliff(elevation, walkable):
 		prop_path = ROCK_PROP_PATH
 		prop_region = null
 		walkable = false
@@ -106,6 +111,11 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 		"tall_grass_path": tall_grass_path,
 		"tall_grass_key_color": tall_grass_key
 	}
+	# Landmark footprints stamp into the base logic FIRST (world-depth.md § Landmarks
+	# seam) so clears/placements still shadow them; landmarks are immutable world
+	# features, so a landmark tile never carries a player mutation.
+	if landmark_resolver.is_valid():
+		logic = landmark_resolver.call(map_pos, logic)
 	# Mutations apply last, at this single boundary, clears then placements so a
 	# built structure shadows a cleared tile; empty maps keep base byte-identical.
 	if _overrides.has(map_pos):
@@ -284,14 +294,6 @@ func _ring_candidates(distance: int) -> Array:
 	return candidates
 
 
-func _pick_prop(map_pos: Vector2i, props: Array) -> Variant:
-	for i in range(props.size()):
-		var prop: Dictionary = props[i]
-		if _coord_noise(map_pos.x, map_pos.y, 101 + i * 7) < float(prop["chance"]):
-			return prop
-	return null
-
-
 func _texture(path: String, region: Variant) -> Texture2D:
 	var entry: Dictionary = _textures.get(path, {})
 	if entry.is_empty():
@@ -309,10 +311,3 @@ func _texture(path: String, region: Variant) -> Texture2D:
 		frame.region = region
 		entry["region"] = frame
 	return entry["region"]
-
-
-func _coord_noise(x: int, y: int, salt: int) -> float:
-	var n = int(x) * 374761393 + int(y) * 668265263 + _seed * 104729 + salt * 4256233
-	n = (n ^ (n >> 13)) * 1274126177
-	n = n ^ (n >> 16)
-	return float(n & 0x7fffffff) / float(0x7fffffff)

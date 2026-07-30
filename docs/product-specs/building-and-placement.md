@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-25
+Last verified: 2026-07-29
 Review cadence days: 21
 Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
@@ -105,3 +105,7 @@ Phase 6 (`overworld-pokemon.md`) adds ONE node to `scenes/app/Main.tscn` (the En
 ## Pre-Phase-7 suite expansion (co-modification note)
 
 The user-approved pre-Phase-7 expansion touched `scripts/app/field_action_router.gd` (this subsystem owns it) as part of the suite-growth wiring only — the expansion's approved scope adds verification lanes and scenarios, no building behavior: costs, occupancy, the would-trap guard, the demolition/refund rules, and the demolition-witness invariant are unchanged, and the save schema stays v4. The new lanes (double-run determinism, satellite sweeps in S9, soak warning tripwire, the sidecar `crafted_state.world_seed`/`shot_seq` equality gate) are documented in [../RELIABILITY.md](../RELIABILITY.md) and the exec plan.
+
+## Phase 7 Build 1 (landmarks) co-modification note
+
+Phase 7 Build 1 ([world-depth.md](world-depth.md) § Landmarks, footprint-validation gate (b)) adds the landmark-refusal clause to `Structures.can_place_on`: a tile carrying `landmark_id != ""` never accepts a placement — landmarks are immutable world features the player can NEVER build on OR demolish (the lifelong guard; footprints stamp at world-gen BELOW clears/placements at the generator's single mutation boundary, so no player mutation ever shadows one). `field_action_router.gd` co-mods by EXTRACTION only: the puzzle/statue/key interact arms move to `scripts/app/landmark_actions.gd` (the router's 216/220 budget); costs, occupancy, the would-trap guard, and the demolition/refund rules are unchanged, and the save schema stays v4.

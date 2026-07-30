@@ -29,6 +29,14 @@ from legibility_lib import (
 )
 
 
+# Build-phased spec exemption: a FROZEN multi-build spec (docs/product-specs/world-depth.md)
+# lists its whole-phase source set in the "Source paths" metadata up front, but the later
+# builds' files legitimately do not exist yet. An entry explicitly marked "(Build N)" (N >= 2)
+# is exempt from the missing-path rule until its build lands; the stale-marker backstop below
+# forces the marker OFF the moment the path exists, so the exemption can never outlive the gap.
+BUILD_STAGED_SOURCE_MARKER = re.compile(r"^(.+?)\s*\(Build ([2-9]|\d{2,})\)$")
+
+
 def report_stamp_issues(root: Path) -> list[str]:
     """Validate the playtest-report stamp schema (freshness-refusal hook).
 
@@ -301,6 +309,12 @@ def run(root: Path | None = None) -> list[str]:
         except Exception as exc:
             issues.append(f"Doc metadata is invalid for {rel}: {exc}")
         for source in source_paths_from_metadata(metadata):
+            staged = BUILD_STAGED_SOURCE_MARKER.match(source)
+            if staged:
+                staged_path = staged.group(1).strip()
+                if (root / staged_path).exists():
+                    issues.append(f"Doc {rel} carries a stale build-phase marker for an existing source path: {staged_path}")
+                continue
             if not (root / source).exists():
                 issues.append(f"Doc {rel} references a missing source path: {source}")
         for target in internal_links(path):
@@ -315,6 +329,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(rubric_question_inventory_issues(root))
     issues.extend(miss_postmortem_issues(root))
     issues.extend(sim_rng_setup_issues(root))
+    issues.extend(world_depth_rng_issues(root))
     issues.extend(shot_numbering_issues(root))
 
     return issues
@@ -585,6 +600,40 @@ def sim_rng_setup_issues(root: Path) -> list[str]:
             issues.append(
                 f"{rel}: constructs RandomNumberGenerator.new(); *_sim.gd step "
                 "engines must be rng-free (derived SplitMix hashes only)")
+    return issues
+
+
+def _world_depth_determinism_files(root: Path) -> list[Path]:
+    """world-depth.md § Determinism scope: every domain module plus the two
+    world-depth runtimes. The *_sim.gd glob above does not reach these files, so
+    this list is the extension's coverage (world_chain_runtime.gd arms lazily —
+    Build 3 lands it; the ban holds the moment it exists)."""
+    files = list(root.glob("scripts/domain/**/*.gd"))
+    for rel in ("scripts/runtime/landmark_runtime.gd",
+                "scripts/runtime/world_chain_runtime.gd"):
+        path = root / rel
+        if path.exists():
+            files.append(path)
+    return sorted(set(files))
+
+
+def world_depth_rng_issues(root: Path) -> list[str]:
+    """Static determinism rule codifying world-depth.md § Determinism's NO-new-rng
+    contract: per-world seeds + landmark/legendary anchors are PURE SplitMix hashes
+    of (root_seed, chain coords), so scripts/domain/** + the two world-depth
+    runtimes must never CONSTRUCT a RandomNumberGenerator (a construction — not a
+    threaded parameter: pick_species_for/level_for_scope legitimately receive the
+    shared _rng to consume it in the pinned order). The three legitimate owners
+    (game_runtime, battle_runtime, player_avatar) live outside this scope, so the
+    ban needs no allowlist. Extends sim_rng_setup_issues."""
+    issues: list[str] = []
+    for path in _world_depth_determinism_files(root):
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"RandomNumberGenerator\s*\.\s*new\s*\(", text):
+            issues.append(
+                f"{relative_path(path, root)}: constructs RandomNumberGenerator.new(); "
+                "world-depth domain + runtimes are rng-free (pure SplitMix hashes of "
+                "(root_seed, chain) — world-depth.md § Determinism)")
     return issues
 
 

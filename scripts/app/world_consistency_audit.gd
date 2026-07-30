@@ -62,6 +62,7 @@ func run(ctx: Dictionary) -> void:
 	else:
 		for failure in _failures:
 			push_error(str(failure))
+		_runtime().emit_trace("world_consistency_audit_failed", "SmokeScenarios", {"failures": _failures, "tiles_checked": _tiles_checked, "seed": _runtime().get_world_seed()}) # miss-002 loudness: a red names its cause in the trace, never stderr-only
 
 
 func _audit_tiles(center: Vector2i) -> void:
@@ -176,6 +177,8 @@ func _check_tall_grass(tile: Vector2i) -> void:
 	var render: Dictionary = _world().get_tile_render_data(tile)
 	if not str(render.get("biome", "")) in TALL_GRASS_BIOMES:
 		return
+	if str(_world().get_tile_logic(tile).get("landmark_id", "")) != "":
+		return # landmark footprints clear the grass overlay BY DESIGN: their encounter is footprint-scoped token scope, never grass-driven (world-depth.md § Landmarks)
 	var plain := render.duplicate()
 	plain["tall_grass_path"] = ""
 	plain["tall_grass_key_color"] = ""

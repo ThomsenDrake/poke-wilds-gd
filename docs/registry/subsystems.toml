@@ -85,6 +85,17 @@ quality_bucket = "runtime"
 # battle + avatar) — real play still never calls it; boot / overworld_step / menu_save
 # gain seed_for_smoke calls in smoke_scenarios.gd. save_stability (app_bootstrap registry
 # entry) is the v4 save-surface byte-stability witness for this subsystem's save schema.
+# PHASE 7 BUILD 1 CO-MODIFICATION (the `landmarks` subsystem entry owns the detail note):
+# session_state.gd's world-key marshalling was EXTRACTED into the NEW
+# scripts/runtime/session_payload.gd (to_payload/apply_into), making room for the additive
+# landmark_state var + the FROZEN location-keyed state seam landmark_state_for(chain:
+# Vector2i) -> Dictionary / set_landmark_state(chain, state) — Build 1 resolves BOTH to
+# the top-level v4-additive key (absent -> {}; NO SAVE_VERSION bump, chained worlds
+# unreachable); Build 3 extends the resolution to chained_worlds[world_id_for(chain)].
+# landmark_state WITHOUT rewriting landmark_runtime (written against the seam, never the
+# keying). game_runtime.gd wires LandmarkRuntime ONLY (instantiation + step + the
+# footprint encounter-scope read feeding generate_wild_encounter), at its 320 budget via
+# extraction.
 
 [[subsystems]]
 name = "world_runtime"
@@ -109,6 +120,17 @@ validation_commands = [
 ]
 required_trace_events = ["world_rebuilt", "biome_entered"]
 quality_bucket = "world"
+# PHASE 7 BUILD 1 CO-MODIFICATION (the `landmarks` subsystem entry owns the detail note):
+# world_generator.gd consults a pure landmark_resolver Callable at the SINGLE mutation
+# boundary (:109-114) — Landmarks.tile_logic_for stamps footprint tiles (adding the
+# landmark_id + encounter_token keys) BEFORE clears/placements apply; base logic returns
+# UNCHANGED outside footprints (empty maps byte-identical; an invalid Callable is too),
+# paid by EXTRACTING _pick_prop + _coord_noise + the rock-cliff tail per world-depth.md
+# § Implementation shape. biome_encounters.gd gains the optional landmark_token path in
+# filter_species_ids (dormant PKMNMANSION/RUINS_OUTER/RUINS_INNER tokens direct-match
+# verbatim; the type-sentinel fallback keys on the HOST world-biome; "" outside footprints
+# => byte-identical pools). world_view.gd renders the stamped landmark tiles through the
+# existing map render path.
 
 [[subsystems]]
 name = "pokemon_data"
@@ -750,6 +772,7 @@ code_paths = [
   "scripts/domain/fishing.gd",
   "scripts/runtime/fishing_runtime.gd",
   "scripts/app/fishing_flow_scenario.gd",
+  "scripts/app/fishing_flow_checks.gd",
   "scripts/app/visual_sweep_fishing.gd",
 ]
 scene_paths = []
@@ -940,3 +963,116 @@ quality_bucket = "overworld_mons"
 #     (probe.live's radius caps samples at DESPAWN_CELLS cells; despawn hygiene rides the
 #     scenario timeline hash) + the guardian sublane warns LOUD on a no-nest skip (seed-
 #     conditioned: never red, never silent). Required-trace list unchanged.
+
+[[subsystems]]
+name = "landmarks"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/landmarks.gd",
+  "scripts/runtime/landmark_runtime.gd",
+  "scripts/runtime/session_payload.gd",
+  "scripts/app/landmark_actions.gd",
+  "scripts/app/landmark_flow_scenario.gd",
+  "scripts/app/world_depth_checks.gd",
+  "scripts/app/visual_sweep_world_depth.gd",
+]
+scene_paths = ["scenes/app/Main.tscn"]
+spec_doc = "docs/product-specs/world-depth.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
+]
+# The two Build-1 plan traces (single owning source string "LandmarkRuntime") plus the
+# scenario's symmetric passed/failed pair (miss-002) and the satellite sweep marker (the
+# sweep has NO _failed trace — its failure paths ride push_error captured by both
+# transports' ERROR_MARKERS, loud never silent). key_item_used is a documented auxiliary
+# (trace-events.md), NOT registry-required.
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "landmark_flow_passed", "landmark_flow_failed", "visual_sweep_world_depth_passed"]
+quality_bucket = "landmarks"
+# PHASE 7 BUILD 1 OF 3 (docs/product-specs/world-depth.md § Landmarks) — landmarks ONLY;
+# legendaries (Build 2) + chaining/save v5 (Build 3) pending. The frozen GENERATOR seam is
+# chain-parametric from day one: Landmarks.tile_logic_for(world_seed, chain, map_pos,
+# base_logic) + landmarks_in_world(world_seed, chain) + anchor_for(world_seed, chain,
+# landmark_id) — the origin fills chain=(0,0) and EVERY world hosts all three landmarks
+# (pkmn_mansion 13x10, desert_ruins 15x11 outer/inner/underground, heart_tower 9x8) from
+# day one (user decision — any-world generation is a REQUIREMENT, not a later flip).
+# Anchors are PURE SplitMix (overworld_mons._mix convention, pinned SALT_LANDMARK_ANCHOR
+# 0x23, explicit sub-INT64_MAX constants + 63-bit masks — NO engine hash(), NO rng
+# objects, NO dict iteration), bounded to ANCHOR_SEARCH_BUDGET := 400 with a fixed-ring
+# fallback (never an absent landmark, never an unbounded loop). The frozen STATE seam
+# SessionState.landmark_state_for(chain) / set_landmark_state(chain, state) resolves in
+# Build 1 to the v4-ADDITIVE top-level landmark_state key (absent -> {}; NO SAVE_VERSION
+# bump — chained worlds are unreachable until Build 3, which extends the seam's RESOLUTION
+# to chained_worlds WITHOUT rewriting landmark_runtime — the runtime is written against
+# the seam, NEVER the keying). Mansion puzzle as PURE transitions in landmarks.gd
+# (MANSION_STATUES := 3 toggles, locked -> statues_set -> unlocked, stays-unlocked, no
+# argument mutation): mansion_key (bag pickup at an interior journal table) gates the room
+# grid, the third simultaneous statue ON flips the sewer door walkable via the resolver
+# overlay, one-shot first-entry traces per landmark|region. Encounter scope is
+# FOOTPRINT-LOCAL: tile logic carries encounter_token; generate_wild_encounter threads it
+# to filter_species_ids' landmark_token path (dormant PKMNMANSION / RUINS_OUTER /
+# RUINS_INNER tokens direct-match verbatim off the parsed catalog; RUINS_INNER_CURATED
+# {VOLCARONA, GOLURK 38-45} + the RUINS_UNDERGROUND DUSCLOPS flagged; level bands 18-26 /
+# 22-30 / inner floor 30 invented); token "" outside footprints => pools byte-identical
+# to pre-Phase-7. Heart Tower ships footprint + entry + the dedicated field track
+# (Wilds_HeartTower.ogg on entry, host-biome restore on exit — trace-asserted, headless
+# never plays audio); INTERNALS DEFERRED (spec § Scope — element floors, puzzle, Ho-Oh/
+# Lugia reward quarantined). landmark_flow (SEED 2026072907, seed_for_smoke BEFORE
+# new_game per the save_stability precedent) SOLVES the Mansion puzzle on the fixed seed,
+# proves the footprint-local pool (DITTO mansion-exclusive — cross-asserted against
+# breed_flow's Ditto-universal-parent reliance), the Ruins outer/inner/underground scope,
+# the tower entry, footprint protection (can_place_on refuses landmark tiles), and the
+# puzzle-state save round-trip THROUGH THE SEAM; it JOINS the double-run lane (the
+# verify_all regroup is [4,3] interim — Build 3's world_chain completes the spec's final
+# [4,4]). The visual_sweep_world_depth satellite (seed 2026072907; shot range
+# single-sourced in the visual_sweep_baselines.gd registry) baselines 31_ruins_interior +
+# 32_mansion (puzzle state CRAFTED through the frozen seam, never played live; 33_beacon
+# is Build 3's).
+# CROSS-SUBSYSTEM CO-MODIFICATION (files stay OWNED BY their home subsystem — one owner
+# per file, never double-listed in code_paths):
+#   scripts/domain/world_generator.gd — the SINGLE mutation-boundary resolver hook
+#     (landmark tiles stamp into the base logic BEFORE clears/placements; an invalid
+#     Callable is byte-identical), paid by EXTRACTING _pick_prop + _coord_noise + the
+#     rock-cliff tail per the spec's implementation-shape table. Owned by world_runtime.
+#   scripts/domain/biome_encounters.gd — the optional landmark_token path in
+#     filter_species_ids (direct-membership matches the dormant token verbatim; the
+#     type-sentinel fallback keys on the host world-biome). Owned by world_runtime.
+#   scripts/domain/structures.gd — can_place_on gains the landmark_id == "" refusal
+#     (extracted helper at its 320/320 wall). Owned by building_loop.
+#   scripts/runtime/session_state.gd — owns the frozen seam methods + the additive
+#     landmark_state var; its world-key marshalling EXTRACTED into the NEW
+#     scripts/runtime/session_payload.gd (to_payload/apply_into — the extraction HOME
+#     shared by all three builds; session_payload.gd is listed in THIS entry's
+#     code_paths). session_state.gd stays in session_runtime's code_paths.
+#   scripts/runtime/game_runtime.gd — wiring ONLY: LandmarkRuntime instantiation + step +
+#     the footprint encounter-scope read into generate_wild_encounter (at its 320 budget,
+#     paid by extraction). Owned by session_runtime.
+#   scripts/app/field_action_router.gd — the puzzle/statue/key interact arms EXTRACTED to
+#     scripts/app/landmark_actions.gd (precedence: entities -> landmarks -> camp objects
+#     -> fish -> harvest -> build). Owned by building_loop.
+#   scripts/runtime/overworld_mons_runtime.gd — the Ruins Underground DUSCLOPS rides the
+#     Phase-6 stationary-entity mechanism (documented reach into _entities/_removed/
+#     _sim.new_mon — the guardian precedent, no public spawn API; KO/catch permanent via
+#     _removed, whiteout re-battleable; the aggressive disposition is faithful, the
+#     LOCATION is the port's). Owned by overworld_mons.
+#   scripts/app/qa_scenarios.gd — the landmark_flow + visual_sweep_world_depth(+_update)
+#     dispatch entries. Owned by app_bootstrap.
+#   scripts/runtime/world_view.gd — the landmark render path (tiles stamp into base
+#     logic -> the existing map render; interior props per the spec's asset notes).
+#     Owned by world_runtime.
+#   scripts/app/visual_sweep_baselines.gd — the SHOT_REGISTRY world_depth entry (range
+#     [31, 32], seed 2026072907). Owned by app_bootstrap/vision_fidelity.
+# TOOLS CO-MODIFICATION (under the miss-002 re-stamp ritual where pinned): run_playtests.py
+#   PLAYTEST_SCENARIOS gains landmark_flow / visual_sweep_world_depth(+_update);
+#   godot_dap_smoketest.py the requirements rows + WINDOWED sets; verify_all.py
+#   DOUBLE_RUN_SCENARIOS gains landmark_flow regrouped [4,3] (the <=80s per-group budget
+#   holds); check_repo_contracts.py the *_sim.gd rng ban EXTENDED to scripts/domain/** +
+#   landmark_runtime.gd (spec § Determinism; allowlisted owners game_runtime/
+#   battle_runtime/player_avatar only).
+# UNTOUCHED by design: the shared _rng encounter stream (landmark draws go through the
+# existing generate_wild_encounter — same stream, narrower pool) and the six pinned
+# double-run consumers (seven with landmark_flow). NO SAVE_VERSION bump; NO new
+# RandomNumberGenerator anywhere (static-rule-enforced).

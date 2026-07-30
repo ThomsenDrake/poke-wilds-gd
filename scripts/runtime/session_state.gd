@@ -13,6 +13,7 @@ const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const Structures := preload("res://scripts/domain/structures.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
+const SessionPayload := preload("res://scripts/runtime/session_payload.gd")
 
 const SAVE_VERSION := 4
 const DAY_MINUTES := 1440
@@ -39,6 +40,7 @@ var unlocked_field_moves: Dictionary = {}
 var time_of_day_minutes: int = NEW_GAME_TIME_OF_DAY
 var total_steps: int = 0
 var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
+var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
 
 
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
@@ -54,51 +56,33 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	time_of_day_minutes = NEW_GAME_TIME_OF_DAY
 	total_steps = 0
 	repel_steps = 0
+	landmark_state = {}
 	if not starter.is_empty():
 		party.append(starter)
 
 
+# World-key marshalling lives in session_payload.gd (extracted Phase 7 Build 1 —
+# that file is the shared home for the three world-depth builds, strictly serial;
+# it does NOT reference save_migration.gd, a Build-3 artifact).
 func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
-	world_seed = int(data.get("world_seed", 1337))
-	player_tile = Vector2i(int(data.get("player_x", 0)), int(data.get("player_y", 0)))
-	# Absent campsite keys (v1/v2/pre-hold v3 saves) anchor to the player tile.
-	campsite_tile = Vector2i(int(data.get("campsite_x", player_tile.x)), int(data.get("campsite_y", player_tile.y)))
-	campsite_pokemon = _normalize_campsite(data.get("campsite_pokemon", []))
-	# Absent/invalid structures backfill to {} like the campsite keys (invalid
-	# entries dropped; see _normalize_structures).
-	structures = _normalize_structures(data.get("structures", {}))
-	# v4 additive: breeding pen state (breeding_runtime validates on apply_save_state).
-	var raw_pastures: Variant = data.get("pastures", {})
-	pastures = (raw_pastures as Dictionary).duplicate(true) if raw_pastures is Dictionary else {}
-	party = normalized_party
-	var raw_bag: Variant = data.get("bag", null)
-	bag = _normalize_bag(raw_bag) if raw_bag is Dictionary else STARTING_BAG.duplicate()
-	time_of_day_minutes = _wrap_time(int(data.get("time_of_day_minutes", NEW_GAME_TIME_OF_DAY)))
-	total_steps = maxi(0, int(data.get("total_steps", 0)))
-	repel_steps = maxi(0, int(data.get("repel_steps", 0))) # Phase 4 additive (absent -> 0).
-	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch space (smoke_scenario_runner pokes it directly).
-	unlocked_field_moves.clear()
+	SessionPayload.apply_into(self, data, normalized_party, STARTING_BAG, LEGACY_ITEM_IDS, DAY_MINUTES, NEW_GAME_TIME_OF_DAY)
 
 
 func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dictionary = {}) -> Dictionary:
-	return {
-		"version": SAVE_VERSION,
-		"world_seed": world_seed,
-		"player_x": player_tile.x,
-		"player_y": player_tile.y,
-		"party": party,
-		"bag": bag,
-		"time_of_day_minutes": time_of_day_minutes,
-		"total_steps": total_steps,
-		"repel_steps": repel_steps,
-		"world_overrides": world_overrides,
-		# Split save key for placed structures (canonical: the generator's map).
-		"structures": structures_overrides,
-		"campsite_x": campsite_tile.x,
-		"campsite_y": campsite_tile.y,
-		"campsite_pokemon": campsite_pokemon,
-		"pastures": pastures
-	}
+	return SessionPayload.to_payload(self, world_overrides, structures_overrides, SAVE_VERSION)
+
+
+# --- Frozen location-keyed landmark state seam (world-depth.md § Persistence) -----
+# Build 1 resolves BOTH directions to the v4-additive top-level landmark_state key
+# (origin only — chained worlds are unreachable before Build 3); Build 3 extends the
+# RESOLUTION to chained_worlds[world_id_for(chain)].landmark_state WITHOUT rewriting
+# landmark_runtime, which calls ONLY this seam, never the keying.
+func landmark_state_for(_chain: Vector2i) -> Dictionary:
+	return landmark_state.duplicate(true)
+
+
+func set_landmark_state(_chain: Vector2i, state: Dictionary) -> void:
+	landmark_state = state.duplicate(true) if state is Dictionary else {}
 
 
 # Load-time structures handoff (save-shape) for the generator's placement map.
@@ -272,48 +256,3 @@ func get_unlocked_field_moves() -> Array:
 
 func _wrap_time(minutes: int) -> int:
 	return posmod(minutes, DAY_MINUTES)
-
-
-# The same normalization the runtime applies to a loaded party, run here so
-# campsite-held mons AND v4 box contents stay legal (corrupt contents degrade
-# to an empty box, never a crash or a torn placement entry).
-func _normalize_campsite(raw: Variant) -> Array:
-	var normalized: Array = []
-	if raw is Array:
-		var rules = PokemonRules.new()
-		for mon in raw:
-			if mon is Dictionary and not (mon as Dictionary).is_empty():
-				normalized.append(rules.normalize_loaded_mon(mon))
-	return normalized
-
-
-# Validates a loaded "structures" map into save shape ("x,y" -> entry), dropping
-# malformed keys/entries (mirrors WorldOverrides.merge_placements' defensiveness).
-func _normalize_structures(raw: Variant) -> Dictionary:
-	var normalized: Dictionary = {}
-	if not (raw is Dictionary):
-		return normalized
-	var raw_map: Dictionary = raw
-	for key in raw_map.keys():
-		var parts := str(key).split(",")
-		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
-			continue
-		var entry: Variant = raw_map[key]
-		if not (entry is Dictionary) or not WorldOverrides.is_valid_placement(entry):
-			continue
-		var placement: Dictionary = (entry as Dictionary).duplicate(true)
-		# v4 additive: a storage_box entry may carry box contents (absent = empty).
-		if str(placement.get("structure_id", "")) == Structures.BOX_ID:
-			placement["contents"] = _normalize_campsite(placement.get("contents", []))
-		normalized["%d,%d" % [parts[0].to_int(), parts[1].to_int()]] = placement
-	return normalized
-
-
-func _normalize_bag(raw: Dictionary) -> Dictionary:
-	var normalized: Dictionary = {}
-	for item_id in raw.keys():
-		var count = int(raw[item_id])
-		if count > 0 and not str(item_id).is_empty():
-			var canonical := str(LEGACY_ITEM_IDS.get(str(item_id), str(item_id)))
-			normalized[canonical] = int(normalized.get(canonical, 0)) + count
-	return normalized

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-26
+Last verified: 2026-07-29
 Review cadence days: 21
 Source paths: scripts/domain/recipes.gd, scripts/domain/material_drops.gd, scripts/domain/day_phase.gd, scripts/domain/encounter_selection.gd, scripts/domain/structures.gd, scripts/domain/world_overrides.gd, scripts/domain/biome_encounters.gd, scripts/domain/battle_rules.gd, scripts/domain/pokemon_rules.gd, scripts/runtime/night_system.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd, scripts/runtime/structure_layer.gd, scripts/runtime/game_runtime.gd, scripts/runtime/battle_runtime.gd, scripts/runtime/session_state.gd, scripts/ui/camp_menu.gd, scripts/ui/bag_screen.gd, scripts/app/field_action_router.gd, scripts/app/main.gd, scripts/app/camp_survival_scenario.gd, scripts/app/craft_flow_scenario.gd, scripts/app/night_cycle_scenario.gd, scripts/app/time_evolution_scenario.gd, scripts/app/visual_sweep_camping.gd, scenes/ui/CampMenu.tscn
 
@@ -162,3 +162,7 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 ## Phase 6 integration note (overworld Pokémon)
 
 Phase 6 (`overworld-pokemon.md`) extracts `_pick_encounter_species`'s body from `game_runtime` into `scripts/domain/encounter_selection.gd` (`pick_wild_species` static — the night-ghost check stays a two-line runtime call, warning source unchanged at `"GameRuntime"`), paying the game_runtime budget for the overworld wiring. The grass encounter stream's behavior is unchanged — the night system's shared `_rng` guarantee holds (the overworld subsystem consumes no rng).
+
+## Phase 7 Build 1 (landmarks) co-modification note
+
+Phase 7 Build 1 ([world-depth.md](world-depth.md) § Implementation shape) extracts `generate_wild_encounter`'s species-entry resolution from `game_runtime` into `scripts/domain/encounter_selection.gd` (`species_entry_for` static, verbatim — both fallback warnings keep the exact `"GameRuntime"` source + wording, pin-safe for the log greps), paying the game_runtime budget for the landmark wiring. The grass/camp encounter stream is unchanged: `pick_wild_species` + `level_from_distance` + the shared `_rng` order are untouched, and the landmark token scope narrows pools ONLY inside footprints (camp/craft encounters ride the open wilds, outside every footprint — byte-identical pools).

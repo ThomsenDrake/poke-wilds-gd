@@ -52,7 +52,7 @@ func run(ctx: Dictionary) -> void:
 	# field_move_used + grants a yield instead of refusing invisibly.
 	_expect(runtime.party_has_field_move_ability("dig"), "precondition: swapped party is not dig-capable (a re-fire would degrade to an invisible refused dig)")
 	var fire_tile := _place_campfire()
-	var site_ok := fire_tile != Vector2i.ZERO and _failures.is_empty()
+	var site_ok := fire_tile != Vector2i.MAX and _failures.is_empty()
 	if site_ok:
 		_face(fire_tile)
 		site_ok = _failures.is_empty()
@@ -79,7 +79,7 @@ func _place_campfire() -> Vector2i:
 		runtime.session.remove_item(str(item_id), runtime.get_item_count(str(item_id)))
 		runtime.session.add_item(str(item_id), int(GRANT[item_id]))
 	var fire_tile := _find_open_tile(_player().tile_position)
-	if fire_tile == Vector2i.ZERO:
+	if fire_tile == Vector2i.MAX:
 		_failures.append("site: no open tile for the campfire within 8 rings")
 		return Vector2i.ZERO
 	var placed: Dictionary = runtime.build_runtime.try_place(fire_tile, "campfire", {})
@@ -202,14 +202,14 @@ func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; retu
 		_failures.append(label)
 	return ok
 
-func _find_open_tile(center: Vector2i) -> Vector2i: # first open tile ring-by-ring (craft_flow's pattern)
-	for ring in range(1, 9):
+func _find_open_tile(center: Vector2i) -> Vector2i: # first open tile ring-by-ring (craft_flow's pattern); not-found = MAX ((0,0) is a real tile; ring 24 out-reaches any landmark footprint)
+	for ring in range(1, 25):
 		for tile in _runner.ring_around(center, ring):
 			var logic: Dictionary = _world().get_tile_logic(tile)
 			if bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() \
 				and str(logic.get("structure_id", "")).is_empty():
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX
 
 
 func _world() -> Node: return _ctx["world"]

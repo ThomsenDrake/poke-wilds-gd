@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-26
+Last verified: 2026-07-29
 Review cadence days: 21
 Source paths: scripts/domain/field_moves.gd, scripts/runtime/night_system.gd, scripts/runtime/player_avatar.gd, scripts/domain/structures.gd, scripts/runtime/session_state.gd, scripts/app/field_action_router.gd, scripts/runtime/game_runtime.gd, scripts/runtime/build_runtime.gd, scripts/runtime/harvest_runtime.gd, scripts/runtime/harvest_resolver.gd, scripts/app/field_moves_flow_scenario.gd, scripts/app/field_moves_dig_checks.gd
 
@@ -114,3 +114,7 @@ Phase 6 (`overworld-pokemon.md`) PLUGS the Attack/Charm hooks into entities: `fi
 ## Pre-Phase-7 suite expansion (co-modification note)
 
 The user-approved pre-Phase-7 expansion adds `scripts/app/field_moves_fly_checks.gd` (FLY/TELEPORT lifecycle tails driven from the tail of `field_moves_checks.check_fly`: with two or more way stones the last-registered ordering holds for bare Teleport, Fly REFUSES a demolished stone, and the survivor set persists), and the new `rng_joint_pin` scenario consumes the step-pure harvest DIG step as one of its joint rng consumers — dig draws consume NO shared `_rng` (the step-counter SplitMix invariant, now jointly pinned with the encounter + fishing streams across two in-scenario runs). `playtest_field_soak`'s per-soak warning count is gated by the committed soak warning pin under `docs/generated/` (exceedance RED). The field-move capability model is unchanged.
+
+## Phase 7 Build 1 (landmarks) co-modification note
+
+The Phase 7 Build 1 repair pass fixes a latent sentinel collision in this subsystem's check helpers: the way-stone open-tile scans (`field_moves_checks.gd` / `field_moves_fly_checks.gd` `_find_open_tile`) return `Vector2i.MAX` on not-found instead of `Vector2i.ZERO` — `(0,0)` is a real open tile, and the ZERO sentinel conflated a found origin tile with "not found" (surfaced when the landmark anchor placement shifted a scenario's starting point; the same fix landed in the campfire scans of `craft_flow` / `fishing_flow` / `input_gate` / `night_cycle` + the shared `phase5_sites.find_open_tile`). The field-move capability model, the Fly/Teleport lifecycle rules, and the DIG-step rng purity are unchanged.

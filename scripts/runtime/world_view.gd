@@ -171,6 +171,7 @@ func rebuild(seed_value: int) -> void:
 	_generator.setup(world_seed)
 	_generator.clear_overrides() # mirror the runtime's canonical map; clear first so stale entries never leak across seeds
 	var runtime := _runtime_or_null()
+	if runtime != null and "landmark_runtime" in runtime: _generator.landmark_resolver = Callable(runtime.landmark_runtime, "tile_logic_for_active") # Phase 7: footprints + door overlay stamp into base logic -> existing render
 	if runtime != null:
 		_generator.apply_overrides(runtime.mutations_for_view())
 	_tile_cache.clear()

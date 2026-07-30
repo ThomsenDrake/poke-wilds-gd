@@ -101,13 +101,12 @@ func sync_window(player_tile: Vector2i, time_label: String) -> void:
 
 func _spawn_slot(cell: Vector2i, time_label: String) -> void:
 	var slot_id := "mon_%d,%d" % [cell.x, cell.y]
-	if _rt_ref.get_ref()._entities.has(slot_id) or _rt_ref.get_ref()._removed.has(slot_id) or not OverworldMons.is_slot_present(int(_rt_ref.get_ref()._session.world_seed), cell, 0):
+	if _rt_ref.get_ref()._entities.has(slot_id) or _rt_ref.get_ref()._removed.has(slot_id):
+		return
+	var species_id := _slot_species(cell, time_label)
+	if species_id == "":
 		return
 	var biome := biome_of(OverworldMons.cell_center(cell))
-	var pool := pool_for(biome, time_label)
-	if pool.is_empty():
-		return
-	var species_id := str(pool[OverworldMons.species_index(int(_rt_ref.get_ref()._session.world_seed), cell, 0, pool.size())])
 	var anchor := _find_anchor(cell, _swim_only(_rt_ref.get_ref()._catalog.get_species(species_id)))
 	if anchor == Vector2i.MAX:
 		return # presence rolled, no walkable anchor (open water; prototype: skip, counted)
@@ -115,6 +114,32 @@ func _spawn_slot(cell: Vector2i, time_label: String) -> void:
 		OverworldMons.level_for(int(_rt_ref.get_ref()._session.world_seed), cell, 0, ring_of(cell)),
 		OverworldMons.disposition_for(species_id, biome, time_label, _rt_ref.get_ref()._catalog.get_species(species_id)))
 	_trace_spawned(_rt_ref.get_ref()._entities[slot_id])
+
+# The Phase-6 slot roamer's species for a cell ("" when presence is not rolled or the biome
+# pool is empty) — single-sourced between _spawn_slot and the nest oracle's slot_anchor so the
+# two can never drift on which roamer a nest cell carries.
+func _slot_species(cell: Vector2i, time_label: String) -> String:
+	if not OverworldMons.is_slot_present(int(_rt_ref.get_ref()._session.world_seed), cell, 0):
+		return ""
+	var pool := pool_for(biome_of(OverworldMons.cell_center(cell)), time_label)
+	if pool.is_empty():
+		return ""
+	return str(pool[OverworldMons.species_index(int(_rt_ref.get_ref()._session.world_seed), cell, 0, pool.size())])
+
+# The tile the Phase-6 slot roamer holds in `cell` (Vector2i.MAX when none spawns): the nest
+# ORACLE's mirror of _spawn_slot. The spawner runs slot-THEN-nest, so a guardian's clear-ground
+# anchor must avoid this tile; find_nest_center_near reserves it so the oracle and the spawner
+# agree (else a single-land-tile water cell reports a nest its guardian can never occupy).
+func slot_anchor(cell: Vector2i, time_label: String) -> Vector2i:
+	var slot_id := "mon_%d,%d" % [cell.x, cell.y]
+	if _rt_ref.get_ref()._entities.has(slot_id):
+		return (_rt_ref.get_ref()._entities[slot_id] as Dictionary).tile
+	if _rt_ref.get_ref()._removed.has(slot_id):
+		return Vector2i.MAX # roamer permanently gone: the guardian may use any tile
+	var species_id := _slot_species(cell, time_label)
+	if species_id == "":
+		return Vector2i.MAX
+	return _find_anchor(cell, _swim_only(_rt_ref.get_ref()._catalog.get_species(species_id)))
 
 # DIVERGENCE #1 (exec-plan mandate): nest + Alpha guardian on ring >= NEST_MIN_RING cells.
 # The faithful STREWN single egg stays the common case; a dedicated strewn-egg roll is NOT
@@ -129,7 +154,7 @@ func _spawn_nest(cell: Vector2i) -> void:
 	var guardian_id := "guardian_%d,%d" % [cell.x, cell.y]
 	if not _rt_ref.get_ref()._entities.has(guardian_id) and not _rt_ref.get_ref()._removed.has(guardian_id):
 		var species_id := str(pool[OverworldMons.species_index(seed, cell, 0, pool.size())])
-		var anchor := _find_anchor(cell, false)
+		var anchor := _find_anchor(cell, false, -1, true)
 		if anchor != Vector2i.MAX: # stationary guardian: forced AGGRESSIVE, sight widened
 			_rt_ref.get_ref()._entities[guardian_id] = new_mon(guardian_id, OverworldMons.CLASS_STATIONARY, 0, cell, species_id, anchor, OverworldMons.guardian_level_for(seed, cell, ring_of(cell)), OverworldMons.DISPOSITION_AGGRESSIVE)
 			_trace_spawned(_rt_ref.get_ref()._entities[guardian_id])
@@ -139,7 +164,7 @@ func _spawn_nest(cell: Vector2i) -> void:
 		if _rt_ref.get_ref()._entities.has(egg_id) or _rt_ref.get_ref()._removed.has(egg_id):
 			continue
 		var egg_species := str(pool[OverworldMons.nest_egg_species_index(seed, cell, egg_index, pool.size())])
-		var egg_tile := _find_anchor(cell, false, OverworldMons.nest_egg_species_index(seed, cell, egg_index, OverworldMons.CELL_SIZE * OverworldMons.CELL_SIZE))
+		var egg_tile := _find_anchor(cell, false, OverworldMons.nest_egg_species_index(seed, cell, egg_index, OverworldMons.CELL_SIZE * OverworldMons.CELL_SIZE), true)
 		if egg_tile != Vector2i.MAX:
 			_rt_ref.get_ref()._entities[egg_id] = new_egg(egg_id, egg_index, cell, egg_species, egg_tile)
 			eggs += 1
@@ -190,15 +215,22 @@ func _trace_spawned(entity: Dictionary) -> void:
 
 # In-cell scan from the anchor stream offset (open-water cells have none and skip in the
 # caller — prototype amendment); occupied tiles excluded so nest components never stack.
-func _find_anchor(cell: Vector2i, swim_only: bool, stream_offset: int = -1) -> Vector2i:
+# clear_ground (nest components ONLY — roaming anchors keep the walkable-only scan so the
+# roamer stream stays Phase-6 identical): the tile also carries NO prop, so a strewn egg
+# or guardian never shares a walkable decor prop (bushes) — the entity_prop_overlap contract.
+# exclude_tile lets the nest ORACLE (find_nest_center_near, which scans EMPTY cells) reserve
+# the Phase-6 slot roamer's tile exactly as the spawner's entity_at exclusion does at spawn
+# time — so the oracle never reports a nest the sim cannot populate with a guardian.
+func _find_anchor(cell: Vector2i, swim_only: bool, stream_offset: int = -1, clear_ground: bool = false, exclude_tile: Vector2i = Vector2i.MAX) -> Vector2i:
 	var offset := stream_offset if stream_offset >= 0 else OverworldMons.anchor_offset(int(_rt_ref.get_ref()._session.world_seed), cell, 0)
 	var base := cell * OverworldMons.CELL_SIZE
 	var area := OverworldMons.CELL_SIZE * OverworldMons.CELL_SIZE
 	for k in range(area):
 		var index := (offset + k) % area
 		var tile := base + Vector2i(index % OverworldMons.CELL_SIZE, index / OverworldMons.CELL_SIZE)
-		if is_open(tile, swim_only) and _rt_ref.get_ref().entity_at(tile).is_empty():
-			return tile
+		if tile != exclude_tile and is_open(tile, swim_only) and _rt_ref.get_ref().entity_at(tile).is_empty():
+			if not clear_ground or str(_rt_ref.get_ref()._world_gen.get_tile_logic(tile).get("prop_path", "")) == "":
+				return tile
 	return Vector2i.MAX
 
 # Greedy Manhattan step away from (flee) or toward (chase) the player; first strictly
@@ -247,7 +279,7 @@ func find_nest_center_near(center: Vector2i, radius: int) -> Vector2i:
 			var cell := Vector2i(cx, cy)
 			if OverworldMons.manhattan(OverworldMons.cell_center(cell), center) > radius or not OverworldMons.is_nest_cell(int(_rt_ref.get_ref()._session.world_seed), cell, ring_of(cell)):
 				continue
-			if _find_anchor(cell, false) == Vector2i.MAX:
-				continue # a water-locked cell can hold neither guardian nor eggs — keep seeking
+			if _find_anchor(cell, false, -1, true, slot_anchor(cell, _rt_ref.get_ref()._time_label)) == Vector2i.MAX:
+				continue # water-locked / prop-choked, or the Phase-6 slot roamer holds the only guardian tile — not a viable nest; keep seeking
 			return OverworldMons.cell_center(cell)
 	return Vector2i.ZERO

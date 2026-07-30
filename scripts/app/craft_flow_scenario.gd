@@ -42,9 +42,9 @@ func run(ctx: Dictionary) -> void:
 	var party_before: Array = _runner.swap_party(runtime, ["MACHOP"]) # FIGHTING -> Build-capable
 	_grant_materials()
 	var fire_tile := _find_open_tile(_player().tile_position)
-	if fire_tile == Vector2i.ZERO:
-		_failures.append("site: no open tile for the campfire within 8 rings")
-	var placed: Dictionary = runtime.build_runtime.try_place(fire_tile, "campfire", {}) if fire_tile != Vector2i.ZERO else {"ok": false, "reason": "no_site"}
+	if fire_tile == Vector2i.MAX:
+		_failures.append("site: no open tile for the campfire within 24 rings")
+	var placed: Dictionary = runtime.build_runtime.try_place(fire_tile, "campfire", {}) if fire_tile != Vector2i.MAX else {"ok": false, "reason": "no_site"}
 	if not bool(placed.get("ok", false)):
 		_failures.append("campfire: placement refused (%s)" % str(placed.get("reason", "")))
 	else:
@@ -179,14 +179,18 @@ func _grant_materials() -> void:
 		_runtime().session.add_item(str(entry[0]), int(entry[1]))
 
 
+# Not-found = Vector2i.MAX (NEVER ZERO — (0,0) is a real open tile; the ZERO sentinel once
+# conflated a found origin tile with "not found"). Ring 24 (up from 8, Phase 7 Build 1): a
+# landmark footprint spans ~15 tiles, so the scan must out-reach any footprint edge (landmark
+# tiles carry floor props + the can_place_on refusal; world-depth.md § Landmarks).
 func _find_open_tile(center: Vector2i) -> Vector2i:
-	for ring in range(1, 9):
+	for ring in range(1, 25):
 		for tile in _runner.ring_around(center, ring):
 			var logic: Dictionary = _world().get_tile_logic(tile)
 			if bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")).is_empty() \
 				and str(logic.get("structure_id", "")).is_empty():
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX
 
 
 func _world() -> Node: return _ctx["world"]

@@ -31,6 +31,7 @@ const SHOT_REGISTRY := {
 	"pokemon": {"range": [20, 21], "seed": 2026072605},
 	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
 	"fishing": {"range": [26, 27], "seed": 2026072804},
+	"world_depth": {"range": [31, 32], "seed": 2026072907},
 	"retired": [17],
 }
 
@@ -133,14 +134,17 @@ func _missing_baselines(shots: Array) -> Array:
 	return missing
 
 
-# Baselines the shared dir holds for the OTHER sweeps (derived from SHOT_REGISTRY:
-# camping 15-17 incl. retired, storage 18-19, pokemon 20-21, overworld 22-23 + 30,
-# fishing 26-27): the prune guard keeps each sweep's update from deleting them, the
-# report guard (visual_sweep_report.gd) from failing on them.
+# Baselines the shared dir holds for OTHER sweeps (derived from SHOT_REGISTRY, MAIN
+# INCLUDED: a satellite update must never prune main's 01-14, and main's own update
+# carries its live shots in `shots` so its stale-shot prune only loses registry-deleted
+# numbers; retired holes stay protected forever): the prune guard keeps each sweep's
+# update from deleting the others, the report guard from failing on them.
 static func _foreign_shot(name: String) -> bool:
 	var number := int(str(name).get_slice("_", 0))
 	for sweep in SHOT_REGISTRY:
-		if sweep == "main" or sweep == "retired":
+		if SHOT_REGISTRY[sweep] is Array: # retired holes (bare number list)
+			if (SHOT_REGISTRY[sweep] as Array).has(number):
+				return true
 			continue
 		if shot_numbers(sweep).has(number):
 			return true

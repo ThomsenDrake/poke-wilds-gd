@@ -105,7 +105,7 @@ func find_gated_pair(world, center: Vector2i, radius: int, move_id: String = "")
 	for dy in range(-radius, radius + 1):
 		for dx in range(-radius, radius + 1):
 			var tile = center + Vector2i(dx, dy)
-			if world.is_tile_walkable(tile):
+			if bool(world.get_tile_logic(tile).get("walkable", false)): # generator logic, NOT world.is_tile_walkable (render-cache reads are non-deterministic far from the synced window)
 				continue
 			var field_move = world.tile_requires_field_move(tile)
 			if field_move.is_empty():
@@ -114,7 +114,7 @@ func find_gated_pair(world, center: Vector2i, radius: int, move_id: String = "")
 				continue
 			for direction in directions:
 				var neighbor = tile + direction
-				if world.is_tile_walkable(neighbor):
+				if bool(world.get_tile_logic(neighbor).get("walkable", false)): # same rationale as stand_spot: the radius box reaches past the synced window
 					return {"from_tile": neighbor, "direction": direction, "gated_tile": tile, "field_move": field_move}
 	return {}
 
@@ -139,7 +139,7 @@ func find_harvest_target(world, center: Vector2i, radius: int, action: String, b
 func stand_spot(world, tile: Vector2i) -> Dictionary:
 	for direction in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
 		var neighbor = tile + direction
-		if world.is_tile_walkable(neighbor):
+		if bool(world.get_tile_logic(neighbor).get("walkable", false)): # generator logic, NOT world.is_tile_walkable (render-cache reads are non-deterministic far from the synced window)
 			return {"from_tile": neighbor, "direction": -direction}
 	return {}
 
