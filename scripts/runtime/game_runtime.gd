@@ -26,6 +26,7 @@ const FishingRuntime := preload("res://scripts/runtime/fishing_runtime.gd")
 const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
+const WildEncounterDraw := preload("res://scripts/runtime/wild_encounter_draw.gd")
 
 signal world_overridden(tile: Vector2i) # per harvest/placement so the view re-renders the tile in place
 
@@ -50,6 +51,7 @@ var fishing_runtime = FishingRuntime.new()
 var breeding_runtime = BreedingRuntime.new()
 var overworld_mons_runtime = OverworldMonsRuntime.new()
 var landmark_runtime = LandmarkRuntime.new()
+var wild_encounter_draw = WildEncounterDraw.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
@@ -74,6 +76,7 @@ func _ready() -> void:
 	overworld_mons_runtime.encounter_requested.connect(_on_entity_encounter) # forced-battle presentation bridge (zero main.gd lines)
 	landmark_runtime.setup(session, catalog, trace, _world_gen, _biome_encounters, overworld_mons_runtime, music_router) # Phase 7 Build 1: entry/puzzle/scope; state ONLY via the frozen seam
 	_world_gen.landmark_resolver = Callable(landmark_runtime, "tile_logic_for_active") # footprints + the door overlay at the single mutation boundary
+	wild_encounter_draw.setup(session, catalog, pokemon_rules, trace, _rng, night_system, landmark_runtime, _biome_encounters) # Build-2 extraction: generate_wild_encounter's wild-draw tail (the shared _rng rides by REFERENCE)
 	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
@@ -105,6 +108,7 @@ func new_game() -> void:
 	# both off the SESSION (footprints + the door overlay), so a pre-reset scan rates candidates against the PREVIOUS world's footprints and can commit a walled spawn; find_walkable_spawn's own setup(seed) reseeds the generator (no explicit setup here), and the scan draws no shared _rng.
 	var spawn = _world_gen.find_walkable_spawn(seed)
 	session.reset_for_new_game(seed, starter, spawn); _initialized = true
+	overworld_mons_runtime.stamp_legendaries() # Build 2: the frozen seven as world-fixed statics (AFTER the reset sets the seed)
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,
 		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
@@ -216,26 +220,21 @@ func seed_for_smoke(seed: int) -> void:
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
 	var provoked_mon := overworld_mons_runtime.take_pending_encounter() # Phase 6: a provoked/attacked entity rides the seam FIRST...
-	if not provoked_mon.is_empty(): return provoked_mon # ...so repel + night ghosts never touch a forced battle (fishing precedent)
+	if not provoked_mon.is_empty(): # ...so repel + night ghosts never touch a forced battle (fishing precedent)
+		_trace_legendary_encounter(provoked_mon) # Build 2: the registry-REQUIRED battle-start trace (no-op unless battle_kind "legendary")
+		return provoked_mon
 	var hooked := fishing_runtime.take_pending_encounter() # Phase 5 fishing: a just-hooked mon rides this seam...
 	if not hooked.is_empty(): return hooked # ...BEFORE the wild draw, so repel + night ghosts never touch fishing
 	if field_move_runtime.repel_suppresses(): return {} # repel short-circuits BEFORE any encounter rng is consumed
-	var scope: Dictionary = landmark_runtime.encounter_scope_for(tile_pos, biome) # Phase 7: footprint-local token scope ("" outside -> byte-identical stream)
-	var species_id = landmark_runtime.pick_species_for(scope, _biome_encounters, DayPhase.time_of_day_label(session.time_of_day_minutes), _rng) if str(scope.get("token", "")) != "" else _pick_encounter_species(biome)
-	var species_entry: Dictionary = EncounterSelection.species_entry_for(catalog, species_id, str(scope.get("biome", biome)), trace)
-	if species_entry.is_empty():
-		return {}
-	var level = landmark_runtime.level_for_scope(scope, species_id, tile_pos, _rng)
-	var wild_mon := pokemon_rules.create_pokemon_instance(species_entry, level, Callable(catalog, "get_move"), _rng)
-	# shiny_rolled fires on EVERY creation (odds provable both directions; the shiny_odds scenario).
-	trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(wild_mon.get("species_id", "")), "is_shiny": bool(wild_mon.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "wild"})
-	return wild_mon
+	return wild_encounter_draw.draw(tile_pos, biome) # Build-2 extraction: scope + night ghosts + the draw + shiny_rolled
 
 
-func _pick_encounter_species(biome: String) -> String:
-	# Night danger: unlit-night draws may become shadow ghosts (night_system rolls the shared _rng; empty by day or in light).
-	var ghost := night_system.try_ghost_species(session.player_tile)
-	return ghost if not ghost.is_empty() else EncounterSelection.pick_wild_species(catalog, _biome_encounters, biome, DayPhase.time_of_day_label(session.time_of_day_minutes), _rng, trace)
+# Phase 7 Build 2 (world-depth.md § Legendaries :161): the registry-REQUIRED battle-start trace, SINGLE owner — distinct from the generic stationary-spawn so the ring gate is provable; no-op for every non-legendary forced battle.
+func _trace_legendary_encounter(mon: Dictionary) -> void:
+	if str(mon.get("battle_kind", "")) != "legendary":
+		return
+	var chain: Vector2i = mon.get("chain", Vector2i.ZERO)
+	trace.emit_event("legendary_encounter", "GameRuntime", {"species_id": str(mon.get("species_id", "")), "tile": mon.get("tile", [0, 0]), "chain": "%d,%d" % [chain.x, chain.y], "biome": str(mon.get("biome", "")), "ring": int(mon.get("ring", 0)), "battle_kind": "legendary"})
 
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
@@ -296,6 +295,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 	_world_gen.clear_placements()
 	_world_gen.apply_placements(session.structures)
 	breeding_runtime.apply_save_state(session.pastures) # v4-additive pen state (validates AFTER placements land)
+	overworld_mons_runtime.stamp_legendaries() # Build 2: the frozen seven, suppressed by the loaded legendary_removals (AFTER apply_loaded_state)
 	return true
 
 

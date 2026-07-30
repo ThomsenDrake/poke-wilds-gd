@@ -88,6 +88,8 @@ func store_clean(mons, player_tile: Vector2i) -> String:
 	var player_cell := OverworldMons.cell_for_tile(player_tile)
 	for entity_id in mons._entities.keys():
 		var entity: Dictionary = mons._entities[entity_id]
+		if str(entity.get("kind", "")) == "legendary":
+			continue # Build 2: window-exempt statics persist at ring ≥60 by design (the sim's sync_window skips them too) — the DESPAWN_CELLS drift audit is for window-culled roamers, never the permanent legendaries
 		var tile: Vector2i = entity.get("tile", Vector2i.ZERO)
 		if OverworldMons.cell_distance(OverworldMons.cell_for_tile(tile), player_cell) > OverworldMons.DESPAWN_CELLS:
 			return "entity %s lingers past DESPAWN_CELLS" % str(entity_id)
@@ -100,6 +102,8 @@ func _nearest(mons, player, field: String, wanted: String, radius: int = ENGAGE_
 	var player_tile: Vector2i = player.tile_position
 	for entity_id in mons._entities.keys():
 		var entity: Dictionary = mons._entities[entity_id]
+		if str(entity.get("kind", "")) == "legendary":
+			continue # Build 2: legendaries are NOT a soak action band (the soak never battles — legendary_spawn owns that); permanent window-exempt ring-≥60 AGGRESSIVE statics, an unscoped scan locks onto one and drags the player 70+ rings out, starving the roam banks (the egg-kind targeting precedent)
 		if str(entity.get(field, "")) != wanted:
 			continue
 		var tile: Vector2i = entity.get("tile", Vector2i.ZERO)

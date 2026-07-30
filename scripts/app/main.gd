@@ -89,7 +89,7 @@ func _on_encounter_requested(tile_position: Vector2i) -> void:
 	_in_battle = true
 	_player.input_enabled = false
 	_message_box.hide_message()
-	_music_router().play_battle_track("wild")
+	_music_router().play_battle_track(str(wild_mon.get("battle_kind", "wild"))) # Build 2: a legendary static's pending payload sets "legendary" (music_router.gd:33); default "wild"
 	_battle_enemy_dex = _dex_for_species(str(wild_mon.get("species_id", "")))
 	_cry_player.play_cry(_battle_enemy_dex)
 	_battle_view.start_wild_battle(wild_mon)

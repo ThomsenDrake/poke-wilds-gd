@@ -18,9 +18,10 @@
     ]
   },
   "playtest_soak": {
-    "count": 2,
+    "count": 3,
     "messages": [
       "Species catalog load complete.",
+      "Unhandled move effect in battle.",
       "Unhandled move effect in battle."
     ]
   }

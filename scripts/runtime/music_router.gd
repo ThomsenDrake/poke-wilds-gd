@@ -55,7 +55,19 @@ func play_battle_track(kind: String = DEFAULT_BATTLE_KIND) -> void:
 	if track_path.is_empty():
 		_warn("No track mapped for battle kind; falling back to the wild battle theme.", {"kind": kind})
 		track_path = str(BATTLE_TRACKS[DEFAULT_BATTLE_KIND])
+	_emit_track_selected(kind, track_path)
 	play_track_path(track_path)
+
+
+# Observable kind->track witness (miss-002 + world-depth.md § Legendaries music seam):
+# play_track_path is headless-gated and never plays audio under test, so the selected
+# track would otherwise be UNOBSERVABLE — this emits the resolved mapping BEFORE the
+# gate so the legendary_spawn scenario can assert "legendary selects the beasts track"
+# (the first real BATTLE_TRACKS["legendary"] caller). Auxiliary trace, documented not
+# registry-required (trace-events.md).
+func _emit_track_selected(kind: String, track_path: String) -> void:
+	if _trace != null:
+		_trace.emit_event("music_track_selected", "MusicRouter", {"kind": kind, "track_path": track_path})
 
 
 func play_track_path(track_path: String) -> void:

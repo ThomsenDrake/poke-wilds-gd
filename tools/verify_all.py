@@ -7,8 +7,8 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     seven rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
-                        (Build 3's world_chain completes the spec's eight, [4,4])
+  S6.5   double-run     eight rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
+                        (two groups of four; Build 3's world_chain, the ninth, regroups)
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
                         + the four satellite sweep families (shots 15-23)
@@ -69,18 +69,21 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# seven rng-consumer scenarios run twice headless, each run persisting its ordered
+# eight rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
 # two trace sets (timing-stripped, key-sorted, order-sensitive). Total lane budget
 # <=90s (two bounded runs + the compare); a mismatch reds with the divergent
 # event + both canonical payloads as the named cause (miss-002). Phase 7: the two
-# world-depth scenarios split ACROSS groups — landmark_flow joins group 1 now
-# ([4,3] interim); Build 3's world_chain completes the spec's [4,4] in group 2.
+# world-depth scenarios split ACROSS groups — landmark_flow in group 1, Build 2's
+# legendary_spawn completes the spec's [4,4] in group 2 (self-pinned: seed_for_smoke
+# -> new_game -> rebuild; stamping is pure _mix, NO rng); Build 3's world_chain
+# (the ninth consumer) regroups again.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
-                        "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow"]
+                        "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow",
+                        "legendary_spawn"]
 DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:4], DOUBLE_RUN_SCENARIOS[4:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — a group of four + a group of three, never one run of all
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — two groups of four, never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
 # S9 windowed satellite sweep families (shots 15-23 + 31-32, windowed-diffed one-command
@@ -336,7 +339,7 @@ class Runner:
                 if self.fail_fast_stop:
                     break
 
-        # --- S6.5: double-run determinism lane (seven rng-consumers x2, <=90s) ---
+        # --- S6.5: double-run determinism lane (eight rng-consumers x2, <=90s) ---
         if not self.fail_fast_stop:
             self._run_double_determinism_lane(bin_)
 
@@ -438,7 +441,7 @@ class Runner:
     def _run_double_determinism_lane(self, bin_: str) -> None:
         """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
 
-        Runs the seven rng-consumer scenarios twice headless, each run persisting its
+        Runs the eight rng-consumer scenarios twice headless, each run persisting its
         ordered trace JSONL (--trace-dir), then canonical-compares the two trace
         sets with determinism_verify.py's cmp --mode trace. Budget: 2x90s bounded
         runs + 10s compare (six cold-start headless scenarios incl. journey+soak do
@@ -466,10 +469,10 @@ class Runner:
                     except OSError:
                         pass
 
-        # A group of four + a group of three (not one run of all) so each run's
+        # Two groups of four (not one run of all) so each run's
         # worst case fits the outer budget with headroom; traces accumulate per
         # dir across groups
-        # and the single cmp below compares the full six-scenario set.
+        # and the single cmp below compares the full eight-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
             for label, trace_dir, report in (

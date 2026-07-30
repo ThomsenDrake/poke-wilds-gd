@@ -88,10 +88,24 @@ func run_egg_case(runtime, shiny_ok_ref: Array) -> bool:
 	if not _ensure(_runner.trace_log_has_since("nest_found", cursor_n), "egg: no nest_found trace"): return false
 	var eggs := _eggs_near(mons, nest)
 	if not _ensure(eggs.size() == NEST_EGGS, "egg: the nest holds %d eggs, pinned %d (NEST_EGGS)" % [eggs.size(), NEST_EGGS]): return false
-	var guardian_species := "" # the live guardian beside THESE eggs (a second nest cell may share the window)
+	var guardian_species := ""; var guardian_entity: Dictionary = {} # the live guardian beside THESE eggs (a second nest cell may share the window)
 	for e in probe.live(mons, nest, 12):
-		if str(e.get("kind", "")) == "guardian": guardian_species = str(e.species_id); break
+		if str(e.get("kind", "")) == "guardian": guardian_entity = e; guardian_species = str(e.species_id); break
 	if not _ensure(guardian_species != "", "egg: the nest cell materialized no guardian"): return false
+	# Build 2's never-encounter exclusion reshuffled the roaming pools (legendaries slipped the TYPE-sentinel
+	# fallback), so the pinned nest's natural alpha may share NO egg group with the egg — re-craft the alpha as
+	# the egg's own species (PRIMEAPE-injection precedent), placed spotted-from-the-stand so the hatch-drive recapture rides the real mechanic.
+	if str(guardian_entity.species_id) != str(eggs[1].species_id):
+		mons._entities.erase(str(guardian_entity.id))
+		var parent_tile := Vector2i.ZERO; var stand: Vector2i = nest + Vector2i(2, 2)
+		for r in range(1, 9): # inside GUARDIAN_SPOT_RADIUS(8) of the stand AND EGG_PROVOKE_RADIUS(6) of the stolen egg
+			for d in [Vector2i.DOWN, Vector2i.UP, Vector2i.LEFT, Vector2i.RIGHT]:
+				var candidate: Vector2i = stand + d * r
+				if parent_tile == Vector2i.ZERO and _world().is_tile_walkable(candidate) and absi(candidate.x - eggs[1].tile.x) + absi(candidate.y - eggs[1].tile.y) <= 6: parent_tile = candidate
+		if parent_tile != Vector2i.ZERO:
+			var parent: Dictionary = mons.get("_sim").call("new_mon", str(guardian_entity.id), "stationary", 0, Vector2i(floori(float(parent_tile.x) / 8.0), floori(float(parent_tile.y) / 8.0)), str(eggs[1].species_id), parent_tile, 5, "AGGRESSIVE")
+			mons._entities[str(parent.id)] = parent
+			guardian_species = str(parent.species_id)
 	# Attack-on-egg: shiny-check + clear, NO provocation, NO battle (the :248 silence witness).
 	var egg_attack: Dictionary = eggs[0]
 	mons.call("note_faced_tile", egg_attack.tile)

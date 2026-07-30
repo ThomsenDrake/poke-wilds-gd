@@ -42,6 +42,13 @@ static func to_payload(session: RefCounted, world_overrides: Dictionary, structu
 	# shape (the frozen golden fixture carries no landmark_state key).
 	if not (session.landmark_state as Dictionary).is_empty():
 		payload["landmark_state"] = session.landmark_state
+	# Phase 7 Build 2 v4-ADDITIVE (NO SAVE_VERSION bump): gone-for-good legendary removal
+	# keys ("<cx>,<cy>:<SPECIES>", the LegendaryPlacement.removal_key grammar), a
+	# chain-scoped flat list; written ONLY when non-empty so a legendary-untouched save
+	# keeps the exact pre-Build-2 byte shape (the frozen golden fixture carries no
+	# legendary_removals key — spec § Save v5 byte-preservation witness).
+	if not (session.legendary_removals as Array).is_empty():
+		payload["legendary_removals"] = session.legendary_removals
 	return payload
 
 
@@ -71,6 +78,10 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	# under chained_worlds["<cx>,<cy>"].landmark_state without touching landmark_runtime.
 	var raw_landmarks: Variant = data.get("landmark_state", {})
 	session.landmark_state = (raw_landmarks as Dictionary).duplicate(true) if raw_landmarks is Dictionary else {}
+	# Phase 7 Build 2 v4-additive (absent -> []): gone-for-good legendary removal keys;
+	# LegendaryPlacement re-derives stamp-time suppression from this set per world/chain.
+	var raw_removals: Variant = data.get("legendary_removals", [])
+	session.legendary_removals = (raw_removals as Array).duplicate(true) if raw_removals is Array else []
 	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch
 	# space (smoke_scenario_runner pokes it directly).
 	session.unlocked_field_moves.clear()

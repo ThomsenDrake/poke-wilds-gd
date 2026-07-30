@@ -24,6 +24,16 @@ const TYPE_SENTINEL := "TYPE"
 # learnset): it is a breeding artifact, never a wild encounter.
 const NEVER_ENCOUNTER_IDS := {"EGG": true}
 
+# The frozen seven (world-depth.md § Legendaries) are STATIC ring-gated stationary
+# entities, NEVER a random-pool entry. No legendary has any wilds_data.asm spawn
+# line, so the direct + TYPE-sentinel matches above never take one — but they ARE
+# battle-viable AND carry the TYPE sentinel, so without this exclusion the type
+# fallback (:111) and the full-catalog fallback below (which gates NOTHING else)
+# would surface them. This guards BOTH paths (belt-and-suspenders beside the
+# no-token fact). The roster is FROZEN in scripts/domain/legendary_placement.gd
+# (LEGENDARY_IDS) — keep the two sets in lockstep.
+const LEGENDARY_IDS := {"MEWTWO": true, "REGIROCK": true, "REGICE": true, "REGISTEEL": true, "REGIELEKI": true, "REGIDRAGO": true, "REGIGIGAS": true}
+
 # Nocturnal filter (Phase 2 night survival): NIGHT_ONLY species are barred
 # from DAY pools — the one wiki-anchored datum is Umbreon (Savanna, night
 # only). NIGHT pools include them, and every biome's type set gains GHOST at
@@ -113,6 +123,10 @@ func filter_species_ids(species_dict: Dictionary, biome: String, time_of_day := 
 
 	if ids.is_empty():
 		for key in species_dict.keys():
+			# The frozen seven never enter a pool — not even the unguarded fallback
+			# (world-depth.md § Legendaries; the only path that could surface one).
+			if LEGENDARY_IDS.has(str(key)):
+				continue
 			ids.append(str(key))
 		ids.sort()
 		var reason := "no_species_matched_types"
@@ -135,10 +149,13 @@ func known_biomes() -> Array:
 # (CORSOLA_GALARIAN, SHELLOS_EAST/WEST ship sprites + wilds_data only), which
 # would otherwise produce uncatchable encounters, and several form folders
 # (GMRMIME, the ROTOM appliance forms) ship no evos_attacks.asm at all.
-# The deliberate full-catalog fallback below is left untouched. Public so
-# the night system's ghost pool (injected Callable) shares this exact rule.
+# The deliberate full-catalog fallback below is left untouched (the
+# LEGENDARY_IDS skip is its ONLY guard). Public so the night system's ghost
+# pool (injected Callable) shares this exact rule.
 func is_battle_viable(species_id: String, entry: Dictionary) -> bool:
 	if NEVER_ENCOUNTER_IDS.has(species_id):
+		return false
+	if LEGENDARY_IDS.has(species_id): # statics, never a pool entry (see :28-36)
 		return false
 	if str(entry.get("front_path", "")) == "" or str(entry.get("back_path", "")) == "":
 		return false

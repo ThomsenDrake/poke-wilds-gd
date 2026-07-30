@@ -30,6 +30,7 @@ extends RefCounted
 
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const OverworldMonsSim := preload("res://scripts/runtime/overworld_mons_sim.gd")
+const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const Breeding := preload("res://scripts/domain/breeding.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
@@ -118,6 +119,9 @@ func note_warp(tile: Vector2i) -> void:
 	if active:
 		_sim.sync_window(tile, DayPhase.time_of_day_label(int(_session.time_of_day_minutes)))
 
+func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load, AFTER the session seed + legendary_removals land; the sim owns the records. Build 3 threads the ACTIVE chain (the landmark_runtime._chain precedent).
+	_sim.stamp_legendaries(Vector2i.ZERO)
+
 # The forced-battle seam: {} when none; consumed exactly once — game_runtime.generate_wild_
 # encounter calls this BEFORE fishing, so Repel/unlit-night ghosts never touch a provoked
 # battle (canonical: Repel wards the GRASS stream only — spec § Rate balance & Repel).
@@ -128,8 +132,7 @@ func take_pending_encounter() -> Dictionary:
 
 # victory/catch removes the entity (:288); escaped/defeat keeps it with persisted HP +
 # stages (:284) and drops chasing→idle on EVERY such outcome (DIVERGENCE #11). The pending
-# entity is always a mon/guardian — eggs are never armed into the seam (the :250 wild-egg
-# BATTLE path is dropped; spec § Divergences #13), so there is no egg branch here.
+# entity is always a mon/guardian/legendary — eggs never arm into the seam (:250 dropped).
 func note_battle_outcome(outcome: String, enemy: Dictionary) -> void:
 	if not _last_battle_was_entity:
 		return
@@ -143,6 +146,8 @@ func note_battle_outcome(outcome: String, enemy: Dictionary) -> void:
 		_remove_entity(entity, OverworldMons.REASON_KO)
 	elif outcome.begins_with("caught"):
 		_remove_entity(entity, OverworldMons.REASON_CAUGHT)
+	if str(entity.get("kind", "")) == "legendary" and (outcome == "victory" or outcome.begins_with("caught")): # gone-for-good PER-WORLD (flagged PORT DECISION inverting wiki :224); a white-out leaves it re-battleable above
+		_session.legendary_removals.append(LegendaryPlacement.removal_key(entity.get("chain", Vector2i.ZERO), str(entity.species_id))) # v4-additive; session_payload marshals
 
 # An egg is the :248 shiny-check + clear (NO battle, NO aggro); a mon is a player-initiated
 # forced battle — provoked:false, so NO +3 buff (:280).
@@ -227,6 +232,9 @@ func _force_battle(entity: Dictionary, provoked: bool) -> Dictionary:
 
 func _arm_pending(entity: Dictionary, mon: Dictionary) -> void:
 	entity["state"] = "engaged"
+	mon["battle_kind"] = str(entity.get("battle_kind", "wild")) # Build 2 seam: a legendary static sets "legendary" (music_router.gd:33); the battle-start path reads it
+	if str(entity.get("kind", "")) == "legendary": # the legendary_encounter payload rides the pending (game_runtime owns the SINGLE trace)
+		mon["tile"] = _t(entity.tile); mon["biome"] = str(entity.get("biome", "")); mon["ring"] = int(entity.get("ring", 0)); mon["chain"] = entity.get("chain", Vector2i.ZERO)
 	_pending = mon; _pending_id = str(entity.id); _last_battle_was_entity = true
 	encounter_requested.emit(entity.tile)
 
@@ -285,8 +293,8 @@ func _resolve_faced(species_id: String) -> Dictionary:
 	return best
 
 func _disposition_now(entity: Dictionary) -> String: # live: resolved where the mon stands
-	if str(entity.get("kind", "")) == "guardian":
-		return OverworldMons.DISPOSITION_AGGRESSIVE # forced (design)
+	if ["guardian", "legendary"].has(str(entity.get("kind", ""))):
+		return OverworldMons.DISPOSITION_AGGRESSIVE # forced (design — the legendary stationary presentation, never the catalog aggression byte)
 	return OverworldMons.disposition_for(str(entity.species_id), _sim.biome_of(entity.tile), _time_label, _catalog.get_species(str(entity.species_id)))
 
 func _remove_entity(entity: Dictionary, reason: String, permanent: bool = true) -> void:

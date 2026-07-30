@@ -74,6 +74,12 @@ const SCENARIOS := {
 	# world_depth_checks.gd for the app budget; joins the double-run lane). The
 	# world-depth sweep (shots 31-32) is windowed-only like the other satellites.
 	"landmark_flow": [preload("res://scripts/app/landmark_flow_scenario.gd"), "run", []],
+	# Phase 7 Build 2 legendaries (world-depth.md § Legendaries): the ring-gated spawn
+	# proof — the frozen seven anchored in the origin world (SNOW three; the LAVA four
+	# NO_ANCHOR witnessed, the domain empirical flag), the legendary_encounter{battle_
+	# kind:"legendary"} battle-start trace, the never-encounter exclusion, the white-out
+	# re-battleable + KO gone-for-good rematch rules. Joins the double-run lane.
+	"legendary_spawn": [preload("res://scripts/app/legendary_spawn_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 }

@@ -30,11 +30,12 @@ extends Node2D
 #
 # RUNTIME CONTRACT (build-runtime lane): reads live_entities_in(Rect2i) -> Array of dicts, each
 # {"id": stable-across-roam (e.g. "mon_3,2"; needed for the lerp), "tile": Vector2i, "species_id":
-# String, "render_kind": "mon"|"egg"|"guardian" (falls back to is_egg / the domain stationary
-# class), "facing": Vector2i optional}. Holds NO RandomNumberGenerator, never reads the shared _rng
-# — the determinism guarantee is untouched by construction.
+# String, "render_kind": "mon"|"egg"|"guardian"|"legendary" (falls back to is_egg / the domain
+# stationary class), "facing": Vector2i optional}. Holds NO RandomNumberGenerator, never reads the
+# shared _rng — the determinism guarantee is untouched by construction.
 
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd") # CLASS_* vocabulary only
+const EntityMarkers := preload("res://scripts/runtime/entity_markers.gd") # generated nest-ring/alpha-badge nodes (Build-2 extraction)
 
 const TILE_SIZE := 16
 const HALF_WIDTH_TILES := 30 # mirror world_view's synced window (world_view.gd:22-23)
@@ -48,6 +49,7 @@ const SNAP_EPSILON := 0.5 # px: resting sprites land EXACTLY on the feet target 
 const KIND_MON := "mon"
 const KIND_EGG := "egg"
 const KIND_GUARDIAN := "guardian"
+const KIND_LEGENDARY := "legendary" # Build 2: stationary statics — guardian sprite path, NO nest ring, NO alpha badge
 const FRAME_IDLE := {Vector2i.DOWN: 0, Vector2i.UP: 2, Vector2i.LEFT: 4} # right = side frame flipped
 
 var _entity_nodes: Dictionary = {} # id -> {"sprite": Sprite2D, "tile": Vector2i, "kind": String}
@@ -55,9 +57,8 @@ var _nest_nodes: Dictionary = {} # nest cell (Vector2i) -> Sprite2D (the ground 
 var _species_sheets: Dictionary = {} # species_id -> Texture2D (the 96x16 sheet; tier-2 included)
 var _frame_cache: Dictionary = {} # "path#frame" -> AtlasTexture (one region per facing idle)
 var _warned_missing: Dictionary = {} # species_id -> true (warn once per species, never spam)
+var _markers = EntityMarkers.new() # generated marker nodes + texture caches (Build-2 extraction)
 var _egg_texture: Texture2D = null
-var _nest_ring: Texture2D = null
-var _alpha_badge: Texture2D = null
 var _player: Node = null
 
 
@@ -110,7 +111,7 @@ func _ensure_entity_node(entity: Dictionary, id: String) -> void:
 	var frame_index: int = FRAME_IDLE.get(Vector2i.LEFT if flip else facing, 0)
 	var record := _ensure_sprite(id, tile, kind, _frame_texture(sheet, frame_index), flip)
 	if kind == KIND_GUARDIAN:
-		_attach_alpha_marker(record["sprite"])
+		_markers.attach_alpha_marker(record["sprite"]) # legendaries (KIND_LEGENDARY) get NO badge
 
 
 # Create-or-update one sprite; the target tile updates every sync (the lerp chases it), offset set once.
@@ -149,26 +150,7 @@ func _lerp_sprites(delta: float) -> void:
 func _ensure_nest_node(cell: Vector2i) -> void: # generated ring; DIVERGENCE #1 (no submodule art)
 	if _nest_nodes.has(cell):
 		return
-	var sprite := Sprite2D.new()
-	sprite.name = "Nest_%d_%d" % [cell.x, cell.y]
-	sprite.centered = false
-	sprite.texture = _nest_ring_texture()
-	sprite.z_index = -1 # a ground feature: sorts under every z-0 entity (pen ground-eggs are z 0)
-	sprite.position = map_to_world(OverworldMons.cell_center(cell))
-	add_child(sprite)
-	_nest_nodes[cell] = sprite
-
-
-# A red diamond badge over the guardian's head — NOT a palette swap (a tint would read as a shiny, :230).
-func _attach_alpha_marker(sprite: Sprite2D) -> void:
-	if sprite.get_node_or_null("AlphaMarker") != null:
-		return
-	var marker := Sprite2D.new()
-	marker.name = "AlphaMarker"
-	marker.centered = false
-	marker.texture = _alpha_badge_texture()
-	marker.position = Vector2(4, -22) # above the mon's head (parent origin is the feet)
-	sprite.add_child(marker)
+	_nest_nodes[cell] = _markers.nest_sprite(self, cell)
 
 
 func _species_sheet(species_id: String) -> Texture2D:
@@ -215,39 +197,6 @@ func _egg_frame() -> Texture2D:
 	return _egg_texture
 
 
-func _nest_ring_texture() -> Texture2D:
-	if _nest_ring != null:
-		return _nest_ring
-	var image := Image.create(TILE_SIZE, TILE_SIZE, false, Image.FORMAT_RGBA8)
-	# A woven ground ring (generated; DIVERGENCE #1), hollow-centered, distinct from the pen egg.
-	var light := Color(0.55, 0.40, 0.22)
-	var dark := Color(0.40, 0.28, 0.15)
-	for x in range(TILE_SIZE):
-		for y in range(TILE_SIZE):
-			var dx := float(x) - 7.5
-			var dy := float(y) - 7.5
-			var dist := sqrt(dx * dx + dy * dy)
-			if dist <= 7.0 and dist >= 4.0:
-				image.set_pixel(x, y, light if (x + y) % 2 == 0 else dark)
-	_nest_ring = ImageTexture.create_from_image(image)
-	return _nest_ring
-
-
-func _alpha_badge_texture() -> Texture2D:
-	if _alpha_badge != null:
-		return _alpha_badge
-	var image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
-	for x in range(8):
-		for y in range(8):
-			var diamond := absi(x - 3) + absi(y - 3)
-			if diamond <= 2:
-				image.set_pixel(x, y, Color(0.86, 0.16, 0.16))
-			elif diamond == 3:
-				image.set_pixel(x, y, Color.WHITE) # 1px outline so the badge reads on any mon
-	_alpha_badge = ImageTexture.create_from_image(image)
-	return _alpha_badge
-
-
 # The live entity sprite whose LOGIC tile is `tile` (null when none; a mon/guardian is preferred
 # over an egg sharing the tile). The world_spatial_audit entity lane reads this (the
 # world_view.get_prop_sprite:138 precedent) to prove the feet-origin z-order contract — an
@@ -284,8 +233,8 @@ func _entity_kind(entity: Dictionary) -> String:
 	if bool(entity.get("is_egg", false)):
 		return KIND_EGG
 	var kind := str(entity.get("render_kind", ""))
-	if kind == KIND_EGG or kind == KIND_MON or kind == KIND_GUARDIAN:
-		return kind
+	if kind == KIND_EGG or kind == KIND_MON or kind == KIND_GUARDIAN or kind == KIND_LEGENDARY:
+		return kind # legendaries take the sheet path below but stay ring-/badge-free (guardian-only, spec :158)
 	if str(entity.get("entity_class", "")) == OverworldMons.CLASS_STATIONARY:
 		return KIND_GUARDIAN
 	return KIND_MON

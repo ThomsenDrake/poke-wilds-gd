@@ -301,6 +301,19 @@ SCENARIO_REQUIREMENTS = {
                 "landmark_flow_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Phase 7 Build 2 legendaries (world-depth.md § Legendaries): the ring-gated
+    # spawn proof — the all-list pins the registry-REQUIRED battle-start trace
+    # (legendary_encounter, emitted ONLY for a battle_kind "legendary" forced
+    # battle), the KO despawn + battle_finished + the symmetric pass marker (the
+    # *_failed marker rides failed_event_entry; single-sourced mirror in
+    # run_playtests' PLAYTEST_SCENARIOS; miss-002 re-stamp). Joins the double-run
+    # lane (self-pinned: seed_for_smoke -> new_game -> rebuild; stamping is pure
+    # _mix, NO rng — the breed_flow precedent).
+    "legendary_spawn": {
+        "all": ["boot_started", "boot_ready", "legendary_encounter",
+                "overworld_mon_despawned", "battle_finished", "legendary_spawn_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     # World-depth sweep (shots 31-32, shared baseline dir). Windowed-only like the
     # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_world_depth": {

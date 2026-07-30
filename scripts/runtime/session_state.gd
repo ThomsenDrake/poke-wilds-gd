@@ -41,6 +41,7 @@ var time_of_day_minutes: int = NEW_GAME_TIME_OF_DAY
 var total_steps: int = 0
 var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
 var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
+var legendary_removals: Array = [] # Phase 7 Build 2 v4-additive: gone-for-good legendary keys "<cx>,<cy>:<SPECIES>" (world-depth.md § Persistence; absent in save -> []).
 
 
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
@@ -57,6 +58,7 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	total_steps = 0
 	repel_steps = 0
 	landmark_state = {}
+	legendary_removals = []
 	if not starter.is_empty():
 		party.append(starter)
 

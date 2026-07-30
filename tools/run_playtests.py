@@ -68,7 +68,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "landmark_flow", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "landmark_flow", "legendary_spawn", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",

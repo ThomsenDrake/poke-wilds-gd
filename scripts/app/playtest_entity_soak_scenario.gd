@@ -14,7 +14,7 @@ const PlaytestBotEntity := preload("res://scripts/runtime/playtest_bot_entity.gd
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
 
-const SOAK_SEED := 2026072806 # entity-soak pin (distinct from the joint-pin / save seeds)
+const SOAK_SEED := 2026072807 # entity-soak pin (distinct from the joint-pin / save seeds). Build-2 RE-PIN from 2026072806: the contract-required never-encounter exclusion (world-depth.md § Legendaries) reshuffled the roamer pool, so under the old pin the lone near-spawn TIMID flipped disposition and band 3 starved; the whole-store teleport scan then dragged the player ring-91 outward and starved the FRIENDLY bank too (flee 0 / recruit 8). This sibling seed re-engages all four bands under the reshuffled pool (flee 3 / recruit 22 / egg 19 / alpha 107, warn 1) — miss-002's "seed is the calibration lever". Deterministic; the legendaries themselves are NOT in this soak's store (the harness reset wipes the stamped statics), so the bot's legendary band-exclusion is defense-in-depth, not this lever.
 const ITERATIONS := 400
 const AUDIT_EVERY := 25
 

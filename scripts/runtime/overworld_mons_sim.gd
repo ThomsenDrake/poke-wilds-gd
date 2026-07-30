@@ -14,6 +14,7 @@ extends RefCounted
 # wild-encounter stream) is never consumed, so the pinned scenarios/canary stay untouched.
 
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
+const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 
 const DIRS := [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
@@ -33,7 +34,8 @@ func recompute_on_time_change(time_label: String) -> void:
 	if previous.is_empty() or previous == time_label:
 		return
 	for entity in _rt_ref.get_ref()._live_list(): # membership pins to the spawn cell (roamers cross biomes)
-		if str(entity.get("kind", "")) != "egg" and not pool_for(biome_of(OverworldMons.cell_center(entity.cell)), time_label).has(str(entity.species_id)):
+		var kind := str(entity.get("kind", ""))
+		if kind != "egg" and kind != "legendary" and not pool_for(biome_of(OverworldMons.cell_center(entity.cell)), time_label).has(str(entity.species_id)): # legendaries are pool-exempt statics (the never-encounter exclusion)
 			_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_RECOMPUTE, false)
 
 func step_chase_flee(total_steps: int, player_tile: Vector2i) -> void:
@@ -57,7 +59,7 @@ func step_triggers(player_tile: Vector2i) -> void:
 		if int(entity.get("pacify_steps", 0)) > 0:
 			entity["pacify_steps"] = int(entity.pacify_steps) - 1 # Charm calm window counts down
 		var state := str(entity.get("state", "idle"))
-		var radius := OverworldMons.guardian_spot_radius() if kind == "guardian" else OverworldMons.SPOT_RADIUS
+		var radius := OverworldMons.guardian_spot_radius() if ["guardian", "legendary"].has(kind) else OverworldMons.SPOT_RADIUS # legendaries share the guardian's widened sight (uniform stationary-aggressive presentation; mirrors _disposition_now)
 		if state == "idle":
 			if _rt_ref.get_ref()._disposition_now(entity) == OverworldMons.DISPOSITION_TIMID and int(entity.get("pacify_steps", 0)) <= 0 and OverworldMons.is_spooked(entity.tile, player_tile):
 				entity["state"] = "fleeing"; entity["flee_steps"] = OverworldMons.FLEE_STEPS
@@ -91,6 +93,8 @@ func step_roam(total_steps: int, player_tile: Vector2i) -> void:
 func sync_window(player_tile: Vector2i, time_label: String) -> void:
 	var player_cell := OverworldMons.cell_for_tile(player_tile)
 	for entity in _rt_ref.get_ref()._live_list(): # the invented distance un-materialization (re-derives on return)
+		if str(entity.get("kind", "")) == "legendary":
+			continue # Build 2: world-fixed statics are window-exempt (re-stamped ONLY on a world change)
 		if not OverworldMons.in_spawn_band(entity.cell, player_cell):
 			_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_DISTANCE, false)
 	var edge := OverworldMons.DESPAWN_CELLS
@@ -174,6 +178,25 @@ func _spawn_nest(cell: Vector2i) -> void:
 		var guardian: Dictionary = _rt_ref.get_ref()._entities.get(guardian_id, {})
 		_rt_ref.get_ref()._emit("nest_found", {"tile": _rt_ref.get_ref()._t(guardian.get("tile", OverworldMons.cell_center(cell))), "guardian_species_id": str(guardian.get("species_id", "")), "eggs": eggs})
 
+# Phase 7 Build 2 (world-depth.md § Legendaries): the frozen seven as world-fixed STATIONARY
+# statics, stamped on world load/new-game (game_runtime calls the runtime delegator AFTER the
+# session's seed + legendary_removals land). Gone-for-good PER-WORLD (flagged PORT DECISION
+# inverting wiki :224) rides the persistent removal set; they share CLASS_STATIONARY + forced
+# AGGRESSIVE + the guardian's +3 chase-catch, but NEVER nest machinery (no ring, no pool) and
+# are window-exempt (no cull above); a world change (new_game/load; Build 3 chain-cross) drops the previous statics + their removal marks, so each world re-derives from its own seed.
+func stamp_legendaries(chain: Vector2i) -> void:
+	var rt = _rt_ref.get_ref()
+	for id in rt._entities.keys():
+		if str((rt._entities[id] as Dictionary).get("kind", "")) == "legendary":
+			rt._entities.erase(id); rt._removed.erase(id)
+	for entry in LegendaryPlacement.legendaries_for_world(int(rt._session.world_seed), chain, rt._session.legendary_removals):
+		var species_id := str(entry.get("species_id", ""))
+		var id := "legendary_%d,%d:%s" % [chain.x, chain.y, species_id]
+		if rt._entities.has(id) or rt._removed.has(id):
+			continue
+		rt._entities[id] = new_legendary(id, chain, species_id, entry.get("tile", Vector2i.MAX), str(entry.get("biome", "")), int(entry.get("ring", 0)))
+		_trace_spawned(rt._entities[id])
+
 # biome_encounters is the ONE biome truth (the same filter the grass stream rides), minus
 # Undiscovered-group species — legendaries/mythicals never roam (the prototype's banlist;
 # data-driven off the LIVE catalog, never a hardcoded list).
@@ -201,6 +224,18 @@ func new_mon(id: String, entity_class: String, slot: int, cell: Vector2i, specie
 		"cell": cell, "species_id": species_id, "tile": tile, "level": level, "disposition": disposition, "state": "idle",
 		"gender": OverworldMons.gender_for(seed, cell, slot, str(entry.get("gender_ratio", ""))), "is_shiny": OverworldMons.is_shiny(seed, cell, slot),
 		"flee_steps": 0, "pacify_steps": 0, "current_hp": 0, "attack_stages": 0, "swim_only": _swim_only(entry)}
+
+# A legendary static: new_mon's derived-stream gender/shiny (spawn-pinned, never re-rolled)
+# + forced AGGRESSIVE at the guardian level band, and the payload the pending seam threads
+# to the legendary_encounter battle-start trace (game_runtime owns the emit). The catalog's
+# overworld-aggression byte (1=normal) is NOT read — the disposition is the stationary
+# presentation decision (guardian precedent), never a catalog field.
+func new_legendary(id: String, chain: Vector2i, species_id: String, tile: Vector2i, biome: String, ring: int) -> Dictionary:
+	var cell := OverworldMons.cell_for_tile(tile)
+	var mon := new_mon(id, OverworldMons.CLASS_STATIONARY, 0, cell, species_id, tile, OverworldMons.guardian_level_for(int(_rt_ref.get_ref()._session.world_seed), cell, ring), OverworldMons.DISPOSITION_AGGRESSIVE)
+	mon["kind"] = "legendary"; mon["render_kind"] = "legendary"; mon["battle_kind"] = LegendaryPlacement.BATTLE_KIND_LEGENDARY
+	mon["biome"] = biome; mon["ring"] = ring; mon["chain"] = chain
+	return mon
 
 func new_egg(id: String, egg_index: int, cell: Vector2i, species_id: String, tile: Vector2i) -> Dictionary:
 	var seed := int(_rt_ref.get_ref()._session.world_seed)

@@ -970,10 +970,15 @@ status = "active"
 layer = "runtime"
 code_paths = [
   "scripts/domain/landmarks.gd",
+  "scripts/domain/legendary_placement.gd",
   "scripts/runtime/landmark_runtime.gd",
   "scripts/runtime/session_payload.gd",
+  "scripts/runtime/entity_markers.gd",
+  "scripts/runtime/wild_encounter_draw.gd",
   "scripts/app/landmark_actions.gd",
   "scripts/app/landmark_flow_scenario.gd",
+  "scripts/app/legendary_spawn_scenario.gd",
+  "scripts/app/legendary_spawn_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd",
 ]
@@ -983,15 +988,47 @@ validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
 ]
-# The two Build-1 plan traces (single owning source string "LandmarkRuntime") plus the
+# The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2
+# legendary_encounter battle-start trace (single owning source "GameRuntime", emitted on the
+# battle-start path — registry-REQUIRED per world-depth.md § Legendaries :51), plus the
 # scenario's symmetric passed/failed pair (miss-002) and the satellite sweep marker (the
 # sweep has NO _failed trace — its failure paths ride push_error captured by both
 # transports' ERROR_MARKERS, loud never silent). key_item_used is a documented auxiliary
-# (trace-events.md), NOT registry-required.
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "landmark_flow_passed", "landmark_flow_failed", "visual_sweep_world_depth_passed"]
+# (trace-events.md), NOT registry-required. The legendary_spawn scenario's passed/failed
+# pair registered here in the scenario lane (Build 2).
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "visual_sweep_world_depth_passed"]
 quality_bucket = "landmarks"
+# PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
+# frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
+# LEGENDARY_IDS, flagged SNOW/LAVA affinity, pure _mix ring-≥60 anchors bounded to 300, the
+# "<cx>,<cy>:<SPECIES>" removal grammar + legendaries_for_world suppression) joins THIS
+# entry's code_paths (session_payload.gd precedent — one world-depth home, strictly
+# serial). RUNTIME LANE: the frozen-seven stamping (overworld_mons_sim.stamp_legendaries /
+# new_legendary via the overworld_mons_runtime.stamp_legendaries delegator, called by
+# game_runtime on new-game + load; CLASS_STATIONARY + forced AGGRESSIVE + the guardian's +3
+# chase-catch, window-exempt, nest-ring-free), the battle_kind pending seam (default "wild";
+# the legendary static sets "legendary"; main.gd:92 reads it — the ONE plumbing change,
+# music_router UNCHANGED), the legendary_encounter battle-start trace (game_runtime SINGLE
+# owner — registered in required_trace_events above), the KO/catch removal append onto
+# session.legendary_removals (white-out leaves the mon re-battleable, Phase-6 precedent),
+# and the two at-wall EXTRACTIONS the lane paid: scripts/runtime/entity_markers.gd (the
+# entity_layer's generated nest-ring/alpha-badge nodes; legendaries render through the
+# guardian sprite path WITHOUT ring or badge — the world_entity_audit guardian-only ring
+# invariant) + scripts/runtime/wild_encounter_draw.gd (game_runtime's wild-draw tail; the
+# shared encounter _rng rides by reference, byte-identical stream). Co-modifications under
+# their OWN homes: biome_encounters' LEGENDARY_IDS never-encounter exclusion (world_runtime)
+# + session_state/session_payload's v4-additive legendary_removals marshalling
+# (session_runtime). SCENARIO LANE LANDED: scripts/app/legendary_spawn_scenario.gd (the
+# ring-gated spawn proof — anchored SNOW three witnessed, the LAVA four NO_ANCHOR negative
+# proof + lava_absent payload witness per the domain empirical flag; the exclusion over
+# every pool path; the chase-catch +3 / legendary_encounter{battle_kind:"legendary"} kind
+# seam; the white-out re-battleable + KO gone-for-good rematch rules), its passed/failed
+# registration above, the requirements row + PLAYTEST_SCENARIOS entry, and the double-run
+# lane regroup to the spec's [4,4] (self-pinned: seed_for_smoke -> new_game -> rebuild;
+# stamping is pure _mix, NO rng).
 # PHASE 7 BUILD 1 OF 3 (docs/product-specs/world-depth.md § Landmarks) — landmarks ONLY;
 # legendaries (Build 2) + chaining/save v5 (Build 3) pending. The frozen GENERATOR seam is
 # chain-parametric from day one: Landmarks.tile_logic_for(world_seed, chain, map_pos,
