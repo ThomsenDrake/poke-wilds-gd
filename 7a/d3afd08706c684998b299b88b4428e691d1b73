@@ -1,0 +1,126 @@
+docs/generated/visual-baselines/21_shiny_battle.png.sidecar.json
+  s_b053a329cf705a::t_37bca0a4e9d00e 1
+docs/registry/subsystems.toml
+  s_b053a329cf705a::t_f04c4911a6ffda 973,976-977,980,991,994-996,1000-1002,1004-1031
+  s_b053a329cf705a::t_5550cdeb37aae8 981
+scripts/runtime/overworld_mons_runtime.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 33,122-124,135,149-150,235-237,296-297
+docs/references/trace-events.md
+  s_b053a329cf705a::t_1f5caf0bb9e737 155
+  s_b053a329cf705a::t_f04c4911a6ffda 22,153,156
+  s_b053a329cf705a::t_5e72c9ab8c1d73 157
+  s_b053a329cf705a::t_a978af1a176fb9 2
+scripts/runtime/overworld_mons_sim.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 17,37-38,96-97,181-199,228-238
+  s_b053a329cf705a::t_1721d0988defa1 62
+  s_b053a329cf705a::t_7c8a4390d20e49 239
+scripts/runtime/wild_encounter_draw.gd.uid
+  s_b053a329cf705a::t_c96497302b9097 1
+scripts/domain/biome_encounters.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 27-36,126-129,152-154,158
+  s_b053a329cf705a::t_d23d72011487bc 159
+docs/product-specs/overworld-pokemon.md
+  s_b053a329cf705a::t_f04c4911a6ffda 2,154-158,160
+  s_b053a329cf705a::t_e394a9f8ccf6d1 159
+  s_b053a329cf705a::t_2da6c1bb349a55 161
+docs/QUALITY_SCORE.md
+  s_b053a329cf705a::t_f04c4911a6ffda 29
+scripts/app/main.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 92
+scripts/runtime/entity_markers.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 1-79
+docs/generated/miss-postmortems.json
+  s_b053a329cf705a::t_f04c4911a6ffda 151-152,217-230
+docs/product-specs/world-depth.md
+  s_b053a329cf705a::t_ef92943d47a1c1 156
+  s_b053a329cf705a::t_5fbbf89fb8a40b 2
+  s_b053a329cf705a::t_f009aaf8c07822 94
+  s_b053a329cf705a::t_17a93a94763240 4
+  s_b053a329cf705a::t_6a09b9f3262403 48
+  s_b053a329cf705a::t_89ec8201212a8f 104
+tools/godot_dap_smoketest.py
+  s_b053a329cf705a::t_f04c4911a6ffda 304-316
+docs/generated/visual-baselines/20_egg_in_pen.png.sidecar.json
+  s_b053a329cf705a::t_37bca0a4e9d00e 1
+tools/run_playtests.py
+  s_b053a329cf705a::t_f04c4911a6ffda 71
+scripts/app/playtest_entity_soak_scenario.gd
+  s_b053a329cf705a::t_545a94e1bb0cc9 17
+scripts/runtime/entity_layer.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 33-35,38,52,60,114,153,236-237
+scripts/runtime/playtest_bot_entity.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 91-92,105-106
+scripts/runtime/session_payload.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 45-51,81-84
+docs/product-specs/bootstrap-and-overworld.md
+  s_b053a329cf705a::t_f04c4911a6ffda 38
+scripts/runtime/session_state.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 44,61
+scripts/app/overworld_mons_battle_checks.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 91,93,95-108
+docs/product-specs/menu-and-save.md
+  s_b053a329cf705a::t_f04c4911a6ffda 55-56
+  s_b053a329cf705a::t_c93ef34c8e50e9 2
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_b053a329cf705a::t_f04c4911a6ffda 184,196
+scripts/app/legendary_spawn_scenario.gd
+  s_b053a329cf705a::t_43087798b699c4 122-124
+  s_b053a329cf705a::t_b3781858d0e4de 135-137
+  s_b053a329cf705a::t_14bf3dfe77cfd6 9-20
+  s_b053a329cf705a::t_f04c4911a6ffda 1-8,21-23,25-95,98,102-118,120-121,125-134,138-159,163-179,182-220
+  s_b053a329cf705a::t_0236da5e996e70 119
+  s_b053a329cf705a::t_590ac91fa2b1a3 24
+  s_b053a329cf705a::t_e7873b112edaa0 99-101
+  s_b053a329cf705a::t_4a8b8abb29b28a 96-97
+  s_b053a329cf705a::t_2f001cc78fa1e1 160-162
+  s_b053a329cf705a::t_da241eee5cd2ce 180-181
+scripts/app/legendary_spawn_scenario.gd.uid
+  s_b053a329cf705a::t_c96497302b9097 1
+scripts/domain/legendary_placement.gd
+  s_b053a329cf705a::t_4907d857ed8de5 115-126
+  s_b053a329cf705a::t_f04c4911a6ffda 1-114,127-215
+scripts/domain/legendary_placement.gd.uid
+  s_b053a329cf705a::t_f04c4911a6ffda 1
+tools/verify_all.py
+  s_b053a329cf705a::t_f04c4911a6ffda 10-11,72,77-80,82-83,86,342,444,472,475
+scripts/runtime/music_router.gd
+  s_b053a329cf705a::t_8dfcb1fe8385b4 58,62-70
+  s_b053a329cf705a::t_eb8f5abb6b60af 71-72
+docs/generated/soak-warning-baseline.json
+  s_b053a329cf705a::t_f04c4911a6ffda 21,24
+docs/RELIABILITY.md
+  s_b053a329cf705a::t_c7dbace06e2481 2
+  s_b053a329cf705a::t_f04c4911a6ffda 33-34,119,126,174
+  s_b053a329cf705a::t_85e8f252890606 154
+  s_b053a329cf705a::t_b435ac354e8181 145
+CONTROLS.md
+  s_b053a329cf705a::t_f04c4911a6ffda 200-209,258-259
+scripts/app/qa_scenarios.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 77-82
+scripts/runtime/wild_encounter_draw.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 1-49
+scripts/app/legendary_spawn_checks.gd
+  s_b053a329cf705a::t_bd0e26080c3818 1-93
+scripts/runtime/entity_markers.gd.uid
+  s_b053a329cf705a::t_c96497302b9097 1
+scripts/app/legendary_spawn_checks.gd.uid
+  s_b053a329cf705a::t_c96497302b9097 1
+scripts/runtime/game_runtime.gd
+  s_b053a329cf705a::t_f04c4911a6ffda 29,54,79,111,223-225,229,232-237,298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "7ad3afd08706c684998b299b88b4428e691d1b73",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
