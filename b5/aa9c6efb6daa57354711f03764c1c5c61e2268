@@ -1,0 +1,273 @@
+scripts/app/visual_sweep_fishing.gd
+  s_b053a329cf705a::t_16bc4b0517133c 49
+  s_b053a329cf705a::t_91531f7a28d436 56
+docs/product-specs/world-depth.md
+  s_b053a329cf705a::t_eca6767d723281 157
+  s_b053a329cf705a::t_9ebf84c6ff555b 202
+  s_b053a329cf705a::t_894b354acb2baa 196
+  s_b053a329cf705a::t_2875e86bc43341 160
+  s_b053a329cf705a::t_29530edc4446fc 153
+  s_b053a329cf705a::t_afae57c95a16bc 161
+  s_b053a329cf705a::t_2d4af15b1e07f4 155
+  s_b053a329cf705a::t_fa964ae788434a 159
+  s_b053a329cf705a::t_9a09dbba9c362a 156
+tools/run_playtests.py
+  s_b053a329cf705a::t_6eeaf94d8347d9 731-736
+  s_b053a329cf705a::t_da286472cb48aa 1056
+  s_b053a329cf705a::t_d0f99eb9266f6e 75
+  s_b053a329cf705a::t_26cfa401dbd588 84-96
+  s_b053a329cf705a::t_6437616f305619 103
+  s_b053a329cf705a::t_a72d19ba96e5c3 982-985,987
+  s_b053a329cf705a::t_78e02b0e5e25d0 700-703
+  s_b053a329cf705a::t_6d8d3d930c1b85 706
+  s_b053a329cf705a::t_85787aae4611b2 696-699
+  s_b053a329cf705a::t_ee1e60ad79a06a 68-74,76-83
+  s_b053a329cf705a::t_9c1d2dfa26a3bb 97-99
+tools/godot_dap_smoketest.py
+  s_b053a329cf705a::t_630f8689de9080 357-359
+  s_b053a329cf705a::t_0ba1ee9e6b896c 54-63
+  s_b053a329cf705a::t_f72774ec7f248d 35-36
+  s_b053a329cf705a::t_c727d1d95432f3 51-52
+  s_b053a329cf705a::t_a823b58ad8a0f3 345-356
+  s_b053a329cf705a::t_11a79d44dfd9d7 537-540,542
+  s_b053a329cf705a::t_a98c5ebab3324a 314
+  s_b053a329cf705a::t_75f9d00922fbb5 368-375
+  s_b053a329cf705a::t_2d9cad616546d0 53
+scripts/app/playtest_entity_soak_scenario.gd
+  s_b053a329cf705a::t_00c426183c786f 57-61
+  s_b053a329cf705a::t_37dabeede2fb6e 10-14
+  s_b053a329cf705a::t_91705f05101898 62
+  s_b053a329cf705a::t_fd1725cf334627 129
+  s_b053a329cf705a::t_8f1f88ea174fff 25
+  s_b053a329cf705a::t_95d6b197b743ec 20-23
+  s_b053a329cf705a::t_96b4ac2d41c625 77-78
+  s_b053a329cf705a::t_9e568749c61b45 121-128,130-156
+  s_b053a329cf705a::t_97063f4f21e790 52
+docs/registry/subsystems.toml
+  s_b053a329cf705a::t_6c586adb01c0bf 1161-1164
+  s_b053a329cf705a::t_0b49d37df9d5b6 1025
+  s_b053a329cf705a::t_9efbe151396499 1110-1111
+  s_b053a329cf705a::t_b3bca8d9806bac 1112-1115,1122-1123,1125
+  s_b053a329cf705a::t_846c63fd48b498 1027
+  s_b053a329cf705a::t_873e8e220a436a 1038-1042
+  s_b053a329cf705a::t_fb8020b21cff6a 1003,1005,1008
+  s_b053a329cf705a::t_1deb0a062c5787 49-52
+  s_b053a329cf705a::t_417c4651af7aeb 7
+  s_b053a329cf705a::t_1b69f5381629aa 1012-1014
+  s_b053a329cf705a::t_a7e8c6f3ee94e4 1098-1103
+  s_b053a329cf705a::t_9bd17117920679 1116-1121
+  s_b053a329cf705a::t_838737d1573c8e 1124
+  s_b053a329cf705a::t_122f6fbb57d75a 1159-1160
+scripts/app/visual_sweep_world_depth_oracle.gd
+  s_b053a329cf705a::t_905758034396b9 37-41,43
+  s_b053a329cf705a::t_8d05a26761f072 98-100,104-106,109-111,113-117
+  s_b053a329cf705a::t_55379661634938 1-36,42,44-97,101-103,107-108,112,118-142
+docs/product-specs/overworld-pokemon.md
+  s_b053a329cf705a::t_35f2f02b718edd 129
+docs/product-specs/breeding-shinies-drops-fishing.md
+  s_b053a329cf705a::t_84c8a9b6a3a7d0 137-138
+scripts/app/visual_sweep_world_chain.gd
+  s_b053a329cf705a::t_e6bd76c1e582d9 49,58-59,61-68
+  s_b053a329cf705a::t_70df7a1af4388b 27,31
+  s_b053a329cf705a::t_56de11518ed54e 108
+  s_b053a329cf705a::t_fae95568a72752 36
+  s_b053a329cf705a::t_4824c7b30a57a1 11-14
+  s_b053a329cf705a::t_e28dd734c8df67 4-10
+  s_b053a329cf705a::t_538c71f63f0813 1-3,15-26,28-30,32-35,37-48,50-57,69-107,109-220
+  s_b053a329cf705a::t_ee18fca52a7b18 60
+scripts/app/visual_sweep_world_depth.gd
+  s_b053a329cf705a::t_b06a8b3f5d2b67 118
+  s_b053a329cf705a::t_5f24c28f691635 48
+  s_b053a329cf705a::t_39fcbd7009cd93 103
+  s_b053a329cf705a::t_b37e440c3fb8a4 60
+  s_b053a329cf705a::t_2e3f460260d64e 69
+  s_b053a329cf705a::t_9e86ebf2e3ece8 17-18
+  s_b053a329cf705a::t_1f6e0f08554ee9 88
+  s_b053a329cf705a::t_4c36b3f7edfe2a 198-199,201
+  s_b053a329cf705a::t_ad1892c1e34de8 53
+scripts/app/visual_sweep_pokemon.gd
+  s_b053a329cf705a::t_415d4865f25cfa 49
+  s_b053a329cf705a::t_a1dabb4abbe2bb 56
+docs/generated/visual-baselines/34_heart_tower.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+scripts/app/visual_sweep_camping.gd
+  s_b053a329cf705a::t_206d0e14fbc2ee 56
+  s_b053a329cf705a::t_12670a7d5099ff 48
+scripts/app/night_cycle_scenario.gd
+  s_b053a329cf705a::t_15dd86d55cf31a 37-39
+  s_b053a329cf705a::t_b882fa7268a194 10-15
+scripts/app/qa_scenarios.gd
+  s_b053a329cf705a::t_615efa49766308 93-98
+  s_b053a329cf705a::t_b54bb7d9dc9d44 101-102
+scripts/app/visual_sweep_world_depth_expand.gd
+  s_b053a329cf705a::t_979f0969e29d89 22
+  s_b053a329cf705a::t_30344f764b3b6a 57-58
+  s_b053a329cf705a::t_db93541b107738 3-15,20-21,26-27,39-40,55-56,59-73,75-89,100,102,109,116
+  s_b053a329cf705a::t_a12a3a6e7cc9e7 1-2,16-19,23-25,28-38,41-54,90-99,101,103-108,110-115,117
+  s_b053a329cf705a::t_7aa105853f0e60 74
+docs/generated/visual-baselines/31_ruins_interior.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+docs/product-specs/bootstrap-and-overworld.md
+  s_b053a329cf705a::t_700d648a10be4e 104-109
+docs/generated/visual-baselines/32_mansion.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+docs/QUALITY_SCORE.md
+  s_b053a329cf705a::t_d9290c757dd48a 29
+  s_b053a329cf705a::t_97e0aad68d2efa 2
+  s_b053a329cf705a::t_c0638f15aab120 12
+scripts/app/visual_sweep_world_depth_beacon.gd
+  s_b053a329cf705a::t_45268a777319a2 20
+  s_b053a329cf705a::t_577df41fd66184 47
+  s_b053a329cf705a::t_8f6ba21e852594 49-58
+docs/product-specs/field-moves.md
+  s_b053a329cf705a::t_deff6395516a3f 10
+  s_b053a329cf705a::t_a93e5f3d4d922f 121-124
+scripts/app/visual_sweep_baselines.gd
+  s_b053a329cf705a::t_5a98248cb71b1f 9
+  s_b053a329cf705a::t_25e4b4e9bdb01e 35
+  s_b053a329cf705a::t_1a64830d392fa7 55,57-59,61-62
+  s_b053a329cf705a::t_78d55115ac71b2 36
+  s_b053a329cf705a::t_c48ae52f31a9e2 53-54
+  s_b053a329cf705a::t_815c6d908d76d6 56,60
+scripts/app/beacon_selector_scenario.gd
+  s_b053a329cf705a::t_676a7694ece0bf 113
+  s_b053a329cf705a::t_304cac26dbec35 1-112,114-170
+docs/product-specs/building-and-placement.md
+  s_b053a329cf705a::t_95f7ff51a81a67 89
+scripts/runtime/music_router.gd
+  s_b053a329cf705a::t_6df7448d24851f 50
+docs/product-specs/storage-and-party.md
+  s_b053a329cf705a::t_54a56278a945d3 67
+CONTROLS.md
+  s_b053a329cf705a::t_07850dc471d23d 198
+scripts/app/visual_sweep_overworld.gd
+  s_b053a329cf705a::t_c0610db2749d3b 50
+  s_b053a329cf705a::t_355198f3ba35df 43
+tools/verify_all.py
+  s_b053a329cf705a::t_7d622d9b9337ee 418-422
+  s_b053a329cf705a::t_88be6e338eb073 11
+  s_b053a329cf705a::t_b8692e1bd70ee5 83
+  s_b053a329cf705a::t_270be78f087f9e 10
+  s_b053a329cf705a::t_6e6b69267502f1 14
+  s_b053a329cf705a::t_b1f71e21e5f931 72,75-82,84-96,99-100,102
+  s_b053a329cf705a::t_5688205b46e654 510
+  s_b053a329cf705a::t_ff77468c0de6bd 120,125-130
+  s_b053a329cf705a::t_fc17d2e9654754 105-119,121-124,131
+docs/references/trace-events.md
+  s_b053a329cf705a::t_686216f9272758 162-163
+  s_b053a329cf705a::t_80f34b1cc0b34a 164
+  s_b053a329cf705a::t_c204c7ac3be1bf 168
+  s_b053a329cf705a::t_67255b1ed4eea0 148
+  s_b053a329cf705a::t_917c053cba4113 154
+  s_b053a329cf705a::t_6ae31f54b12274 144-145
+  s_b053a329cf705a::t_8f72281bea1517 160
+  s_b053a329cf705a::t_b9e9d84d68d24b 169
+  s_b053a329cf705a::t_f7c9eb785410a0 156
+docs/generated/visual-baselines/35_chained_world.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+docs/generated/visual-baselines/33_beacon.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+scripts/app/legendary_spawn_checks.gd
+  s_b053a329cf705a::t_6b5b6b19120306 25,29
+  s_b053a329cf705a::t_cfad7f6e7d6913 96-126
+scripts/runtime/field_move_runtime.gd
+  s_b053a329cf705a::t_1bee649feb5720 61
+  s_b053a329cf705a::t_09ec56e03624e9 6-8
+scripts/app/legendary_spawn_scenario.gd
+  s_b053a329cf705a::t_e6805e35801030 120
+docs/RELIABILITY.md
+  s_b053a329cf705a::t_3053077c239a7b 36
+  s_b053a329cf705a::t_8d807e1f89c790 153
+  s_b053a329cf705a::t_429cd456315dc8 159
+  s_b053a329cf705a::t_fca602a37465c2 157
+  s_b053a329cf705a::t_1d49903f621c44 160
+  s_b053a329cf705a::t_cea7531bfb15f0 180
+  s_b053a329cf705a::t_6617a7bcae552a 156
+  s_b053a329cf705a::t_5744ce1ba5980d 134
+  s_b053a329cf705a::t_edd3d9d6ff721c 33
+  s_b053a329cf705a::t_488c3b898f718b 121,123
+  s_b053a329cf705a::t_700711497094be 34
+  s_b053a329cf705a::t_88a2861678a6e1 155
+docs/product-specs/camping-crafting-survival.md
+  s_b053a329cf705a::t_1b9cbce96eebbb 149
+scripts/app/visual_sweep_storage.gd
+  s_b053a329cf705a::t_75d72768b93855 59
+  s_b053a329cf705a::t_4b0ead2360b56d 51
+scripts/app/landmark_guardian_checks.gd
+  s_b053a329cf705a::t_bfec302bb8f14a 5-9
+  s_b053a329cf705a::t_0ccaf599d0df10 36-44
+  s_b053a329cf705a::t_4bc47775e16eea 1-4,10-35,45-89
+docs/generated/miss-postmortems.json
+  s_b053a329cf705a::t_825de42de00140 2-20,22-24,27-69,71-328
+docs/generated/visual-baselines/36_legendary_guardian.png.sidecar.json
+  s_b053a329cf705a::t_d45a73623c9f72 1
+scripts/app/landmark_flow_scenario.gd
+  s_b053a329cf705a::t_5ff962735951c0 66
+  s_b053a329cf705a::t_7a2f473d196781 141-156
+  s_b053a329cf705a::t_6c54500d67fb19 57
+  s_b053a329cf705a::t_76f5093978df4d 100
+  s_b053a329cf705a::t_09a218c94a194d 122
+  s_b053a329cf705a::t_d2223118885e02 22
+  s_b053a329cf705a::t_c2481607627204 56
+scripts/runtime/game_runtime.gd
+  s_b053a329cf705a::t_3631786ba27555 72
+scripts/app/world_chain_scenario.gd
+  s_b053a329cf705a::t_e7f09fdec8e671 31
+  s_b053a329cf705a::t_37970442bb6657 122-129
+  s_b053a329cf705a::t_2927578c17ae7a 54
+  s_b053a329cf705a::t_36c297f7465888 76
+  s_b053a329cf705a::t_ef805650b6af31 43
+scripts/app/world_chain_cross_checks.gd
+  s_b053a329cf705a::t_30ce915d89e66c 54
+  s_b053a329cf705a::t_07ba1ae6959e0b 1-53,55-151
+scripts/app/world_chain_persist_checks.gd
+  s_b053a329cf705a::t_b31db0be6cc409 165-167
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_b053a329cf705a::t_29d68279267f6a 186-187
+scripts/app/world_depth_checks.gd
+  s_b053a329cf705a::t_19054ab8c62646 97
+  s_b053a329cf705a::t_c7ebdba6de20d8 116-120
+  s_b053a329cf705a::t_5a228a7b073a32 102
+  s_b053a329cf705a::t_8eb7a4bae346db 3-4
+docs/product-specs/menu-and-save.md
+  s_b053a329cf705a::t_b369804dc60e68 59-62
+scripts/app/visual_sweep_registry_support.gd
+  s_b053a329cf705a::t_0ad9655b115cee 8-10,13-14,20,22
+  s_b053a329cf705a::t_fde0e1669615b6 1-7,11-12,15-19,21,23
+docs/generated/visual-baselines/35_chained_world.png.import
+  s_b053a329cf705a::t_c0b5fb4064f029 1-40
+docs/generated/visual-baselines/36_legendary_guardian.png.import
+  s_b053a329cf705a::t_c98daf4edcea41 1-40
+docs/generated/visual-baselines/34_heart_tower.png.import
+  s_b053a329cf705a::t_6a4b35a146c8b4 1-40
+scripts/app/beacon_selector_scenario.gd.uid
+  s_b053a329cf705a::t_a5b0414dea4e56 1
+scripts/app/landmark_guardian_checks.gd.uid
+  s_b053a329cf705a::t_4b0ef87171b089 1
+scripts/app/visual_sweep_registry_support.gd.uid
+  s_b053a329cf705a::t_02f49c226caf08 1
+scripts/app/visual_sweep_world_chain.gd.uid
+  s_b053a329cf705a::t_2241e53edaa118 1
+scripts/app/visual_sweep_world_depth_expand.gd.uid
+  s_b053a329cf705a::t_81c51a5caf1641 1
+scripts/app/visual_sweep_world_depth_oracle.gd.uid
+  s_b053a329cf705a::t_fd4dd943931039 1
+scripts/app/world_chain_cross_checks.gd.uid
+  s_b053a329cf705a::t_0ece2ba7583027 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "b5aa9c6efb6daa57354711f03764c1c5c61e2268",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
