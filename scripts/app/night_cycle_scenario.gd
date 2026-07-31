@@ -7,9 +7,12 @@ extends Node
 # (Fire) party member each zero the hazards; a shadow battle blocks retreat exactly
 # once (retreat_blocked) then ends by victory; dawn clears the hazard; and the
 # nocturnal filter + clock-boundary proofs ride night_cycle_checks.gd (the
-# placement_flow -> placement_flow_demolition split pattern). Deterministic: ghost
-# rolls ride runtime._rng, placements are cleared for a crafted dark start, and
-# the dispatcher's save guard restores the real save.
+# placement_flow -> placement_flow_demolition split pattern). Deterministic:
+# self-pinned seed_for_smoke BEFORE new_game + rebuild (the breed_flow precedent;
+# the double-run lane's tenth consumer reds without it — a BOOT world rides the
+# wall-clock root_seed), ghost rolls ride the pinned runtime._rng, placements are
+# cleared for a crafted dark start, and the dispatcher's save guard restores the
+# real save.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const NightCycleChecks := preload("res://scripts/app/night_cycle_checks.gd")
@@ -31,7 +34,9 @@ func run(ctx: Dictionary) -> void:
 	_checks.setup(ctx, _runner, _failures)
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
-	runtime.seed_for_smoke(SEED)
+	runtime.seed_for_smoke(SEED) # BEFORE new_game: pins the root_seed draw too (the breed_flow precedent; the double-run lane reds without it)
+	runtime.new_game() # self-contained: the world + spawn derive from the PINNED seed (a boot world would ride the wall-clock root_seed — a pure function of (code, seed) is the lane contract)
+	_world().rebuild(runtime.get_world_seed()) # the view owns its own generator: re-seed it or every _world() logic read answers from the BOOT world (the breed_flow precedent)
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var party_before: Array = _runner.swap_party(runtime, ["MACHOP"], 30) # FIGHTING: Build-capable, no Flash light

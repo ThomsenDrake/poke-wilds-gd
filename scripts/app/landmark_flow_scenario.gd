@@ -19,6 +19,7 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
 const WorldDepthChecks := preload("res://scripts/app/world_depth_checks.gd")
+const LandmarkGuardianChecks := preload("res://scripts/app/landmark_guardian_checks.gd") # R2: the guardian forced-battle +3 witness (extracted at the app 220 wall)
 # Domain access rides the runtime's own preload (the app layer may not preload
 # domain directly — check_architecture.gd's layer table).
 const Landmarks := LandmarkRuntime.Landmarks
@@ -53,6 +54,8 @@ func run(ctx: Dictionary) -> void:
 	var saved_chance: float = _player().encounter_chance; _player().encounter_chance = 0.0 # the scope draws are explicit generate_wild_encounter calls, never step triggers
 	_oks["mansion_ok"] = _walk_the_mansion(runtime)
 	if _failures.is_empty():
+		_oks["loot_ok"] = _loot_case(runtime) # R9: the courtyard loot shelf grant + one-shot (interact_loot's _loot_taken)
+	if _failures.is_empty():
 		_oks["puzzle_ok"] = _solve_the_statues(runtime)
 	else:
 		_failures.append("skipped: puzzle (cascaded from an earlier mansion red)")
@@ -60,6 +63,7 @@ func run(ctx: Dictionary) -> void:
 		var checks := WorldDepthChecks.new(); add_child(checks); checks.setup(_ctx, _runner, _failures, _mansion_origin)
 		_oks["mansion_pool_ok"] = checks.run_mansion_pool_case(runtime)
 		_oks["ruins_ok"] = checks.run_ruins_case(runtime)
+		_oks["guardian_ok"] = LandmarkGuardianChecks.run_guardian_battle_case(runtime, _runner, _failures, _ctx) # R2: the guardian's defining +3 (the entity persists from run_ruins_case)
 		_oks["tower_ok"] = checks.run_tower_case(runtime)
 		_oks["save_ok"] = checks.run_save_roundtrip_case(runtime)
 	else:
@@ -93,6 +97,7 @@ func _walk_the_mansion(runtime) -> bool:
 	_ensure(_runner.trace_log_has_since("landmark_entered", cursor, {"landmark_id": Landmarks.MANSION_ID, "region": "courtyard", "first_entry": true}), "mansion: no landmark_entered{pkmn_mansion,courtyard,first_entry}")
 	var key_result: Dictionary = runtime.landmark_runtime.interact_journal(_mansion_origin + Landmarks.MANSION_KEY_TABLE_TILE)
 	_ensure(bool(key_result.get("handled", false)) and runtime.session.get_item_count(Landmarks.MANSION_KEY_ID) == 1, "mansion: the key-table pickup did not bag mansion_key (%s)" % str(key_result.get("message", "")))
+	_ensure(not bool(runtime._world_gen.get_tile_logic(_mansion_origin + ROOM_DOOR_LOCAL).get("walkable", false)), "mansion: the room door is open BEFORE key use (gating bypassed)")
 	var door_cursor: int = _runner.trace_log_line_count()
 	var door_result: Dictionary = runtime.landmark_runtime.use_key_at(_mansion_origin + ROOM_DOOR_LOCAL)
 	_ensure(bool(door_result.get("handled", false)), "mansion: the room door key arm was not handled")
@@ -114,6 +119,7 @@ func _solve_the_statues(runtime) -> bool:
 	if not _walk(runtime, [_mansion_origin + ROOM_DOOR_LOCAL, _mansion_origin + ROOM_DOOR_LOCAL + Vector2i(0, 1)], "room door crossing"):
 		return false
 	_ensure(_runner.trace_log_has_since("landmark_entered", room_cursor, {"landmark_id": Landmarks.MANSION_ID, "region": "room"}), "mansion: no landmark_entered{room}")
+	_ensure(not bool(runtime._world_gen.get_tile_logic(_mansion_origin + SEWER_DOOR_LOCAL).get("walkable", false)), "mansion: the sewer door is open BEFORE the solve (puzzle gate bypassed)")
 	var solved_cursor := -1
 	for i in range(Landmarks.MANSION_STATUES):
 		if i == Landmarks.MANSION_STATUES - 1:
@@ -129,6 +135,22 @@ func _solve_the_statues(runtime) -> bool:
 	if not _walk(runtime, [_mansion_origin + SEWER_DOOR_LOCAL, _mansion_origin + SEWER_DOOR_LOCAL + Vector2i(0, 1)], "sewer crossing"):
 		return false
 	_ensure(_runner.trace_log_has_since("landmark_entered", sewer_cursor, {"landmark_id": Landmarks.MANSION_ID, "region": "sewer", "first_entry": true}), "mansion: no landmark_entered{sewer,first_entry} after the crossing")
+	return _failures.size() == start
+
+
+# The courtyard loot shelf (R9; FLAGGED #11): Z on the DERIVED MANSION_LOOT_TILE grants exactly
+# one MANSION_LOOT_BALL_ID, and a second Z is a one-shot no-op (interact_loot's session-scoped
+# _loot_taken, cleared at scenario start). No scenario triggered interact_loot before this, so a
+# regression dropping the grant OR the one-shot passed green.
+func _loot_case(runtime) -> bool:
+	var start: int = _failures.size()
+	var loot_tile: Vector2i = _mansion_origin + Landmarks.MANSION_LOOT_TILE
+	var before: int = runtime.session.get_item_count(Landmarks.MANSION_LOOT_BALL_ID)
+	var first: Dictionary = runtime.landmark_runtime.interact_loot(loot_tile)
+	_ensure(bool(first.get("handled", false)), "loot: Z on the mansion loot shelf %s was not handled" % str(loot_tile))
+	_ensure(runtime.session.get_item_count(Landmarks.MANSION_LOOT_BALL_ID) == before + 1, "loot: the bag did not gain exactly one %s (%d -> %d)" % [Landmarks.MANSION_LOOT_BALL_ID, before, runtime.session.get_item_count(Landmarks.MANSION_LOOT_BALL_ID)])
+	var second: Dictionary = runtime.landmark_runtime.interact_loot(loot_tile)
+	_ensure(bool(second.get("handled", false)) and runtime.session.get_item_count(Landmarks.MANSION_LOOT_BALL_ID) == before + 1, "loot: a second Z was not a one-shot no-op (count %d, expected %d)" % [runtime.session.get_item_count(Landmarks.MANSION_LOOT_BALL_ID), before + 1])
 	return _failures.size() == start
 
 

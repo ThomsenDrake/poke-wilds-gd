@@ -117,7 +117,7 @@ func _prove_exclusion(runtime) -> bool:
 			_failures.append("exclusion: %s leaked through the full-catalog fallback" % sid)
 		if filter.is_battle_viable(sid, runtime.catalog.get_species(sid)):
 			_failures.append("exclusion: %s passes is_battle_viable (the TYPE-fallback guard the night-ghost pool shares)" % sid)
-	return _failures.size() == start
+	LegendarySpawnChecks.curated_exclusion_pin(runtime, _failures); return _failures.size() == start # R6: the curated/extra_ids path the per-biome scan cannot see
 
 # Chase-catch provoked +3 -> the battle-start trace -> a white-out leaves it standing (damage
 # persisted on the entity, dropped to idle) and re-battleable (:284/:288); the white-out REMATCH

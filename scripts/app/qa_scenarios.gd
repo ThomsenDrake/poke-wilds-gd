@@ -90,8 +90,16 @@ const SCENARIOS := {
 	# world_chain_persist_checks.gd for the app budget; the double-run lane's NINTH
 	# consumer (self-pinned: seed_for_smoke BEFORE new_game; NO rng in the crossing path).
 	"world_chain": [preload("res://scripts/app/world_chain_scenario.gd"), "run", []],
+	# Phase 7 audit R5 (world-depth.md § Teleport Beacons): the multi-beacon SELECTOR
+	# functional choice — two edge beacons registered, the APP teleport route opens the
+	# BeaconSelector, a REAL input pick of the second-registered beacon warps the avatar to
+	# THAT tile (not index 0), plus the registration-order listing + a cancel control.
+	# Needs scenes/ui/BeaconSelector.tscn in Main.tscn (the orchestrator commits both).
+	"beacon_selector": [preload("res://scripts/app/beacon_selector_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
+	"visual_sweep_world_chain": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", []],
+	"visual_sweep_world_chain_update": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", [{"mode": "update"}]],
 }
 
 

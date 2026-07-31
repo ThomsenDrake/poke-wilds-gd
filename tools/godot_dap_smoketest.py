@@ -32,7 +32,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_storage", "visual_sweep_storage_update",
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
-                                 "visual_sweep_world_depth", "visual_sweep_world_depth_update"}
+                                 "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+                                 "visual_sweep_world_chain", "visual_sweep_world_chain_update"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -47,7 +48,19 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                            "visual_sweep_overworld", "visual_sweep_overworld_update",
                            "visual_sweep_fishing", "visual_sweep_fishing_update",
-                           "visual_sweep_world_depth", "visual_sweep_world_depth_update"}
+                           "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+                           "visual_sweep_world_chain", "visual_sweep_world_chain_update"}
+
+# R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
+# (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label) runs for the
+# main sweep AND the two world-depth/chain satellites that carry the R4 coded-region
+# sidecars (shots 31-36). Single-sourced here; run_playtests.py imports it so the two
+# transports gate the same families. The other satellites (camping/storage/pokemon/
+# overworld) carry no R4 coded regions and keep the in-engine global gate; update-mode
+# variants stay excluded (region diff is meaningless right after a baseline rewrite).
+REGION_ORACLE_SCENARIOS = frozenset((
+    "visual_sweep", "visual_sweep_world_depth", "visual_sweep_world_chain",
+))
 
 
 def force_headless() -> bool:
@@ -298,7 +311,7 @@ SCENARIO_REQUIREMENTS = {
     "landmark_flow": {
         "all": ["boot_started", "boot_ready", "landmark_entered",
                 "puzzle_state_changed", "key_item_used", "landmark_entity_spawned",
-                "landmark_flow_passed"],
+                "alpha_provoked", "landmark_flow_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Phase 7 Build 2 legendaries (world-depth.md § Legendaries): the ring-gated
@@ -329,14 +342,35 @@ SCENARIO_REQUIREMENTS = {
                 "puzzle_state_changed", "world_chain_passed"],
         "any": [["session_loaded", "session_created"]],
     },
-    # World-depth sweep (shots 31-33, shared baseline dir). Windowed-only like the
-    # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    # Phase 7 audit R5 (world-depth.md § Teleport Beacons): the multi-beacon SELECTOR
+    # functional choice — two edge beacons registered, the APP teleport route opens the
+    # BeaconSelector, a REAL input pick of the second-registered beacon warps the avatar to
+    # THAT tile (not index 0). The all-list pins the two edge-beacon registrations
+    # (beacon_placed) + the picked warp (teleport_used) + the symmetric pass marker (the
+    # *_failed marker rides failed_event_entry). Needs scenes/ui/BeaconSelector.tscn in
+    # Main.tscn (the orchestrator's final commit includes both).
+    "beacon_selector": {
+        "all": ["boot_started", "boot_ready", "beacon_placed", "teleport_used",
+                "beacon_selector_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # World-depth sweep (shots 31-34, shared baseline dir; the derived-world 35/36
+    # ride the visual_sweep_world_chain rows below). Windowed-only like the other
+    # sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_world_depth": {
         "all": ["visual_sweep_world_depth_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     "visual_sweep_world_depth_update": {
         "all": ["visual_sweep_world_depth_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_world_chain": {
+        "all": ["visual_sweep_world_chain_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_world_chain_update": {
+        "all": ["visual_sweep_world_chain_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Pre-Phase-7 joint-RNG determinism pin (deep-dive suite expansion): one
@@ -500,9 +534,12 @@ def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]
     all=["visual_sweep_passed"]) without the explainable region gate. It is a
     no-op for every other scenario and under force-headless, loads the region diff
     lazily (run_playtests' import of this module is unaffected), and records the
-    verdict into the result file only; red-tier failures flip ok.
+    verdict into the result file only; red-tier failures flip ok. Audit Major #2: the
+    scope is REGION_ORACLE_SCENARIOS (main + the world_depth / world_chain satellites
+    that own the R4 coded-region sidecars for shots 31-36), not "visual_sweep" alone —
+    so a revived DAP path region-gates the same families as the windowed transport.
     """
-    if scenario != "visual_sweep" or force_headless():
+    if scenario not in REGION_ORACLE_SCENARIOS or force_headless():
         return summary
     try:
         spec = importlib.util.spec_from_file_location(

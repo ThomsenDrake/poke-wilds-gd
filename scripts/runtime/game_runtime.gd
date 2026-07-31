@@ -69,7 +69,7 @@ func _ready() -> void:
 	night_system.setup(session, catalog, trace, Callable(_world_gen, "placements_for_save"), Callable(_biome_encounters, "is_battle_viable"), _rng)
 	crafting_runtime.setup(session, catalog, trace)
 	camping_runtime.setup(session, trace)
-	field_move_runtime.setup(session, catalog, trace, _world_gen, night_system, _rng, world_overridden.emit)
+	field_move_runtime.setup(session, catalog, trace, _world_gen, night_system, world_overridden.emit) # Phase-7 audit: NO _rng — the eight moves roll nothing (a future roll re-injects it, the fishing_runtime precedent)
 	habitat_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen)
 	fishing_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, Callable(catalog, "get_move"))
 	breeding_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _rng, world_overridden.emit, self)

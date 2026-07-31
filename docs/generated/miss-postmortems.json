@@ -1,272 +1,329 @@
 {
-  "schema": "miss-postmortem/1",
-  "note": "Tracked canonical-JSON ledger; a deliberate human/agent ritual, NEVER a runner post-step (mirrors graduation-ledger.json). Counts are COMPUTED from entries, never narrated. Refuse-on-unreadable: a present-but-corrupt ledger is a hard error, never reset to empty. The both-directions check_repo_contracts backstop is IMPLEMENTED (tools/check_repo_contracts.py miss_postmortem_issues, folded into run; incompleteness advisories on stderr): every entry's mechanism_added MUST resolve to a landed artifact (each named repo path exists; each named art-anchor id is in the registry) and every executed plant's revert_scope sha256 pins MUST still match the tree — the pins are recorded at the byte-identical revert, so the check is position-independent (it holds mid-slice as well as post-commit, where a live git status would false-red on unrelated in-flight edits). Entry #1's plant EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable, 1152x648, forward_plus); the run artifacts are machine-local (.godot-smoke is gitignored: proof-class1-compare.json first-break, proof-class1-update-refusal.json regen-under-break RED, proof-class1-revert-compare.json post-revert GREEN, proof-vlm-plugin-degrade.json opt-in reviewer degrade) — the DURABLE proof is the revert_scope pins below plus the backstop that holds them. Entry #2's plant (the nav_audit false-red; the protocol's first FALSE-RED variant) EXECUTED 2026-07-22 (headless, PLAYTEST_FORCE_HEADLESS, Godot 4.6.1-stable): a forced turn-1 trap stayed GREEN and stream-identical across 20 fresh subprocesses under the seed while removing the seed diverged 10/10 streams and the pre-fix RUN check went 3/3 RED; the pre-fix harness reproduced the reasonless red that the fixed harness reports with reasons — the durable proof is the revert_scope pins below (the FIXED-tree bytes, since the mechanism landed before the plant ran). Entry #2's scripts/app/nav_audit.gd pin was RE-STAMPED 2026-07-22 after a GATED_SCAN_RADIUS hardening (20->40): a live world measured its nearest surf gate on ring 22 from a real saved player tile, so the tighter bound made the pass event hostage to the save's geometry (deterministic RED after any mid-run save drift, e.g. a harness kill — the save-geometry sibling this entry's classes_silent already discloses); the gate CONTRACTS the entry's mechanism proved are unchanged (same surf/cut proofs, wider scan). The pin follows the fixed tree through legitimate code change — the documented maintenance route, like fixing a broken internal link. Entry #2's tools/godot_dap_smoketest.py pin was RE-STAMPED 2026-07-23 for the building_loop slice: registering the new placement_flow scenario in SCENARIO_REQUIREMENTS (so the smoke/visual harness accepts it as a first-class scenario, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + nav_audit_failed emission) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route. Entry #2's tools/run_playtests.py pin was likewise RE-STAMPED 2026-07-23 for the building_loop slice: adding placement_flow to PLAYTEST_SCENARIOS (wiring the Phase 1 acceptance scenario into the verify_all one-command gate, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves this entry's proved honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_event_entry + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route; the remaining two scope pins (nav_audit.gd, nav_audit_battle.gd) are unchanged and still hold. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED again 2026-07-24 for the final-fix minor slice: registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS + the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets and SMOKE_SCENARIOS, mirroring visual_sweep exactly, is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + the single-sourced table + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pins follow the fixed tree through the same legitimate maintenance route; the two nav_audit scope pins are unchanged and still hold. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED 2026-07-24 for the Phase-3 scenarios+baselines slice: registering storage_flow / visual_sweep_storage(_update) / input_gate in SCENARIO_REQUIREMENTS + the WINDOWED sets + PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (so the harness accepts them as first-class scenarios, exactly as placement_flow was wired in the 2026-07-23 restamp) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS single-sourced in the smoketest + the TraceCollector failed_events collection, both byte-untouched) intact; the pins follow the fixed tree through legitimate code change — the documented maintenance route. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED again 2026-07-24 for the battle-end input latch slice: registering battle_end_input (the generalized latch's battle-arm regression scenario — a press that ends a battle on Z-on-RUN / a ball-select Z capture must not re-fire the overworld context action the same frame; a fresh deliberate press the next frame still harvests) in SCENARIO_REQUIREMENTS + PLAYTEST_SCENARIOS, exactly as input_gate was wired, is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS single-sourced in the smoketest + failed_event_entry + the TraceCollector failed_events collection, all byte-for-byte untouched) intact — and the mechanism fired live in this slice (the pre-fix RED reported battle_end_input_failed with named reasons AND the 'ERROR: ' push_error on both channels); the two nav_audit scope pins are unchanged and still hold.",
-  "entries": [
+ "schema": "miss-postmortem/1",
+ "note": "Tracked canonical-JSON ledger; a deliberate human/agent ritual, NEVER a runner post-step (mirrors graduation-ledger.json). Counts are COMPUTED from entries, never narrated. Refuse-on-unreadable: a present-but-corrupt ledger is a hard error, never reset to empty. The both-directions check_repo_contracts backstop is IMPLEMENTED (tools/check_repo_contracts.py miss_postmortem_issues, folded into run; incompleteness advisories on stderr): every entry's mechanism_added MUST resolve to a landed artifact (each named repo path exists; each named art-anchor id is in the registry) and every executed plant's revert_scope sha256 pins MUST still match the tree — the pins are recorded at the byte-identical revert, so the check is position-independent (it holds mid-slice as well as post-commit, where a live git status would false-red on unrelated in-flight edits). Entry #1's plant EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable, 1152x648, forward_plus); the run artifacts are machine-local (.godot-smoke is gitignored: proof-class1-compare.json first-break, proof-class1-update-refusal.json regen-under-break RED, proof-class1-revert-compare.json post-revert GREEN, proof-vlm-plugin-degrade.json opt-in reviewer degrade) — the DURABLE proof is the revert_scope pins below plus the backstop that holds them. Entry #2's plant (the nav_audit false-red; the protocol's first FALSE-RED variant) EXECUTED 2026-07-22 (headless, PLAYTEST_FORCE_HEADLESS, Godot 4.6.1-stable): a forced turn-1 trap stayed GREEN and stream-identical across 20 fresh subprocesses under the seed while removing the seed diverged 10/10 streams and the pre-fix RUN check went 3/3 RED; the pre-fix harness reproduced the reasonless red that the fixed harness reports with reasons — the durable proof is the revert_scope pins below (the FIXED-tree bytes, since the mechanism landed before the plant ran). Entry #2's scripts/app/nav_audit.gd pin was RE-STAMPED 2026-07-22 after a GATED_SCAN_RADIUS hardening (20->40): a live world measured its nearest surf gate on ring 22 from a real saved player tile, so the tighter bound made the pass event hostage to the save's geometry (deterministic RED after any mid-run save drift, e.g. a harness kill — the save-geometry sibling this entry's classes_silent already discloses); the gate CONTRACTS the entry's mechanism proved are unchanged (same surf/cut proofs, wider scan). The pin follows the fixed tree through legitimate code change — the documented maintenance route, like fixing a broken internal link. Entry #2's tools/godot_dap_smoketest.py pin was RE-STAMPED 2026-07-23 for the building_loop slice: registering the new placement_flow scenario in SCENARIO_REQUIREMENTS (so the smoke/visual harness accepts it as a first-class scenario, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + nav_audit_failed emission) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route. Entry #2's tools/run_playtests.py pin was likewise RE-STAMPED 2026-07-23 for the building_loop slice: adding placement_flow to PLAYTEST_SCENARIOS (wiring the Phase 1 acceptance scenario into the verify_all one-command gate, exactly as harvest_flow is wired) is an additive dispatch-table change that leaves this entry's proved honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_event_entry + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the same legitimate maintenance route; the remaining two scope pins (nav_audit.gd, nav_audit_battle.gd) are unchanged and still hold. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED again 2026-07-24 for the final-fix minor slice: registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS + the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets and SMOKE_SCENARIOS, mirroring visual_sweep exactly, is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS widening + failed_event_entry + the single-sourced table + finalize's ok contract) byte-for-byte untouched, so the class stays closed and the pins follow the fixed tree through the same legitimate maintenance route; the two nav_audit scope pins are unchanged and still hold. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED 2026-07-24 for the Phase-3 scenarios+baselines slice: registering storage_flow / visual_sweep_storage(_update) / input_gate in SCENARIO_REQUIREMENTS + the WINDOWED sets + PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (so the harness accepts them as first-class scenarios, exactly as placement_flow was wired in the 2026-07-23 restamp) is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS single-sourced in the smoketest + the TraceCollector failed_events collection, both byte-untouched) intact; the pins follow the fixed tree through legitimate code change — the documented maintenance route. Entry #2's tools/run_playtests.py + tools/godot_dap_smoketest.py pins were RE-STAMPED again 2026-07-24 for the battle-end input latch slice: registering battle_end_input (the generalized latch's battle-arm regression scenario — a press that ends a battle on Z-on-RUN / a ball-select Z capture must not re-fire the overworld context action the same frame; a fresh deliberate press the next frame still harvests) in SCENARIO_REQUIREMENTS + PLAYTEST_SCENARIOS, exactly as input_gate was wired, is an additive dispatch-table change that leaves the honest-reporting mechanism this entry proved (ERROR_MARKERS single-sourced in the smoketest + failed_event_entry + the TraceCollector failed_events collection, all byte-for-byte untouched) intact — and the mechanism fired live in this slice (the pre-fix RED reported battle_end_input_failed with named reasons AND the 'ERROR: ' push_error on both channels); the two nav_audit scope pins are unchanged and still hold.",
+ "entries": [
+  {
+   "id": "miss-001-hp-bar-11px",
+   "date": "2026-07-22",
+   "head_sha": "cf44597ecc5203d8830a4d594030dfcdfbd7b931",
+   "instance": {
+    "description": "Programmatic HP bars (EnemyHPBar/PlayerHPBar ColorRects in scenes/ui/BattleView.tscn) were misaligned +11 stage-px from the baked GSC tracks: enemy at x43 (track x32), player at x107 (track x96). The committed baseline sidecar (fd7d0925e0aed24c9cb0f04526a3368717dfac72, 2026-07-18) froze the wrong draw_order EnemyHPBar rect [43,18,48,4] and the suite stayed GREEN against it for 3+ days. Every automated check class was self-referential: truth was the code's own output or a human transcription of it, so nothing could see an overlay sitting off the art feature it belongs on.",
+    "shots": [
+     "09_battle.png",
+     "10_battle_moves.png",
+     "11_battle_after_attack.png",
+     "12_battle_items.png"
+    ],
+    "perturbation": "Fix: EnemyHPBar offset_left 43->32 and PlayerHPBar offset_left 107->96 (-11 stage px each), then visual_sweep_update regenerated exactly the four battle baselines 09-12 (overworld/menu baselines byte-identical)."
+   },
+   "missing_anchor_class": "SA",
+   "classes_silent": [
     {
-      "id": "miss-001-hp-bar-11px",
-      "date": "2026-07-22",
-      "head_sha": "cf44597ecc5203d8830a4d594030dfcdfbd7b931",
-      "instance": {
-        "description": "Programmatic HP bars (EnemyHPBar/PlayerHPBar ColorRects in scenes/ui/BattleView.tscn) were misaligned +11 stage-px from the baked GSC tracks: enemy at x43 (track x32), player at x107 (track x96). The committed baseline sidecar (fd7d0925e0aed24c9cb0f04526a3368717dfac72, 2026-07-18) froze the wrong draw_order EnemyHPBar rect [43,18,48,4] and the suite stayed GREEN against it for 3+ days. Every automated check class was self-referential: truth was the code's own output or a human transcription of it, so nothing could see an overlay sitting off the art feature it belongs on.",
-        "shots": [
-          "09_battle.png",
-          "10_battle_moves.png",
-          "11_battle_after_attack.png",
-          "12_battle_items.png"
-        ],
-        "perturbation": "Fix: EnemyHPBar offset_left 43->32 and PlayerHPBar offset_left 107->96 (-11 stage px each), then visual_sweep_update regenerated exactly the four battle baselines 09-12 (overworld/menu baselines byte-identical)."
-      },
-      "missing_anchor_class": "SA",
-      "classes_silent": [
-        {
-          "class": "pixel baseline + global 0.5% gate (visual_diff.py)",
-          "anchor_kind": "CO",
-          "why_silent": "The wrong render WAS the baseline; delta 0."
-        },
-        {
-          "class": "visual_region_diff red tiers",
-          "anchor_kind": "CO",
-          "why_silent": "No clusters vs its own baseline; the bar moved WITH the baseline."
-        },
-        {
-          "class": "Lane-4 deterministic sidecar-consistency reviewer",
-          "anchor_kind": "CO",
-          "why_silent": "draw_order delta checks z/y_sort/presence only, never rects; baseline and fresh sidecars both carried the code's [43,18,...]."
-        },
-        {
-          "class": "ui_render_model / ui_render_art",
-          "anchor_kind": "HM",
-          "why_silent": "HP bars were never modeled — no bar rect in the ACTION_*/MOVE_*/ITEM_* constants."
-        },
-        {
-          "class": "text_oracle glyph XOR",
-          "anchor_kind": "CO",
-          "why_silent": "HP numbers are not ANCHOR strings; the glyph oracle matches anchor-mode strings only."
-        },
-        {
-          "class": "layout_audit",
-          "anchor_kind": "CO",
-          "why_silent": "Checks name/level overlap only; consumes the layout model, not art."
-        },
-        {
-          "class": "contrast_check (WCAG)",
-          "anchor_kind": "XS",
-          "why_silent": "Label rects unchanged; a translation changes no contrast ratio."
-        },
-        {
-          "class": "cvd_sim (Machado 2009)",
-          "anchor_kind": "XS",
-          "why_silent": "Palettes unchanged; position-independent."
-        },
-        {
-          "class": "display_matrix",
-          "anchor_kind": "CO",
-          "why_silent": "Self-consistent scale replication at every window size; the offset replicates cleanly."
-        },
-        {
-          "class": "rubric line 63 'Are HP bars on their baked tracks...?'",
-          "anchor_kind": "EA",
-          "why_silent": "Asked by the rubric, answered by NO agent — the model-reviewer lane was designed but never populated."
-        }
-      ],
-      "mechanism_added": "SA anchor class: docs/registry/art-anchors.toml entries battle/enemy_hp_track + battle/player_hp_track (dark-run stage_rects (32,18,48,4)/(96,74,48,4) re-derived from battle_screen2.png bytes); tools/art_geometry.py derive_rect; tools/check_art_anchors.py art_anchor_issues folded into check_repo_contracts.run (RED static gate); anchor_drift class in tools/vision_review.py default_reviewer (quarantine-tier, art:<id> regions); tools/run_playtests.py apply_anchor_gate baseline-regeneration refusal — active for BOTH visual_sweep and visual_sweep_update via VISUAL_SWEEP_SCENARIOS (a guard on the compare name alone leaves the refusal branch unreachable, which the plant's first pass exposed and fixed), plus the VISION_REVIEWER_CMD opt-in wiring of the --reviewer-cmd socket into apply_vision_review; EA answerer: tools/vlm_reviewer.py (reviewer_kind model-qwen3-vl, composite degrade, kinds_ran contract) populating the socket for the battle 'hp bars on their baked tracks' question — opt-in in the runner (default unset ⇒ deterministic lane), the first model-answered manifest pending a qwen3-vl pull; protocol backstop: tools/check_repo_contracts.py miss_postmortem_issues (both-directions, folded into run) resolving this mechanism_added to landed artifacts and holding this plant's revert_scope. All resolve to landed artifacts in this slice.",
-      "plant": {
-        "perturbation": "CLASS-LEVEL: re-break EnemyHPBar/PlayerHPBar offsets to 43/107 WITHOUT regenerating baselines (any overlay off its art anchor), run every lane; then ALSO regenerate baselines under the break (--scenario visual_sweep_update) and re-run. Both bars are broken; only the enemy anchor can fire live-respect today — PlayerHUD/PlayerHPBar is nested and not yet exposed in the sidecar draw_order (recursive collection pending), so the player anchor is recorded UNVERIFIABLE, never silently passed.",
-        "executed": true,
-        "mechanism_caught": true,
-        "classes_silent_confirmed": true,
-        "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode — machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar — and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole — regenerated baselines were. REGEN-UNDER-BREAK (update mode — machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap — prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole).",
-        "revert_scope": {
-          "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
-          "docs/generated/visual-baselines/09_battle.png.sidecar.json": "9d8c3c634ea3c7f16fef1c1b8dc5a390431af9bed951908291d2657441538ee6",
-          "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
-          "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "30120ed1008977a1ad3b6358b0c1cf73cf7c57259c05026ce88e26025b652917",
-          "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
-          "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "918f834a10400023c9d838b6eb1a28703d8038664a6377c67a6b375b54f6bea6",
-          "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
-          "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "da72cec352afa8bd66f068778254acd981bc2cfd591e91a6842ed3ba7d38f0f9"
-        }
-      },
-      "plants_recorded_but_excluded_from_stats": true
+     "class": "pixel baseline + global 0.5% gate (visual_diff.py)",
+     "anchor_kind": "CO",
+     "why_silent": "The wrong render WAS the baseline; delta 0."
     },
     {
-      "id": "miss-002-nav-audit-false-red",
-      "date": "2026-07-22",
-      "head_sha": "385da7efcb93a2963ed3c96d80528a3480f775e1",
-      "instance": {
-        "description": "FALSE-RED variant (the suite intermittently LIES; not a miss). nav_audit intermittently failed on FRESH verify_all runs with 'missing required events: nav_audit_passed' — the scenario ran to completion in ~2.6s but never emitted its pass event. The pass event was gated on the outcome of a wild battle whose inputs were drawn from UNSEEDED, wall-clock-seeded RNG (game_runtime.gd and battle_runtime.gd both call _rng.randomize() once per fresh subprocess): when the drawn wild landed an EFFECT_TRAP_TARGET move, the game CORRECTLY refused to flee ('Can't escape!' while is_trapped, view stays visible) and _check_run_escape recorded that legitimate mechanic as a suite failure, suppressing nav_audit_passed. Compounding the red into a REASONLESS one: the failure reason was emitted only via push_error ('ERROR: Nav audit failed: ...'), and ERROR_MARKERS=('SCRIPT ERROR','Parse Error') never matched the 'ERROR: ' prefix, so exceptions:[] and the report showed only the blank missing-event. Investigations exonerated the create_timer/cold-start hypothesis (nav_audit uses only tile_changed/process_frame awaits; failing runs last ~2.6s against a 120s budget): the wall-clock dependence was in the RNG SEED — which is why cold-start only correlated (it shifts the randomize() seed), why the true failure rate was ~3-5% regardless of temperature, why re-runs passed (new seed), why 10/10 greens occurred (luck), and why a git-stash test proved it PRE-EXISTING at clean HEAD cf44597 (the unseeded draw and the unversioned user:// save both live outside the working tree).",
-        "shots": [
-          "nav_audit (fresh headless subprocess runs under verify_all / run_playtests.py --include-smoke)"
-        ],
-        "perturbation": "Fix (instance closed AS A SIDE EFFECT of the class mechanism): pin both runtime rngs via seed_for_smoke(NAV_AUDIT_SEED := 20260718) before _start_battle (the house seeding convention), and make _check_run_escape total — a visible view after RUN must carry the game's ONLY refusal text 'Can't escape!' (proving the trap-refusal mechanic as NEW coverage), then the trap is deterministically expired (battle_runtime._player_mon['trap_turns'] = 0) and RUN re-proven to end the battle. A legitimate in-game escape refusal can never again be recorded as a suite failure; the traversal/menu halves are untouched (no battle rng), and the save backup/restore guard is untouched."
-      },
-      "missing_anchor_class": "CO",
-      "classes_silent": [
-        {
-          "class": "run_playtests.py required-event check (missing_all)",
-          "anchor_kind": "CO",
-          "why_silent": "Checks only that nav_audit_passed is present; the scenario RAN and simply never emitted it, so the check reported 'missing' correctly but with no reason — there was no failure-event contract symmetric with the _passed special-casing."
-        },
-        {
-          "class": "ERROR_MARKERS exception capture (run_playtests.py + godot_dap_smoketest.py)",
-          "anchor_kind": "CO",
-          "why_silent": "('SCRIPT ERROR','Parse Error') does not match push_error's 'ERROR: <message>' prefix (the 'at:' backtrace line carries no marker either), so the emitted failure reason was discarded into exceptions:[] — the reason existed and was thrown away."
-        },
-        {
-          "class": "determinism_verify.py pins + canary",
-          "anchor_kind": "CO",
-          "why_silent": "Pins the visual_sweep CAPTURE determinism (project.godot msaa/snap pins, canary shot hash); never covers scenario PASS EVENTS or the rng draws feeding them — a different determinism surface."
-        },
-        {
-          "class": "playtest_soak seeded bot (SOAK_SEED)",
-          "anchor_kind": "CO",
-          "why_silent": "Proves the soak's OWN bot rng deterministic; nav_audit never adopted the convention — its wild draw, enemy move choice, and trap/attract rolls rode the per-process randomize()."
-        },
-        {
-          "class": "visual_sweep/display_matrix BATTLE_RNG_SEED direct assignment",
-          "anchor_kind": "CO",
-          "why_silent": "Seeds the battle rng for a HAND-CRAFTED wild (visual_sweep never drives generate_wild_encounter); no seam covered the real encounter-draw path nav_audit exercises, and nothing pinned the game-side _rng at all."
-        },
-        {
-          "class": "miss_postmortem_issues / graduation_ledger backstops",
-          "anchor_kind": "CO",
-          "why_silent": "Track landed mechanisms and graduation streaks, not run-to-run determinism of scenario inputs; a flake that re-passes leaves no ledger trace."
-        },
-        {
-          "class": "per-scenario save backup/restore guard (smoke_scenarios.gd)",
-          "anchor_kind": "CO",
-          "why_silent": "Restores the SAVE around each run but cannot pin in-process rng draws (and, as recorded here, cannot protect save geometry from a harness SIGKILL mid-scenario — the latent sibling subclass, advisory, not this entry's fix)."
-        }
-      ],
-      "mechanism_added": "Two coordinated class-level mechanisms (the instance is fixed as a side effect; neither changes what nav_audit verifies). (A) DETERMINISM — scripts/runtime/game_runtime.gd seed_for_smoke(seed) seam pins BOTH _rng and battle_runtime._rng (mirrors the existing direct-assignment convention at scripts/app/visual_sweep.gd BATTLE_RNG_SEED and scripts/app/display_matrix.gd but covers the whole generate_wild_encounter path), called from scripts/app/nav_audit_battle.gd run() with scripts/app/nav_audit.gd NAV_AUDIT_SEED := 20260718 before _start_battle, so the audited inputs are a pure function of (code, save, seed), reproducible across subprocesses and across cold and warm starts; plus the total RUN contract in scripts/app/nav_audit_battle.gd _check_run_escape — a legitimate 'Can't escape!' trap refusal is PROVEN, the trap expired deterministically, and escape re-proven (strengthened coverage, never relaxed). (C) HONEST REPORTING — shared-harness class fix so EVERY scenario's red names its cause: tools/godot_dap_smoketest.py ERROR_MARKERS widened to capture push_error's 'ERROR: ' prefix and single-sourced (imported by tools/run_playtests.py so both transports agree by construction), plus failed_event_entry: any trace event ending in '_failed' is collected as a named failure with its reasons payload and both finalize and result_summary mark not-ok and record it; scripts/app/nav_audit.gd emits nav_audit_failed with the failures array on the non-pass branch alongside push_error (the going-forward contract for every audit's non-pass branch), documented in docs/references/trace-events.md and held by tools/check_repo_contracts.py (nav_audit_failed in app_bootstrap required_trace_events; the miss_postmortem_issues backstop holds this entry's revert_scope pins). Handled engine-side refusals stay quiet at the source — scripts/runtime/save_store.gd parses corrupt saves via JSON.new().parse (error code, no engine output) — so the widened capture adds no false reds on green paths (proven by a full headless suite run). The class — unseeded pass-events plus silent non-pass exits suite-wide — is closed by (A) as the convention every scenario adopts plus (C) in the shared harness. All resolve to landed artifacts in this slice.",
-      "plant": {
-        "perturbation": "CLASS-LEVEL, two parts, headless (PLAYTEST_FORCE_HEADLESS), then byte-identical revert. PART 1 (determinism backstop): force the instance's KIND — the wild's moveset replaced by a single perfect-accuracy EFFECT_TRAP_TARGET move with unkillable HP in _start_battle, so turn 1 ALWAYS applies the partial trap to the player through the real mechanic (choose_enemy_move_index -> execute_attack -> apply_trap). P1-1: mechanism in place, 20 fresh subprocesses (warm + mtime-cold + one .godot-move true-cold) -> 20/20 GREEN with the trap refusal PROVEN (battle_options_checked 11 vs the untrapped 10) and the ts_msec-normalized event stream byte-identical across the 19 same-temperature runs (the one true-cold run forms its OWN identical cold stream; the sole cold/warm delta is the engine cold-cache 'sound' flag on attack_animation_played — not the pinned rng stream, not the pass payload, which is identical). P1-2: seed_for_smoke call removed (unseeded randomize() re-introduced), same forced trap, 10 fresh runs -> all still GREEN (the total RUN contract alone tolerates the trap) but 10/10 DIVERGENT event streams (a different wild species/level every run: SLAKOTH/KAKUNA/QUILLADIN/...) — the non-determinism returns and the class is caught loudly, isolating the seed as the determinism pin. P1-3: seed restored, pre-fix _check_run_escape restored, forced trap -> 3/3 RED with the original instance's exact failure text 'battle: RUN did not end the battle' — the total contract is what turns the trap red into proven behavior. PART 2 (honest-reporting backstop): P2-1 (specimen): nav_audit_failed emission removed, ERROR_MARKERS narrowed to ('SCRIPT ERROR','Parse Error'), pre-fix check + forced trap, run through run_playtests.py -> reproduces the original REASONLESS red byte-for-byte in shape (missing_all=['nav_audit_passed'], exceptions=[], failed_events=[]). P2-2: (C) restored (emission + widened markers), same forced failure -> the report carries its reason on BOTH channels (failed_events=[nav_audit_failed {'failures': ['battle: RUN did not end the battle']}] AND exceptions=['ERROR: Nav audit failed: battle: RUN did not end the battle']) — a red can no longer be reasonless. All perturbations reverted byte-identical (verified by sha256 against the pre-plant snapshots); because the mechanism fix LANDED before the plant executed, the recorded pins are the FIXED-tree bytes, held mechanically by the miss_postmortem_issues backstop from now on.",
-        "executed": true,
-        "mechanism_caught": true,
-        "classes_silent_confirmed": true,
-        "revert_proof": "git-tracked plant scope sha-verified equal to the pre-plant fixed-tree snapshots (byte-identical revert); the pins below are held by the check_repo_contracts miss_postmortem_issues backstop (position-independent: holds mid-slice/uncommitted exactly as post-commit). Plant artifacts (.godot-smoke/plant-p2-1.json reasonless-red specimen, plant-p2-2.json reason-carrying report) are machine-local. RE-STAMP 2026-07-23 (Phase 2 scenarios+baselines slice): the four camping/crafting/night/evolution scenarios were registered in SCENARIO_REQUIREMENTS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS (run_playtests.py), legitimately perturbing both pinned scope files. The (C) honest-reporting mechanism was re-verified intact in the drifted bytes before re-stamping: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:222), and run_playtests.py still single-sources the table from the sibling harness (:53); the mechanism FIRED live in this slice — the Phase 2 scenario reds reported named reasons on both channels (failed_events=[night_cycle_failed {'failures': [...]}] AND exceptions=['ERROR: ...']). The (A) determinism seam is untouched (game_runtime.seed_for_smoke; the four new scenarios all pin it). The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py 767e43a77f84..., godot_dap_smoketest.py 875682aacd2a.... RE-STAMP 2026-07-23 (final-fix agent, post-adversarial-review slice): nav_audit_battle.gd legitimately perturbed — run() now DAY-pins the clock (Phase 2 time-aware encounter draws: the nocturnal filter + ghost roll had made the audited stream a function of the save's time_of_day) and swap-pins a fixed BULBASAUR party (a craft sweep leaking an overleveled party through the unguarded playtest entries KOs the audit wild on move activation, leaving the RUN check reading a pending victory view). Both mechanisms re-verified intact in the drifted bytes before re-stamping: (A) seed_for_smoke(rng_seed) is still run()'s first act (nav_audit_battle.gd:28), the total RUN contract untouched (:171-175), NAV_AUDIT_SEED still threaded (nav_audit.gd:41), game_runtime.seed_for_smoke unchanged (:203); (C) untouched — the other three scope pins are byte-identical (nav_audit.gd ad29dd5c..., godot_dap_smoketest.py e65e93a2..., run_playtests.py d437b440...). Proven save-independent: nav_audit green twice on a polluted save (night clock + overleveled leaked party) and on a fresh save. Old pin: nav_audit_battle.gd 537661553c06.... RE-STAMP 2026-07-24 (final-fix agent, post-adversarial-review minor-fix slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS plus the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets (godot_dap_smoketest.py) and SMOKE_SCENARIOS (run_playtests.py), mirroring visual_sweep exactly so the camping sweep is a first-class gate scenario that transport-skips honestly under PLAYTEST_FORCE_HEADLESS instead of failing headless where its captures cannot render. Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:234), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:91) from the sibling harness, and finalize's ok contract is unchanged (:204). The (A) determinism seam is untouched. The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py d437b4407c37..., godot_dap_smoketest.py e65e93a264e8.... RE-STAMP 2026-07-24 (battle-end input latch slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the battle_end_input scenario (the generalized latch's battle-arm regression: a press that ENDS A BATTLE — Z-on-RUN / a ball-select Z capture — must not re-fire the overworld context action the same frame) in SCENARIO_REQUIREMENTS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS (run_playtests.py), exactly as input_gate was wired in the 2026-07-24 Phase-3 restamp. Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:267), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:92) from the sibling harness. The mechanism FIRED live in this slice — the pre-fix RED run reported named reasons on BOTH channels (battle_end_input_failed {'failures': [...]} trace AND 'ERROR: Battle-end input gate failed: ...' push_error). The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; the new scenario pins it via seed_for_smoke(2026072402)). The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py e14a88d8bd5d..., godot_dap_smoketest.py dea950bba362.... RE-STAMP 2026-07-25 (Phase 5 scenarios slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the Phase 5 scenarios (breed_flow, shiny_odds, habitat_drops, fishing_flow, playtest_breed_soak + visual_sweep_pokemon / visual_sweep_pokemon_update) in SCENARIO_REQUIREMENTS plus the WINDOWED_ONLY / WINDOWED_SUBPROCESS sets (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (run_playtests.py), mirroring the Phase 2/3 restamps exactly so the Phase 5 proofs are first-class gate scenarios (the pokemon-state sweep transport-skips honestly under PLAYTEST_FORCE_HEADLESS). Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:326), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:93) from the sibling harness, and finalize's ok contract is unchanged (:181). The mechanism FIRED live in this slice — the Phase 5 scenario reds reported named reasons on BOTH channels (e.g. breed_flow_failed {'failures': [...]} trace AND 'ERROR: BreedFlowScenario failed: ...' push_error exception). The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; all five new scenarios pin it). The two nav_audit scope pins above were verified unchanged (ad29dd5c17fb..., 4a967b965eb0...). Old pins: run_playtests.py 49513b9400f3..., godot_dap_smoketest.py 69c38084d668.... RE-STAMP 2026-07-27 (Phase 6 overworld mons slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the overworld_mons gate scenario plus visual_sweep_overworld / visual_sweep_overworld_update (the deterministic 22/23 sweep) in SCENARIO_REQUIREMENTS (the seven plan-mandated domain traces pinned on the gate scenario) plus WINDOWED_ONLY_SCENARIOS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (run_playtests.py), mirroring the Phase 2/3/5 restamps exactly so the Phase 6 proofs are first-class gate scenarios (the overworld sweep transport-skips honestly under PLAYTEST_FORCE_HEADLESS). Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons, run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:93) from the sibling harness. The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; the new scenario's entity rolls ride the derived-hash stream — no shared _rng at all — and its CONTROL window pins seed_for_smoke). The two nav_audit scope pins above were verified unchanged (ad29dd5c17fb..., 4a967b965eb0...). Old pins: run_playtests.py d29cf5de9c73..., godot_dap_smoketest.py 9cca544ae124....",
-        "revert_scope": {
-          "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
-          "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-          "tools/run_playtests.py": "28ce554313c28a14dade4202fe17bbcb458c3d7ec43ea410a4938275e44fec4e",
-          "tools/godot_dap_smoketest.py": "69cb1acdcd553b9cb4a8d9c7d8513839087f71d15ef53e2b0bf649db4f7231b1"
-        },
-        "re_stamp_log": [
-          {
-            "date": "2026-07-28",
-            "file": "tools/run_playtests.py",
-            "old_pin": "3afc6f157ddb",
-            "new_pin": "1b6e2c5d5c31",
-            "reason": "legitimate edit (pre-Phase-7 suite expansion deep-dive fixes: soak tripwire ok-guard B2 + sidecar missing-stamp hardening M1 + double-run budget split M4); baseline shifted, plant scope verified free of plant content"
-          },
-          {
-            "date": "2026-07-28",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "87db2ed38d2f",
-            "new_pin": "ebc13b8915a4",
-            "reason": "legitimate edit: exposed save_stability_update requirements row (on-demand golden regeneration)"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/run_playtests.py",
-            "old_pin": "1b6e2c5d5c31",
-            "new_pin": "f891f3ba8cc7",
-            "reason": "legitimate edit (Phase 7 Build 1 landmarks slice): landmark_flow + visual_sweep_world_depth(_update) registered in PLAYTEST_SCENARIOS, wired exactly as the Phase 6 overworld_mons restamp — additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :94, the TraceCollector failed_events collection unchanged); the (A) determinism seam is untouched (landmark_flow pins seed_for_smoke(2026072907) before new_game); the two nav_audit scope pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "ebc13b8915a4",
-            "new_pin": "896fdc2dfe44",
-            "reason": "legitimate edit (Phase 7 Build 1 landmarks slice): landmark_flow registered in SCENARIO_REQUIREMENTS (the two frozen plan traces + auxiliary key_item_used + the symmetric pass marker; the *_failed marker rides failed_event_entry) and visual_sweep_world_depth(_update) in the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets — additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/run_playtests.py",
-            "old_pin": "f891f3ba8cc7",
-            "new_pin": "7de9512a8350",
-            "reason": "legitimate edit: suite-level save backup/restore guard (atexit) — the suite no longer pollutes the user save across runs (KO-animation-overrun flake class)"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/run_playtests.py",
-            "old_pin": "7de9512a8350",
-            "new_pin": "6ff675512849",
-            "reason": "legitimate edit (Phase 7 Build 1 review-phase fixes): the --include-smoke argparse help now counts SMOKE_SCENARIOS dynamically (it narrated 7 while the list holds 13, contradicting the RELIABILITY recount) — a help-text correction layered on top of the atexit guard restamp that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness, the TraceCollector failed_events collection + the atexit save guard unchanged); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "896fdc2dfe44",
-            "new_pin": "88dd49b19b14",
-            "reason": "legitimate edit (Phase 7 Build 1 review-phase fixes): landmark_entity_spawned (the Ruins Underground DUSCLOPS witness, now documented in trace-events.md) promoted into the landmark_flow requirements 'all' so the dormant->LIVE guardian deliverable is a FIRST-CLASS gate event instead of transitively gated through landmark_flow_passed — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects structured *_failed reasons :417); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/run_playtests.py",
-            "old_pin": "6ff675512849",
-            "new_pin": "bab35239ea8b",
-            "reason": "legitimate edit: --fresh-save flag — verify lanes run save-less so traces never depend on residual save state (double-run cmp save-dependence flake)"
-          },
-          {
-            "date": "2026-07-29",
-            "file": "tools/run_playtests.py",
-            "old_pin": "bab35239ea8b",
-            "new_pin": "d2b77b10dd73",
-            "reason": "legitimate edit (review-phase save-guard hardening): the suite-level save backup moved from an in-memory copy to a DISK SIBLING written before any unlink, with SIGTERM-inline + atexit restore and startup self-heal of a stale sibling (verify_all SIGKILLs overrun lanes; atexit never ran there, so --fresh-save’s delete-first could permanently lose the user’s save); the --fresh-save help text reworded to the true contract (first scenario boots save-less; the smoke_scenario_dispatched boundary + per-consumer re-pins keep traces save-independent). Leaves this entry’s proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still single-sourced from the sibling harness (:96), SCENARIO_REQUIREMENTS likewise (:55), failed_event_entry still collects structured *_failed reasons (:140), finalize’s ok contract unchanged. The (A) determinism seam is untouched; the nav_audit pins + the godot_dap_smoketest.py pin unchanged and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/run_playtests.py",
-            "old_pin": "d2b77b10dd73",
-            "new_pin": "47f2b2b6d5c1",
-            "reason": "legitimate edit (Phase 7 Build 2 legendaries slice): legendary_spawn registered in PLAYTEST_SCENARIOS, wired exactly as the Build 1 landmark_flow restamp — an additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :96, SCENARIO_REQUIREMENTS :55, the TraceCollector failed_events collection :140 + finalize's ok contract unchanged); the (A) determinism seam is untouched (legendary_spawn pins seed_for_smoke(2026073001) BEFORE new_game, the breed_flow precedent; legendary stamping is pure _mix, NO rng); the two nav_audit scope pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "88dd49b19b14",
-            "new_pin": "44d16f132b27",
-            "reason": "legitimate edit (Phase 7 Build 2 legendaries slice): legendary_spawn registered in SCENARIO_REQUIREMENTS — the all-list pins the registry-REQUIRED battle-start trace legendary_encounter (emitted ONLY for a battle_kind \"legendary\" forced battle), the KO despawn + battle_finished + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons :430); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/run_playtests.py",
-            "old_pin": "47f2b2b6d5c1",
-            "new_pin": "28ce554313c2",
-            "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in PLAYTEST_SCENARIOS, wired exactly as the Build 2 legendary_spawn restamp — an additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :96, SCENARIO_REQUIREMENTS :55, the TraceCollector failed_events collection + the disk-sibling save guard unchanged); the (A) determinism seam is untouched (world_chain pins seed_for_smoke(2026072913) BEFORE new_game, the save_stability precedent; the crossing path is pure SplitMix, NO rng); the two nav_audit scope pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "44d16f132b27",
-            "new_pin": "d4ada0827f0a",
-            "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in SCENARIO_REQUIREMENTS — the all-list pins the three registry-REQUIRED chain traces (world_edge_crossed, world_chained, beacon_placed) + the walk-into-boundary traversal_blocked refusal + the chained-world puzzle_state_changed witness + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/verify_all.py",
-            "old_pin": "f5cf1ce9bd31",
-            "new_pin": "9e2cf3fb6e86",
-            "reason": "informational (NOT in revert_scope — recorded for traceability alongside the two in-scope restamps): the double-run lane regroup [4,4] -> [4,5] admitting world_chain as the ninth rng-consumer (group 2's fifth, self-pinned; the two world-depth scenarios stay in SEPARATE groups; the <=80s per-group budget holds) + the header/comment co-mods (eight -> nine). The file carries no plant pin, so nothing mechanical shifts; the two in-scope restamps above are the operative ones"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/verify_all.py",
-            "old_pin": "9e2cf3fb6e86",
-            "new_pin": "ae84e04fb890",
-            "reason": "informational (NOT in revert_scope — recorded for traceability): the double-run lane's per-group outer budget split 80.0 -> [80.0, 100.0] (index-aligned with DOUBLE_RUN_GROUPS) giving the five-scenario group 2 explicit headroom over the four-scenario budget, + the shot-range comment co-mods (31-32 -> 31-33, the landed world_depth registry range) + the comments narrating it. The file carries no plant pin, so nothing mechanical shifts; the two in-scope tool pins + the two nav_audit scope pins are untouched and still hold"
-          },
-          {
-            "date": "2026-07-30",
-            "file": "tools/godot_dap_smoketest.py",
-            "old_pin": "d4ada0827f0a",
-            "new_pin": "69cb1acdcd55",
-            "reason": "legitimate edit: the world-depth sweep requirements comment narrated shots 31-32 while the landed SHOT_REGISTRY range is [31,33] (the Build-3 33_beacon shot shipped with a captured baseline) — a comment-only truthfulness co-mod that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons, SCENARIO_REQUIREMENTS rows unchanged); the (A) determinism seam is untouched; the nav_audit pins + the run_playtests.py pin unchanged and still hold"
-          }
-        ]
-      },
-      "plants_recorded_but_excluded_from_stats": true
+     "class": "visual_region_diff red tiers",
+     "anchor_kind": "CO",
+     "why_silent": "No clusters vs its own baseline; the bar moved WITH the baseline."
+    },
+    {
+     "class": "Lane-4 deterministic sidecar-consistency reviewer",
+     "anchor_kind": "CO",
+     "why_silent": "draw_order delta checks z/y_sort/presence only, never rects; baseline and fresh sidecars both carried the code's [43,18,...]."
+    },
+    {
+     "class": "ui_render_model / ui_render_art",
+     "anchor_kind": "HM",
+     "why_silent": "HP bars were never modeled — no bar rect in the ACTION_*/MOVE_*/ITEM_* constants."
+    },
+    {
+     "class": "text_oracle glyph XOR",
+     "anchor_kind": "CO",
+     "why_silent": "HP numbers are not ANCHOR strings; the glyph oracle matches anchor-mode strings only."
+    },
+    {
+     "class": "layout_audit",
+     "anchor_kind": "CO",
+     "why_silent": "Checks name/level overlap only; consumes the layout model, not art."
+    },
+    {
+     "class": "contrast_check (WCAG)",
+     "anchor_kind": "XS",
+     "why_silent": "Label rects unchanged; a translation changes no contrast ratio."
+    },
+    {
+     "class": "cvd_sim (Machado 2009)",
+     "anchor_kind": "XS",
+     "why_silent": "Palettes unchanged; position-independent."
+    },
+    {
+     "class": "display_matrix",
+     "anchor_kind": "CO",
+     "why_silent": "Self-consistent scale replication at every window size; the offset replicates cleanly."
+    },
+    {
+     "class": "rubric line 63 'Are HP bars on their baked tracks...?'",
+     "anchor_kind": "EA",
+     "why_silent": "Asked by the rubric, answered by NO agent — the model-reviewer lane was designed but never populated."
     }
-  ]
+   ],
+   "mechanism_added": "SA anchor class: docs/registry/art-anchors.toml entries battle/enemy_hp_track + battle/player_hp_track (dark-run stage_rects (32,18,48,4)/(96,74,48,4) re-derived from battle_screen2.png bytes); tools/art_geometry.py derive_rect; tools/check_art_anchors.py art_anchor_issues folded into check_repo_contracts.run (RED static gate); anchor_drift class in tools/vision_review.py default_reviewer (quarantine-tier, art:<id> regions); tools/run_playtests.py apply_anchor_gate baseline-regeneration refusal — active for BOTH visual_sweep and visual_sweep_update via VISUAL_SWEEP_SCENARIOS (a guard on the compare name alone leaves the refusal branch unreachable, which the plant's first pass exposed and fixed), plus the VISION_REVIEWER_CMD opt-in wiring of the --reviewer-cmd socket into apply_vision_review; EA answerer: tools/vlm_reviewer.py (reviewer_kind model-qwen3-vl, composite degrade, kinds_ran contract) populating the socket for the battle 'hp bars on their baked tracks' question — opt-in in the runner (default unset ⇒ deterministic lane), the first model-answered manifest pending a qwen3-vl pull; protocol backstop: tools/check_repo_contracts.py miss_postmortem_issues (both-directions, folded into run) resolving this mechanism_added to landed artifacts and holding this plant's revert_scope. All resolve to landed artifacts in this slice.",
+   "plant": {
+    "perturbation": "CLASS-LEVEL: re-break EnemyHPBar/PlayerHPBar offsets to 43/107 WITHOUT regenerating baselines (any overlay off its art anchor), run every lane; then ALSO regenerate baselines under the break (--scenario visual_sweep_update) and re-run. Both bars are broken; only the enemy anchor can fire live-respect today — PlayerHUD/PlayerHPBar is nested and not yet exposed in the sidecar draw_order (recursive collection pending), so the player anchor is recorded UNVERIFIABLE, never silently passed.",
+    "executed": true,
+    "mechanism_caught": true,
+    "classes_silent_confirmed": true,
+    "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode — machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar — and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole — regenerated baselines were. REGEN-UNDER-BREAK (update mode — machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap — prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole).",
+    "revert_scope": {
+     "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
+     "docs/generated/visual-baselines/09_battle.png.sidecar.json": "9d8c3c634ea3c7f16fef1c1b8dc5a390431af9bed951908291d2657441538ee6",
+     "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
+     "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "30120ed1008977a1ad3b6358b0c1cf73cf7c57259c05026ce88e26025b652917",
+     "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
+     "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "918f834a10400023c9d838b6eb1a28703d8038664a6377c67a6b375b54f6bea6",
+     "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
+     "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "da72cec352afa8bd66f068778254acd981bc2cfd591e91a6842ed3ba7d38f0f9"
+    }
+   },
+   "plants_recorded_but_excluded_from_stats": true
+  },
+  {
+   "id": "miss-002-nav-audit-false-red",
+   "date": "2026-07-22",
+   "head_sha": "385da7efcb93a2963ed3c96d80528a3480f775e1",
+   "instance": {
+    "description": "FALSE-RED variant (the suite intermittently LIES; not a miss). nav_audit intermittently failed on FRESH verify_all runs with 'missing required events: nav_audit_passed' — the scenario ran to completion in ~2.6s but never emitted its pass event. The pass event was gated on the outcome of a wild battle whose inputs were drawn from UNSEEDED, wall-clock-seeded RNG (game_runtime.gd and battle_runtime.gd both call _rng.randomize() once per fresh subprocess): when the drawn wild landed an EFFECT_TRAP_TARGET move, the game CORRECTLY refused to flee ('Can't escape!' while is_trapped, view stays visible) and _check_run_escape recorded that legitimate mechanic as a suite failure, suppressing nav_audit_passed. Compounding the red into a REASONLESS one: the failure reason was emitted only via push_error ('ERROR: Nav audit failed: ...'), and ERROR_MARKERS=('SCRIPT ERROR','Parse Error') never matched the 'ERROR: ' prefix, so exceptions:[] and the report showed only the blank missing-event. Investigations exonerated the create_timer/cold-start hypothesis (nav_audit uses only tile_changed/process_frame awaits; failing runs last ~2.6s against a 120s budget): the wall-clock dependence was in the RNG SEED — which is why cold-start only correlated (it shifts the randomize() seed), why the true failure rate was ~3-5% regardless of temperature, why re-runs passed (new seed), why 10/10 greens occurred (luck), and why a git-stash test proved it PRE-EXISTING at clean HEAD cf44597 (the unseeded draw and the unversioned user:// save both live outside the working tree).",
+    "shots": [
+     "nav_audit (fresh headless subprocess runs under verify_all / run_playtests.py --include-smoke)"
+    ],
+    "perturbation": "Fix (instance closed AS A SIDE EFFECT of the class mechanism): pin both runtime rngs via seed_for_smoke(NAV_AUDIT_SEED := 20260718) before _start_battle (the house seeding convention), and make _check_run_escape total — a visible view after RUN must carry the game's ONLY refusal text 'Can't escape!' (proving the trap-refusal mechanic as NEW coverage), then the trap is deterministically expired (battle_runtime._player_mon['trap_turns'] = 0) and RUN re-proven to end the battle. A legitimate in-game escape refusal can never again be recorded as a suite failure; the traversal/menu halves are untouched (no battle rng), and the save backup/restore guard is untouched."
+   },
+   "missing_anchor_class": "CO",
+   "classes_silent": [
+    {
+     "class": "run_playtests.py required-event check (missing_all)",
+     "anchor_kind": "CO",
+     "why_silent": "Checks only that nav_audit_passed is present; the scenario RAN and simply never emitted it, so the check reported 'missing' correctly but with no reason — there was no failure-event contract symmetric with the _passed special-casing."
+    },
+    {
+     "class": "ERROR_MARKERS exception capture (run_playtests.py + godot_dap_smoketest.py)",
+     "anchor_kind": "CO",
+     "why_silent": "('SCRIPT ERROR','Parse Error') does not match push_error's 'ERROR: <message>' prefix (the 'at:' backtrace line carries no marker either), so the emitted failure reason was discarded into exceptions:[] — the reason existed and was thrown away."
+    },
+    {
+     "class": "determinism_verify.py pins + canary",
+     "anchor_kind": "CO",
+     "why_silent": "Pins the visual_sweep CAPTURE determinism (project.godot msaa/snap pins, canary shot hash); never covers scenario PASS EVENTS or the rng draws feeding them — a different determinism surface."
+    },
+    {
+     "class": "playtest_soak seeded bot (SOAK_SEED)",
+     "anchor_kind": "CO",
+     "why_silent": "Proves the soak's OWN bot rng deterministic; nav_audit never adopted the convention — its wild draw, enemy move choice, and trap/attract rolls rode the per-process randomize()."
+    },
+    {
+     "class": "visual_sweep/display_matrix BATTLE_RNG_SEED direct assignment",
+     "anchor_kind": "CO",
+     "why_silent": "Seeds the battle rng for a HAND-CRAFTED wild (visual_sweep never drives generate_wild_encounter); no seam covered the real encounter-draw path nav_audit exercises, and nothing pinned the game-side _rng at all."
+    },
+    {
+     "class": "miss_postmortem_issues / graduation_ledger backstops",
+     "anchor_kind": "CO",
+     "why_silent": "Track landed mechanisms and graduation streaks, not run-to-run determinism of scenario inputs; a flake that re-passes leaves no ledger trace."
+    },
+    {
+     "class": "per-scenario save backup/restore guard (smoke_scenarios.gd)",
+     "anchor_kind": "CO",
+     "why_silent": "Restores the SAVE around each run but cannot pin in-process rng draws (and, as recorded here, cannot protect save geometry from a harness SIGKILL mid-scenario — the latent sibling subclass, advisory, not this entry's fix)."
+    }
+   ],
+   "mechanism_added": "Two coordinated class-level mechanisms (the instance is fixed as a side effect; neither changes what nav_audit verifies). (A) DETERMINISM — scripts/runtime/game_runtime.gd seed_for_smoke(seed) seam pins BOTH _rng and battle_runtime._rng (mirrors the existing direct-assignment convention at scripts/app/visual_sweep.gd BATTLE_RNG_SEED and scripts/app/display_matrix.gd but covers the whole generate_wild_encounter path), called from scripts/app/nav_audit_battle.gd run() with scripts/app/nav_audit.gd NAV_AUDIT_SEED := 20260718 before _start_battle, so the audited inputs are a pure function of (code, save, seed), reproducible across subprocesses and across cold and warm starts; plus the total RUN contract in scripts/app/nav_audit_battle.gd _check_run_escape — a legitimate 'Can't escape!' trap refusal is PROVEN, the trap expired deterministically, and escape re-proven (strengthened coverage, never relaxed). (C) HONEST REPORTING — shared-harness class fix so EVERY scenario's red names its cause: tools/godot_dap_smoketest.py ERROR_MARKERS widened to capture push_error's 'ERROR: ' prefix and single-sourced (imported by tools/run_playtests.py so both transports agree by construction), plus failed_event_entry: any trace event ending in '_failed' is collected as a named failure with its reasons payload and both finalize and result_summary mark not-ok and record it; scripts/app/nav_audit.gd emits nav_audit_failed with the failures array on the non-pass branch alongside push_error (the going-forward contract for every audit's non-pass branch), documented in docs/references/trace-events.md and held by tools/check_repo_contracts.py (nav_audit_failed in app_bootstrap required_trace_events; the miss_postmortem_issues backstop holds this entry's revert_scope pins). Handled engine-side refusals stay quiet at the source — scripts/runtime/save_store.gd parses corrupt saves via JSON.new().parse (error code, no engine output) — so the widened capture adds no false reds on green paths (proven by a full headless suite run). The class — unseeded pass-events plus silent non-pass exits suite-wide — is closed by (A) as the convention every scenario adopts plus (C) in the shared harness. All resolve to landed artifacts in this slice.",
+   "plant": {
+    "perturbation": "CLASS-LEVEL, two parts, headless (PLAYTEST_FORCE_HEADLESS), then byte-identical revert. PART 1 (determinism backstop): force the instance's KIND — the wild's moveset replaced by a single perfect-accuracy EFFECT_TRAP_TARGET move with unkillable HP in _start_battle, so turn 1 ALWAYS applies the partial trap to the player through the real mechanic (choose_enemy_move_index -> execute_attack -> apply_trap). P1-1: mechanism in place, 20 fresh subprocesses (warm + mtime-cold + one .godot-move true-cold) -> 20/20 GREEN with the trap refusal PROVEN (battle_options_checked 11 vs the untrapped 10) and the ts_msec-normalized event stream byte-identical across the 19 same-temperature runs (the one true-cold run forms its OWN identical cold stream; the sole cold/warm delta is the engine cold-cache 'sound' flag on attack_animation_played — not the pinned rng stream, not the pass payload, which is identical). P1-2: seed_for_smoke call removed (unseeded randomize() re-introduced), same forced trap, 10 fresh runs -> all still GREEN (the total RUN contract alone tolerates the trap) but 10/10 DIVERGENT event streams (a different wild species/level every run: SLAKOTH/KAKUNA/QUILLADIN/...) — the non-determinism returns and the class is caught loudly, isolating the seed as the determinism pin. P1-3: seed restored, pre-fix _check_run_escape restored, forced trap -> 3/3 RED with the original instance's exact failure text 'battle: RUN did not end the battle' — the total contract is what turns the trap red into proven behavior. PART 2 (honest-reporting backstop): P2-1 (specimen): nav_audit_failed emission removed, ERROR_MARKERS narrowed to ('SCRIPT ERROR','Parse Error'), pre-fix check + forced trap, run through run_playtests.py -> reproduces the original REASONLESS red byte-for-byte in shape (missing_all=['nav_audit_passed'], exceptions=[], failed_events=[]). P2-2: (C) restored (emission + widened markers), same forced failure -> the report carries its reason on BOTH channels (failed_events=[nav_audit_failed {'failures': ['battle: RUN did not end the battle']}] AND exceptions=['ERROR: Nav audit failed: battle: RUN did not end the battle']) — a red can no longer be reasonless. All perturbations reverted byte-identical (verified by sha256 against the pre-plant snapshots); because the mechanism fix LANDED before the plant executed, the recorded pins are the FIXED-tree bytes, held mechanically by the miss_postmortem_issues backstop from now on.",
+    "executed": true,
+    "mechanism_caught": true,
+    "classes_silent_confirmed": true,
+    "revert_proof": "git-tracked plant scope sha-verified equal to the pre-plant fixed-tree snapshots (byte-identical revert); the pins below are held by the check_repo_contracts miss_postmortem_issues backstop (position-independent: holds mid-slice/uncommitted exactly as post-commit). Plant artifacts (.godot-smoke/plant-p2-1.json reasonless-red specimen, plant-p2-2.json reason-carrying report) are machine-local. RE-STAMP 2026-07-23 (Phase 2 scenarios+baselines slice): the four camping/crafting/night/evolution scenarios were registered in SCENARIO_REQUIREMENTS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS (run_playtests.py), legitimately perturbing both pinned scope files. The (C) honest-reporting mechanism was re-verified intact in the drifted bytes before re-stamping: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:222), and run_playtests.py still single-sources the table from the sibling harness (:53); the mechanism FIRED live in this slice — the Phase 2 scenario reds reported named reasons on both channels (failed_events=[night_cycle_failed {'failures': [...]}] AND exceptions=['ERROR: ...']). The (A) determinism seam is untouched (game_runtime.seed_for_smoke; the four new scenarios all pin it). The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py 767e43a77f84..., godot_dap_smoketest.py 875682aacd2a.... RE-STAMP 2026-07-23 (final-fix agent, post-adversarial-review slice): nav_audit_battle.gd legitimately perturbed — run() now DAY-pins the clock (Phase 2 time-aware encounter draws: the nocturnal filter + ghost roll had made the audited stream a function of the save's time_of_day) and swap-pins a fixed BULBASAUR party (a craft sweep leaking an overleveled party through the unguarded playtest entries KOs the audit wild on move activation, leaving the RUN check reading a pending victory view). Both mechanisms re-verified intact in the drifted bytes before re-stamping: (A) seed_for_smoke(rng_seed) is still run()'s first act (nav_audit_battle.gd:28), the total RUN contract untouched (:171-175), NAV_AUDIT_SEED still threaded (nav_audit.gd:41), game_runtime.seed_for_smoke unchanged (:203); (C) untouched — the other three scope pins are byte-identical (nav_audit.gd ad29dd5c..., godot_dap_smoketest.py e65e93a2..., run_playtests.py d437b440...). Proven save-independent: nav_audit green twice on a polluted save (night clock + overleveled leaked party) and on a fresh save. Old pin: nav_audit_battle.gd 537661553c06.... RE-STAMP 2026-07-24 (final-fix agent, post-adversarial-review minor-fix slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the visual_sweep_camping / visual_sweep_camping_update scenarios (the Phase 2 camping-state sweep, shots 15-17) in SCENARIO_REQUIREMENTS plus the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets (godot_dap_smoketest.py) and SMOKE_SCENARIOS (run_playtests.py), mirroring visual_sweep exactly so the camping sweep is a first-class gate scenario that transport-skips honestly under PLAYTEST_FORCE_HEADLESS instead of failing headless where its captures cannot render. Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:234), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:91) from the sibling harness, and finalize's ok contract is unchanged (:204). The (A) determinism seam is untouched. The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py d437b4407c37..., godot_dap_smoketest.py e65e93a264e8.... RE-STAMP 2026-07-24 (battle-end input latch slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the battle_end_input scenario (the generalized latch's battle-arm regression: a press that ENDS A BATTLE — Z-on-RUN / a ball-select Z capture — must not re-fire the overworld context action the same frame) in SCENARIO_REQUIREMENTS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS (run_playtests.py), exactly as input_gate was wired in the 2026-07-24 Phase-3 restamp. Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:267), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:92) from the sibling harness. The mechanism FIRED live in this slice — the pre-fix RED run reported named reasons on BOTH channels (battle_end_input_failed {'failures': [...]} trace AND 'ERROR: Battle-end input gate failed: ...' push_error). The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; the new scenario pins it via seed_for_smoke(2026072402)). The two nav_audit scope pins above were verified unchanged. Old pins: run_playtests.py e14a88d8bd5d..., godot_dap_smoketest.py dea950bba362.... RE-STAMP 2026-07-25 (Phase 5 scenarios slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the Phase 5 scenarios (breed_flow, shiny_odds, habitat_drops, fishing_flow, playtest_breed_soak + visual_sweep_pokemon / visual_sweep_pokemon_update) in SCENARIO_REQUIREMENTS plus the WINDOWED_ONLY / WINDOWED_SUBPROCESS sets (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (run_playtests.py), mirroring the Phase 2/3 restamps exactly so the Phase 5 proofs are first-class gate scenarios (the pokemon-state sweep transport-skips honestly under PLAYTEST_FORCE_HEADLESS). Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons (:326), run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:93) from the sibling harness, and finalize's ok contract is unchanged (:181). The mechanism FIRED live in this slice — the Phase 5 scenario reds reported named reasons on BOTH channels (e.g. breed_flow_failed {'failures': [...]} trace AND 'ERROR: BreedFlowScenario failed: ...' push_error exception). The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; all five new scenarios pin it). The two nav_audit scope pins above were verified unchanged (ad29dd5c17fb..., 4a967b965eb0...). Old pins: run_playtests.py 49513b9400f3..., godot_dap_smoketest.py 69c38084d668.... RE-STAMP 2026-07-27 (Phase 6 overworld mons slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed — registering the overworld_mons gate scenario plus visual_sweep_overworld / visual_sweep_overworld_update (the deterministic 22/23 sweep) in SCENARIO_REQUIREMENTS (the seven plan-mandated domain traces pinned on the gate scenario) plus WINDOWED_ONLY_SCENARIOS (godot_dap_smoketest.py) and PLAYTEST_SCENARIOS / SMOKE_SCENARIOS (run_playtests.py), mirroring the Phase 2/3/5 restamps exactly so the Phase 6 proofs are first-class gate scenarios (the overworld sweep transport-skips honestly under PLAYTEST_FORCE_HEADLESS). Both are additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:25), failed_event_entry still collects structured *_failed reasons, run_playtests.py still single-sources the table (:53) and ERROR_MARKERS (:93) from the sibling harness. The (A) determinism seam is untouched (game_runtime.seed_for_smoke unchanged; the new scenario's entity rolls ride the derived-hash stream — no shared _rng at all — and its CONTROL window pins seed_for_smoke). The two nav_audit scope pins above were verified unchanged (ad29dd5c17fb..., 4a967b965eb0...). Old pins: run_playtests.py d29cf5de9c73..., godot_dap_smoketest.py 9cca544ae124.... RE-STAMP 2026-07-31 (post-Phase-7 audit-repair Major #2 slice): run_playtests.py + godot_dap_smoketest.py legitimately perturbed to close the audit's INERT-oracle major — the explainable region diff (RED-tier ink/canary) was scoped to scenario=='visual_sweep' alone, leaving shots 31-36 (the R4 oracle's only owners, on the world_depth/world_chain satellites) gated by nothing but visual_diff.py's 0.5% global backstop; a new REGION_ORACLE_SCENARIOS set (single-sourced in godot_dap_smoketest.py, imported by run_playtests.py) extends the region gate to those two satellites so a sub-0.5% landmark sprite drop now reds on its coded region. The (C) honest-reporting mechanism was re-verified intact in the drifted bytes before re-stamping: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py), failed_event_entry still collects structured *_failed reasons, run_playtests.py still single-sources the table from the sibling harness; the (A) determinism seam is untouched. The two nav_audit scope pins + the verify_all.py pin were verified byte-identical and still hold. Old pins: run_playtests.py 9e9edf6258dd…, godot_dap_smoketest.py 160e30d4a83f….",
+    "revert_scope": {
+     "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
+     "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
+     "tools/run_playtests.py": "5699cbe617f7e7921a478cad47c874ca5eeca8849bbe4c8f04c1defed99e0571",
+     "tools/godot_dap_smoketest.py": "147e42e453a93cda0c3027e4d049e81e45bbfa996f16f9682bff40737feb278f",
+     "tools/verify_all.py": "ea6ecdfe7591847f0dd3ab4174a3f22669115d71665d674938eb8f087ac734d8"
+    },
+    "re_stamp_log": [
+     {
+      "date": "2026-07-28",
+      "file": "tools/run_playtests.py",
+      "old_pin": "3afc6f157ddb",
+      "new_pin": "1b6e2c5d5c31",
+      "reason": "legitimate edit (pre-Phase-7 suite expansion deep-dive fixes: soak tripwire ok-guard B2 + sidecar missing-stamp hardening M1 + double-run budget split M4); baseline shifted, plant scope verified free of plant content"
+     },
+     {
+      "date": "2026-07-28",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "87db2ed38d2f",
+      "new_pin": "ebc13b8915a4",
+      "reason": "legitimate edit: exposed save_stability_update requirements row (on-demand golden regeneration)"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/run_playtests.py",
+      "old_pin": "1b6e2c5d5c31",
+      "new_pin": "f891f3ba8cc7",
+      "reason": "legitimate edit (Phase 7 Build 1 landmarks slice): landmark_flow + visual_sweep_world_depth(_update) registered in PLAYTEST_SCENARIOS, wired exactly as the Phase 6 overworld_mons restamp — additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :94, the TraceCollector failed_events collection unchanged); the (A) determinism seam is untouched (landmark_flow pins seed_for_smoke(2026072907) before new_game); the two nav_audit scope pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "ebc13b8915a4",
+      "new_pin": "896fdc2dfe44",
+      "reason": "legitimate edit (Phase 7 Build 1 landmarks slice): landmark_flow registered in SCENARIO_REQUIREMENTS (the two frozen plan traces + auxiliary key_item_used + the symmetric pass marker; the *_failed marker rides failed_event_entry) and visual_sweep_world_depth(_update) in the WINDOWED_ONLY/WINDOWED_SUBPROCESS sets — additive dispatch-table changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/run_playtests.py",
+      "old_pin": "f891f3ba8cc7",
+      "new_pin": "7de9512a8350",
+      "reason": "legitimate edit: suite-level save backup/restore guard (atexit) — the suite no longer pollutes the user save across runs (KO-animation-overrun flake class)"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/run_playtests.py",
+      "old_pin": "7de9512a8350",
+      "new_pin": "6ff675512849",
+      "reason": "legitimate edit (Phase 7 Build 1 review-phase fixes): the --include-smoke argparse help now counts SMOKE_SCENARIOS dynamically (it narrated 7 while the list holds 13, contradicting the RELIABILITY recount) — a help-text correction layered on top of the atexit guard restamp that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness, the TraceCollector failed_events collection + the atexit save guard unchanged); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "896fdc2dfe44",
+      "new_pin": "88dd49b19b14",
+      "reason": "legitimate edit (Phase 7 Build 1 review-phase fixes): landmark_entity_spawned (the Ruins Underground DUSCLOPS witness, now documented in trace-events.md) promoted into the landmark_flow requirements 'all' so the dormant->LIVE guardian deliverable is a FIRST-CLASS gate event instead of transitively gated through landmark_flow_passed — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects structured *_failed reasons :417); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/run_playtests.py",
+      "old_pin": "6ff675512849",
+      "new_pin": "bab35239ea8b",
+      "reason": "legitimate edit: --fresh-save flag — verify lanes run save-less so traces never depend on residual save state (double-run cmp save-dependence flake)"
+     },
+     {
+      "date": "2026-07-29",
+      "file": "tools/run_playtests.py",
+      "old_pin": "bab35239ea8b",
+      "new_pin": "d2b77b10dd73",
+      "reason": "legitimate edit (review-phase save-guard hardening): the suite-level save backup moved from an in-memory copy to a DISK SIBLING written before any unlink, with SIGTERM-inline + atexit restore and startup self-heal of a stale sibling (verify_all SIGKILLs overrun lanes; atexit never ran there, so --fresh-save’s delete-first could permanently lose the user’s save); the --fresh-save help text reworded to the true contract (first scenario boots save-less; the smoke_scenario_dispatched boundary + per-consumer re-pins keep traces save-independent). Leaves this entry’s proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still single-sourced from the sibling harness (:96), SCENARIO_REQUIREMENTS likewise (:55), failed_event_entry still collects structured *_failed reasons (:140), finalize’s ok contract unchanged. The (A) determinism seam is untouched; the nav_audit pins + the godot_dap_smoketest.py pin unchanged and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/run_playtests.py",
+      "old_pin": "d2b77b10dd73",
+      "new_pin": "47f2b2b6d5c1",
+      "reason": "legitimate edit (Phase 7 Build 2 legendaries slice): legendary_spawn registered in PLAYTEST_SCENARIOS, wired exactly as the Build 1 landmark_flow restamp — an additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :96, SCENARIO_REQUIREMENTS :55, the TraceCollector failed_events collection :140 + finalize's ok contract unchanged); the (A) determinism seam is untouched (legendary_spawn pins seed_for_smoke(2026073001) BEFORE new_game, the breed_flow precedent; legendary stamping is pure _mix, NO rng); the two nav_audit scope pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "88dd49b19b14",
+      "new_pin": "44d16f132b27",
+      "reason": "legitimate edit (Phase 7 Build 2 legendaries slice): legendary_spawn registered in SCENARIO_REQUIREMENTS — the all-list pins the registry-REQUIRED battle-start trace legendary_encounter (emitted ONLY for a battle_kind \"legendary\" forced battle), the KO despawn + battle_finished + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons :430); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/run_playtests.py",
+      "old_pin": "47f2b2b6d5c1",
+      "new_pin": "28ce554313c2",
+      "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in PLAYTEST_SCENARIOS, wired exactly as the Build 2 legendary_spawn restamp — an additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :96, SCENARIO_REQUIREMENTS :55, the TraceCollector failed_events collection + the disk-sibling save guard unchanged); the (A) determinism seam is untouched (world_chain pins seed_for_smoke(2026072913) BEFORE new_game, the save_stability precedent; the crossing path is pure SplitMix, NO rng); the two nav_audit scope pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "44d16f132b27",
+      "new_pin": "d4ada0827f0a",
+      "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in SCENARIO_REQUIREMENTS — the all-list pins the three registry-REQUIRED chain traces (world_edge_crossed, world_chained, beacon_placed) + the walk-into-boundary traversal_blocked refusal + the chained-world puzzle_state_changed witness + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/verify_all.py",
+      "old_pin": "f5cf1ce9bd31",
+      "new_pin": "9e2cf3fb6e86",
+      "reason": "informational (NOT in revert_scope — recorded for traceability alongside the two in-scope restamps): the double-run lane regroup [4,4] -> [4,5] admitting world_chain as the ninth rng-consumer (group 2's fifth, self-pinned; the two world-depth scenarios stay in SEPARATE groups; the <=80s per-group budget holds) + the header/comment co-mods (eight -> nine). The file carries no plant pin, so nothing mechanical shifts; the two in-scope restamps above are the operative ones"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/verify_all.py",
+      "old_pin": "9e2cf3fb6e86",
+      "new_pin": "ae84e04fb890",
+      "reason": "informational (NOT in revert_scope — recorded for traceability): the double-run lane's per-group outer budget split 80.0 -> [80.0, 100.0] (index-aligned with DOUBLE_RUN_GROUPS) giving the five-scenario group 2 explicit headroom over the four-scenario budget, + the shot-range comment co-mods (31-32 -> 31-33, the landed world_depth registry range) + the comments narrating it. The file carries no plant pin, so nothing mechanical shifts; the two in-scope tool pins + the two nav_audit scope pins are untouched and still hold"
+     },
+     {
+      "date": "2026-07-30",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "d4ada0827f0a",
+      "new_pin": "69cb1acdcd55",
+      "reason": "legitimate edit: the world-depth sweep requirements comment narrated shots 31-32 while the landed SHOT_REGISTRY range is [31,33] (the Build-3 33_beacon shot shipped with a captured baseline) — a comment-only truthfulness co-mod that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons, SCENARIO_REQUIREMENTS rows unchanged); the (A) determinism seam is untouched; the nav_audit pins + the run_playtests.py pin unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/run_playtests.py",
+      "old_pin": "28ce554313c2",
+      "new_pin": "9e9edf6258dd",
+      "reason": "legitimate edit (Phase 7 audit R3 satellite-gate slice): added SATELLITE_SWEEP_SCENARIOS + SWEEP_GATE_SCENARIOS and extended the RED-tier sidecar seed-equality gate + the source-art anchor gate (apply_region_gate / prepare_anchor_gate / apply_anchor_gate) from the main sweep to the satellite families, so an un-stamped/re-seeded satellite sidecar (incl. all Phase 7 shots 31-33) now reds instead of passing silently; verify_all.py single-sources the same tuple (its S9 loop and the runner's gates can never drift); beacon_selector registered in PLAYTEST_SCENARIOS (R5), wired exactly as world_chain. Additive dispatch-table + gate-scope changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness, SCENARIO_REQUIREMENTS likewise, the TraceCollector failed_events collection + the disk-sibling save guard unchanged); the (A) determinism seam is untouched; the two nav_audit scope pins + the godot_dap_smoketest.py pin unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "69cb1acdcd55",
+      "new_pin": "be821cbc3d81",
+      "reason": "legitimate edit (Phase 7 audit R2 + R5 slice): landmark_flow's requirements all-list gained alpha_provoked (the Ruins Underground DUSCLOPS guardian's provoked +3 forced-battle witness, R2 — promoted to a first-class gate event beside landmark_entity_spawned, exactly as the 2026-07-29 landmark_entity_spawned restamp), and a new beacon_selector scenario row was registered (R5: the multi-beacon SELECTOR functional choice — the all-list pins the two edge-beacon registrations beacon_placed + the picked warp teleport_used + the symmetric pass marker; the *_failed marker rides failed_event_entry). Additive requirements-row changes that leave this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins + the run_playtests.py pin unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/verify_all.py",
+      "old_pin": "ae84e04fb890",
+      "new_pin": "b46cf79360df",
+      "reason": "legitimate edit + backstop arming (Phase 7 audit R3 + R12 slice): R3 single-sourced SATELLITE_SWEEP_SCENARIOS from run_playtests.py (the S9 windowed loop now imports the runner's gate scope so the two can never drift) — an additive orchestrator change that forks no behavior and touches no exit-code contract. R12 then ARMED the miss-002 backstop for this file: verify_all.py is added to revert_scope at this hash (the FINAL post-repair tree, after the R3 single-source settled), so miss_postmortem_issues now mechanically flags future drift of the double-run lane's own orchestrator (the Build 2/3 regroup target) — converting the two prior informational-only re-stamps into a held pin. The honest-reporting mechanism this entry proved is untouched; the two in-scope tool pins + the two nav_audit scope pins are unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/verify_all.py",
+      "old_pin": "b46cf79360df",
+      "new_pin": "6d5433fc1147",
+      "reason": "legitimate edit (Phase 7 audit R14 + docs-sync slice): the double-run lane header now records the night-ghost rng exclusion (night_system.gd:123,128) as a LOUD NAMED skip — the two draws ride the already-pinned shared game_runtime._rng stream and are self-pinned via seed_for_smoke in night_cycle (S7 single-run, requirements-gated), and no consumer ever enters unlit night (new games start 10:00; the soak never reaches NIGHT_START 20:30), so the nine cross-process consumers stay nine (miss-002-spirit loudness over a budget-burning tenth consumer); plus shot-range truthfulness co-mods (the S9 header/comment 'four satellite families (shots 15-23)' -> six, shots 15-23 + 30-36, world_depth [31,34] + the derived-world world_chain [35,36] single-sourced from run_playtests). ALL comment-only — the refusal contracts, the exit-code map, ERROR_MARKERS transport, and finalize's ok contract this entry's proved (C) honest-reporting mechanism rides are byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the documented maintenance route; the two in-scope tool pins + the two nav_audit scope pins are unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/verify_all.py",
+      "old_pin": "6d5433fc1147",
+      "new_pin": "ea6ecdfe7591",
+      "reason": "legitimate edit (Phase 7 audit R-INFRA night_cycle slice): night_cycle JOINS the double-run lane as its TENTH consumer — the literal repair the prior R14 entry recorded as a LOUD NAMED exclusion. DOUBLE_RUN_SCENARIOS grows nine -> ten, the regroup moves [4,5] -> [5,5], the per-group outer budgets [80,100] -> [100,100]s, and the exclusion header block is replaced by the tenth-consumer rationale: night_cycle covers the unlit-night ghost draws (night_system.gd:123,128 — the shared game_runtime._rng randf gate + the randi_range species pick), the ONE shared-stream consumer none of the other nine ever enters (new games start 10:00; the soaks never reach NIGHT_START 20:30), so a ghost-localized regression can no longer replay green in the lane and only red in S7. The scenario co-mod (scripts/app/night_cycle_scenario.gd) self-pins the breed_flow way — seed_for_smoke BEFORE new_game + rebuild — so its crafted-dark draws replay cross-process (a boot world would ride the wall-clock root_seed and red the cmp). Lane constants + the header comment are the change surface — the refusal contracts, the exit-code map, ERROR_MARKERS transport, and finalize's ok contract this entry's proved (C) honest-reporting mechanism rides are byte-for-byte untouched, so the class stays closed and the pin follows the fixed tree through the documented maintenance route; the two in-scope tool pins + the two nav_audit scope pins are unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "be821cbc3d81",
+      "new_pin": "160e30d4a83f",
+      "reason": "legitimate edit (Phase 7 audit R-DOCS shot-range truthfulness slice): the world-depth sweep requirements comment narrated shots 31-33 while the landed SHOT_REGISTRY ranges are world_depth [31,34] + the derived-world world_chain [35,36] (the R11 34_heart_tower + 35_chained_world + 36_legendary_guardian baselines shipped captured) — a comment-only truthfulness co-mod (the exact 2026-07-30 31-32->31-33 restamp precedent) that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons :468, SCENARIO_REQUIREMENTS rows unchanged); the (A) determinism seam is untouched; the nav_audit pins + the run_playtests.py + verify_all.py pins unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/run_playtests.py",
+      "old_pin": "9e9edf6258dd",
+      "new_pin": "5699cbe617f7",
+      "reason": "legitimate edit (Phase 7 post-repair audit Major #2 slice): the explainable region diff (visual_region_diff.run_region_diff — RED-tier ink/canary) was guarded to scenario=='visual_sweep' only, so the world_depth/world_chain satellites reconciled through visual_diff.py's 0.5% GLOBAL gate and shots 31-36 — the only owners of the R4 coded-region oracle — were region-UNGATED (a sub-0.5% landmark pixel change stayed green). Added REGION_ORACLE_SCENARIOS (single-sourced from the sibling harness) = main + the two R4 satellites, and apply_region_gate now runs the region diff for that set (update-mode still skipped). Comment/guard/docstring change surface only — the (C) honest-reporting mechanism this entry proves is byte-for-byte intact: run_playtests.py still single-sources the requirements table from the sibling harness (exec_module :53), failed_event collection + ERROR_MARKERS transport unchanged; the (A) determinism seam is untouched. The godot_dap_smoketest.py pin is re-stamped in its own entry; the two nav_audit scope pins + the verify_all.py pin are unchanged and still hold"
+     },
+     {
+      "date": "2026-07-31",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "160e30d4a83f",
+      "new_pin": "147e42e453a9",
+      "reason": "legitimate edit (Phase 7 post-repair audit Major #2 slice): mirror of the run_playtests.py change for the DAP transport — apply_region_step's guard moved from scenario=='visual_sweep' to the single-sourced REGION_ORACLE_SCENARIOS (defined HERE, imported by run_playtests.py so both transports gate the same families: main + the world_depth/world_chain satellites that own the R4 coded-region sidecars for shots 31-36). Added the REGION_ORACLE_SCENARIOS frozenset + a guard/docstring change; force_headless skip untouched. The (C) honest-reporting mechanism this entry proves is byte-for-byte intact: ERROR_MARKERS still carries 'ERROR: ' (the ('SCRIPT ERROR','Parse Parse','ERROR: ') triple), failed_event_entry still collects structured *_failed reasons, SCENARIO_REQUIREMENTS rows unchanged; the (A) determinism seam is untouched. The two nav_audit scope pins + the run_playtests.py + verify_all.py pins are unchanged and still hold"
+     }
+    ]
+   },
+   "plants_recorded_but_excluded_from_stats": true
+  }
+ ]
 }

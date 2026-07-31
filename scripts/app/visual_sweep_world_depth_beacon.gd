@@ -17,6 +17,7 @@ const BEACON_RING_MIN := 88 # WORLD_RADIUS(96) - TELEPORT_EDGE_MARGIN(8): the ed
 const BEACON_RING_MAX := 94 # inside the hard edge (WORLD_RADIUS - 2) so terrain frames the beacons
 const CLUSTER_RADIUS := 4 # chebyshev spread of the two beacons around the player anchor
 const SELECTOR_PATH := "UI/BeaconSelector" # Main.tscn beacon-picker node (field_move_actions precedent)
+const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_oracle.gd") # R4 regional pixel oracle
 
 
 # Crafts + captures the shot on the sweep node. Beacons are placed on the RUNTIME world_gen
@@ -43,7 +44,18 @@ static func run(sweep: Node) -> void:
 	sweep._crafted["beacon_anchor"] = [anchor.x, anchor.y]
 	sweep._crafted["beacon_tiles"] = beacons.map(func(tile): return [tile.x, tile.y])
 	sweep._crafted["beacon_chain"] = "0,0"
+	sweep._pending_oracle = WorldDepthOracle.static_region(SHOT, sweep._crafted, anchor) # R4: beacon way-stone pixel gate
 	await sweep._capture(SHOT)
+	_close_selector(sweep) # the selector is a SEPARATE overlay from the message box; close it so later shots (34/35) are clean
+
+
+# The selector overlay (opened above) is NOT the message box, so hide_message() won't dismiss it.
+# Close it after the beacon shot so the following captures don't carry the picker (33 owns the open UI).
+static func _close_selector(sweep: Node) -> void:
+	var scene: Node = sweep.get_tree().current_scene
+	var selector: Node = scene.get_node_or_null(SELECTOR_PATH) if scene != null else null
+	if selector != null and selector.has_method("close_selector"):
+		selector.close_selector()
 
 
 # Bounded edge-band search: the full manhattan ring at each distance 88-94 (deterministic

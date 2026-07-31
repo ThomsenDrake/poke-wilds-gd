@@ -7,14 +7,22 @@ extends Node
 # holds (pending seam disarmed, no entity past DESPAWN_CELLS, no entity_at on the
 # player's tile), and every band engaged at least once (a starved band is LOUD, never a
 # silent skip). Self-guarded: the playtest_ prefix skips the dispatcher's save guard, so
-# the bot owns the backup/restore (the breed-soak precedent).
+# the bot owns the backup/restore (the breed-soak precedent). Phase 7 audit R11: the
+# harness reset wipes new_game's legendary statics, so the soak RE-STAMPS the frozen seven
+# (the whole soak runs WITH the window-exempt statics in the store) and engages each
+# anchored legendary through the forced-battle seam at least once — a soak that never
+# touches a legendary is LOUD, never a silent pass.
 
 const PlaytestBot := preload("res://scripts/runtime/playtest_bot.gd")
 const PlaytestBotEntity := preload("res://scripts/runtime/playtest_bot_entity.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
+const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
+# Domain access rides the runtime's re-export (the app layer may not preload domain
+# directly — check_architecture.gd's layer table; the legendary_spawn_checks precedent).
+const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
 
-const SOAK_SEED := 2026072807 # entity-soak pin (distinct from the joint-pin / save seeds). Build-2 RE-PIN from 2026072806: the contract-required never-encounter exclusion (world-depth.md § Legendaries) reshuffled the roamer pool, so under the old pin the lone near-spawn TIMID flipped disposition and band 3 starved; the whole-store teleport scan then dragged the player ring-91 outward and starved the FRIENDLY bank too (flee 0 / recruit 8). This sibling seed re-engages all four bands under the reshuffled pool (flee 3 / recruit 22 / egg 19 / alpha 107, warn 1) — miss-002's "seed is the calibration lever". Deterministic; the legendaries themselves are NOT in this soak's store (the harness reset wipes the stamped statics), so the bot's legendary band-exclusion is defense-in-depth, not this lever.
+const SOAK_SEED := 2026072810 # entity-soak pin (distinct from the joint-pin / save seeds). Build-2 RE-PIN from 2026072806: the contract-required never-encounter exclusion (world-depth.md § Legendaries) reshuffled the roamer pool, so under the old pin the lone near-spawn TIMID flipped disposition and band 3 starved; the whole-store teleport scan then dragged the player ring-91 outward and starved the FRIENDLY bank too (flee 0 / recruit 8). Build-3 RE-PIN from 2026072807 (verify pass, 2026-07-31): the R11 re-stamp assert exposed that the old pin's derived world (world_seed 921588470 — new_game's starter instance consumes ONE _rng draw, so the root_seed is clean-stream index 1, NOT the first draw) carries ZERO affinity-biome anchors inside the ring 60..134 probe budget (a legal NO_ANCHOR — "the world lacks the biome"), so the post-reset re-stamp stamped nothing and the legendary witness starved red. This sibling derives world_seed 1319840800: the SNOW three anchored at rings 127/123/128 (inside the 134 probe budget), and all four bands re-engage (flee 2 / recruit 15 / egg 10 / alpha 102, warn 1 — miss-002's "seed is the calibration lever"). Deterministic; the harness reset wipes the stamped statics, and the R11 RE-STAMP returns the anchored frozen seven to the store for the whole soak — the bot's band targeting still SKIPS them (a whole-store scan would drag the player 60+ rings out and starve the roam banks), so the legendaries are witnessed by the direct forced-battle seam (_prove_legendary_encounters), never the bands.
 const ITERATIONS := 400
 const AUDIT_EVERY := 25
 
@@ -41,11 +49,17 @@ func run(ctx: Dictionary) -> void:
 	player.encounter_chance = 0.0
 	var stats := {"iterations": 0, "engaged": 0, "starved": 0, "egg_attempts": 0, "eggs_stolen": 0,
 		"alpha_attempts": 0, "alpha_provoked": 0, "recruit_attempts": 0, "recruits": 0,
-		"flee_attempts": 0, "flees_startled": 0, "max_sprites": 0}
+		"flee_attempts": 0, "flees_startled": 0, "legendary_encounters": 0, "max_sprites": 0}
 	if mons == null:
 		_reasons.append("overworld_mons_runtime is not wired")
 	else:
 		_reset(mons)
+		mons.stamp_legendaries() # R11: the harness reset wipes new_game's stamped statics — RE-STAMP so the whole soak runs WITH the frozen seven in the store (window-exempt static persistence + sprite sync + store hygiene witnessed on every audit tick)
+		var stamped: int = _legendary_entities(mons).size()
+		if stamped == 0:
+			_reasons.append("legendaries: the post-reset re-stamp derived ZERO anchored statics under seed %d (re-pin SOAK_SEED — miss-002's calibration lever)" % SOAK_SEED)
+		else:
+			_prove_legendary_encounters(mons, stats)
 		mons.active = true # the dispatcher's activation gate leaves this scenario inert; the soak opts in
 		for i in range(ITERATIONS):
 			stats["iterations"] = int(stats["iterations"]) + 1
@@ -60,6 +74,8 @@ func run(ctx: Dictionary) -> void:
 		if not final.is_empty():
 			_reasons.append("final: %s" % final)
 		_check_engagement(stats)
+		if int(stats.get("legendary_encounters", 0)) == 0:
+			_reasons.append("legendary encounters starved: ZERO across the soak (the re-stamp + the direct forced-battle seam never fired — the distance-gated statics went untouched)")
 		mons.active = false
 	player.encounter_chance = saved_chance
 	_emit(runtime, stats)
@@ -100,6 +116,42 @@ func _check_engagement(stats: Dictionary) -> void:
 	for band_key in ["egg_attempts", "alpha_attempts", "recruit_attempts", "flee_attempts"]:
 		if int(stats.get(band_key, 0)) == 0:
 			_reasons.append("band %s starved: zero engagements across %d iterations" % [band_key, ITERATIONS])
+
+
+# R11: engage EVERY anchored legendary through the forced-battle seam — the alpha band's
+# own attack_entity path (:280 player-initiated; NO rng beyond the shared gender nonce, an
+# intentional creation-order consumer). The set_battle latch keeps main._in_battle set so
+# the presentation bridge early-returns (the legendary_spawn / landmark_guardian_checks
+# precedent): the pending seam arms on the DIRECT take, the species is counted, and the
+# seam is disarmed — never a real battle view. NO step-clock tick and NO player move, so
+# the calibrated 400 iterations run exactly as the SOAK_SEED pin demands; legendaries ride
+# the store for the whole soak regardless.
+func _prove_legendary_encounters(mons, stats: Dictionary) -> void:
+	var set_battle: Callable = _ctx.get("set_battle", Callable())
+	if set_battle.is_valid(): set_battle.call(true) # latch the presentation bridge: the forced battle stays on the DIRECT seam, never the battle view
+	for entity in _legendary_entities(mons):
+		var species := str(entity.get("species_id", ""))
+		var result: Dictionary = mons.attack_entity(entity.get("tile", Vector2i.MAX))
+		var pending: Dictionary = mons.take_pending_encounter(); mons._pending_id = ""
+		if bool(result.get("ok", false)) and LegendaryPlacement.LEGENDARY_IDS.has(str(pending.get("species_id", ""))):
+			stats["legendary_encounters"] = int(stats.get("legendary_encounters", 0)) + 1
+		else:
+			_reasons.append("legendaries: attack_entity on the anchored %s did not arm the forced-battle seam (%s)" % [species, str(result.get("reason", "pending empty"))])
+		entity["state"] = "idle"; entity["attack_stages"] = 0 # the take leaves "engaged"/+stages behind; tidy so the loop's step clock sees an idle static (the landmark_guardian_checks cleanup precedent)
+	if set_battle.is_valid(): set_battle.call(false)
+	mons._last_battle_was_entity = false # clean latch state: the loop's chase-catch gate opens exactly as on a fresh soak
+
+
+# The anchored frozen seven currently IN the store (kind "legendary" records; the origin
+# world anchors at least one under any seed with a ring-band affinity biome — the
+# legendary_spawn pin's SNOW three under ITS seed; the soak seed derives its own set).
+func _legendary_entities(mons) -> Array:
+	var legendaries: Array = []
+	for entity_id in mons._entities.keys():
+		var entity: Dictionary = mons._entities[entity_id]
+		if str(entity.get("kind", "")) == "legendary":
+			legendaries.append(entity)
+	return legendaries
 
 
 func _emit(runtime, stats: Dictionary) -> void:

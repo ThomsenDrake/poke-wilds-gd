@@ -6,6 +6,7 @@ extends RefCounted
 # The baseline dir is SHARED with visual_sweep_camping (its 15-17 shots).
 
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
+const RegistrySupport := preload("res://scripts/app/visual_sweep_registry_support.gd") # R3 registry helpers (app-220 extraction)
 
 const PREFERRED_SHOT_DIR := "res://.godot-smoke/shots"
 const FALLBACK_SHOT_DIR := "user://visual_shots"
@@ -31,7 +32,8 @@ const SHOT_REGISTRY := {
 	"pokemon": {"range": [20, 21], "seed": 2026072605},
 	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
 	"fishing": {"range": [26, 27], "seed": 2026072804},
-	"world_depth": {"range": [31, 33], "seed": 2026072907},
+	"world_depth": {"range": [31, 34], "seed": 2026072907},
+	"world_chain": {"range": [35, 36], "seed": 1746331193}, # R11 derived world == world_seed_for(2026072907,(0,-1)) (SplitMix & 0x7fffffff); own sweep so R3's one-world gate holds
 	"retired": [17],
 }
 
@@ -46,6 +48,16 @@ static func shot_numbers(sweep: String) -> Array:
 			numbers.append(number)
 	numbers.append_array(entry.get("extra", []))
 	return numbers
+
+
+# R3 registry helpers live in visual_sweep_registry_support.gd (extracted at the app-220 wall); these
+# thin forwarders keep the six satellite call sites unchanged (the dict arg avoids a preload cycle).
+static func registry_seed(sweep: String) -> int:
+	return RegistrySupport.registry_seed_for(SHOT_REGISTRY, sweep)
+
+
+func crafted_state(sweep: String, base: Dictionary) -> Dictionary:
+	return RegistrySupport.crafted_state_for(SHOT_REGISTRY, sweep, base)
 
 
 # Resizes to CANONICAL_WINDOW_SIZE, returning the prior size (headless: no-op).

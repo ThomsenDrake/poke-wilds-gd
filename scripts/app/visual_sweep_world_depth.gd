@@ -14,6 +14,8 @@ const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const WorldDepthBeaconShot := preload("res://scripts/app/visual_sweep_world_depth_beacon.gd") # 33 (app-220 extraction)
+const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_oracle.gd") # R4 regional pixel oracle (app-220 extraction)
+const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # R11 shots 34-36 + rest probe (app-220 extraction)
 
 const DEFAULT_THRESHOLD_PCT := 0.5
 const RUINS_ID := "desert_ruins" # public contract strings (trace payloads, spec § Landmarks)
@@ -43,18 +45,19 @@ var _mode := VisualSweepBaselines.MODE_COMPARE
 var _threshold_pct := DEFAULT_THRESHOLD_PCT
 var _shots: Array = []
 var _failures: Array = []
+var _pending_oracle: Dictionary = {} # R4: per-shot tile regions (set by a shot, consumed+cleared in _capture)
 
 
 func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_ctx = ctx
-	_crafted = CRAFTED_STATE.duplicate(true)
+	_crafted = _baselines.crafted_state("world_depth", CRAFTED_STATE) # R3: world_seed single-sourced from SHOT_REGISTRY
 	_mode = str(options.get("mode", VisualSweepBaselines.MODE_COMPARE))
 	_threshold_pct = float(options.get("threshold_pct", DEFAULT_THRESHOLD_PCT))
 	_base_dir = _baselines.resolve_shot_dir()
 	if _base_dir.is_empty():
 		_runtime().warn("SmokeScenarios", "World depth sweep found no writable screenshot directory.", {}); return
 	_baselines.clear_shots(_base_dir)
-	if not _baselines.craft_state(_ctx, _runner, CRAFTED_STATE):
+	if not _baselines.craft_state(_ctx, _runner, _crafted):
 		push_error("World depth sweep could not craft its deterministic state; catalog incomplete."); return
 	var previous_window := _baselines.apply_canonical_window_size()
 	await _settle(5)
@@ -63,6 +66,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	await _ruins_shot()
 	await _mansion_shot()
 	await WorldDepthBeaconShot.run(self)
+	await WorldDepthExpand.run(self) # R11: heart tower (34); chained/guardian ride the world_chain satellite (R3 one-world gate)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()
@@ -81,6 +85,7 @@ func _ruins_shot() -> void:
 	_runner.teleport_player(_world(), _player(), _runtime(), tile)
 	_world().set_time_of_day(int(CRAFTED_STATE["time_of_day"]))
 	_world().sync_visible(tile)
+	_pending_oracle = WorldDepthOracle.static_region(SHOT_RUINS_INTERIOR, _crafted, tile) # R4: statue-pair pixel gate
 	await _capture(SHOT_RUINS_INTERIOR)
 
 
@@ -95,7 +100,7 @@ func _mansion_shot() -> void:
 	# Craft the SOLVED puzzle through the frozen seam (never the keying), then rebuild
 	# so the resolver's door overlay re-stamps both doors open through the tile cache.
 	_runtime().session.set_landmark_state(Vector2i.ZERO, CRAFTED_MANSION_STATE.duplicate(true))
-	_world().rebuild(int(CRAFTED_STATE["world_seed"]))
+	_world().rebuild(int(_crafted["world_seed"]))
 	for door_region in MANSION_DOOR_LOCALS:
 		var door_tile: Vector2i = footprint.position + MANSION_DOOR_LOCALS[door_region]
 		if not bool(_world().get_tile_logic(door_tile).get("walkable", false)):
@@ -110,6 +115,7 @@ func _mansion_shot() -> void:
 	_runner.teleport_player(_world(), _player(), _runtime(), tile)
 	_world().set_time_of_day(int(CRAFTED_STATE["time_of_day"]))
 	_world().sync_visible(tile)
+	_pending_oracle = WorldDepthOracle.static_region(SHOT_MANSION, _crafted, tile) # R4: statue-grid + open-door pixel gate
 	await _capture(SHOT_MANSION)
 
 
@@ -189,24 +195,13 @@ func _capture(filename: String) -> void:
 	_message_box().hide_message()
 	await _settle(8) # let the render layer reconcile onto logic tiles (byte-stable rest)
 	var metadata: Dictionary = RenderIntrospection.collect(_ctx, filename, _crafted)
+	WorldDepthOracle.merge_into(metadata, _pending_oracle) # R4: bake the projected tile regions into the sidecar
+	_pending_oracle = {}
 	var result: Dictionary = await _captures.capture(_runtime(), get_viewport(), filename,
-		{"save_path": "%s/%s" % [_base_dir, filename], "metadata": metadata, "rest_probe": Callable(self, "_rest_state")})
+		{"save_path": "%s/%s" % [_base_dir, filename], "metadata": metadata, "rest_probe": Callable(WorldDepthExpand, "rest_state").bind(self)})
 	if not result.ok:
 		_failures.append("%s: %s (%s)" % [filename, result.kind, result.detail]); return
 	_shots.append(filename)
-
-
-# Capture-rest probe (SnapshotCapture waits + stamps it): the entity layer is INERT so
-# it is at rest by construction; an active layer mid-window is a contract break and
-# never settles (mirrors visual_sweep_overworld.gd:200). Player done = not mid-step.
-func _rest_state() -> Dictionary:
-	var at_rest := true
-	var scene: Node = get_tree().current_scene
-	var layer: Node = scene.get_node_or_null("EntityLayer") if scene != null else null
-	var mons: Object = _runtime().get("overworld_mons_runtime")
-	if layer != null and mons != null and bool(mons.get("active")):
-		at_rest = false
-	return {"entities_at_rest": at_rest, "player_lerp_complete": not _player().is_moving()}
 
 
 func _settle(frames: int) -> void:

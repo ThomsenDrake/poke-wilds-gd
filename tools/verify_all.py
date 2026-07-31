@@ -7,11 +7,11 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     nine rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
-                        (groups of four + five; world_chain, the ninth, regroups)
+  S6.5   double-run     ten rng-consumers x2 headless, cmp --mode trace (2x100s+cmp)
+                        (two groups of five; night_cycle, the tenth, regroups [5,5])
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
-                        + the four satellite sweep families (shots 15-23)
+                        + the six satellite sweep families (shots 15-23 + 30-36)
   S10    legibility     generate_legibility_report.py (generate-only, NOT gated)
 
 then runs post-refusals R1-R6 (head_sha==HEAD, stamp shape, windowed stamps vs
@@ -69,36 +69,66 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# nine rng-consumer scenarios run twice headless, each run persisting its ordered
+# ten rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
 # two trace sets (timing-stripped, key-sorted, order-sensitive). The per-group outer
-# budgets ([80, 100]s — the five-scenario group gets the larger share) bound the two
-# bounded runs + the 10s compare; a mismatch reds with the divergent
-# event + both canonical payloads as the named cause (miss-002). Phase 7: the two
-# world-depth scenarios split ACROSS groups — landmark_flow in group 1, Build 2's
-# legendary_spawn in group 2 (self-pinned: seed_for_smoke -> new_game -> rebuild;
-# stamping is pure _mix, NO rng); Build 3's world_chain (the ninth consumer)
-# completes the regroup as group 2's fifth (self-pinned the same way; the crossing
-# path is pure SplitMix + an in-scenario double-run fingerprint). Group 2's five
-# scenarios each carry the 30s per-scenario cap, so its outer budget is scaled up
-# from the four-scenario group's (explicit headroom, not a sum-stays-under hope).
+# budgets ([100, 100]s — both groups carry five scenarios, the four-scenario 80s
+# share scaled one scenario up) bound the two bounded runs + the 10s compare; a
+# mismatch reds with the divergent event + both canonical payloads as the named
+# cause (miss-002). Phase 7: the two world-depth scenarios split ACROSS groups —
+# landmark_flow in group 1, Build 2's legendary_spawn in group 2 (self-pinned:
+# seed_for_smoke -> new_game -> rebuild; stamping is pure _mix, NO rng); Build 3's
+# world_chain (the ninth consumer) joined group 2 (self-pinned the same way; the
+# crossing path is pure SplitMix + an in-scenario double-run fingerprint).
+#
+# TENTH CONSUMER (Phase-7 audit, miss-002 loudness): night_cycle covers the
+# unlit-night ghost draws — night_system.gd:123,128, the shared game_runtime._rng
+# randf gate + the randi_range species pick — the ONE shared-stream consumer none
+# of the other nine ever enters: new games start at 10:00 (session_state
+# NEW_GAME_TIME_OF_DAY 600) and the playtest soaks never reach NIGHT_START 20:30
+# (day_phase 1230), so before this landed the ghost path could regress and replay
+# green in the lane (only S7's single run would red). night_cycle self-pins the
+# breed_flow way — seed_for_smoke BEFORE new_game + rebuild (the scenario co-mod;
+# a boot world rides the wall-clock root_seed and would red the cmp) — then drives
+# 40 crafted-dark draws at 23:00 (GHOST_CHANCE 0.5 on the pinned stream), so the
+# ghost draws replay cross-process here exactly as they fire in production. Each
+# scenario carries the 30s per-scenario cap; the per-group budgets are explicit
+# headroom, not a sum-stays-under hope.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
                         "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow",
-                        "legendary_spawn", "world_chain"]
-DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:4], DOUBLE_RUN_SCENARIOS[4:]]
+                        "legendary_spawn", "world_chain", "night_cycle"]
+DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:5], DOUBLE_RUN_SCENARIOS[5:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [80.0, 100.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [100.0, 100.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
-# S9 windowed satellite sweep families (shots 15-23 + 31-33, windowed-diffed one-command
-# alongside the main visual_sweep). visual_sweep_fishing (26-27) is registered in
-# the smoke list + windowed sets but is NOT one of these families per the frozen
-# contract's "shots 15-23" wording -- it runs via the PLAYTEST_SCENARIOS path.
-# world_depth (31-33) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
-# § Smoke validation; its own seed + seeded state setup).
-SATELLITE_SWEEP_SCENARIOS = ["visual_sweep_camping", "visual_sweep_storage",
-                             "visual_sweep_pokemon", "visual_sweep_overworld",
-                             "visual_sweep_world_depth"]
+def _load_run_playtests_constant(name: str):
+    """Single-source a constant from run_playtests.py (R3): the RED-tier sidecar
+    seed-equality + anchor gates live there, so its SATELLITE_SWEEP_SCENARIOS is the
+    truth this orchestrator's S9 windowed loop mirrors. The importlib load mirrors
+    _load_vision_review below — run_playtests is read, never forked (its top-level
+    only loads the sibling smoke harness; the main entry is __main__-guarded)."""
+    path = ROOT / "tools" / "run_playtests.py"
+    spec = importlib.util.spec_from_file_location("run_playtests", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load run_playtests from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return getattr(module, name)
+
+
+# S9 windowed satellite sweep families (shots 15-23 + 30-36, windowed-diffed one-command
+# alongside the main visual_sweep). SINGLE-SOURCED from run_playtests.py (R3) so the
+# orchestrator's loop and the runner's gates cover the identical family set by
+# construction. visual_sweep_fishing (26-27) is registered in the smoke list + windowed
+# sets but is NOT one of these families per the frozen contract's "shots 15-23" wording
+# -- it runs via the PLAYTEST_SCENARIOS path. world_depth ([31,34]: 31-32 + 33_beacon +
+# the R11 34_heart_tower) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
+# § Smoke validation; its own seed + state), and the R11 world_chain family ([35,36], the
+# derived-world seed world_seed_for(2026072907,(0,-1)) single-sourced from SHOT_REGISTRY)
+# covers the non-origin states — its OWN family because R3's sidecar seed-equality gate
+# demands exactly one deterministic world per run.
+SATELLITE_SWEEP_SCENARIOS = list(_load_run_playtests_constant("SATELLITE_SWEEP_SCENARIOS"))
 
 # "warn" maps to GREEN on purpose: a warn-tier refusal (R6 vision-review
 # freshness under --skip-windowed) is recorded + printed but NEVER escalates
@@ -385,10 +415,11 @@ class Runner:
                         extra={"report": str(audit_report.relative_to(ROOT))})
                     if entry["status"] in ("pass", "fail"):
                         certified.append(audit_report)
-                # --- S9: windowed visual_sweep + the four satellite sweep families
-                # (shots 15-23 windowed-diffed one-command; RUN LAST: freshest
-                # shots/review). The main sweep keeps sweep_report (post-refusals
-                # R4 + stamps key off it); each satellite gets its own report. ---
+                # --- S9: windowed visual_sweep + the six satellite sweep families
+                # (shots 15-23 + 30-36 windowed-diffed one-command, single-sourced
+                # above; RUN LAST: freshest shots/review). The main sweep keeps
+                # sweep_report (post-refusals R4 + stamps key off it); each satellite
+                # gets its own report. ---
                 if not self.fail_fast_stop:
                     sweep_lanes = [("visual_sweep", sweep_report)] + [
                         (name, SMOKE_DIR / f"verify-{name}.json")
@@ -476,7 +507,7 @@ class Runner:
         # Two groups (not one run of all) so each run's
         # worst case fits its per-group outer budget with headroom; traces accumulate
         # per dir across groups
-        # and the single cmp below compares the full nine-scenario set.
+        # and the single cmp below compares the full ten-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
             for label, trace_dir, report in (

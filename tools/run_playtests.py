@@ -65,10 +65,42 @@ WINDOWED_ONLY_SCENARIOS = smoketest.WINDOWED_ONLY_SCENARIOS
 # refusal), so both its snapshot (prepare_anchor_gate) and its verdict
 # (apply_anchor_gate) cover both names.
 VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
+# The five satellite sweep families. verify_all.py single-sources THIS tuple for its
+# S9 windowed loop (R3) so the orchestrator and the gates can never drift on which
+# families are satellites. visual_sweep_fishing is NOT a satellite family per
+# verify_all's frozen "shots 15-23" contract (it runs via the PLAYTEST_SCENARIOS
+# path), so it stays out of this set by construction.
+SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_camping", "visual_sweep_storage",
+                             "visual_sweep_pokemon", "visual_sweep_overworld",
+                             "visual_sweep_world_depth", "visual_sweep_world_chain")
+# The full gate scope (R3): the RED-tier sidecar seed-equality gate + the source-art
+# anchor gate cover the main sweep AND every satellite family. Each sweep clears
+# .godot-smoke/shots at start (clear_shots), so the gate reads exactly THAT family's
+# fresh sidecar set — an un-stamped / re-seeded satellite sidecar now reds instead of
+# passing silently, and update-mode satellite baseline rewrites are anchor-policed.
+# The early-return in apply_region_gate / prepare_anchor_gate / apply_anchor_gate
+# fires only when a scenario is in NEITHER the main nor the satellite set.
+SWEEP_GATE_SCENARIOS = VISUAL_SWEEP_SCENARIOS + SATELLITE_SWEEP_SCENARIOS
+# R4 regional pixel-oracle scope (audit Major #2): the explainable per-region diff
+# (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label, ~0 tolerance)
+# runs for the main sweep AND the two world-depth/chain satellites that carry the R4
+# coded-region sidecars (shots 31-36). Before this, apply_region_gate guarded the region
+# diff on scenario=="visual_sweep" alone, so visual_sweep_world_depth / _world_chain
+# reconciled through visual_diff.py's 0.5% GLOBAL gate and a sub-0.5% landmark pixel
+# change — the EXACT gap R4 was built to close (visual_sweep_world_depth_oracle.gd:6-8) —
+# stayed green. Each sweep clears .godot-smoke/shots at start, so the diff reads exactly
+# that family's fresh shots against the committed baseline sidecars. The other satellites
+# (camping/storage/pokemon/overworld) keep the in-engine global gate: their sidecars carry
+# no R4 coded regions, so the regional diff would add only the recomputed global backstop
+# (already enforced in-engine); scoping to the R4 families keeps the gate proportionate and
+# non-vacuous. Update-mode variants stay excluded (region diff is meaningless right after a
+# baseline rewrite — the update_mode guard below would skip them regardless). Single-sourced
+# in the sibling smoke harness so both transports gate the same families.
+REGION_ORACLE_SCENARIOS = smoketest.REGION_ORACLE_SCENARIOS
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "landmark_flow", "legendary_spawn", "world_chain", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "landmark_flow", "legendary_spawn", "world_chain", "beacon_selector", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update", "visual_sweep_world_chain", "visual_sweep_world_chain_update"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -661,13 +693,17 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     just rewritten, so the compare is trivially green).
 
     ALSO carries the sidecar world_seed/shot_seq EQUALITY gate (RED tier), which
-    runs for BOTH visual_sweep and visual_sweep_update -- including update mode,
-    where the other post-steps stand down: policing the promoted source sidecars
-    is its reason to exist (a baseline re-captured under a different world must
-    never be frozen green).
+    runs for the main sweep AND every satellite family (SWEEP_GATE_SCENARIOS, R3)
+    -- including update mode, where the other post-steps stand down: policing the
+    promoted source sidecars is its reason to exist (a baseline re-captured under
+    a different world must never be frozen green). The explainable region diff
+    below is compare-mode only, scoped to REGION_ORACLE_SCENARIOS (the main sweep
+    + the world_depth / world_chain satellites that carry the R4 coded-region
+    oracle for shots 31-36 — audit Major #2; the other satellites keep the
+    in-engine global gate).
     """
     scenario = result.get("scenario")
-    if scenario not in VISUAL_SWEEP_SCENARIOS:
+    if scenario not in SWEEP_GATE_SCENARIOS:
         return
     if result.get("transport") == "skipped-headless":
         return  # transport honesty: nothing was captured to gate
@@ -692,8 +728,12 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
         result["sidecar_seed_violations"] = seed_violations
         result["ok"] = False
 
-    # The explainable region diff below is compare-mode main-sweep only.
-    if scenario != "visual_sweep":
+    # The explainable region diff below is compare-mode only, scoped to the families
+    # that carry the R4 coded-region oracle (REGION_ORACLE_SCENARIOS: main + the
+    # world_depth / world_chain satellites). Audit Major #2: the old guard
+    # (scenario != "visual_sweep") left shots 31-36 region-ungated, so the R4 oracle
+    # was populated but INERT for its only owners.
+    if scenario not in REGION_ORACLE_SCENARIOS:
         return
     if update_mode:
         return
@@ -939,9 +979,12 @@ def prepare_anchor_gate(project: Path, scenario: str) -> dict[str, bytes]:
     the scenario that actually rewrites baselines (an empty snapshot would make
     a refusal unlink every baseline and restore nothing). The snapshot is the
     whole baseline dir (PNG + sidecar), so a refusal reverts the update
-    completely -- a wrong baseline is worse than a missing one.
+    completely -- a wrong baseline is worse than a missing one. R3: the satellite
+    families share the gate (SWEEP_GATE_SCENARIOS) so a satellite update-mode
+    rewrite is anchor-policed too (satellites carry no art anchors, so the gate is
+    a no-op refusal-wise until one is registered — arming, never a false red).
     """
-    if scenario not in VISUAL_SWEEP_SCENARIOS:
+    if scenario not in SWEEP_GATE_SCENARIOS:
         return {}
     baseline_dir = _baseline_dir(project)
     if not baseline_dir.is_dir():
@@ -1010,7 +1053,7 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
     render_introspection collects it) are recorded UNVERIFIABLE, never silently
     passed. An empty registry is a no-op (the gate arms once >=1 anchor exists).
     """
-    if result.get("scenario") not in VISUAL_SWEEP_SCENARIOS:
+    if result.get("scenario") not in SWEEP_GATE_SCENARIOS:
         return
     if result.get("transport") == "skipped-headless":
         return  # nothing captured to gate

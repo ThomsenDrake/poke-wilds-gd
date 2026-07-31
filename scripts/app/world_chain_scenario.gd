@@ -28,6 +28,7 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const WorldChainChecks := preload("res://scripts/app/world_chain_checks.gd")
 const WorldChainPersistChecks := preload("res://scripts/app/world_chain_persist_checks.gd")
+const WorldChainCrossChecks := preload("res://scripts/app/world_chain_cross_checks.gd") # R8: the cross-method duality (deposit/fly/second-cardinal/fly-suppression), extracted at the app 220 wall
 const FieldMovesParty := preload("res://scripts/runtime/field_moves_party.gd")
 
 const SEED := 2026072913
@@ -39,6 +40,7 @@ var _failures: Array = []
 var _oks: Dictionary = {}
 var _checks = null
 var _persist = null
+var _crossm = null
 
 
 func run(ctx: Dictionary) -> void:
@@ -49,6 +51,7 @@ func run(ctx: Dictionary) -> void:
 	var party_before: Array = FieldMovesParty.swap_in(runtime) # Surf (Rhyperior) + Fly (Charizard) + Teleport (Calyrex) — the canonical all-field-moves fixture
 	_checks = WorldChainChecks.new(); add_child(_checks); _checks.setup(_ctx, _runner, _failures)
 	_persist = WorldChainPersistChecks.new(); add_child(_persist); _persist.setup(_ctx, _runner, _failures, _checks)
+	_crossm = WorldChainCrossChecks.new(); add_child(_crossm); _crossm.setup(_ctx, _runner, _failures, _checks)
 	_ensure(FieldMovesParty.verify(runtime).is_empty(), "party: the all-field-moves fixture failed verification (%s)" % str(FieldMovesParty.verify(runtime)))
 	FieldMovesParty.restore(runtime, party_before) # the witness is done: each _script half re-swaps AFTER new_game (its party.clear would wipe a pre-script swap)
 	var cases := {}
@@ -70,6 +73,7 @@ func run(ctx: Dictionary) -> void:
 		_oks["beacon_ok"] = bool(cases.get("beacon_ok", false)) and bool(cases.get("crossworld_ok", false))
 		_oks["save_ok"] = bool(cases.get("save_ok", false))
 		_oks["control_ok"] = bool(cases.get("control_ok", false)) # extra witness beside the spec's eight payload keys
+		_oks["cross_method_ok"] = bool(cases.get("deposit_ok", false)) and bool(cases.get("fly_ok", false)) and bool(cases.get("cardinal_ok", false)) and bool(cases.get("fly_suppress_ok", false)) # R8: the cross-method duality
 	if _failures.is_empty():
 		var payload: Dictionary = _oks.duplicate(); payload["seed"] = SEED
 		runtime.emit_trace("world_chain_passed", "SmokeScenarios", payload)
@@ -115,6 +119,14 @@ func _script(runtime) -> Dictionary:
 	_step(runtime, cases, "crossworld_ok", Callable(_persist, "run_crossworld_case"))
 	_step(runtime, cases, "control_ok", Callable(_persist, "run_control_case"))
 	_step(runtime, cases, "avatar_ok", Callable(_checks, "run_avatar_cross_case"))
+	# R8: the cross-method duality (deposit geometry, the production-gate fly cross + its
+	# surf-refused negative control, a second cardinal, use_fly's edge_suppressed sibling
+	# gate). Runs AFTER the fingerprint is captured + avatar_ok returns to origin, so the
+	# extra crosses never perturb the double-run fingerprint or the persistence cases.
+	_step(runtime, cases, "deposit_ok", Callable(_crossm, "run_deposit_case"))
+	_step(runtime, cases, "fly_ok", Callable(_crossm, "run_fly_cross_case"))
+	_step(runtime, cases, "cardinal_ok", Callable(_crossm, "run_cardinal_cross_case"))
+	_step(runtime, cases, "fly_suppress_ok", Callable(_crossm, "run_fly_suppression_case"))
 	return {"fp": fp, "cases": cases}
 
 

@@ -3,7 +3,9 @@ extends RefCounted
 # Phase 4 field-move callers (spec: docs/product-specs/field-moves.md). EXTRACTED
 # from game_runtime.gd (AT its 320 budget; game_runtime only instantiates + setup()s
 # this beside the other runtimes, injected with the shared session/catalog/trace/
-# world_gen + _rng so any roll stays deterministic under seed_for_smoke). Owns the
+# world_gen). NO rng injection: NONE of the eight moves ROLL (the Phase-7 audit's
+# dormant-injection finding — a future roll re-injects game_runtime._rng, the
+# fishing_runtime precedent, so seed_for_smoke pins it). Owns the
 # EIGHT Phase-4 moves that had capability rules but ZERO runtime callers: flash,
 # teleport (+ way stones), ride, fly, repel, power (movable boulders), and the
 # attack/charm overworld HOOKS Phase 6 consumes. cut/dig/smash (harvest_runtime), surf
@@ -46,7 +48,6 @@ var _catalog = null
 var _trace = null
 var _world_gen = null
 var _night_system = null
-var _rng = null
 var _riding := false
 var _tile_overridden: Callable = Callable() # world_overridden.emit (the harvest_runtime precedent)
 # Phase-6 plug-in seams: the overworld entities register these; until they land the
@@ -57,13 +58,12 @@ var overworld_attack_hook: Callable = Callable(); var overworld_charm_hook: Call
 var beacon_registered_hook: Callable = Callable() # fired after waystone_registered (beacon_placed when the stone sits in the edge band)
 var world_chain_gate = null # teleport_suppressed() gate for use_teleport/use_fly (null = inert, pre-wiring)
 
-func setup(session_state, catalog, trace_logger, world_generator, night_system, rng, tile_overridden: Callable = Callable()) -> void:
+func setup(session_state, catalog, trace_logger, world_generator, night_system, tile_overridden: Callable = Callable()) -> void:
 	_session = session_state
 	_catalog = catalog
 	_trace = trace_logger
 	_world_gen = world_generator
 	_night_system = night_system
-	_rng = rng
 	_tile_overridden = tile_overridden
 
 func _capable(move_id: String) -> bool:

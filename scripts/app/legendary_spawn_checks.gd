@@ -22,9 +22,11 @@ extends RefCounted
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const MusicRouter := preload("res://scripts/runtime/music_router.gd")
+const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
 # App may not preload domain directly (check_architecture.gd layer table) — ride the
 # runtime's own preload (the landmark_flow precedent).
 const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
+const Landmarks := LandmarkRuntime.Landmarks
 
 const ORIGIN := Vector2i.ZERO # Build 2 stamps the origin world (Build 3 threads the active chain)
 const MAIN_SOURCE_PATH := "res://scripts/app/main.gd"
@@ -91,3 +93,34 @@ static func roundtrip_removal(runtime, species_id: String, anchored: Array) -> S
 		if sid != species_id and LegendaryPlacement.anchor_for(runtime.get_world_seed(), ORIGIN, sid) != LegendaryPlacement.NO_ANCHOR and not present.has(sid):
 			return "ko: the round-tripped removal set dropped the untouched %s" % sid
 	return ""
+
+
+# Phase 7 audit R6: the curated/extra_ids exclusion path the per-biome pool scan cannot see.
+# generate_wild_encounter injects a scope's extra_ids/curated AFTER the biome filter
+# (landmark_runtime.pick_species_for), so a legendary added to a LIVE landmark scope
+# (e.g. MEWTWO into Landmarks.RUINS_INNER_CURATED) becomes drawable on that footprint's
+# tiles while every per-biome exclusion assert stays green. Walk the LIVE scope tables
+# (mutation-proven, the world_depth_checks style) and assert curated ∩ legendaries == ∅ and
+# extra_ids ∩ legendaries == ∅ for every tokened footprint tile. Appends named failures.
+static func curated_exclusion_pin(runtime, failures: Array) -> void:
+	var seed: int = runtime.get_world_seed()
+	for landmark in Landmarks.landmarks_in_world(seed, ORIGIN):
+		var footprint: Rect2i = landmark["footprint"]
+		for y in range(footprint.position.y, footprint.end.y):
+			for x in range(footprint.position.x, footprint.end.x):
+				var tile := Vector2i(x, y)
+				var logic: Dictionary = runtime._world_gen.get_tile_logic(tile)
+				var token := str(logic.get("encounter_token", ""))
+				if token == "":
+					continue
+				var scope: Dictionary = runtime.landmark_runtime.encounter_scope_for(tile, str(logic.get("biome", "")))
+				var curated: Dictionary = scope.get("curated", {}) if scope.get("curated", {}) is Dictionary else {}
+				var extra: Array = scope.get("extra_ids", []) if scope.get("extra_ids", []) is Array else []
+				if curated.is_empty() and extra.is_empty():
+					continue
+				for species in LegendaryPlacement.LEGENDARY_IDS:
+					var sid := str(species)
+					if curated.has(sid):
+						failures.append("exclusion: %s is curated into the %s scope (curated ∩ legendaries must be empty — a legendary is drawable on that footprint)" % [sid, token])
+					if extra.has(sid):
+						failures.append("exclusion: %s is an extra_id of the %s scope (extra_ids ∩ legendaries must be empty)" % [sid, token])

@@ -47,6 +47,7 @@ func play_biome_track(biome: String) -> void:
 	if track_path.is_empty():
 		_warn("No track mapped for biome; falling back to the default overworld theme.", {"biome": biome})
 		track_path = DEFAULT_OVERWORLD_TRACK
+	_emit_track_selected(biome, track_path) # R10: observable biome->track witness mirroring play_battle_track — the Heart Tower EXIT restore rides this seam, made headless-observable BEFORE the play gate (the landmark_runtime exit branch's play_biome_track is otherwise untraceable)
 	play_track_path(track_path)
 
 

@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -46,7 +46,10 @@ quality_bucket = "bootstrap"
 #     visual_sweep_fishing(+_update) joins PLAYTEST_SCENARIOS / WINDOWED_SUBPROCESS_SCENARIOS /
 #     WINDOWED_ONLY_SCENARIOS in tools/godot_dap_smoketest.py.
 #   tools/verify_all.py — S9 gains the four satellite sweep families (shots 15-23
-#     windowed-diffed one command) + the fishing satellite, and a DOUBLE-RUN determinism
+#     windowed-diffed one command) + the fishing satellite (Phase 7: SIX satellites —
+#     world_depth [31,34] + the derived-world world_chain [35,36] join; the tuple is
+#     single-sourced from run_playtests via importlib, R3 — see the landmarks entry),
+#     and a DOUBLE-RUN determinism
 #     lane lands AFTER S6: the six rng-consumer scenarios (playtest_journey, playtest_soak,
 #     overworld_mons, shiny_odds, fishing_flow, breed_flow) twice headless, ts-stripped
 #     canonical trace JSONL + payloads compared via a new determinism_verify.py cmp verb
@@ -997,12 +1000,18 @@ code_paths = [
   "scripts/app/landmark_flow_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
+  "scripts/app/landmark_guardian_checks.gd",
   "scripts/app/world_chain_scenario.gd",
+  "scripts/app/beacon_selector_scenario.gd",
   "scripts/app/world_chain_checks.gd",
   "scripts/app/world_chain_persist_checks.gd",
+  "scripts/app/world_chain_cross_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd",
   "scripts/app/visual_sweep_world_depth_beacon.gd",
+  "scripts/app/visual_sweep_world_depth_oracle.gd",
+  "scripts/app/visual_sweep_world_depth_expand.gd",
+  "scripts/app/visual_sweep_world_chain.gd",
   "scripts/ui/beacon_selector.gd",
 ]
 scene_paths = ["scenes/app/Main.tscn", "scenes/ui/BeaconSelector.tscn"]
@@ -1013,7 +1022,9 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario world_chain",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario beacon_selector",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_chain",
 ]
 # The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2
 # legendary_encounter battle-start trace (single owning source "GameRuntime", emitted on the
@@ -1024,8 +1035,11 @@ validation_commands = [
 # (trace-events.md), NOT registry-required. The legendary_spawn scenario's passed/failed
 # pair registered here in the scenario lane (Build 2); the world_chain scenario's
 # passed/failed pair registered here in the Build 3 scenario lane (the three chain
-# traces above are its registry-required domain events).
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "visual_sweep_world_depth_passed"]
+# traces above are its registry-required domain events); the beacon_selector scenario's
+# passed/failed pair registered here in the Phase 7 audit repair lane (R5 — the multi-beacon
+# SELECTOR functional choice; its registry-required domain events are the two beacon_placed
+# registrations + the picked teleport_used warp).
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "beacon_selector_passed", "beacon_selector_failed", "visual_sweep_world_depth_passed", "visual_sweep_world_chain_passed"]
 quality_bucket = "landmarks"
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
@@ -1081,19 +1095,34 @@ quality_bucket = "landmarks"
 # {VOLCARONA, GOLURK 38-45} + the RUINS_UNDERGROUND DUSCLOPS flagged; level bands 18-26 /
 # 22-30 / inner floor 30 invented); token "" outside footprints => pools byte-identical
 # to pre-Phase-7. Heart Tower ships footprint + entry + the dedicated field track
-# (Wilds_HeartTower.ogg on entry, host-biome restore on exit — trace-asserted, headless
-# never plays audio); INTERNALS DEFERRED (spec § Scope — element floors, puzzle, Ho-Oh/
+# (Wilds_HeartTower.ogg on entry via the auxiliary landmark_music{trigger: entry} trace;
+# the host-biome restore on EXIT is trace-asserted via the music_router's shared
+# music_track_selected{kind: <host biome>} seam — R10: play_biome_track emits it BEFORE
+# the headless gate, mirroring play_battle_track, and world_depth_checks' tower case
+# steps OUT and asserts the event, so the restore is no longer seamless; headless never
+# plays audio); INTERNALS DEFERRED (spec § Scope — element floors, puzzle, Ho-Oh/
 # Lugia reward quarantined). landmark_flow (SEED 2026072907, seed_for_smoke BEFORE
 # new_game per the save_stability precedent) SOLVES the Mansion puzzle on the fixed seed,
 # proves the footprint-local pool (DITTO mansion-exclusive — cross-asserted against
 # breed_flow's Ditto-universal-parent reliance), the Ruins outer/inner/underground scope,
 # the tower entry, footprint protection (can_place_on refuses landmark tiles), and the
 # puzzle-state save round-trip THROUGH THE SEAM; it JOINS the double-run lane (the
-# verify_all regroup is [4,5] — Build 2's legendary_spawn + Build 3's world_chain
-# completed it). The visual_sweep_world_depth satellite (seed 2026072907; shot range
-# single-sourced in the visual_sweep_baselines.gd registry) baselines 31_ruins_interior +
-# 32_mansion (puzzle state CRAFTED through the frozen seam, never played live) + the
-# Build-3 33_beacon (visual_sweep_world_depth_beacon.gd; baseline CAPTURED, 0.0% drift).
+# verify_all regroup is [5,5] — Build 2's legendary_spawn + Build 3's world_chain + the
+# Phase-7 audit's night_cycle (the tenth consumer) completed it). The visual_sweep_world_depth satellite (seed 2026072907; shot range
+# [31,34] single-sourced in the visual_sweep_baselines.gd registry) baselines
+# 31_ruins_interior + 32_mansion (puzzle state CRAFTED through the frozen seam, never
+# played live) + the Build-3 33_beacon (visual_sweep_world_depth_beacon.gd) + the R11
+# 34_heart_tower (visual_sweep_world_depth_expand.gd; asserted on rendered wall/decor
+# props — the tower has NO encounter token); the R4 regional oracle (visual_sweep_world_depth_oracle.gd)
+# merges projected landmark/beacon/tower tiles into the sidecars — 31/32/35/36 carry
+# expected_regions.ink + canary_rect, while 33_beacon + 34_heart_tower are ink-only (canary_rect
+# empty: the beacon selector overlay + the tower decor's alpha edge are not strict-canary-safe, so
+# the ink overlap gate is their red tier, visual_region_diff.py:40). A dropped statue/decor/beacon/
+# tower/guardian sprite reds via visual_region_diff.py instead of hiding under the 0.5% global gate. The
+# R11 world_chain satellite is its OWN family (range [35,36]: 35_chained_world +
+# 36_legendary_guardian; the derived-world seed world_seed_for(2026072907,(0,-1)) —
+# 1746331193 (the SplitMix mix & 0x7fffffff) — single-sourced from SHOT_REGISTRY; its own sweep so R3's
+# one-world seed-equality gate holds). Baselines CAPTURED, 0.0% drift.
 # CROSS-SUBSYSTEM CO-MODIFICATION (files stay OWNED BY their home subsystem — one owner
 # per file, never double-listed in code_paths):
 #   scripts/domain/world_generator.gd — the SINGLE mutation-boundary resolver hook
@@ -1127,7 +1156,12 @@ quality_bucket = "landmarks"
 #     logic -> the existing map render; interior props per the spec's asset notes).
 #     Owned by world_runtime.
 #   scripts/app/visual_sweep_baselines.gd — the SHOT_REGISTRY world_depth entry (range
-#     [31, 33], seed 2026072907). Owned by app_bootstrap/vision_fidelity.
+#     [31, 34], seed 2026072907) + the Phase-7-audit world_chain entry (range [35, 36],
+#     seed world_seed_for(2026072907,(0,-1)) = 1746331193 — baselines 31-36 total).
+#     Owned by app_bootstrap/vision_fidelity (the NEW visual_sweep_registry_support.gd
+#     extraction — the R3 registry single-source + the R11 rest-probe/legendary-framing
+#     helpers the world-depth satellites share with every OTHER satellite — is listed
+#     in app_bootstrap's code_paths at its SHOT_REGISTRY home, NOT here: one owner).
 # TOOLS CO-MODIFICATION (under the miss-002 re-stamp ritual where pinned): run_playtests.py
 #   PLAYTEST_SCENARIOS gains landmark_flow / visual_sweep_world_depth(+_update);
 #   godot_dap_smoketest.py the requirements rows + WINDOWED sets; verify_all.py

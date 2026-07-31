@@ -162,6 +162,9 @@ func run_crossworld_case(runtime) -> bool:
 	var info: Dictionary = _checks.cross(runtime, EDGE_SOUTH, SOUTH, "surf", "final_return")
 	var result: Dictionary = info["result"]
 	_ensure(bool(result.get("ok", false)) and str(result.get("chain", "")) == "0,0", "crossworld: the final return to origin failed (%s)" % str(result.get("reason", "")))
+	if bool(result.get("ok", false)): # R7: the post-reload return must restore the ARCHIVED origin (run_save_case reloaded mid-chain), never a fresh re-derive
+		_ensure(not bool(result.get("newly_generated", true)), "crossworld: origin re-derived FRESH after save+reload (the chained_worlds archive was lost on apply — :184)")
+		_ensure(_checks.origin_fence != Vector2i.MAX and str((runtime._world_gen.placements_for_save() as Dictionary).get("%d,%d" % [_checks.origin_fence.x, _checks.origin_fence.y], {}).get("structure_id", "")) == "fence", "crossworld: the origin fence %s did not stand with structure_id 'fence' after the post-reload return" % str(_checks.origin_fence))
 	_runner.teleport_player(_world(), _player(), runtime, ORIGIN)
 	var cursor: int = _runner.trace_log_line_count()
 	var refused: Dictionary = runtime.field_move_runtime.use_teleport(beacon_tile)

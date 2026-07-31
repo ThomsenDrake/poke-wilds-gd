@@ -1,9 +1,7 @@
 extends Node
 
-# World-depth split checks (Phase 7; world-depth.md § Smoke validation): landmark_flow's
-# pool/ruins/tower/save cases live here for the app budget (Build 3's world_chain asserts
-# join this shared home). Every scope assert reads the LIVE token tables, never a copied
-# list; each footprint case asserts can_place_on's landmark refusal. miss-002: named reds.
+# World-depth split checks (Phase 7; world-depth.md § Smoke validation): landmark_flow's pool/ruins/tower/save
+# cases live here for the app budget. Every scope assert reads the LIVE token tables; miss-002 named reds.
 
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
 const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
@@ -96,14 +94,12 @@ func run_ruins_case(runtime) -> bool:
 	var guard_cursor: int = _runner.trace_log_line_count()
 	_runner.teleport_player(_world(), _player(), runtime, guard_tile)
 	runtime.note_player_step()
-	_ensure(_runner.trace_log_has_since("landmark_entity_spawned", guard_cursor, {"species_id": Landmarks.RUINS_UNDERGROUND_SPECIES, "landmark_id": Landmarks.RUINS_ID}), "ruins: no landmark_entity_spawned{DUSCLOPS} under the guard band")
+	_ensure(_runner.trace_log_has_since("landmark_entity_spawned", guard_cursor, {"species_id": Landmarks.RUINS_UNDERGROUND_SPECIES, "landmark_id": Landmarks.RUINS_ID}), "ruins: no landmark_entity_spawned{DUSCLOPS} under the guard band") # the AGGRESSIVE disposition witness rides landmark_guardian_checks (the trace literal is a constant==constant tautology; audit Major #1)
 	runtime.overworld_mons_runtime.active = saved_active
 	return _failures.size() == start
 
 
-# Heart Tower: footprint + the entry witness + the dedicated field track. The music SWITCH
-# rides the landmark_music trace seam (emitted BEFORE play_track_path, which is headless-
-# gated and emits nothing itself) + the track asset's presence — asserted by trace, not audio.
+# Heart Tower: footprint + the entry witness + the dedicated field track + the EXIT host-biome restore (R10).
 func run_tower_case(runtime) -> bool:
 	var start: int = _failures.size()
 	var stand := _first_walkable(runtime, Landmarks.TOWER_ID)
@@ -117,6 +113,11 @@ func run_tower_case(runtime) -> bool:
 	_ensure(_runner.trace_log_has_since("landmark_entered", cursor, {"landmark_id": Landmarks.TOWER_ID, "first_entry": true}), "tower: no landmark_entered{heart_tower,first_entry}")
 	_ensure(_runner.trace_log_has_since("landmark_music", cursor, {"landmark_id": Landmarks.TOWER_ID, "track": TOWER_TRACK}), "tower: no landmark_music{heart_tower} switch trace on first entry")
 	_ensure(ResourceLoader.exists(TOWER_TRACK), "tower: the dedicated field track is missing (%s)" % TOWER_TRACK)
+	var footprint: Rect2i = (_landmark(runtime, Landmarks.TOWER_ID)["footprint"] as Rect2i) # R10: the field-music EXIT restore — step OUT, the host-biome theme restores (music_track_selected)
+	var outside := Vector2i(stand["tile"].x, footprint.position.y - 1) # one row above the footprint: outside (landmark_id ""), the host biome
+	var exit_cursor: int = _runner.trace_log_line_count()
+	_runner.teleport_player(_world(), _player(), runtime, outside); runtime.note_player_step()
+	_ensure(_runner.trace_log_has_since("music_track_selected", exit_cursor, {"kind": str(runtime._world_gen.get_tile_logic(outside).get("biome", ""))}), "tower: no music_track_selected host-biome restore on exit (the exit-restore seam is dead)")
 	return _failures.size() == start
 
 

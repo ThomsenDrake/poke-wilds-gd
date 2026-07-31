@@ -45,7 +45,7 @@ var _baselines_copied := false
 
 func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_ctx = ctx
-	_crafted = CRAFTED_STATE.duplicate(true)
+	_crafted = _baselines.crafted_state("camping", CRAFTED_STATE) # R3: world_seed single-sourced from SHOT_REGISTRY
 	_mode = str(options.get("mode", VisualSweepBaselines.MODE_COMPARE))
 	_threshold_pct = float(options.get("threshold_pct", DEFAULT_THRESHOLD_PCT))
 	_base_dir = _baselines.resolve_shot_dir()
@@ -53,7 +53,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 		_runtime().warn("SmokeScenarios", "Camping sweep found no writable screenshot directory.", {})
 		return
 	_baselines.clear_shots(_base_dir)
-	if not _baselines.craft_state(_ctx, _runner, CRAFTED_STATE):
+	if not _baselines.craft_state(_ctx, _runner, _crafted):
 		push_error("Camping sweep could not craft its deterministic state; species catalog incomplete.")
 		return
 	var previous_window := _baselines.apply_canonical_window_size()

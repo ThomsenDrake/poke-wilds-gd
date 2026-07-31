@@ -195,7 +195,7 @@ Every world hosts three landmarks — multi-tile destinations stamped determinis
 - **Desert Ruins** — glowing-statue grounds (the outer zone) around a walled inner chamber, with an underground level below. The inner chamber runs higher-level mons than the grounds (a curated set — a flagged port addition). In the underground, **Dusclops** is ALWAYS aggressive — it spots and chases on sight and hits +3 Attack harder if it catches you (the same aggressive-disposition rules as [Overworld Pokémon](#overworld-pokémon)).
 - **Heart Tower** — a themed base chamber you can enter, with its own field music on entry (the overworld theme restores on exit). The element floors, the floor puzzle, and the tower's reward are not in yet (deferred).
 
-Loot props at the Mansion and the Ruins grant Poké Balls until ball tiers land (the Ultra Ball substitution is flagged). Wild levels inside landmarks are a port invention (the original documents none): Mansion 18–26, Ruins grounds 22–30, Ruins inner floor 30.
+The Mansion's loot shelf grants a Poké Ball once per world (a one-shot; the Ultra Ball substitution is flagged) — the Ruins carry no loot props. Wild levels inside landmarks are a port invention (the original documents none): Mansion 18–26, Ruins grounds 22–30, Ruins inner floor 30.
 
 ## Legendary Pokémon
 
