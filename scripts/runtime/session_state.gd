@@ -8,14 +8,19 @@ extends RefCounted
 # world_overrides/campsite/structures; v4 adds storage_box "contents", Phase 4
 # "repel_steps", and the Phase 5 "pastures" pen state (breeding EGGS ride the party
 # array as additive mon keys — is_egg + an "egg" payload; absent keys backfill).
+# v5 (Phase 7 Build 3) is the first STRUCTURAL bump since v2: chain identity
+# (root_seed/active_chain) + the per-world chained_worlds dict — the ACTIVE world
+# keeps v4 keying exactly, and the pure transform lives in save_migration.gd (the
+# world_overrides.gd domain-sibling pattern), delegated from session_payload.gd.
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const Structures := preload("res://scripts/domain/structures.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const SessionPayload := preload("res://scripts/runtime/session_payload.gd")
+const SaveMigration := preload("res://scripts/domain/save_migration.gd")
 
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 const DAY_MINUTES := 1440
 const NEW_GAME_TIME_OF_DAY := 600 # 10:00
 # Sleeping bag: a REUSABLE key item (never consumed; id in i18n for data_audit).
@@ -42,6 +47,15 @@ var total_steps: int = 0
 var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
 var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
 var legendary_removals: Array = [] # Phase 7 Build 2 v4-additive: gone-for-good legendary keys "<cx>,<cy>:<SPECIES>" (world-depth.md § Persistence; absent in save -> []).
+# Phase 7 Build 3 (v5) chain identity: root_seed is the immutable chain root
+# (world_seed_for(root,(0,0)) == root — origin terrain is EXACTLY the v4 world);
+# active_chain is the ACTIVE world's "<cx>,<cy>" (SaveMigration.world_id_for grammar);
+# chained_worlds keys NON-active worlds "<cx>,<cy>" -> {world_overrides, structures,
+# campsite_x/y, campsite_pokemon, pastures, player_x/y, landmark_state} — the map
+# world_chain_runtime deserializes from (world-depth.md § Save v5).
+var root_seed: int = 1337
+var active_chain: String = "0,0"
+var chained_worlds: Dictionary = {}
 
 
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
@@ -59,15 +73,19 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	repel_steps = 0
 	landmark_state = {}
 	legendary_removals = []
+	root_seed = new_world_seed # the new-game randi draw IS the chain root (origin world_seed == root)
+	active_chain = "0,0"
+	chained_worlds = {}
 	if not starter.is_empty():
 		party.append(starter)
 
 
 # World-key marshalling lives in session_payload.gd (extracted Phase 7 Build 1 —
-# that file is the shared home for the three world-depth builds, strictly serial;
-# it does NOT reference save_migration.gd, a Build-3 artifact).
+# that file is the shared home for the three world-depth builds, strictly serial);
+# Build 3 prepends SaveMigration.migrate(data) FIRST inside apply_into (a pure copy),
+# then reads the v5 keys with new-game defaults (origin backfill).
 func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
-	SessionPayload.apply_into(self, data, normalized_party, STARTING_BAG, LEGACY_ITEM_IDS, DAY_MINUTES, NEW_GAME_TIME_OF_DAY)
+	SessionPayload.apply_into(self, data, normalized_party, STARTING_BAG, LEGACY_ITEM_IDS, DAY_MINUTES, NEW_GAME_TIME_OF_DAY, SAVE_VERSION)
 
 
 func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dictionary = {}) -> Dictionary:
@@ -75,21 +93,49 @@ func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dic
 
 
 # --- Frozen location-keyed landmark state seam (world-depth.md § Persistence) -----
-# Build 1 resolves BOTH directions to the v4-additive top-level landmark_state key
-# (origin only — chained worlds are unreachable before Build 3); Build 3 extends the
-# RESOLUTION to chained_worlds[world_id_for(chain)].landmark_state WITHOUT rewriting
-# landmark_runtime, which calls ONLY this seam, never the keying.
-func landmark_state_for(_chain: Vector2i) -> Dictionary:
-	return landmark_state.duplicate(true)
+# Build 3 resolution: the ACTIVE world's puzzle state rides the flat landmark_state
+# var (its MAPS keep v4 top-level keying); every OTHER world nests under
+# chained_worlds[world_id_for(chain)].landmark_state (absent -> {}). landmark_runtime
+# calls ONLY this seam, never the keying — the resolution extended HERE, not there.
+func landmark_state_for(chain: Vector2i) -> Dictionary:
+	var world_id := SaveMigration.world_id_for(chain)
+	if world_id == active_chain:
+		return landmark_state.duplicate(true)
+	var entry: Variant = chained_worlds.get(world_id, {})
+	if not (entry is Dictionary):
+		return {}
+	var state: Variant = (entry as Dictionary).get("landmark_state", {})
+	return (state as Dictionary).duplicate(true) if state is Dictionary else {}
 
 
-func set_landmark_state(_chain: Vector2i, state: Dictionary) -> void:
-	landmark_state = state.duplicate(true) if state is Dictionary else {}
+func set_landmark_state(chain: Vector2i, state: Dictionary) -> void:
+	var safe: Dictionary = state.duplicate(true) if state is Dictionary else {}
+	var world_id := SaveMigration.world_id_for(chain)
+	if world_id == active_chain:
+		landmark_state = safe
+		return
+	if safe.is_empty():
+		if chained_worlds.has(world_id) and chained_worlds[world_id] is Dictionary:
+			(chained_worlds[world_id] as Dictionary).erase("landmark_state") # omitted when {} (world-depth.md § Save v5)
+		return
+	if not chained_worlds.has(world_id) or not (chained_worlds[world_id] is Dictionary):
+		chained_worlds[world_id] = {}
+	(chained_worlds[world_id] as Dictionary)["landmark_state"] = safe
 
 
 # Load-time structures handoff (save-shape) for the generator's placement map.
 func get_structures() -> Dictionary:
 	return structures.duplicate(true)
+
+
+# Deep copies: chained_worlds is the world_chain_runtime deserialization source and
+# the save's per-world payload — callers never alias the live session map.
+func get_chained_worlds() -> Dictionary:
+	return chained_worlds.duplicate(true)
+
+
+func set_chained_worlds(worlds: Dictionary) -> void:
+	chained_worlds = worlds.duplicate(true) if worlds is Dictionary else {}
 
 
 func get_active_party_index() -> int:

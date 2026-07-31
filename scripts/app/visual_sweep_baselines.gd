@@ -31,7 +31,7 @@ const SHOT_REGISTRY := {
 	"pokemon": {"range": [20, 21], "seed": 2026072605},
 	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
 	"fishing": {"range": [26, 27], "seed": 2026072804},
-	"world_depth": {"range": [31, 32], "seed": 2026072907},
+	"world_depth": {"range": [31, 33], "seed": 2026072907},
 	"retired": [17],
 }
 

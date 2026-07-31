@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -96,6 +96,21 @@ quality_bucket = "runtime"
 # keying). game_runtime.gd wires LandmarkRuntime ONLY (instantiation + step + the
 # footprint encounter-scope read feeding generate_wild_encounter), at its 320 budget via
 # extraction.
+# PHASE 7 BUILD 3 CO-MODIFICATION (the `landmarks` subsystem entry owns the world-depth
+# detail): session_state.gd bumps SAVE_VERSION 4->5 + gains the root_seed/active_chain/
+# chained_worlds vars (get/set_chained_worlds accessors), and reset_for_new_game draws
+# root_seed = the new-game world_seed (the frozen origin identity world_seed_for(root,
+# (0,0)) == root). session_payload.gd emits the v5 keys in to_payload (the active world
+# keeps its 15 v4 keys EXACTLY; its landmark_state nests under chained_worlds[active_chain]
+# .landmark_state — the v4 top-level seat is retired) and PREPENDS SaveMigration.migrate
+# in apply_into (new save_version argument — save_migration.gd must NOT preload
+# SessionState, the preload cycle session_state->session_payload->save_migration->
+# session_state). The pure v4->v5 transform lives in the NEW scripts/domain/
+# save_migration.gd — OWNED BY the `landmarks` entry's code_paths (one world-depth home,
+# the world_overrides.gd sibling pattern; NOT double-listed here), the delegation chain
+# session_state -> session_payload -> save_migration. The frozen v4 golden fixture stays
+# the migration WITNESS (save_stability's one pinned guard line canonicalizes
+# migrate(golden); update mode downshifts; a v5-shaped write is refused — app_bootstrap).
 
 [[subsystems]]
 name = "world_runtime"
@@ -971,7 +986,10 @@ layer = "runtime"
 code_paths = [
   "scripts/domain/landmarks.gd",
   "scripts/domain/legendary_placement.gd",
+  "scripts/domain/save_migration.gd",
+  "scripts/domain/world_chain.gd",
   "scripts/runtime/landmark_runtime.gd",
+  "scripts/runtime/world_chain_runtime.gd",
   "scripts/runtime/session_payload.gd",
   "scripts/runtime/entity_markers.gd",
   "scripts/runtime/wild_encounter_draw.gd",
@@ -979,16 +997,22 @@ code_paths = [
   "scripts/app/landmark_flow_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
+  "scripts/app/world_chain_scenario.gd",
+  "scripts/app/world_chain_checks.gd",
+  "scripts/app/world_chain_persist_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd",
+  "scripts/app/visual_sweep_world_depth_beacon.gd",
+  "scripts/ui/beacon_selector.gd",
 ]
-scene_paths = ["scenes/app/Main.tscn"]
+scene_paths = ["scenes/app/Main.tscn", "scenes/ui/BeaconSelector.tscn"]
 spec_doc = "docs/product-specs/world-depth.md"
 validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario world_chain",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
 ]
 # The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2
@@ -998,8 +1022,10 @@ validation_commands = [
 # sweep has NO _failed trace — its failure paths ride push_error captured by both
 # transports' ERROR_MARKERS, loud never silent). key_item_used is a documented auxiliary
 # (trace-events.md), NOT registry-required. The legendary_spawn scenario's passed/failed
-# pair registered here in the scenario lane (Build 2).
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "visual_sweep_world_depth_passed"]
+# pair registered here in the scenario lane (Build 2); the world_chain scenario's
+# passed/failed pair registered here in the Build 3 scenario lane (the three chain
+# traces above are its registry-required domain events).
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "visual_sweep_world_depth_passed"]
 quality_bucket = "landmarks"
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
@@ -1063,11 +1089,11 @@ quality_bucket = "landmarks"
 # breed_flow's Ditto-universal-parent reliance), the Ruins outer/inner/underground scope,
 # the tower entry, footprint protection (can_place_on refuses landmark tiles), and the
 # puzzle-state save round-trip THROUGH THE SEAM; it JOINS the double-run lane (the
-# verify_all regroup is [4,3] interim — Build 3's world_chain completes the spec's final
-# [4,4]). The visual_sweep_world_depth satellite (seed 2026072907; shot range
+# verify_all regroup is [4,5] — Build 2's legendary_spawn + Build 3's world_chain
+# completed it). The visual_sweep_world_depth satellite (seed 2026072907; shot range
 # single-sourced in the visual_sweep_baselines.gd registry) baselines 31_ruins_interior +
-# 32_mansion (puzzle state CRAFTED through the frozen seam, never played live; 33_beacon
-# is Build 3's).
+# 32_mansion (puzzle state CRAFTED through the frozen seam, never played live) + the
+# Build-3 33_beacon (visual_sweep_world_depth_beacon.gd; baseline CAPTURED, 0.0% drift).
 # CROSS-SUBSYSTEM CO-MODIFICATION (files stay OWNED BY their home subsystem — one owner
 # per file, never double-listed in code_paths):
 #   scripts/domain/world_generator.gd — the SINGLE mutation-boundary resolver hook
@@ -1101,7 +1127,7 @@ quality_bucket = "landmarks"
 #     logic -> the existing map render; interior props per the spec's asset notes).
 #     Owned by world_runtime.
 #   scripts/app/visual_sweep_baselines.gd — the SHOT_REGISTRY world_depth entry (range
-#     [31, 32], seed 2026072907). Owned by app_bootstrap/vision_fidelity.
+#     [31, 33], seed 2026072907). Owned by app_bootstrap/vision_fidelity.
 # TOOLS CO-MODIFICATION (under the miss-002 re-stamp ritual where pinned): run_playtests.py
 #   PLAYTEST_SCENARIOS gains landmark_flow / visual_sweep_world_depth(+_update);
 #   godot_dap_smoketest.py the requirements rows + WINDOWED sets; verify_all.py
@@ -1113,3 +1139,72 @@ quality_bucket = "landmarks"
 # existing generate_wild_encounter — same stream, narrower pool) and the six pinned
 # double-run consumers (seven with landmark_flow). NO SAVE_VERSION bump; NO new
 # RandomNumberGenerator anywhere (static-rule-enforced).
+# PHASE 7 BUILD 3 OF 3 (world-depth.md § Save v5) — SAVE/MIGRATION LANE LANDED: the PURE
+# v4->v5 transform scripts/domain/save_migration.gd (migrate — a deep COPY, never mutates
+# its argument; world_id_for — the ONE "<cx>,<cy>" grammar; downshift/can_downshift — the
+# golden update-mode inverse; byte_witness_issues — the two pinned byte-preservation
+# witnesses) joins THIS entry's code_paths (session_payload.gd precedent — one world-depth
+# home). session_state.gd bumps SAVE_VERSION 4->5 + the root_seed/active_chain/
+# chained_worlds vars + the frozen seam resolution extended to chained_worlds
+# [world_id_for(chain)].landmark_state; session_payload.gd prepends SaveMigration.migrate
+# to apply_into + emits the v5 keys + nests the active world's landmark_state under
+# chained_worlds[active_chain].landmark_state; the golden v4 fixture STAYS the migration
+# witness (save_stability's guard canonicalizes migrate(golden) — the one pinned line
+# change; update mode downshifts; v5-shaped writes refused+traced). phase0_scenarios.gd
+# gains the v5 fixture + _v5_fields_ok (v_ok grows to five). The app layer reaches
+# SaveMigration ONLY via the runtime re-export (check_architecture layer table).
+# PHASE 7 BUILD 3 OF 3 (world-depth.md § World chaining) — CHAINING LANE LANDED: the PURE
+# scripts/domain/world_chain.gd (world_seed_for — origin returns root_seed UNMIXED, else
+# _mix(root, cx, cy, SALT_WORLD=0x21) & 0x7fffffff; WORLD_RADIUS:=96 Manhattan extent;
+# TELEPORT_EDGE_MARGIN:=8; ENTRY_TILE_BUDGET:=200; adjacent_chain / at_edge / is_outside /
+# teleport_suppressed_at / is_beacon_tile / entry_tile_for — the seed-derived entry-edge
+# deposit, surf-crossing water-adjacent) + scripts/runtime/world_chain_runtime.gd (the
+# try_cross_edge swap: persist the outgoing maps + landmark_state into chained_worlds,
+# world_generator.setup(new_seed) + re-apply the incoming world's overrides/placements/
+# campsite/pastures, RE-STAMP its legendaries + RE-APPLY its puzzle state via the frozen
+# seam, entry-edge reposition, traces world_edge_crossed + world_chained — both registered
+# in required_trace_events above; the beacon registry extension: beacon_placed — registry-
+# REQUIRED — + beacon_tiles() multi-beacon SELECTOR seam + the teleport_suppressed gate,
+# injected onto field_move_runtime via the Phase-6 hook precedent at its 320 wall) join
+# THIS entry's code_paths. game_runtime.gd (320/320) only instantiates + setup()s it (the
+# new_game randi draw renamed root_seed); player_avatar.gd grows the edge-cross trigger
+# (Surf over water / Fly airborne -> try_cross_edge; walk-into-boundary refuses the pinned
+# "world_edge" reason on traversal_blocked); overworld_mons_runtime.stamp_legendaries +
+# landmark_runtime._chain() thread session.active_chain (the one-line swaps the comments
+# pre-announced); save_stability_support.gd's placeholder seed swaps to the true
+# world_seed_for(root, (0,-1)). NO new RandomNumberGenerator (world_depth_rng_issues
+# now arms over world_chain_runtime.gd — it exists).
+# PHASE 7 BUILD 3 — SCENARIO LANE LANDED: scripts/app/world_chain_scenario.gd (SEED
+# 2026072913, seed_for_smoke BEFORE new_game) proves the faithful loop: the in-scenario
+# double-run fingerprint (cross OUT surf-north into (0,-1) + BACK, both worlds' entity
+# set + tile-logic sample re-derive byte-identically across the re-pinned re-run), the
+# pure-hash witness (world_seed == world_seed_for(root, (0,-1))), the unconsumed-stream
+# CONTROL (inert-scope draws re-pin identical), per-world persistence (a fence + campsite
+# survive crossing + return + the v5 round trip — chained_worlds["0,0"].structures carries
+# origin's fence, the active v4-seat structures key carries the chained fence), the
+# legendary RE-STAMP witnessed (the chained world's stationary set == LegendaryPlacement
+# re-derived for (derived_seed, (0,-1)), REGICE anchored on its SNOW ring, no origin-stale
+# statics), landmark-state INDEPENDENCE (the chained Mansion solved -> puzzle_state_
+# changed{solved}, origin's stays locked — the frozen seam, never the keying), the three
+# beacon deltas (beacon_placed{chain, beacon_index} on the edge-band stone — registry-
+# REQUIRED — edge_suppressed AT the edge, the selector warp inland, the cross-world
+# refusal) and the mid-chain save round-trip. Checks split into world_chain_checks.gd +
+# world_chain_persist_checks.gd (world_depth_checks.gd FULL — the two-part app-budget
+# split), the passed/failed registration above, the requirements row + PLAYTEST_SCENARIOS
+# entry, and the double-run lane regroup [4,4] -> [4,5] (the ninth consumer, group 2;
+# self-pinned; the five-scenario group 2 carries a 100s outer budget — verify_all.py's
+# DOUBLE_RUN_RUN_OUTER_TIMEOUT_S is per-group). The 33_beacon baseline LANDED with the
+# sweep lane (visual_sweep_world_depth_beacon.gd — captured, 0.0% re-compare drift).
+# PHASE 7 BUILD 3 — BEACON SELECTOR UI LANED: scripts/ui/beacon_selector.gd + scenes/ui/
+# BeaconSelector.tscn (the camp_menu/storage_screen sibling pattern — a DUMB registration-
+# ordered list; the opener supplies rows off world_chain_runtime.beacon_tiles() + a resolve
+# Callable, closing the last-registered-only divergence, fresh-faq.md:180) join code_paths +
+# scene_paths; scenes/app/Main.tscn gains the $UI/BeaconSelector instance (load_steps 11->12,
+# app->ui scene dep allowed). scripts/app/field_move_actions.gd (field_moves-owned code, this
+# subsystem's co-modification surface) routes teleport/fly through _route_warp: capability +
+# edge suppression refuse BEFORE the picker opens (the runtime traces field_move_refused),
+# >1 beacon opens the selector, a single beacon warps directly, zero beacons keep the legacy
+# last-way-stone warp. The screen SELF-WIRES the input_router latch (its argless `closed` via
+# a documented reach into the scene's _input_router — main.gd's bind array is frozen at its
+# 220 budget; the field_action_router._toggle_campfire reach precedent). ui-layer rules hold:
+# no domain/runtime-script imports (check_architecture), rows are plain label+tile dicts.

@@ -7,8 +7,8 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     eight rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
-                        (two groups of four; Build 3's world_chain, the ninth, regroups)
+  S6.5   double-run     nine rng-consumers x2 headless, cmp --mode trace (2x90s+cmp)
+                        (groups of four + five; world_chain, the ninth, regroups)
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
                         + the four satellite sweep families (shots 15-23)
@@ -69,28 +69,32 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# eight rng-consumer scenarios run twice headless, each run persisting its ordered
+# nine rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
-# two trace sets (timing-stripped, key-sorted, order-sensitive). Total lane budget
-# <=90s (two bounded runs + the compare); a mismatch reds with the divergent
+# two trace sets (timing-stripped, key-sorted, order-sensitive). The per-group outer
+# budgets ([80, 100]s — the five-scenario group gets the larger share) bound the two
+# bounded runs + the 10s compare; a mismatch reds with the divergent
 # event + both canonical payloads as the named cause (miss-002). Phase 7: the two
 # world-depth scenarios split ACROSS groups — landmark_flow in group 1, Build 2's
-# legendary_spawn completes the spec's [4,4] in group 2 (self-pinned: seed_for_smoke
-# -> new_game -> rebuild; stamping is pure _mix, NO rng); Build 3's world_chain
-# (the ninth consumer) regroups again.
+# legendary_spawn in group 2 (self-pinned: seed_for_smoke -> new_game -> rebuild;
+# stamping is pure _mix, NO rng); Build 3's world_chain (the ninth consumer)
+# completes the regroup as group 2's fifth (self-pinned the same way; the crossing
+# path is pure SplitMix + an in-scenario double-run fingerprint). Group 2's five
+# scenarios each carry the 30s per-scenario cap, so its outer budget is scaled up
+# from the four-scenario group's (explicit headroom, not a sum-stays-under hope).
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
                         "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow",
-                        "legendary_spawn"]
+                        "legendary_spawn", "world_chain"]
 DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:4], DOUBLE_RUN_SCENARIOS[4:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = 80.0  # per GROUP — two groups of four, never one run of all
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [80.0, 100.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
-# S9 windowed satellite sweep families (shots 15-23 + 31-32, windowed-diffed one-command
+# S9 windowed satellite sweep families (shots 15-23 + 31-33, windowed-diffed one-command
 # alongside the main visual_sweep). visual_sweep_fishing (26-27) is registered in
 # the smoke list + windowed sets but is NOT one of these families per the frozen
 # contract's "shots 15-23" wording -- it runs via the PLAYTEST_SCENARIOS path.
-# world_depth (31-32) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
+# world_depth (31-33) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
 # § Smoke validation; its own seed + seeded state setup).
 SATELLITE_SWEEP_SCENARIOS = ["visual_sweep_camping", "visual_sweep_storage",
                              "visual_sweep_pokemon", "visual_sweep_overworld",
@@ -469,10 +473,10 @@ class Runner:
                     except OSError:
                         pass
 
-        # Two groups of four (not one run of all) so each run's
-        # worst case fits the outer budget with headroom; traces accumulate per
-        # dir across groups
-        # and the single cmp below compares the full eight-scenario set.
+        # Two groups (not one run of all) so each run's
+        # worst case fits its per-group outer budget with headroom; traces accumulate
+        # per dir across groups
+        # and the single cmp below compares the full nine-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
             for label, trace_dir, report in (
@@ -487,7 +491,7 @@ class Runner:
                      "--timeout", str(DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S),
                      "--godot-bin", bin_],
                     env_override={"PLAYTEST_FORCE_HEADLESS": "1"},
-                    outer_timeout=DOUBLE_RUN_RUN_OUTER_TIMEOUT_S,
+                    outer_timeout=DOUBLE_RUN_RUN_OUTER_TIMEOUT_S[group_index - 1],
                     exit_map={0: "pass", 1: "fail", 2: "tool_error"},
                     extra={"scenarios": list(group)})
                 if self.fail_fast_stop:

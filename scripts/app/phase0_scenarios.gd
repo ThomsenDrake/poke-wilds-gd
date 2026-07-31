@@ -1,35 +1,33 @@
 extends Node
 
 # Phase-0 defect-fix scenarios (qa_scenarios pattern) inside the runner's save
-# backup/restore guard. wild_battle: campsite hold/retrieval + clean heal
-# (0.1/0.5) — the implementation lives in wild_battle_scenario.gd (extracted for
-# the v4 fixture work + the app line budget; dispatch name stays stable here).
-# save_migration: v1/v2->v3->v4 migration, the v3-additive "structures" round-
-# trip (a contents-less storage_box backfills empty; the campsite hold rides the
-# v3 keys), the v4-additive box "contents" round-trip (corrupt contents degrade
-# to an empty box, never a crash), the v4-additive "pastures" round-trip (a
-# penless pasture RELOCATES its mons to the campsite hold — never loses them —
-# with the per-mon habitat sub-dict {satisfied, last_drop_day, last_stone_day}
-# intact and volatile keys cleared; a ground egg is lost warned; a garbage
-# pasture entry degrades to nothing; a party egg survives load), future
-# refusal, corrupt recovery, and the campsite round-trip.
+# backup/restore guard. wild_battle lives in wild_battle_scenario.gd (extracted for the
+# v4 fixture work + the app line budget). save_migration: v1/v2->v3->v4->v5 migration —
+# v3 "structures" (contents-less box backfills empty), v4 "contents" (corrupt -> empty
+# box) + "pastures" (penless pasture RELOCATES mons to the campsite hold — habitat
+# sub-dict intact, ground egg lost warned, garbage degrades, party egg survives load),
+# v5 chain identity + per-world chained_worlds round-trip (non-trivial: active "0,-1",
+# origin entry byte-identical — fence + pastures + campsite + Mansion puzzle state) +
+# the two pinned byte witnesses (golden delta EXACTLY the three identity keys; relocation + argument purity), future refusal, corrupt recovery.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const WildBattleScenario := preload("res://scripts/app/wild_battle_scenario.gd")
+const SessionState := preload("res://scripts/runtime/session_state.gd")
+# Domain access rides the runtime's own preload (app may not preload domain — check_architecture.gd's layer table; the landmark_flow precedent).
+const SaveMigration := SessionState.SaveMigration
+const GOLDEN_PATH := "res://docs/generated/golden-saves/v4_golden.json" # v4 migration witness (shared with save_stability)
 
 const SCENARIOS := {"wild_battle": "run_wild_battle", "save_migration": "run_save_migration"}
 const MIGRATION_MON := {"species_id": "CHIKORITA", "name": "Chikorita", "level": 5, "exp": 125,
 	"max_hp": 20, "current_hp": 20, "status": "PSN", "sleep_turns": 2,
 	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}]}
-# A penned mon with the full habitat sub-dict the Steel-stone cadence rides; the
-# fixture pen has NO fence ring, so load must relocate it to the campsite hold.
+# Penned mon with the full habitat sub-dict the Steel-stone cadence rides; the fixture pen has NO fence ring, so load relocates it to the campsite hold.
 const PASTURE_MON := {"species_id": "EEVEE", "name": "Eevee", "level": 30, "exp": 0,
 	"max_hp": 30, "current_hp": 30, "status": "", "sleep_turns": 2, "happiness": 220,
 	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}],
 	"habitat": {"satisfied": true, "last_drop_day": 3, "last_stone_day": 1}}
-# The additive party-egg shape (Breeding.build_egg): max_hp/current_hp 0, the
-# nested payload carries the child — normalize_loaded_mon passes it by shape.
+# Additive party-egg shape (Breeding.build_egg): max_hp/current_hp 0; the nested payload carries the child — normalize_loaded_mon passes it by shape.
 const MIGRATION_EGG := {"species_id": "EGG", "name": "Egg", "level": 5, "exp": 0,
 	"max_hp": 0, "current_hp": 0, "status": "", "sleep_turns": 0, "moves": [],
 	"is_shiny": false, "is_egg": true,
@@ -44,13 +42,10 @@ const MIGRATION_FIXTURES := [
 		"structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
 		"11,10": {"kind": "placed", "structure_id": "door", "by": "build", "step": 0},
 		"12,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0}}},
-	# v4 is PURELY additive over v3: a storage_box entry may carry "contents"
-	# (absent = empty). 12,10 round-trips one mon; 13,10's corrupt "garbage"
-	# contents must normalize to an empty box, never a crash or a torn entry.
-	# "pastures" is the second v4 additive key: 8,8 has NO fence ring in this
-	# fixture, so its mon must RELOCATE to the campsite hold (never lost, habitat
-	# sub-dict intact, ground egg lost warned); 9,9's garbage entry degrades to
-	# nothing; the party carries an egg that must survive the load normalize.
+	# v4 is PURELY additive over v3: a storage_box may carry "contents" (absent = empty;
+	# 13,10's corrupt "garbage" normalizes to an empty box, never a crash) + "pastures"
+	# (8,8 has NO fence ring: its mon RELOCATES to the campsite hold — habitat intact,
+	# ground egg lost warned; 9,9 garbage degrades; a party egg survives the normalize).
 	{"version": 4, "world_seed": 1234, "player_x": 3, "player_y": 4, "party": [MIGRATION_MON, MIGRATION_EGG], "bag": {"poke_ball": 2},
 		"time_of_day_minutes": 600, "total_steps": 0, "campsite_x": 3, "campsite_y": 4, "campsite_pokemon": [],
 		"structures": {"10,10": {"kind": "placed", "structure_id": "wall", "by": "build", "step": 0},
@@ -58,6 +53,19 @@ const MIGRATION_FIXTURES := [
 		"13,10": {"kind": "placed", "structure_id": "storage_box", "by": "build", "step": 0, "contents": "garbage"}},
 		"pastures": {"8,8": {"anchor": [8, 8], "mons": [PASTURE_MON], "eggs": [{"tile": [8, 9], "egg": MIGRATION_EGG}]},
 		"9,9": "garbage"}},
+	# v5 (Phase 7 Build 3): pinned NON-TRIVIAL — the ACTIVE world is the chained "0,-1"
+	# (root_seed set) and the NON-active origin "0,0" entry carries a fence structures
+	# row + a pastures row + a campsite pair + a Mansion landmark_state row, proving
+	# non-empty per-world data (puzzle state INCLUDED) lands byte-identical on session.chained_worlds.
+	{"version": 5, "world_seed": 4242, "root_seed": 835143192, "active_chain": "0,-1",
+		"player_x": 7, "player_y": 8, "party": [MIGRATION_MON], "bag": {"poke_ball": 3},
+		"time_of_day_minutes": 600, "total_steps": 0, "campsite_x": 7, "campsite_y": 8,
+		"campsite_pokemon": [], "structures": {}, "pastures": {},
+		"chained_worlds": {"0,0": {
+			"structures": {"30,40": {"kind": "placed", "structure_id": "fence", "by": "build", "step": 0}},
+			"pastures": {"31,40": {"anchor": [31, 40], "mons": [PASTURE_MON], "eggs": []}},
+			"campsite_x": 12, "campsite_y": 14,
+			"landmark_state": {"pkmn_mansion": {"statues": [true, true, true], "unlocked": true, "key_taken": false}}}}},
 ]
 
 static func handles(scenario: String) -> bool:
@@ -80,8 +88,8 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	var checks := 0
 	var fail := ""
 	var cursor := runner.trace_log_line_count()
-	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok"), Callable(self, "_v3_fields_ok"), Callable(self, "_v4_fields_ok")]
-	var v_ok := [false, false, false, false]
+	var checkers := [Callable(self, "_v1_fields_ok"), Callable(self, "_v2_fields_ok"), Callable(self, "_v3_fields_ok"), Callable(self, "_v4_fields_ok"), Callable(self, "_v5_fields_ok")]
+	var v_ok := [false, false, false, false, false]
 	for i in range(MIGRATION_FIXTURES.size()):
 		if not fail.is_empty():
 			break
@@ -115,7 +123,7 @@ func run_save_migration(ctx: Dictionary, host: Node) -> void:
 	_cleanup_fixtures()
 	if fail.is_empty():
 		runtime.emit_trace("save_migration_passed", "SmokeScenarios", {
-			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "v3_ok": v_ok[2], "v4_ok": v_ok[3], "future_refused": future_refused, "checks": checks})
+			"v1_ok": v_ok[0], "v2_ok": v_ok[1], "v3_ok": v_ok[2], "v4_ok": v_ok[3], "v5_ok": v_ok[4], "future_refused": future_refused, "checks": checks})
 	else:
 		push_error("Save migration scenario failed: %s" % fail)
 
@@ -180,6 +188,23 @@ func _v4_fields_ok(runtime) -> bool:
 		and bool(egg.get("is_egg", false)) and str(egg_payload.get("species_id", "")) == "EEVEE" \
 		and int(egg_payload.get("steps_to_hatch", 0)) == 2560 \
 		and int(session.bag.get("poke_ball", 0)) == 2 and session.player_tile == Vector2i(3, 4)
+
+# v5 (Phase 7 Build 3): chain identity applied to the session + chained_worlds retained
+# BYTE-IDENTICAL (the accessor world_chain_runtime deserializes from) + save_migration's
+# two pinned byte witnesses green (golden delta EXACTLY the three identity keys; relocation byte-verbatim + migrate() never mutates its argument).
+func _v5_fields_ok(runtime) -> bool:
+	var session = runtime.session
+	if int(session.world_seed) != 4242 or int(session.root_seed) != 835143192 or str(session.active_chain) != "0,-1":
+		return false
+	# BYTE-IDENTICAL retention, deep compared on the JSON canonical of BOTH sides:
+	# JSON.parse yields every number as float while the pinned fixture const carries ints,
+	# and Godot 4.6's recursive Dictionary == refuses the type MIX (12.0 == 12 holds
+	# scalar, fails nested) — one stringify round normalizes both to floats.
+	var expected_canon: Variant = JSON.parse_string(JSON.stringify(MIGRATION_FIXTURES[4]["chained_worlds"]))
+	if JSON.parse_string(JSON.stringify(session.chained_worlds)) != expected_canon:
+		return false
+	var golden: Variant = JSON.parse_string(FileAccess.get_file_as_string(GOLDEN_PATH))
+	return golden is Dictionary and SaveMigration.byte_witness_issues(golden as Dictionary, SessionState.SAVE_VERSION).is_empty()
 
 func _write_fixture(payload: Dictionary) -> void:
 	var file = FileAccess.open(SaveStore.SAVE_PATH, FileAccess.WRITE)

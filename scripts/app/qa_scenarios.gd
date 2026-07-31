@@ -80,6 +80,16 @@ const SCENARIOS := {
 	# kind:"legendary"} battle-start trace, the never-encounter exclusion, the white-out
 	# re-battleable + KO gone-for-good rematch rules. Joins the double-run lane.
 	"legendary_spawn": [preload("res://scripts/app/legendary_spawn_scenario.gd"), "run", []],
+	# Phase 7 Build 3 world chaining (world-depth.md § World chaining + § Save v5): the
+	# faithful loop on fixed seed 2026072913 — surf PAST the WORLD_RADIUS edge into
+	# (0,-1) and back, the in-scenario double-run fingerprint (both worlds byte-identical),
+	# per-world persistence (a fence + campsite survive crossing + return + save), the
+	# legendary re-stamp + landmark state independence witnessed, the beacon deltas (the
+	# registry-required beacon_placed + edge suppression + the cross-world ban) and the
+	# v5 chained-world save round-trip. Checks split into world_chain_checks.gd +
+	# world_chain_persist_checks.gd for the app budget; the double-run lane's NINTH
+	# consumer (self-pinned: seed_for_smoke BEFORE new_game; NO rng in the crossing path).
+	"world_chain": [preload("res://scripts/app/world_chain_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 }

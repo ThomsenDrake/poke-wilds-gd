@@ -21,6 +21,7 @@ const MaterialDrops := preload("res://scripts/domain/material_drops.gd")
 const CraftingRuntime := preload("res://scripts/runtime/crafting_runtime.gd")
 const CampingRuntime := preload("res://scripts/runtime/camping_runtime.gd")
 const FieldMoveRuntime := preload("res://scripts/runtime/field_move_runtime.gd")
+const WorldChainRuntime := preload("res://scripts/runtime/world_chain_runtime.gd") # Phase 7 Build 3: the edge-cross swap + beacon policy (AT this file's 320 wall — delegation only)
 const HabitatRuntime := preload("res://scripts/runtime/habitat_runtime.gd")
 const FishingRuntime := preload("res://scripts/runtime/fishing_runtime.gd")
 const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
@@ -51,7 +52,7 @@ var fishing_runtime = FishingRuntime.new()
 var breeding_runtime = BreedingRuntime.new()
 var overworld_mons_runtime = OverworldMonsRuntime.new()
 var landmark_runtime = LandmarkRuntime.new()
-var wild_encounter_draw = WildEncounterDraw.new()
+var wild_encounter_draw = WildEncounterDraw.new(); var world_chain_runtime = WorldChainRuntime.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
@@ -77,7 +78,7 @@ func _ready() -> void:
 	landmark_runtime.setup(session, catalog, trace, _world_gen, _biome_encounters, overworld_mons_runtime, music_router) # Phase 7 Build 1: entry/puzzle/scope; state ONLY via the frozen seam
 	_world_gen.landmark_resolver = Callable(landmark_runtime, "tile_logic_for_active") # footprints + the door overlay at the single mutation boundary
 	wild_encounter_draw.setup(session, catalog, pokemon_rules, trace, _rng, night_system, landmark_runtime, _biome_encounters) # Build-2 extraction: generate_wild_encounter's wild-draw tail (the shared _rng rides by REFERENCE)
-	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
+	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace); world_chain_runtime.setup(session, trace, _world_gen, field_move_runtime, overworld_mons_runtime, breeding_runtime, landmark_runtime) # Build 3: LAST — registers field_move_runtime's beacon seams
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
 	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
@@ -102,12 +103,12 @@ func ensure_initialized() -> void:
 
 func new_game() -> void:
 	var starter = _build_starter()
-	var seed = int(_rng.randi() & 0x7fffffff)
+	var root_seed = int(_rng.randi() & 0x7fffffff) # the chain ROOT (Build 3): world_seed_for(root,(0,0)) == root, so the origin world IS the v4 world (reset_for_new_game stores it as session.root_seed)
 	_world_gen.clear_overrides(); _world_gen.clear_placements()
-	session.world_seed = seed; session.landmark_state = {} # BEFORE the scan: the landmark resolver seam reads
+	session.world_seed = root_seed; session.landmark_state = {} # BEFORE the scan: the landmark resolver seam reads
 	# both off the SESSION (footprints + the door overlay), so a pre-reset scan rates candidates against the PREVIOUS world's footprints and can commit a walled spawn; find_walkable_spawn's own setup(seed) reseeds the generator (no explicit setup here), and the scan draws no shared _rng.
-	var spawn = _world_gen.find_walkable_spawn(seed)
-	session.reset_for_new_game(seed, starter, spawn); _initialized = true
+	var spawn = _world_gen.find_walkable_spawn(root_seed)
+	session.reset_for_new_game(root_seed, starter, spawn); _initialized = true
 	overworld_mons_runtime.stamp_legendaries() # Build 2: the frozen seven as world-fixed statics (AFTER the reset sets the seed)
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,

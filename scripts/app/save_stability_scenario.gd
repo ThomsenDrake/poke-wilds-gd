@@ -1,18 +1,26 @@
 extends Node
 
-# SAVE STABILITY pin (pre-Phase-7 suite): new_game under seed_for_smoke, scripted v4-
-# surface mutations (campsite deposit/withdraw, stone/rod bag, repel_steps, pastures),
-# then save -> reload -> save with a byte-compare of the CANONICALIZED payload (keys
-# sorted, ts/version stripped — JSON.stringify has NO ordering guarantee, so the
-# canonicalizer, not the engine, owns stability). The committed golden fixture at
-# docs/generated/golden-saves/v4_golden.json must load through the real apply seam and
-# its canonical form must be stable; mode=update rewrites the golden from the live
-# pinned session (the sweep-style one-command escape hatch). miss-002: symmetric
-# markers; a red always names its cause.
+# SAVE STABILITY pin (pre-Phase-7 suite, v5-guarded in Phase 7 Build 3): new_game
+# under seed_for_smoke, scripted v4-surface mutations (campsite deposit/withdraw,
+# stone/rod bag, repel_steps, pastures), then save -> reload -> save with a
+# byte-compare of the CANONICALIZED payload (keys sorted, ts/version stripped —
+# JSON.stringify has NO ordering guarantee, so the canonicalizer, not the engine,
+# owns stability). The committed golden at docs/generated/golden-saves/v4_golden.json
+# STAYS a v4 fixture — the migration WITNESS: the guard canonicalizes
+# SaveMigration.migrate(golden) before the compare (the ONLY pinned guard change), so
+# live v5 == migrated golden exactly (chain-less + puzzle-untouched => the delta is
+# precisely the three identity keys). mode=update DOWNSHIFTS first so the witness
+# regenerates v4-shaped; a v5-shaped write is REFUSED + traced. A world_chain
+# round-trip sublane pins the per-world v5 save shape. miss-002: a red names its cause.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const Sites := preload("res://scripts/runtime/phase5_sites.gd")
 const Phase5 := preload("res://scripts/runtime/phase5_support.gd")
+const SaveStabilitySupport := preload("res://scripts/app/save_stability_support.gd")
+const SessionState := preload("res://scripts/runtime/session_state.gd")
+# Domain access rides the runtime's own preload (the app layer may not preload domain
+# directly — check_architecture.gd's layer table; the landmark_flow precedent).
+const SaveMigration := SessionState.SaveMigration
 
 const SEED := 2026072802 # save-stability pin (distinct from the joint-pin / soak seeds)
 const PEN_SCAN_RADIUS := 400 # wider than breed_flow's 160: the fresh-seeded world's tree bands sit far out from the origin spawn (the pen's LOCATION is irrelevant to save stability — any site proves the surface)
@@ -43,9 +51,11 @@ func run(ctx: Dictionary, extra: Dictionary = {}) -> void:
 		var diff: Array = _diff_paths(JSON.parse_string(canon_a), JSON.parse_string(canon_b))
 		_ensure(false, "stability: the canonical save drifted across save -> reload -> save (%s)" % "; ".join(PackedStringArray(diff.slice(0, 8))))
 	if update:
-		_write_golden(canon_a)
+		SaveStabilitySupport.update_golden(runtime, canon_a, _canon_str, _write_golden, _ensure)
 	else:
 		_check_golden(runtime, canon_a)
+	# Sublane (extracted): the v5 per-world save shape survives save -> reload -> save.
+	SaveStabilitySupport.world_chain_round_trip(runtime, _canon_str, _diff_paths, _ensure)
 	if _reasons.is_empty():
 		runtime.emit_trace("save_stability_passed", "SmokeScenarios", {"seed": SEED,
 			"mode": "update" if update else "verify", "canon_bytes": canon_a.length(), "digest": abs(canon_a.hash())})
@@ -140,7 +150,13 @@ func _check_golden(runtime, live_canon: String) -> void:
 	if not _ensure(parsed is Dictionary, "golden: the fixture is not a JSON object"):
 		return
 	_ensure(runtime._apply_loaded_payload(parsed as Dictionary), "golden: load(golden) failed — schema drift (run save_stability_update)")
-	var canon_once := _canon_str(parsed as Dictionary)
+	# THE ONE pinned guard change (Phase 7 Build 3): canonicalize the MIGRATED golden —
+	# the live v5 save carries the three additive identity keys, so the un-migrated v4
+	# fixture can never match it; migrate() is the witness under test here (line above
+	# already exercised the true apply seam, which migrates first). The SAVE_VERSION
+	# constant is passed EXPLICITLY (NO default-reliance — a future bump must move this
+	# guard with it; SessionState is in scope via the SaveMigration preload chain).
+	var canon_once := _canon_str(SaveMigration.migrate(parsed as Dictionary, SessionState.SAVE_VERSION))
 	var reparsed: Variant = JSON.parse_string(canon_once)
 	_ensure(reparsed is Dictionary and _canon_str(reparsed as Dictionary) == canon_once, "golden: the canonical form is not stable under re-canonicalization")
 	_ensure(canon_once == live_canon, "golden: the committed fixture drifted from the live canonical save (run save_stability_update after an INTENTIONAL save change)")

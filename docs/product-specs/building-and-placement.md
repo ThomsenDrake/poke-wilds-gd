@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-29
+Last verified: 2026-07-30
 Review cadence days: 21
 Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
@@ -101,6 +101,8 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 ## Phase 6 integration note (overworld Pokémon)
 
 Phase 6 (`overworld-pokemon.md`) adds ONE node to `scenes/app/Main.tscn` (the EntityLayer render node at child index 2 — after Player, before the UI CanvasLayer; `load_steps` 10→11). Build mode, placements, and demolition are untouched; entity anchors avoid prop/structure tiles at spawn (the audit pins no prop/structure overlap).
+
+Phase 7 Build 3 (`world-depth.md` § Teleport Beacons) adds ONE more node to `scenes/app/Main.tscn` (the `BeaconSelector` overlay instance under the `$UI` CanvasLayer, after CampMenu; `load_steps` 11→12; `scenes/ui/BeaconSelector.tscn` + `scripts/ui/beacon_selector.gd`, world_depth/landmarks-owned). It lists the ACTIVE world's edge-band way-stones — way-stones this subsystem's placement rules already build (`Structures.WAYSTONE_ID`) — for the multi-beacon Teleport/Fly picker. Build mode, placement costs, occupancy, and demolition are untouched.
 
 ## Pre-Phase-7 suite expansion (co-modification note)
 

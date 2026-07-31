@@ -32,8 +32,8 @@ const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const OverworldMonsSim := preload("res://scripts/runtime/overworld_mons_sim.gd")
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
-const Breeding := preload("res://scripts/domain/breeding.gd")
-const DayPhase := preload("res://scripts/domain/day_phase.gd")
+const Breeding := preload("res://scripts/domain/breeding.gd"); const DayPhase := preload("res://scripts/domain/day_phase.gd")
+const SaveMigration := preload("res://scripts/domain/save_migration.gd") # Build 3: the chain-key grammar (active_chain -> Vector2i) for the legendary re-stamp
 
 signal encounter_requested(tile: Vector2i) # entity_layer bridges it onto player_avatar's (zero main.gd lines)
 
@@ -119,8 +119,8 @@ func note_warp(tile: Vector2i) -> void:
 	if active:
 		_sim.sync_window(tile, DayPhase.time_of_day_label(int(_session.time_of_day_minutes)))
 
-func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load, AFTER the session seed + legendary_removals land; the sim owns the records. Build 3 threads the ACTIVE chain (the landmark_runtime._chain precedent).
-	_sim.stamp_legendaries(Vector2i.ZERO)
+func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load/CHAIN-CROSS, AFTER the session seed + active_chain + legendary_removals land; the sim owns the records. Build 3 threads the ACTIVE chain (the landmark_runtime._chain precedent).
+	_sim.stamp_legendaries(SaveMigration.chain_for(str(_session.active_chain)))
 
 # The forced-battle seam: {} when none; consumed exactly once — game_runtime.generate_wild_
 # encounter calls this BEFORE fishing, so Repel/unlit-night ghosts never touch a provoked

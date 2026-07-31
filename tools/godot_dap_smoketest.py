@@ -314,7 +314,22 @@ SCENARIO_REQUIREMENTS = {
                 "overworld_mon_despawned", "battle_finished", "legendary_spawn_passed"],
         "any": [["session_loaded", "session_created"]],
     },
-    # World-depth sweep (shots 31-32, shared baseline dir). Windowed-only like the
+    # Phase 7 Build 3 world chaining (world-depth.md § World chaining): surf past the
+    # WORLD_RADIUS edge into (0,-1) and back on seed 2026072913 — the all-list pins
+    # the three registry-REQUIRED chain traces (world_edge_crossed, world_chained,
+    # beacon_placed) + the walk-into-boundary refusal (traversal_blocked, the pinned
+    # "world_edge" reason) + the chained-world puzzle witness + the symmetric pass
+    # marker (the *_failed marker rides failed_event_entry; single-sourced mirror in
+    # run_playtests' PLAYTEST_SCENARIOS; miss-002 re-stamp). Joins the double-run
+    # lane as its NINTH consumer (self-pinned: seed_for_smoke BEFORE new_game; the
+    # in-scenario double-run fingerprint is internal like rng_joint_pin).
+    "world_chain": {
+        "all": ["boot_started", "boot_ready", "traversal_blocked",
+                "world_edge_crossed", "world_chained", "beacon_placed",
+                "puzzle_state_changed", "world_chain_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # World-depth sweep (shots 31-33, shared baseline dir). Windowed-only like the
     # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_world_depth": {
         "all": ["visual_sweep_world_depth_passed"],

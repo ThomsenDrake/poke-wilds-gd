@@ -9,6 +9,9 @@ extends RefCounted
 # consistency audit stays under its line budget.
 
 const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
+# Domain access rides the runtime re-export (the world_chain_checks precedent: app may
+# not import domain directly — check_architecture's layer table).
+const WorldChain := preload("res://scripts/runtime/world_chain_runtime.gd").WorldChain
 
 const SAMPLE_RADIUS := 20
 const MAX_Z_ORDER_PROPS := 6
@@ -127,6 +130,8 @@ func _entity_layer(player) -> Node:
 # {"failures", "movement", "spatial"} so the audit can fold in its counters.
 func movement_probe(world, player, runtime, runner, tile: Vector2i) -> Dictionary:
 	var result := {"failures": [], "movement": 0, "spatial": 0}
+	if WorldChain.is_outside(tile):
+		return result # BOUNDARY-CLASSIFIED: a step leaving the WORLD_RADIUS disc refuses by design (pinned walk refusal; the world_chain scenario's refusal_ok owns that witness, and a surf/fly party would CROSS here)
 	var spot: Dictionary = runner.stand_spot(world, tile)
 	if spot.is_empty():
 		return result

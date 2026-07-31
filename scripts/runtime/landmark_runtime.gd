@@ -22,6 +22,7 @@ const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
+const SaveMigration := preload("res://scripts/domain/save_migration.gd") # Build 3: the chain-key grammar (active_chain -> Vector2i) for _chain()
 
 const TOWER_TRACK := "res://pokewilds/music/Wilds_HeartTower.ogg" # Calm variant + trigger DEFERRED (spec § Heart Tower; FLAGGED #7)
 const DUSCLOPS_ID := "landmark_dusclops_%d,%d" # per-cell guardian-shaped id (the sim's guardian id grammar)
@@ -282,8 +283,14 @@ func _is_mansion_local(faced: Vector2i, local: Vector2i) -> bool:
 			return (landmark["footprint"] as Rect2i).position + local == faced
 	return false
 
-func _chain() -> Vector2i: # Build 1: origin. Build 3 swaps the ACTIVE chain here ONLY — nothing below branches on it.
-	return Vector2i.ZERO
+func _chain() -> Vector2i: # Build 3: the ACTIVE chain — world_chain_runtime swaps session.active_chain on a cross; nothing below branches on it.
+	return SaveMigration.chain_for(str(_session.active_chain)) if _session != null else Vector2i.ZERO
+
+# Build 3: a chain-cross makes the per-world first-entry/loot one-shots transient PER-WORLD
+# (world_chain_runtime calls this after the swap); the puzzle STATE rides the frozen seam.
+func note_world_changed() -> void:
+	_visited.clear(); _loot_taken.clear()
+	_current_landmark = ""; _current_region = ""
 
 func _world_seed() -> int:
 	return int(_session.world_seed) if _session != null else 0

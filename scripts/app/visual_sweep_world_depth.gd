@@ -1,20 +1,19 @@
 extends Node
 
-# Deterministic landmark driver for the visual sweep (Phase 7 Build 1; spec:
-# docs/product-specs/world-depth.md § Smoke validation). STANDALONE satellite: the
-# Ruins inner chamber with its glowing statue pair (31) + the Mansion room with the
-# statue grid and both doors open (32). Footprints are found by PROBING the view's
-# tile logic for the resolver's landmark_id stamp (app never preloads domain — the
-# roll is owned below the app, visual_sweep_overworld.gd precedent); the puzzle state
-# is CRAFTED through the frozen SessionState seam (never the keying, never played live
-# at capture) and the door overlay re-stamps on rebuild. Reconciles ONLY its own shots
-# (foreign-shot guard DERIVES from SHOT_REGISTRY). NO rng: byte-stable. The entity
-# layer stays INERT and encounter_chance is pinned 0, so no pending seam can arm.
+# Deterministic world-depth driver for the visual sweep (Phase 7; spec: docs/product-
+# specs/world-depth.md § Smoke validation). STANDALONE satellite: the Ruins inner chamber
+# + glowing statue pair (31), the Mansion room with the statue grid + both doors open (32),
+# and a world edge with two registered way-stone beacons + the multi-beacon selector open
+# (33 — shot extracted to visual_sweep_world_depth_beacon.gd at this file's app-220 wall).
+# Footprints are found by PROBING the view's tile logic for the landmark_id stamp (app never
+# preloads domain); puzzle state is CRAFTED through the frozen seam. NO rng: byte-stable.
+# The entity layer stays INERT and encounter_chance is pinned 0, so no pending seam can arm.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
+const WorldDepthBeaconShot := preload("res://scripts/app/visual_sweep_world_depth_beacon.gd") # 33 (app-220 extraction)
 
 const DEFAULT_THRESHOLD_PCT := 0.5
 const RUINS_ID := "desert_ruins" # public contract strings (trace payloads, spec § Landmarks)
@@ -63,6 +62,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_player().encounter_chance = 0.0 # no grass battles (and no wild-stream draw) during capture
 	await _ruins_shot()
 	await _mansion_shot()
+	await WorldDepthBeaconShot.run(self)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()

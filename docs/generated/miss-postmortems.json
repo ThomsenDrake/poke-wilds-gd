@@ -148,8 +148,8 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-          "tools/run_playtests.py": "47f2b2b6d5c1eb85ef1ac21573b2d25b2272e8d0b1bf380e60b1e127251d92c3",
-          "tools/godot_dap_smoketest.py": "44d16f132b2745963c22cbbf67979254293e6cb304b20bcf6b50bc12342e85d2"
+          "tools/run_playtests.py": "28ce554313c28a14dade4202fe17bbcb458c3d7ec43ea410a4938275e44fec4e",
+          "tools/godot_dap_smoketest.py": "69cb1acdcd553b9cb4a8d9c7d8513839087f71d15ef53e2b0bf649db4f7231b1"
         },
         "re_stamp_log": [
           {
@@ -228,6 +228,41 @@
             "old_pin": "88dd49b19b14",
             "new_pin": "44d16f132b27",
             "reason": "legitimate edit (Phase 7 Build 2 legendaries slice): legendary_spawn registered in SCENARIO_REQUIREMENTS — the all-list pins the registry-REQUIRED battle-start trace legendary_encounter (emitted ONLY for a battle_kind \"legendary\" forced battle), the KO despawn + battle_finished + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons :430); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+          },
+          {
+            "date": "2026-07-30",
+            "file": "tools/run_playtests.py",
+            "old_pin": "47f2b2b6d5c1",
+            "new_pin": "28ce554313c2",
+            "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in PLAYTEST_SCENARIOS, wired exactly as the Build 2 legendary_spawn restamp — an additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still single-sourced from the sibling harness :96, SCENARIO_REQUIREMENTS :55, the TraceCollector failed_events collection + the disk-sibling save guard unchanged); the (A) determinism seam is untouched (world_chain pins seed_for_smoke(2026072913) BEFORE new_game, the save_stability precedent; the crossing path is pure SplitMix, NO rng); the two nav_audit scope pins unchanged and still hold"
+          },
+          {
+            "date": "2026-07-30",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "44d16f132b27",
+            "new_pin": "d4ada0827f0a",
+            "reason": "legitimate edit (Phase 7 Build 3 world_chain scenario slice): world_chain registered in SCENARIO_REQUIREMENTS — the all-list pins the three registry-REQUIRED chain traces (world_edge_crossed, world_chained, beacon_placed) + the walk-into-boundary traversal_blocked refusal + the chained-world puzzle_state_changed witness + the symmetric pass marker (the *_failed marker rides failed_event_entry) — an additive requirements-row change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons); the (A) determinism seam is untouched; the nav_audit pins unchanged and still hold"
+          },
+          {
+            "date": "2026-07-30",
+            "file": "tools/verify_all.py",
+            "old_pin": "f5cf1ce9bd31",
+            "new_pin": "9e2cf3fb6e86",
+            "reason": "informational (NOT in revert_scope — recorded for traceability alongside the two in-scope restamps): the double-run lane regroup [4,4] -> [4,5] admitting world_chain as the ninth rng-consumer (group 2's fifth, self-pinned; the two world-depth scenarios stay in SEPARATE groups; the <=80s per-group budget holds) + the header/comment co-mods (eight -> nine). The file carries no plant pin, so nothing mechanical shifts; the two in-scope restamps above are the operative ones"
+          },
+          {
+            "date": "2026-07-30",
+            "file": "tools/verify_all.py",
+            "old_pin": "9e2cf3fb6e86",
+            "new_pin": "ae84e04fb890",
+            "reason": "informational (NOT in revert_scope — recorded for traceability): the double-run lane's per-group outer budget split 80.0 -> [80.0, 100.0] (index-aligned with DOUBLE_RUN_GROUPS) giving the five-scenario group 2 explicit headroom over the four-scenario budget, + the shot-range comment co-mods (31-32 -> 31-33, the landed world_depth registry range) + the comments narrating it. The file carries no plant pin, so nothing mechanical shifts; the two in-scope tool pins + the two nav_audit scope pins are untouched and still hold"
+          },
+          {
+            "date": "2026-07-30",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "d4ada0827f0a",
+            "new_pin": "69cb1acdcd55",
+            "reason": "legitimate edit: the world-depth sweep requirements comment narrated shots 31-32 while the landed SHOT_REGISTRY range is [31,33] (the Build-3 33_beacon shot shipped with a captured baseline) — a comment-only truthfulness co-mod that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched (ERROR_MARKERS still carries 'ERROR: ' :25, failed_event_entry still collects structured *_failed reasons, SCENARIO_REQUIREMENTS rows unchanged); the (A) determinism seam is untouched; the nav_audit pins + the run_playtests.py pin unchanged and still hold"
           }
         ]
       },
