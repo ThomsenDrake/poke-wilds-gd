@@ -1,0 +1,258 @@
+docs/product-specs/bootstrap-and-overworld.md
+  s_b053a329cf705a::t_33f08b644a3503 2
+  s_b053a329cf705a::t_2fe9bafd35a05c 64-65
+scripts/domain/save_migration.gd.uid
+  s_b053a329cf705a::t_d3ed34fa27f647 1
+scripts/app/world_chain_persist_checks.gd
+  s_b053a329cf705a::t_cf0c33e706fdad 96
+  s_b053a329cf705a::t_b8c9ef47770772 1-95,97-217
+docs/QUALITY_SCORE.md
+  s_b053a329cf705a::t_81623772242c51 12
+  s_b053a329cf705a::t_d344990d07ef0f 29
+  s_b053a329cf705a::t_85a87baa72836d 2
+  s_b053a329cf705a::t_78ab56d535df65 24
+  s_b053a329cf705a::t_12612cc8aff433 13
+scripts/app/phase0_scenarios.gd
+  s_b053a329cf705a::t_75b43057273588 126
+  s_b053a329cf705a::t_8846e160043a9f 18-19
+  s_b053a329cf705a::t_150001dbcf1107 11
+  s_b053a329cf705a::t_d7fd3dc861d419 4,17
+  s_b053a329cf705a::t_ad1b6f80345833 47-48
+  s_b053a329cf705a::t_c174d7a4bdbd2e 45-46
+  s_b053a329cf705a::t_b7867fb9df15ad 195-198,205-208
+  s_b053a329cf705a::t_df8d44e3214912 199,203-204
+  s_b053a329cf705a::t_b30480814fc90d 91-92
+  s_b053a329cf705a::t_c4855f6e42977a 200-202
+  s_b053a329cf705a::t_c7e2dce143f080 56-58
+  s_b053a329cf705a::t_3332c0eada4a47 192-193
+  s_b053a329cf705a::t_dcfe056e4a9f2c 5-6
+  s_b053a329cf705a::t_50db04be85b6d1 16
+  s_b053a329cf705a::t_57b533f84c8de5 7-10
+  s_b053a329cf705a::t_16493095ec9a32 25,30
+  s_b053a329cf705a::t_80832ee038333d 59
+  s_b053a329cf705a::t_5a2f23a1f4156c 194
+  s_b053a329cf705a::t_d30191c107d488 60-68
+scripts/app/qa_scenarios.gd
+  s_b053a329cf705a::t_cf3a4c7338469b 83-92
+scripts/runtime/world_chain_runtime.gd.uid
+  s_b053a329cf705a::t_5e8d1e7d7243cc 1
+docs/generated/miss-postmortems.json
+  s_b053a329cf705a::t_e2fe71b33b6cf9 151,231-251
+  s_b053a329cf705a::t_a06b0d432365d5 152,257-265
+  s_b053a329cf705a::t_56b6ca6b0a517b 252-256
+docs/product-specs/field-moves.md
+  s_b053a329cf705a::t_dc2f6409777ed5 42
+  s_b053a329cf705a::t_5edd3320cb95cf 52
+scripts/app/save_stability_support.gd.uid
+  s_b053a329cf705a::t_929c24666bddcd 1
+docs/product-specs/menu-and-save.md
+  s_b053a329cf705a::t_cc827a8a51111d 16
+  s_b053a329cf705a::t_c7bafcddde5e3b 57-58
+scripts/app/save_stability_support.gd
+  s_b053a329cf705a::t_fd86a91894f889 1-37,43-50,52-67,69-74
+  s_b053a329cf705a::t_2aab36ad67a15b 68
+  s_b053a329cf705a::t_3964094b03badf 51
+  s_b053a329cf705a::t_1b20608f8818b2 38-42
+docs/RELIABILITY.md
+  s_b053a329cf705a::t_a580e5256c7670 156
+  s_b053a329cf705a::t_73971244623412 127
+  s_b053a329cf705a::t_132affbcbe7008 150
+  s_b053a329cf705a::t_939ac467284925 33
+  s_b053a329cf705a::t_87dca93d791798 120
+  s_b053a329cf705a::t_87219565bedae6 154
+scripts/ui/beacon_selector.gd.uid
+  s_b053a329cf705a::t_171efaaa2b1970 1
+tools/run_playtests.py
+  s_b053a329cf705a::t_27fecbab9af91b 71
+docs/registry/subsystems.toml
+  s_b053a329cf705a::t_c2562ebe0ad012 1006,1008
+  s_b053a329cf705a::t_a7b475cc765420 1198-1210
+  s_b053a329cf705a::t_f0822a049f07e0 7
+  s_b053a329cf705a::t_0f2b5cb1aae2bb 1130
+  s_b053a329cf705a::t_aff9cac6e7aaff 1005
+  s_b053a329cf705a::t_dc4929db0f24bf 1025-1028
+  s_b053a329cf705a::t_23d89b1fb71dd1 1156-1174
+  s_b053a329cf705a::t_8eff16ff7fe34b 1000-1002
+  s_b053a329cf705a::t_5f9f458799dc04 989
+  s_b053a329cf705a::t_74a380727f63f7 1095-1096
+  s_b053a329cf705a::t_7f1ede2c7e2cca 1092-1093
+  s_b053a329cf705a::t_a089f83f29e6c0 1015
+  s_b053a329cf705a::t_476b035b840d9b 1142-1155
+  s_b053a329cf705a::t_ac60f35d6144a2 1175-1194
+  s_b053a329cf705a::t_9097b4ca491681 990,992
+  s_b053a329cf705a::t_83e6d8e0351f27 1195-1197
+  s_b053a329cf705a::t_32f57d43c04a30 99-113
+scripts/runtime/field_move_runtime.gd
+  s_b053a329cf705a::t_6dbc95631c1a4f 54-58
+  s_b053a329cf705a::t_ca934f7c17cd70 22-27
+  s_b053a329cf705a::t_b94d3645d6a389 144-145
+  s_b053a329cf705a::t_49d292a4a9b396 129-130
+  s_b053a329cf705a::t_1d156f8f802a34 119
+scripts/runtime/player_avatar.gd
+  s_b053a329cf705a::t_99d53540aa88d1 7-8
+  s_b053a329cf705a::t_abca9780a83b6d 189-192
+  s_b053a329cf705a::t_7a1c8ac693a0b3 203-205
+  s_b053a329cf705a::t_84c97980a79d5f 194,200
+  s_b053a329cf705a::t_816d86a2223bfd 195,197
+  s_b053a329cf705a::t_510ca2480ac2ce 198
+  s_b053a329cf705a::t_b1a11132737e52 166-171
+  s_b053a329cf705a::t_a7968681a4dfec 188,193,196,199,201-202,206-215
+docs/product-specs/overworld-pokemon.md
+  s_b053a329cf705a::t_b2cdc13278d4a4 91
+scripts/runtime/overworld_mons_runtime.gd
+  s_b053a329cf705a::t_ab31d5cb678460 35-36
+  s_b053a329cf705a::t_88ae017bc69b31 122-123
+scripts/ui/beacon_selector.gd
+  s_b053a329cf705a::t_6d512d7b487d57 77-78
+  s_b053a329cf705a::t_6a5fbe17926e63 1-76,79-103
+scripts/runtime/landmark_runtime.gd
+  s_b053a329cf705a::t_4abd1f82b96d9c 25
+  s_b053a329cf705a::t_aaf3994ac235b4 286-293
+scripts/app/save_stability_scenario.gd
+  s_b053a329cf705a::t_2f6777ee3cb3e3 153-155
+  s_b053a329cf705a::t_8984d6b37039b9 156-159
+  s_b053a329cf705a::t_51018b0a091b41 3-7,13
+  s_b053a329cf705a::t_b8b711b0348df2 54,57-58
+  s_b053a329cf705a::t_68ae49516496bf 19-23
+  s_b053a329cf705a::t_7ebadfe562ccb9 8-12,14
+scripts/domain/world_chain.gd
+  s_b053a329cf705a::t_8aeb78ff9d2f0a 1-129
+docs/product-specs/building-and-placement.md
+  s_b053a329cf705a::t_e329b7f46c5b18 105-106
+  s_b053a329cf705a::t_35c50b3f360305 2
+CONTROLS.md
+  s_b053a329cf705a::t_102d8ac7abad47 214
+  s_b053a329cf705a::t_e1873aed6984ae 251
+  s_b053a329cf705a::t_76deed6fd2745a 268
+  s_b053a329cf705a::t_daf3abba58da60 225-226
+  s_b053a329cf705a::t_2ef940d7ed6bc3 210-213,215-218
+scripts/runtime/session_payload.gd
+  s_b053a329cf705a::t_50951f4bed87e2 62-67,69-70,73,75,78,80-95,97-100,103,110-126
+  s_b053a329cf705a::t_fdf6135827832d 6-8,13-14,19
+  s_b053a329cf705a::t_9de3494c31d529 42-50
+  s_b053a329cf705a::t_92ac8bbf642822 127-128
+docs/product-specs/world-depth.md
+  s_b053a329cf705a::t_0e6c73919a02a2 4
+  s_b053a329cf705a::t_bba0606e2fcf90 66
+  s_b053a329cf705a::t_d75dd7303ebfed 159
+docs/exec-plans/active/pokewilds-feature-completion.md
+  s_b053a329cf705a::t_754225c107d025 197
+  s_b053a329cf705a::t_504e00673e716f 280
+  s_b053a329cf705a::t_95e50de7d87c4a 184
+scripts/domain/save_migration.gd
+  s_b053a329cf705a::t_aaff2cb477b027 108-115,119-122,124-125
+  s_b053a329cf705a::t_6936334f98ad37 45-48
+  s_b053a329cf705a::t_286d945cee4b1c 1-44,49-107,116-118,123,126-149
+scripts/app/visual_sweep_world_depth_beacon.gd
+  s_b053a329cf705a::t_b387f00c516c2a 1-32,35-97
+  s_b053a329cf705a::t_f90d10707cedad 33-34
+scripts/app/field_move_actions.gd
+  s_b053a329cf705a::t_c92138acf30eb9 207
+  s_b053a329cf705a::t_ef60aecb5d0736 42-44,46-66,73-100,102-119,121-139
+  s_b053a329cf705a::t_1c2a0dbe27c770 145
+  s_b053a329cf705a::t_f42aeae7a9ec46 9-12
+  s_b053a329cf705a::t_a8649728f39fef 23
+  s_b053a329cf705a::t_79475d2681a018 101
+  s_b053a329cf705a::t_ef34b3154156cf 120
+  s_b053a329cf705a::t_3bd207e50b62cd 140-141
+tools/godot_dap_smoketest.py
+  s_b053a329cf705a::t_c65afdf2c7fb53 332
+  s_b053a329cf705a::t_93f2382a2da452 317-331
+scripts/runtime/game_runtime.gd
+  s_b053a329cf705a::t_61a99f1af36b11 55
+  s_b053a329cf705a::t_ed62ca03ef2d32 81
+  s_b053a329cf705a::t_7079b815400d71 24
+  s_b053a329cf705a::t_f953d428551dc9 106,108,110-111
+tools/verify_all.py
+  s_b053a329cf705a::t_78c3b41eae3710 476-479
+  s_b053a329cf705a::t_1a2c0e35f5c2da 10-11
+  s_b053a329cf705a::t_713691e2b96004 494
+  s_b053a329cf705a::t_df0aeabc47f03d 93
+  s_b053a329cf705a::t_d6d95c32a8cbf4 74-76,82-84,90
+  s_b053a329cf705a::t_7abb432c24bf2b 72,79-81,87
+  s_b053a329cf705a::t_52b5124ee47377 97
+scripts/app/visual_sweep_world_depth.gd
+  s_b053a329cf705a::t_10f09f0d66417b 16
+  s_b053a329cf705a::t_7fa00a36c92902 65
+  s_b053a329cf705a::t_63344860553f44 3-10
+scripts/app/world_chain_checks.gd
+  s_b053a329cf705a::t_7286d15b70033e 101
+  s_b053a329cf705a::t_ca69edb0bfabb4 99-100,102-113
+  s_b053a329cf705a::t_271e145a60b65d 11-12
+  s_b053a329cf705a::t_3e947ac7f4a4f2 3-8,38-39,48,119,188-190,199,207
+  s_b053a329cf705a::t_a635ab7c9fde75 1-2,9-10,13-37,40-47,49-98,114-118,120-187,191-198,200-206,208-220
+scripts/runtime/world_chain_runtime.gd
+  s_b053a329cf705a::t_4a2fd907404f96 30-33,36,41,44
+  s_b053a329cf705a::t_53442b9416d43e 87-89
+  s_b053a329cf705a::t_3fceb9417f8a6c 102-105
+  s_b053a329cf705a::t_2d3c781396e911 148-150,155
+  s_b053a329cf705a::t_de5d90bb5f05d1 1-29,37-40,45-86,90-98,106-147,151,154,156-162,165-166,168-179
+  s_b053a329cf705a::t_3a17d45ad6d38e 152-153
+  s_b053a329cf705a::t_aa020c0946028a 163-164,167
+  s_b053a329cf705a::t_61be531e1d3a65 99-101
+  s_b053a329cf705a::t_5cdb3acfbfbbd9 34-35,42-43
+scripts/runtime/session_state.gd
+  s_b053a329cf705a::t_db41f66c8b6d68 11-14
+  s_b053a329cf705a::t_ef06492bc806af 76-78
+  s_b053a329cf705a::t_39d05800203f7e 21,23
+  s_b053a329cf705a::t_24ffb993d94b63 50-58
+  s_b053a329cf705a::t_a6a0f7c92f6bc7 84-86,88
+  s_b053a329cf705a::t_33bd6e845bcf68 96-123,131-138
+  s_b053a329cf705a::t_e44ebd3f2fce6d 139-140
+docs/references/trace-events.md
+  s_b053a329cf705a::t_8c1c77e2f51f20 160
+  s_b053a329cf705a::t_dd6159f4f43b19 161
+  s_b053a329cf705a::t_deb0e059f43e1d 96
+  s_b053a329cf705a::t_5632fcf7ec77ac 151
+  s_b053a329cf705a::t_d54399ac2b2721 149-150
+  s_b053a329cf705a::t_7d3ef74724b184 166
+  s_b053a329cf705a::t_da7e8735c92487 4
+scripts/app/world_chain_scenario.gd
+  s_b053a329cf705a::t_64a6d622a9a848 40-41,50-51,56-57
+  s_b053a329cf705a::t_4a42e652cf8e8b 53
+  s_b053a329cf705a::t_05d8b97bfe0e03 1-22,27-29,31-39,42-49,52,54-55,58-62,64,66-68,70-89,92-93,95-99,104,112,118-139
+  s_b053a329cf705a::t_2cbfce9ad3c63d 69
+  s_b053a329cf705a::t_5635e21be568dc 90-91,100-103,105-111,113-116
+  s_b053a329cf705a::t_9eb06d4a6eb6ba 63
+  s_b053a329cf705a::t_e81851978998d2 65
+  s_b053a329cf705a::t_ad35d604eb1059 23-26,30
+  s_b053a329cf705a::t_8c98a389f5563a 94
+  s_b053a329cf705a::t_d6428153ab2cfa 117
+scripts/domain/world_chain.gd.uid
+  s_b053a329cf705a::t_5e8d1e7d7243cc 1
+docs/generated/visual-baselines/33_beacon.png.sidecar.json
+  s_b053a329cf705a::t_5186ec7bf7e73a 1
+scripts/app/world_spatial_audit.gd
+  s_b053a329cf705a::t_1fb087f215984f 133-134
+  s_b053a329cf705a::t_40eacc38a4bf67 12-14
+scripts/app/main.gd
+  s_b053a329cf705a::t_4184e358a1d1fe 75
+scripts/app/visual_sweep_baselines.gd
+  s_b053a329cf705a::t_c27c135d9354e0 34
+docs/generated/visual-baselines/33_beacon.png.import
+  s_b053a329cf705a::t_64ac444433041b 1-40
+scripts/app/visual_sweep_world_depth_beacon.gd.uid
+  s_b053a329cf705a::t_5c3045eeee9d66 1
+scripts/app/world_chain_checks.gd.uid
+  s_b053a329cf705a::t_39de0b3103589f 1
+scripts/app/world_chain_persist_checks.gd.uid
+  s_b053a329cf705a::t_927be3fd0e0b0d 1
+scripts/app/world_chain_scenario.gd.uid
+  s_b053a329cf705a::t_6d89f2388e0be4 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "87889984e8629fd50fa428fb47f662b9fd73776c",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
