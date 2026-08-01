@@ -30,6 +30,10 @@ const STARTING_BAG := {
 	"sleeping_bag": 1
 }
 const LEGACY_ITEM_IDS := {"pokeball": "poke_ball"}
+# Configurable random encounters (overworld-pokemon.md): v5-ADDITIVE, NO bump; {} == "off".
+const ENCOUNTER_MODES := ["off", "classic", "anywhere"]
+const ENCOUNTER_RATE_MIN := 0.02; const ENCOUNTER_RATE_MAX := 0.50
+const ENCOUNTER_RATE_STEP := 0.02; const ENCOUNTER_RATE_DEFAULT := 0.12
 
 var world_seed: int = 1337
 var player_tile: Vector2i = Vector2i.ZERO
@@ -47,6 +51,7 @@ var total_steps: int = 0
 var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
 var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
 var legendary_removals: Array = [] # Phase 7 Build 2 v4-additive: gone-for-good legendary keys "<cx>,<cy>:<SPECIES>" (world-depth.md § Persistence; absent in save -> []).
+var encounter_settings: Dictionary = {} # Configurable-encounter opt-in (v5-additive; absent/{} == "off" contact-only). session_payload marshals; title-screen Options configures.
 # Phase 7 Build 3 (v5) chain identity: root_seed is the immutable chain root
 # (world_seed_for(root,(0,0)) == root — origin terrain is EXACTLY the v4 world);
 # active_chain is the ACTIVE world's "<cx>,<cy>" (SaveMigration.world_id_for grammar);
@@ -295,6 +300,13 @@ func time_of_day_label() -> String:
 func note_step_taken() -> void:
 	total_steps += 1
 	repel_steps = maxi(0, repel_steps - 1) # Repel counts down one per step (clamped).
+
+# Configurable random encounters: {} == "off" (contact-only default; overworld-pokemon.md).
+func get_encounter_settings() -> Dictionary:
+	var mode := str(encounter_settings.get("mode", "off"))
+	return {"mode": mode if ENCOUNTER_MODES.has(mode) else "off", "rate": clampf(float(encounter_settings.get("rate", ENCOUNTER_RATE_DEFAULT)), ENCOUNTER_RATE_MIN, ENCOUNTER_RATE_MAX)}
+func set_encounter_settings(mode: String, rate: float) -> void: # off/invalid rides NO key (canonical: default saves keep their byte shape)
+	encounter_settings = {} if mode == "off" or not ENCOUNTER_MODES.has(mode) else {"mode": mode, "rate": clampf(roundf(rate / ENCOUNTER_RATE_STEP) * ENCOUNTER_RATE_STEP, ENCOUNTER_RATE_MIN, ENCOUNTER_RATE_MAX)}
 
 
 # Audit scratch accessor: no stored unlock model (the runner pokes the dict).

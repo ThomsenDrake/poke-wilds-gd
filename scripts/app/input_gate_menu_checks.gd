@@ -48,7 +48,7 @@ func _part_c_start_close_does_not_refire() -> void:
 	await _tap("start") # the poll path opens the start menu
 	if not _expect(_start_menu().visible and not player.input_enabled, "C: injection witness: Enter did not open the start menu"):
 		return
-	_flush_down(4) # POKEMON -> BAG -> SAVE -> NEW GAME -> CLOSE
+	_flush_down(5) # POKEMON -> BAG -> SAVE -> OPTIONS -> NEW GAME -> CLOSE
 	await get_tree().process_frame
 	var entries: ItemList = _start_menu().get_node("MenuPanel/Margin/VBox/Entries")
 	var selected: PackedInt32Array = entries.get_selected_items()
@@ -130,7 +130,7 @@ func _part_d_new_game_confirm_resets_only() -> void:
 	await _tap("start")
 	if not _expect(_start_menu().visible, "D: injection witness: Enter did not open the start menu"):
 		return
-	_flush_down(3) # POKEMON -> BAG -> SAVE -> NEW GAME
+	_flush_down(4) # POKEMON -> BAG -> SAVE -> OPTIONS -> NEW GAME
 	await get_tree().process_frame
 	var entries: ItemList = _start_menu().get_node("MenuPanel/Margin/VBox/Entries")
 	var selected: PackedInt32Array = entries.get_selected_items()

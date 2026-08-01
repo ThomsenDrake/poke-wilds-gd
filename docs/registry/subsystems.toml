@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -23,7 +23,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_stability",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed"]
 quality_bucket = "bootstrap"
 # PRE-PHASE-7 SUITE EXPANSION (user-approved full deep-dive expansion; the four new
 # scenarios are miss-002-compliant: symmetric <name>_passed / <name>_failed{reasons}
@@ -123,6 +123,7 @@ code_paths = [
   "scripts/runtime/world_view.gd",
   "scripts/runtime/tile_texture_cache.gd",
   "scripts/runtime/player_avatar.gd",
+  "scripts/runtime/player_sprite_frames.gd",
   "scripts/domain/biome_defs.gd",
   "scripts/domain/biome_encounters.gd",
   "scripts/domain/world_generator.gd",
@@ -247,12 +248,15 @@ code_paths = [
   "scripts/ui/party_rows.gd",
   "scripts/ui/party_screen.gd",
   "scripts/ui/bag_screen.gd",
+  "scripts/ui/menu_context.gd",
+  "scripts/ui/options_screen.gd",
 ]
 scene_paths = [
   "scenes/ui/StartMenu.tscn",
   "scenes/ui/MessageBox.tscn",
   "scenes/ui/PartyScreen.tscn",
   "scenes/ui/BagScreen.tscn",
+  "scenes/ui/OptionsScreen.tscn",
 ]
 spec_doc = "docs/product-specs/menu-and-save.md"
 validation_commands = [
@@ -886,6 +890,8 @@ code_paths = [
   "scripts/domain/overworld_mons.gd",
   "scripts/runtime/overworld_mons_runtime.gd",
   "scripts/runtime/overworld_mons_sim.gd",
+  "scripts/runtime/overworld_mons_actions.gd",
+  "scripts/domain/contact_encounter.gd",
   "scripts/runtime/overworld_mons_probe.gd",
   "scripts/runtime/entity_layer.gd",
   "scripts/app/overworld_entity_actions.gd",
@@ -1115,7 +1121,9 @@ quality_bucket = "landmarks"
 # the tower entry, footprint protection (can_place_on refuses landmark tiles), and the
 # puzzle-state save round-trip THROUGH THE SEAM; it JOINS the double-run lane (the
 # verify_all regroup is [5,5] — Build 2's legendary_spawn + Build 3's world_chain + the
-# Phase-7 audit's night_cycle (the tenth consumer) completed it). The visual_sweep_world_depth satellite (seed 2026072907; shot range
+# Phase-7 audit's night_cycle (the tenth consumer) completed it; SUPERSEDED — the
+# configurable-encounters slice added encounter_config as the eleventh consumer, regrouping
+# [5,6] with DOUBLE_RUN_RUN_OUTER_TIMEOUT_S [240,300]s). The visual_sweep_world_depth satellite (seed 2026072907; shot range
 # [31,34] single-sourced in the visual_sweep_baselines.gd registry) baselines
 # 31_ruins_interior + 32_mansion (puzzle state CRAFTED through the frozen seam, never
 # played live) + the Build-3 33_beacon (visual_sweep_world_depth_beacon.gd) + the R11

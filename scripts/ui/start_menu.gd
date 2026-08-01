@@ -1,7 +1,7 @@
 extends Control
 
-# Start menu loop: entry list (POKEMON, BAG, SAVE, NEW GAME, CLOSE) hosting the
-# party and bag screens as child scenes. NEW GAME routes through the MessageBox
+# Start menu loop: entry list (POKEMON, BAG, SAVE, OPTIONS, NEW GAME, CLOSE) hosting the
+# party, bag, and options screens as child scenes. NEW GAME routes through the MessageBox
 # sibling's yes/no confirm (Z: Yes / X: No) before the reset, and the menu
 # closes on the reset. Menu-level trace events stay in main.gd
 # (menu_opened/menu_closed) and GameRuntime (save_written).
@@ -19,6 +19,8 @@ signal closed
 signal game_reset
 signal new_game_requested
 signal field_move_requested(move_id: String, mon_index: int)
+
+const MenuContext := preload("res://scripts/ui/menu_context.gd") # context Callable resolution, extracted at the 220 wall
 
 const RUNTIME_METHODS := {
 	"get_party_snapshot": "get_party_snapshot",
@@ -38,18 +40,20 @@ const SESSION_METHODS := {
 	"move_party_member": "move_party_member", "set_party_order": "set_party_order",
 }
 
-const ENTRIES: PackedStringArray = ["POKEMON", "BAG", "SAVE", "NEW GAME", "CLOSE"]
+const ENTRIES: PackedStringArray = ["POKEMON", "BAG", "SAVE", "OPTIONS", "NEW GAME", "CLOSE"]
 const ENTRY_POKEMON := 0
 const ENTRY_BAG := 1
 const ENTRY_SAVE := 2
-const ENTRY_NEW_GAME := 3
-const ENTRY_CLOSE := 4
+const ENTRY_OPTIONS := 3
+const ENTRY_NEW_GAME := 4
+const ENTRY_CLOSE := 5
 
 @onready var _dim: ColorRect = $Dim
 @onready var _menu_panel: PanelContainer = $MenuPanel
 @onready var _entries: ItemList = $MenuPanel/Margin/VBox/Entries
 @onready var _party_screen = $PartyScreen
 @onready var _bag_screen = $BagScreen
+@onready var _options_screen = $OptionsScreen
 
 var _raw_context: Dictionary = {}
 var _context: Dictionary = {}
@@ -63,6 +67,7 @@ func _ready() -> void:
 	_entries.select(0)
 	_party_screen.closed.connect(_on_submenu_closed)
 	_bag_screen.closed.connect(_on_submenu_closed)
+	_options_screen.closed.connect(_on_submenu_closed)
 	_party_screen.field_move_requested.connect(_on_field_move_requested)
 	var confirm_box := get_node_or_null("../MessageBox")
 	if confirm_box != null and confirm_box.has_signal("confirmed"):
@@ -83,6 +88,7 @@ func show_menu() -> void:
 	_menu_panel.visible = true
 	_party_screen.close_screen()
 	_bag_screen.close_screen()
+	_options_screen.close_screen()
 	_entries.select(0)
 	_entries.ensure_current_is_visible()
 
@@ -95,6 +101,7 @@ func hide_menu() -> void:
 	_awaiting_confirm = false
 	_party_screen.close_screen()
 	_bag_screen.close_screen()
+	_options_screen.close_screen()
 	visible = false
 	closed.emit()
 
@@ -128,6 +135,8 @@ func _activate_entry(index: int) -> void:
 			_open_submenu(_bag_screen)
 		ENTRY_SAVE:
 			perform_save()
+		ENTRY_OPTIONS:
+			_open_submenu(_options_screen)
 		ENTRY_NEW_GAME:
 			_begin_new_game_confirm()
 		ENTRY_CLOSE:
@@ -182,39 +191,18 @@ func _selected_entry() -> int:
 	return int(selected[0]) if not selected.is_empty() else 0
 
 func _submenu_open() -> bool:
-	return _party_screen.visible or _bag_screen.visible
+	return _party_screen.visible or _bag_screen.visible or _options_screen.visible
 
 func _on_entry_clicked(index: int, _at_position: Vector2, _mouse_button_index: int) -> void:
 	_entries.select(index)
 	_activate_entry(index)
 
+# Context resolution extracted to menu_context.gd at the 220 wall (pure wiring).
 func _resolve_context(context: Dictionary) -> Dictionary:
-	var resolved := context.duplicate()
-	var runtime := _runtime()
-	if runtime == null:
-		return resolved
-	for key in RUNTIME_METHODS:
-		if not _context_accessor(resolved, key).is_valid():
-			resolved[key] = _node_accessor(runtime, RUNTIME_METHODS[key])
-	for key in SESSION_METHODS:
-		if not _context_accessor(resolved, key).is_valid():
-			resolved[key] = _node_accessor(runtime.get("session"), SESSION_METHODS[key])
-	return resolved
-
-func _context_accessor(context: Dictionary, key: String) -> Callable:
-	var value: Variant = context.get(key, Callable())
-	return value if value is Callable else Callable()
-
-func _node_accessor(target: Variant, method: String) -> Callable:
-	if target is Object and (target as Object).has_method(method):
-		return Callable(target, method)
-	return Callable()
+	return MenuContext.resolve(context, RUNTIME_METHODS, SESSION_METHODS, _runtime())
 
 func _call_context(key: String, args: Array = []) -> Variant:
-	var accessor := _context_accessor(_context, key)
-	if not accessor.is_valid():
-		return null
-	return accessor.callv(args)
+	return MenuContext.call_context(_context, key, args)
 
 func _runtime() -> Node:
 	return get_node_or_null("/root/GameRuntime")

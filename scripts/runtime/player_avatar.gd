@@ -5,6 +5,7 @@ signal encounter_requested(tile_position: Vector2i)
 signal blocked(reason: String, tile: Vector2i)
 
 const WorldChain := preload("res://scripts/domain/world_chain.gd") # Phase 7 Build 3: the pinned edge extent (runtime -> domain)
+const PlayerSpriteFrames := preload("res://scripts/runtime/player_sprite_frames.gd") # walk/run frame build, extracted at the 320 wall
 
 const TILE_SIZE := 16
 const ACTION_MOVE_UP := "move_up"
@@ -12,10 +13,6 @@ const ACTION_MOVE_DOWN := "move_down"
 const ACTION_MOVE_LEFT := "move_left"
 const ACTION_MOVE_RIGHT := "move_right"
 const ACTION_RUN := "run"
-const WALK_ANIMATION_FPS := 12.5
-const WALK_SHEET_PATH := "res://pokewilds/player/ben-walking.png"
-const RUN_SHEET_PATH := "res://pokewilds/player/ben-running.png"
-const LEGACY_WALK_SHEET_PATH := "res://pokewilds/player/kris-walking.png"
 
 @export var start_tile = Vector2i(0, 0)
 @export var walk_step_seconds = 0.16
@@ -232,14 +229,26 @@ func _update_movement(delta: float) -> void:
 	_set_sprite_state(_facing, false)
 
 
+# Random-path encounters are OPT-IN (title-screen Options -> session.encounter_settings): the
+# DEFAULT "off" never rolls — wild battles then come ONLY from a shared-tile contact or the
+# aggressive chase-catch (overworld_mons_runtime). "classic" rolls on encounter tiles;
+# "anywhere" on any standable tile, both at the configured rate (overworld-pokemon.md).
 func _try_trigger_encounter() -> void:
-	if not world.is_encounter_tile(tile_position):
+	var settings := _encounter_settings()
+	var mode := str(settings.get("mode", "off"))
+	if mode == "off" or (mode == "classic" and not world.is_encounter_tile(tile_position)):
 		return
-	var trigger_chance = encounter_chance
+	var trigger_chance := float(settings.get("rate", encounter_chance))
 	if _is_fast_gait():
 		trigger_chance *= run_encounter_modifier
 	if _rng.randf() <= trigger_chance:
 		encounter_requested.emit(tile_position)
+
+# Settings read rides the /root/GameRuntime autoload (the _try_edge_cross precedent); no
+# runtime (a bare avatar) -> {} == off.
+func _encounter_settings() -> Dictionary:
+	var runtime: Node = get_node_or_null("/root/GameRuntime")
+	return runtime.session.get_encounter_settings() if runtime != null and "session" in runtime else {}
 
 
 func _block_reason_for(next_tile: Vector2i) -> String:
@@ -282,39 +291,9 @@ func _direction_to_animation(direction: Vector2i) -> StringName:
 
 
 func _setup_sprite_frames() -> void:
-	# Both sheets are one row of eight 16x16 frames: idle down/up/left/right
-	# (0-3) then stride down/up/left/right (4-7), so walk and run share the
-	# same frame map with an animation-name prefix.
-	var walk_sheet: Texture2D = load(WALK_SHEET_PATH)
-	if walk_sheet == null:
-		walk_sheet = load(LEGACY_WALK_SHEET_PATH)
-	if walk_sheet == null:
-		return
-	var run_sheet: Texture2D = load(RUN_SHEET_PATH)
-	if run_sheet == null:
-		run_sheet = walk_sheet
+	# Frame build extracted to player_sprite_frames.gd at the 320 wall (presentation-only);
+	# null (no walk sheet loadable) keeps the scene-default frames, as before.
+	var frames := PlayerSpriteFrames.build()
+	if frames != null:
+		_sprite.sprite_frames = frames
 
-	var frames = SpriteFrames.new()
-	_add_sheet_animations(frames, walk_sheet, "")
-	_add_sheet_animations(frames, run_sheet, "run_")
-	_sprite.sprite_frames = frames
-
-
-func _add_sheet_animations(frames: SpriteFrames, sheet: Texture2D, prefix: String) -> void:
-	var frame_map = {
-		"down": [0, 4],
-		"up": [1, 5],
-		"left": [2, 6],
-		"right": [3, 7]
-	}
-
-	for animation_name in frame_map.keys():
-		var full_name := prefix + str(animation_name)
-		frames.add_animation(full_name)
-		frames.set_animation_speed(full_name, WALK_ANIMATION_FPS)
-		frames.set_animation_loop(full_name, true)
-		for frame_index in frame_map[animation_name]:
-			var frame = AtlasTexture.new()
-			frame.atlas = sheet
-			frame.region = Rect2(frame_index * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE)
-			frames.add_frame(full_name, frame)

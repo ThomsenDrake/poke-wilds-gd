@@ -55,6 +55,10 @@ static func to_payload(session: RefCounted, world_overrides: Dictionary, structu
 	# legendary_removals key — spec § Save v5 byte-preservation witness).
 	if not (session.legendary_removals as Array).is_empty():
 		payload["legendary_removals"] = session.legendary_removals
+	# Encounter opt-in (v5-additive, NO bump): written ONLY when non-default so an untouched
+	# save keeps the exact pre-feature byte shape (the golden fixture carries no key).
+	if not (session.encounter_settings as Dictionary).is_empty():
+		payload["encounter_settings"] = session.encounter_settings
 	return payload
 
 
@@ -102,6 +106,8 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	# LegendaryPlacement re-derives stamp-time suppression from this set per world/chain.
 	var raw_removals: Variant = migrated.get("legendary_removals", [])
 	session.legendary_removals = (raw_removals as Array).duplicate(true) if raw_removals is Array else []
+	# Encounter opt-in (v5-additive; absent/{} == "off" — the contact-only default).
+	session.encounter_settings = normalize_encounter_settings(migrated.get("encounter_settings", {}))
 	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch
 	# space (smoke_scenario_runner pokes it directly).
 	session.unlocked_field_moves.clear()
@@ -128,6 +134,19 @@ static func chained_worlds_for_save(session: RefCounted) -> Dictionary:
 
 static func wrap_time(minutes: int, day_minutes: int) -> int:
 	return posmod(minutes, day_minutes)
+
+
+# Encounter opt-in load normalizer (the SessionState setter is the LIVE validator; this
+# mirrors it for the load path — documented duplication so this file takes no session-const
+# dependency). Non-Dictionary / unknown mode / "off" -> {} (contact-only); rate clamped.
+static func normalize_encounter_settings(raw: Variant) -> Dictionary:
+	if not raw is Dictionary:
+		return {}
+	var mode := str((raw as Dictionary).get("mode", "off"))
+	if mode == "off" or not ["off", "classic", "anywhere"].has(mode):
+		return {}
+	var rate := clampf(float((raw as Dictionary).get("rate", 0.12)), 0.02, 0.50)
+	return {"mode": mode, "rate": clampf(roundf(rate / 0.02) * 0.02, 0.02, 0.50)} # snap to the 0.02 ladder, mirroring the setter (a hand-edited off-ladder rate never rolls as-saved)
 
 
 # The same normalization the runtime applies to a loaded party, run here so

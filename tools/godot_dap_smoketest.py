@@ -295,6 +295,11 @@ SCENARIO_REQUIREMENTS = {
                 "nest_found", "egg_stolen", "alpha_provoked", "overworld_mons_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Configurable encounters: collision-only default + opt-in modes + save round-trip.
+    "encounter_config": {
+        "all": ["boot_started", "boot_ready", "encounter_config_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     # Overworld sweep (shots 22-23, shared baseline dir). Windowed-only like the
     # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_overworld": {

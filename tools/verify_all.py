@@ -7,8 +7,8 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     ten rng-consumers x2 headless, cmp --mode trace (2x240s+cmp)
-                        (two groups of five; night_cycle, the tenth, regroups [5,5])
+  S6.5   double-run     eleven rng-consumers x2 headless, cmp --mode trace (240+300s+cmp)
+                        ([5,6] groups; encounter_config, the eleventh, joins group 1)
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
                         + the six satellite sweep families (shots 15-23 + 30-36)
@@ -69,11 +69,12 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# ten rng-consumer scenarios run twice headless, each run persisting its ordered
+# eleven rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
 # two trace sets (timing-stripped, key-sorted, order-sensitive). The per-group outer
-# budgets ([240, 240]s — five 45s per-scenario caps + 15s cold-start overhead,
-# index-aligned with the [5,5] groups) bound the two bounded runs + the 10s compare; a
+# budgets ([240, 300]s — each group's scenario count x the 45s per-scenario cap + 15s
+# cold-start overhead, index-aligned with the [5,6] groups) bound the two bounded runs
+# + the 10s compare; a
 # mismatch reds with the divergent event + both canonical payloads as the named
 # cause (miss-002). Phase 7: the two world-depth scenarios split ACROSS groups —
 # landmark_flow in group 1, Build 2's legendary_spawn in group 2 (self-pinned:
@@ -84,7 +85,7 @@ _UNSET = object()  # memoization sentinel (both cached values can legitimately b
 # TENTH CONSUMER (Phase-7 audit, miss-002 loudness): night_cycle covers the
 # unlit-night ghost draws — night_system.gd:123,128, the shared game_runtime._rng
 # randf gate + the randi_range species pick — the ONE shared-stream consumer none
-# of the other nine ever enters: new games start at 10:00 (session_state
+# of the other ten ever enters: new games start at 10:00 (session_state
 # NEW_GAME_TIME_OF_DAY 600) and the playtest soaks never reach NIGHT_START 20:30
 # (day_phase 1230), so before this landed the ghost path could regress and replay
 # green in the lane (only S7's single run would red). night_cycle self-pins the
@@ -101,16 +102,19 @@ _UNSET = object()  # memoization sentinel (both cached values can legitimately b
 # truncated it MID-SCENARIO — a run SIGTERM'd at the deadline raced a run that self-quit
 # at ~30.1s, and the truncated tails diverged by exactly the save-reload re-spawn (or the
 # disposition probes) the shorter run never reached. A budget race, NOT a logic divergence:
-# two COMPLETED runs cmp byte-identical, ts-stripped (all ten consumers re-proven green
+# two COMPLETED runs cmp byte-identical, ts-stripped (all eleven consumers re-proven green
 # under the retuned cap). Retune: cap 30->45s (~45% over the measured worst consumer),
-# outer [100,100]->[240,240]s (five 45s caps + 15s cold-start overhead per [5,5] group;
-# measured group totals ~63-66s). Deviation recorded in the repair report.
+# outer [100,100]->[240,300]s. The configurable-encounters slice added encounter_config as
+# the ELEVENTH consumer, regrouping [5,5]->[5,6]; each group's outer = its scenario count x
+# the 45s cap + 15s cold-start overhead (group 1: 5x45+15=240; group 2: 6x45+15=285 -> 300),
+# so the outer budgets bound each bounded run's worst case with headroom (measured group
+# totals ~63-88s). Deviation recorded in the repair report.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
-                        "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow",
-                        "legendary_spawn", "world_chain", "night_cycle"]
+                        "encounter_config", "landmark_flow", "shiny_odds", "fishing_flow",
+                        "breed_flow", "legendary_spawn", "world_chain", "night_cycle"]
 DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:5], DOUBLE_RUN_SCENARIOS[5:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 45.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 240.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 300.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
 def _load_run_playtests_constant(name: str):
@@ -487,13 +491,14 @@ class Runner:
     def _run_double_determinism_lane(self, bin_: str) -> None:
         """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
 
-        Runs the ten rng-consumer scenarios twice headless, each run persisting its
+        Runs the eleven rng-consumer scenarios twice headless, each run persisting its
         ordered trace JSONL (--trace-dir), then canonical-compares the two trace
-        sets with determinism_verify.py's cmp --mode trace. Budget: 2x240s bounded
+        sets with determinism_verify.py's cmp --mode trace. Budget: 240+300s bounded
         runs + 10s compare (the 2026-08-01 re-stamp retuned the per-scenario cap
-        30->45s — overworld_mons measures ~31s end-to-end, past the old cap — and
-        the per-group outer [100,100]->[240,240]s; deviation recorded in the
-        repair report).
+        30->45s — overworld_mons measures ~31s end-to-end, past the old cap; the
+        configurable-encounters slice added encounter_config as the eleventh consumer
+        and regrouped [5,5]->[5,6], so the per-group outer is [240,300]s = each group's
+        count x 45s + 15s cold start; deviation recorded in the repair report).
         A trace mismatch reds with the divergent
         event + both canonical payloads as the named cause (miss-002); a missing
         binary skips honestly rather than faking a pass.
@@ -520,7 +525,7 @@ class Runner:
         # Two groups (not one run of all) so each run's
         # worst case fits its per-group outer budget with headroom; traces accumulate
         # per dir across groups
-        # and the single cmp below compares the full ten-scenario set.
+        # and the single cmp below compares the full eleven-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
             for label, trace_dir, report in (

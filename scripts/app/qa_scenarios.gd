@@ -44,6 +44,10 @@ const SCENARIOS := {
 	# Phase 6 overworld mons (overworld-pokemon.md): the gate scenario + the deterministic
 	# 22/23 sweep (shared baseline dir; update never prunes foreign shots).
 	"overworld_mons": [preload("res://scripts/app/overworld_mons_scenario.gd"), "run", []],
+	# Configurable encounters (overworld-pokemon.md § Configurable encounters): the
+	# collision-only default + the opt-in modes + the additive save round-trip. Joins the
+	# double-run lane (overworld-active: contact needs live entities).
+	"encounter_config": [preload("res://scripts/app/encounter_config_scenario.gd"), "run", []],
 	"visual_sweep_overworld": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", []],
 	"visual_sweep_overworld_update": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", [{"mode": "update"}]],
 	# Pokemon-state shots 20-21 (shared baseline dir; update never prunes foreign shots).

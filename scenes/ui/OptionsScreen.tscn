@@ -1,11 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/start_menu.gd" id="1_tx833"]
-[ext_resource type="PackedScene" path="res://scenes/ui/PartyScreen.tscn" id="2_pscr"]
-[ext_resource type="PackedScene" path="res://scenes/ui/BagScreen.tscn" id="3_bscr"]
-[ext_resource type="PackedScene" path="res://scenes/ui/OptionsScreen.tscn" id="4_oscr"]
+[ext_resource type="Script" path="res://scripts/ui/options_screen.gd" id="1_oscr"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_opts"]
 bg_color = Color(0.07, 0.08, 0.11, 0.95)
 border_width_left = 2
 border_width_top = 2
@@ -17,7 +14,7 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
-[node name="StartMenu" type="Control"]
+[node name="OptionsScreen" type="Control"]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -26,7 +23,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
-script = ExtResource("1_tx833")
+script = ExtResource("1_oscr")
 
 [node name="Dim" type="ColorRect" parent="."]
 layout_mode = 1
@@ -42,12 +39,12 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -268.0
-offset_top = 204.0
+offset_left = -288.0
+offset_top = 184.0
 offset_right = -8.0
 offset_bottom = 452.0
 grow_horizontal = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_menu")
+theme_override_styles/panel = SubResource("StyleBoxFlat_opts")
 
 [node name="Margin" type="MarginContainer" parent="MenuPanel"]
 layout_mode = 2
@@ -63,19 +60,18 @@ theme_override_constants/separation = 8
 [node name="Title" type="Label" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "MENU"
+text = "OPTIONS"
 
 [node name="Entries" type="ItemList" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
 size_flags_vertical = 3
 
+[node name="Detail" type="Label" parent="MenuPanel/Margin/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+
 [node name="Hint" type="Label" parent="MenuPanel/Margin/VBox"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 12
-text = "Z: Select   X: Close"
-
-[node name="PartyScreen" parent="." instance=ExtResource("2_pscr")]
-
-[node name="BagScreen" parent="." instance=ExtResource("3_bscr")]
-
-[node name="OptionsScreen" parent="." instance=ExtResource("4_oscr")]
+text = "Z: Change   Left/Right: Adjust   X: Back"

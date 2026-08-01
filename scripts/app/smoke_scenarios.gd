@@ -76,7 +76,7 @@ func _scenario_menu_save() -> void:
 	await get_tree().create_timer(0.2).timeout
 	var cursor := _runner.trace_log_line_count()
 	_call("toggle_menu")
-	for _i in range(3):
+	for _i in range(4): # NEW GAME sits at index 4 (POKEMON/BAG/SAVE/OPTIONS precede it — configurable-encounters added OPTIONS at index 3)
 		_press("move_down")
 	_press("action_a")
 	await get_tree().create_timer(0.2).timeout
