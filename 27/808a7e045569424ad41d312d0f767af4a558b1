@@ -1,0 +1,145 @@
+docs/generated/showcase/05_heart_tower.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/generated/showcase/07_pen_eggs.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+scenes/app/Main.tscn
+  s_b053a329cf705a::t_fbfb75d4a5eba9 1
+  s_b053a329cf705a::t_cf806304b40e8b 52
+  s_b053a329cf705a::t_1d6edc811f8d19 13
+  s_b053a329cf705a::t_96ad92bcb2087a 53
+scripts/app/showcase_guardian.gd
+  s_b053a329cf705a::t_94593361a7a004 1-36,41-42,45,47-52
+  s_b053a329cf705a::t_2357713c66d4c7 37-40,43-44,46
+  s_b053a329cf705a::t_3114d524fff31c 53-70
+docs/QUALITY_SCORE.md
+  s_b053a329cf705a::t_0738d3a331d55f 2,12,20,27,29
+scripts/app/showcase_capture_scenario.gd
+  s_b053a329cf705a::t_b9d177465c1cb7 1-131
+scripts/app/showcase_pen.gd
+  s_b053a329cf705a::t_e3884c6bd331fd 24
+  s_b053a329cf705a::t_9e299e4a0008ed 1-23,25-55
+docs/registry/subsystems.toml
+  s_b053a329cf705a::t_20343d5535b954 1015-1021
+  s_b053a329cf705a::t_f5d5f69433dddd 1049
+docs/generated/showcase/01_mansion_statue_room.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/generated/showcase/02_mansion_sewer.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+scripts/app/qa_scenarios.gd
+  s_b053a329cf705a::t_8263d1e34acb26 103-106
+scenes/ui/BeaconSelector.tscn
+  s_b053a329cf705a::t_26488fd44409cc 1-72
+scripts/app/showcase_beacon.gd
+  s_b053a329cf705a::t_8fba8ae05a288f 1-101
+docs/generated/showcase/06_world_edge_beacon.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/product-specs/bootstrap-and-overworld.md
+  s_b053a329cf705a::t_052823ff2aa583 110-115
+  s_b053a329cf705a::t_8bd87db9bc8bff 2
+docs/generated/showcase/03_ruins_exterior.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/generated/showcase/08_biome_vista.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/generated/showcase/09_chained_world.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/RELIABILITY.md
+  s_b053a329cf705a::t_2a2c592ef9253f 34
+  s_b053a329cf705a::t_8d3d07188fe5c0 33
+  s_b053a329cf705a::t_0b1a5e4846d9cb 193-194
+  s_b053a329cf705a::t_8df52da12ce95a 2
+  s_b053a329cf705a::t_66d131ae2c57cb 180
+scripts/app/showcase_support.gd
+  s_b053a329cf705a::t_7cd2d48f51f038 1-47
+tools/run_playtests.py
+  s_b053a329cf705a::t_f2f65c20c655b3 103
+scripts/app/showcase_chained.gd
+  s_b053a329cf705a::t_450eccbc81d80f 42-45,51-58,60-61
+  s_b053a329cf705a::t_dbb62b46c427a1 1-41,46-50,59,62-136
+tools/verify_all.py
+  s_b053a329cf705a::t_3cbfa8d6c99647 95,97-107,112-113
+  s_b053a329cf705a::t_acf41dc4278609 75-76
+  s_b053a329cf705a::t_90d1b97ec98e5f 490,492-496
+  s_b053a329cf705a::t_21193eaf8067fe 10
+docs/generated/showcase/04_ruins_guardian.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/product-specs/world-depth.md
+  s_b053a329cf705a::t_b3bac994a6d6da 2
+  s_b053a329cf705a::t_8c1de162f0779f 4
+  s_b053a329cf705a::t_6833e0384ae004 161
+docs/exec-plans/active/harness-engineering-reorientation.md
+  s_b053a329cf705a::t_0738d3a331d55f 2
+tools/godot_dap_smoketest.py
+  s_b053a329cf705a::t_bb234dc0dc2f6a 53-54
+  s_b053a329cf705a::t_22dc9c92070b9a 36-37
+  s_b053a329cf705a::t_ff4717233fb166 378-385
+docs/generated/showcase/10_legendary_ring.png.sidecar.json
+  s_b053a329cf705a::t_2cc4b7dc890cd3 1
+docs/product-specs/building-and-placement.md
+  s_b053a329cf705a::t_dffa597e624e89 115-118
+  s_b053a329cf705a::t_460a3ca0872262 2
+scripts/app/showcase_landmarks.gd
+  s_b053a329cf705a::t_3398cbfac58358 13
+  s_b053a329cf705a::t_20135a9594829e 77
+  s_b053a329cf705a::t_bb1ec960a8ee50 1-12,14-76,78-100
+docs/references/trace-events.md
+  s_b053a329cf705a::t_1e69224c371e15 170-171
+  s_b053a329cf705a::t_55ba7142e974ba 2
+  s_b053a329cf705a::t_3c94fd228b2a1f 4
+docs/generated/miss-postmortems.json
+  s_b053a329cf705a::t_1d6d9ebf223101 151-152
+  s_b053a329cf705a::t_fe2f10e3cd51ae 147,323-336
+  s_b053a329cf705a::t_3222a94e71957d 153,337-343
+docs/product-specs/overworld-pokemon.md
+  s_b053a329cf705a::t_b2d1928a29f103 163-166
+  s_b053a329cf705a::t_96aec3137384af 2
+docs/generated/showcase/01_mansion_statue_room.png.import
+  s_b053a329cf705a::t_bbe55d7c5c7430 1-40
+docs/generated/showcase/02_mansion_sewer.png.import
+  s_b053a329cf705a::t_5cbe94fa01312a 1-40
+docs/generated/showcase/03_ruins_exterior.png.import
+  s_b053a329cf705a::t_cbcc237126e623 1-40
+docs/generated/showcase/04_ruins_guardian.png.import
+  s_b053a329cf705a::t_f44cc40e59fbf7 1-40
+docs/generated/showcase/05_heart_tower.png.import
+  s_b053a329cf705a::t_d2e2d5a5bb58d6 1-40
+docs/generated/showcase/06_world_edge_beacon.png.import
+  s_b053a329cf705a::t_21dadf03800771 1-40
+docs/generated/showcase/07_pen_eggs.png.import
+  s_b053a329cf705a::t_3feca0bb0e4550 1-40
+docs/generated/showcase/08_biome_vista.png.import
+  s_b053a329cf705a::t_add5de8d105380 1-40
+docs/generated/showcase/09_chained_world.png.import
+  s_b053a329cf705a::t_201e75c953e871 1-40
+docs/generated/showcase/10_legendary_ring.png.import
+  s_b053a329cf705a::t_c5f32eddbc1056 1-40
+scripts/app/showcase_beacon.gd.uid
+  s_b053a329cf705a::t_9e5a570f116540 1
+scripts/app/showcase_capture_scenario.gd.uid
+  s_b053a329cf705a::t_119bee825d4f06 1
+scripts/app/showcase_chained.gd.uid
+  s_b053a329cf705a::t_23d81da86d15f9 1
+scripts/app/showcase_guardian.gd.uid
+  s_b053a329cf705a::t_d0a629954df20f 1
+scripts/app/showcase_landmarks.gd.uid
+  s_b053a329cf705a::t_6c18baae658fff 1
+scripts/app/showcase_pen.gd.uid
+  s_b053a329cf705a::t_0eb3ae1bfe2ac4 1
+scripts/app/showcase_support.gd.uid
+  s_b053a329cf705a::t_c33ebb6b5bcf26 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "27808a7e045569424ad41d312d0f767af4a558b1",
+  "prompts": {},
+  "sessions": {
+    "s_b053a329cf705a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb7dc1cf-1311-4de1-afcb-597d5418858e",
+        "model": "qwen3.8-max-preview"
+      },
+      "human_author": "Drake Thomsen <drake@draket.xyz>"
+    }
+  }
+}
