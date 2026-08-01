@@ -33,7 +33,8 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
                                  "visual_sweep_world_depth", "visual_sweep_world_depth_update",
-                                 "visual_sweep_world_chain", "visual_sweep_world_chain_update"}
+                                 "visual_sweep_world_chain", "visual_sweep_world_chain_update",
+                                 "showcase_capture"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -49,7 +50,8 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_overworld", "visual_sweep_overworld_update",
                            "visual_sweep_fishing", "visual_sweep_fishing_update",
                            "visual_sweep_world_depth", "visual_sweep_world_depth_update",
-                           "visual_sweep_world_chain", "visual_sweep_world_chain_update"}
+                           "visual_sweep_world_chain", "visual_sweep_world_chain_update",
+                           "showcase_capture"}
 
 # R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label) runs for the
@@ -371,6 +373,14 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_world_chain_update": {
         "all": ["visual_sweep_world_chain_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Showcase capture (NOT a baseline sweep): crafts the coolest locales + saves evocative frames to
+    # docs/generated/showcase/. Windowed-only (skip-with-reason under PLAYTEST_FORCE_HEADLESS). The
+    # symmetric showcase_capture_failed marker rides failed_event_entry (miss-002 loudness); the pass
+    # marker is showcase_capture_passed. Deliberately outside the sidecar-seed / region-diff gates.
+    "showcase_capture": {
+        "all": ["showcase_capture_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Pre-Phase-7 joint-RNG determinism pin (deep-dive suite expansion): one

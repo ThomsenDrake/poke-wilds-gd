@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-30
+Last verified: 2026-08-01
 Review cadence days: 21
 Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
@@ -112,3 +112,7 @@ The user-approved pre-Phase-7 expansion touched `scripts/app/field_action_router
 ## Phase 7 Build 1 (landmarks) co-modification note
 
 Phase 7 Build 1 ([world-depth.md](world-depth.md) § Landmarks, footprint-validation gate (b)) adds the landmark-refusal clause to `Structures.can_place_on`: a tile carrying `landmark_id != ""` never accepts a placement — landmarks are immutable world features the player can NEVER build on OR demolish (the lifelong guard; footprints stamp at world-gen BELOW clears/placements at the generator's single mutation boundary, so no player mutation ever shadows one). `field_action_router.gd` co-mods by EXTRACTION only: the puzzle/statue/key interact arms move to `scripts/app/landmark_actions.gd` (the router's 216/220 budget); costs, occupancy, the would-trap guard, and the demolition/refund rules are unchanged, and the save schema stays v4.
+
+## Phase 7 follow-up (showcase + beacon UI) co-modification note
+
+The showcase-capture + BeaconSelector slice ([bootstrap-and-overworld.md](bootstrap-and-overworld.md) § Showcase capture) touches this subsystem's shared `scenes/app/Main.tscn` scene OWNERSHIP only: the scene gains the BeaconSelector UI child (hidden at boot) and the `qa_scenarios.gd` dispatch registration for the windowed-only `showcase_capture` driver. Neither touches `structures.gd` / `build_runtime.gd` / `structure_layer.gd` / `field_action_router.gd`: costs, occupancy, build mode, the would-trap guard, the demolition/refund rules, the landmark-refusal clause, and the v4 save schema are unchanged, and the entity-FIRST context-Z precedence (entities -> camp objects -> fishing -> harvest -> build) is unchanged. The pen-world showcase frame (seed 2026072605, `showcase_pen.gd`) rides the existing fenced-pen mechanic read-only for the capture. Scores unchanged: scene-tree co-mod, no building behavior.

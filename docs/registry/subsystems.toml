@@ -1012,6 +1012,13 @@ code_paths = [
   "scripts/app/visual_sweep_world_depth_oracle.gd",
   "scripts/app/visual_sweep_world_depth_expand.gd",
   "scripts/app/visual_sweep_world_chain.gd",
+  "scripts/app/showcase_capture_scenario.gd",
+  "scripts/app/showcase_support.gd",
+  "scripts/app/showcase_landmarks.gd",
+  "scripts/app/showcase_guardian.gd",
+  "scripts/app/showcase_beacon.gd",
+  "scripts/app/showcase_pen.gd",
+  "scripts/app/showcase_chained.gd",
   "scripts/ui/beacon_selector.gd",
 ]
 scene_paths = ["scenes/app/Main.tscn", "scenes/ui/BeaconSelector.tscn"]
@@ -1039,7 +1046,7 @@ validation_commands = [
 # passed/failed pair registered here in the Phase 7 audit repair lane (R5 — the multi-beacon
 # SELECTOR functional choice; its registry-required domain events are the two beacon_placed
 # registrations + the picked teleport_used warp).
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "beacon_selector_passed", "beacon_selector_failed", "visual_sweep_world_depth_passed", "visual_sweep_world_chain_passed"]
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "beacon_selector_passed", "beacon_selector_failed", "visual_sweep_world_depth_passed", "visual_sweep_world_chain_passed", "showcase_capture_passed", "showcase_capture_failed"]
 quality_bucket = "landmarks"
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —

@@ -100,6 +100,10 @@ const SCENARIOS := {
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 	"visual_sweep_world_chain": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", []],
 	"visual_sweep_world_chain_update": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", [{"mode": "update"}]],
+	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves
+	# evocative frames + crafted-state sidecars to docs/generated/showcase/. Deliberately outside the
+	# baseline gate machinery — no SHOT_REGISTRY entry, no reconcile()/region-diff gate. Windowed-only.
+	"showcase_capture": [preload("res://scripts/app/showcase_capture_scenario.gd"), "run", []],
 }
 
 

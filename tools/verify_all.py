@@ -7,7 +7,7 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     ten rng-consumers x2 headless, cmp --mode trace (2x100s+cmp)
+  S6.5   double-run     ten rng-consumers x2 headless, cmp --mode trace (2x240s+cmp)
                         (two groups of five; night_cycle, the tenth, regroups [5,5])
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
@@ -72,8 +72,8 @@ _UNSET = object()  # memoization sentinel (both cached values can legitimately b
 # ten rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
 # two trace sets (timing-stripped, key-sorted, order-sensitive). The per-group outer
-# budgets ([100, 100]s — both groups carry five scenarios, the four-scenario 80s
-# share scaled one scenario up) bound the two bounded runs + the 10s compare; a
+# budgets ([240, 240]s — five 45s per-scenario caps + 15s cold-start overhead,
+# index-aligned with the [5,5] groups) bound the two bounded runs + the 10s compare; a
 # mismatch reds with the divergent event + both canonical payloads as the named
 # cause (miss-002). Phase 7: the two world-depth scenarios split ACROSS groups —
 # landmark_flow in group 1, Build 2's legendary_spawn in group 2 (self-pinned:
@@ -92,14 +92,25 @@ _UNSET = object()  # memoization sentinel (both cached values can legitimately b
 # a boot world rides the wall-clock root_seed and would red the cmp) — then drives
 # 40 crafted-dark draws at 23:00 (GHOST_CHANCE 0.5 on the pinned stream), so the
 # ghost draws replay cross-process here exactly as they fire in production. Each
-# scenario carries the 30s per-scenario cap; the per-group budgets are explicit
+# scenario carries the 45s per-scenario cap; the per-group budgets are explicit
 # headroom, not a sum-stays-under hope.
+#
+# BUDGET RE-STAMP 2026-08-01 (repair): the overworld_mons gate scenario measures ~31s
+# end-to-end (determinism double-walk + the 11-band spawn walk + the charm/hostile/egg/
+# save battle drives + the disposition tails), so the original 30s per-scenario cap
+# truncated it MID-SCENARIO — a run SIGTERM'd at the deadline raced a run that self-quit
+# at ~30.1s, and the truncated tails diverged by exactly the save-reload re-spawn (or the
+# disposition probes) the shorter run never reached. A budget race, NOT a logic divergence:
+# two COMPLETED runs cmp byte-identical, ts-stripped (all ten consumers re-proven green
+# under the retuned cap). Retune: cap 30->45s (~45% over the measured worst consumer),
+# outer [100,100]->[240,240]s (five 45s caps + 15s cold-start overhead per [5,5] group;
+# measured group totals ~63-66s). Deviation recorded in the repair report.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
                         "landmark_flow", "shiny_odds", "fishing_flow", "breed_flow",
                         "legendary_spawn", "world_chain", "night_cycle"]
 DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:5], DOUBLE_RUN_SCENARIOS[5:]]
-DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 30.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [100.0, 100.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
+DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 45.0
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 240.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
 def _load_run_playtests_constant(name: str):
@@ -476,11 +487,13 @@ class Runner:
     def _run_double_determinism_lane(self, bin_: str) -> None:
         """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
 
-        Runs the eight rng-consumer scenarios twice headless, each run persisting its
+        Runs the ten rng-consumer scenarios twice headless, each run persisting its
         ordered trace JSONL (--trace-dir), then canonical-compares the two trace
-        sets with determinism_verify.py's cmp --mode trace. Budget: 2x90s bounded
-        runs + 10s compare (six cold-start headless scenarios incl. journey+soak do
-        not fit the original <=90s total; deviation recorded in the repair report).
+        sets with determinism_verify.py's cmp --mode trace. Budget: 2x240s bounded
+        runs + 10s compare (the 2026-08-01 re-stamp retuned the per-scenario cap
+        30->45s — overworld_mons measures ~31s end-to-end, past the old cap — and
+        the per-group outer [100,100]->[240,240]s; deviation recorded in the
+        repair report).
         A trace mismatch reds with the divergent
         event + both canonical payloads as the named cause (miss-002); a missing
         binary skips honestly rather than faking a pass.
