@@ -48,6 +48,10 @@ const SCENARIOS := {
 	# collision-only default + the opt-in modes + the additive save round-trip. Joins the
 	# double-run lane (overworld-active: contact needs live entities).
 	"encounter_config": [preload("res://scripts/app/encounter_config_scenario.gd"), "run", []],
+	# Comprehensive world-gen audit (bootstrap-and-overworld.md): cohesion/blending + spawn↔
+	# stats + dungeon-site availability across a fixed seed list; enforcing tier gates, the
+	# future-fix gaps ride the warning-tier world_gen_audit_advisory event (never gates).
+	"world_gen_audit": [preload("res://scripts/app/world_gen_audit_scenario.gd"), "run", []],
 	"visual_sweep_overworld": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", []],
 	"visual_sweep_overworld_update": [preload("res://scripts/app/visual_sweep_overworld.gd"), "run_sweep", [{"mode": "update"}]],
 	# Pokemon-state shots 20-21 (shared baseline dir; update never prunes foreign shots).

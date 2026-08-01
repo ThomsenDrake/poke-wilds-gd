@@ -1257,3 +1257,48 @@ quality_bucket = "landmarks"
 # a documented reach into the scene's _input_router — main.gd's bind array is frozen at its
 # 220 budget; the field_action_router._toggle_campfire reach precedent). ui-layer rules hold:
 # no domain/runtime-script imports (check_architecture), rows are plain label+tile dicts.
+
+[[subsystems]]
+name = "world_gen_audit"
+status = "active"
+layer = "domain"
+code_paths = [
+  "scripts/domain/world_gen_audit.gd",
+  "scripts/domain/world_gen_cohesion.gd",
+  "scripts/domain/world_gen_spawns.gd",
+  "scripts/domain/world_gen_dungeons.gd",
+  "scripts/runtime/world_gen_audit_runner.gd",
+  "scripts/app/world_gen_audit_scenario.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario world_gen_audit",
+  "python3 tools/run_playtests.py --scenario world_gen_audit",
+]
+required_trace_events = ["world_gen_audit_passed", "world_gen_audit_failed", "world_gen_audit_advisory"]
+quality_bucket = "world"
+# COMPREHENSIVE WORLD-GEN AUDIT (the world-generation workflow; audit-first, fixes land in
+# later slices). Measures THREE goals across a fixed seed list, NO rng (pure function of
+# code + catalog + seeds — deterministic by construction, deliberately NOT a double-run
+# consumer): (1) COHESION/BLENDING (world_gen_cohesion.gd — disc determinism density,
+# ring admission, biome-adjacency histogram + hostile-pair count, the diamond ring-seam
+# metric, region-size/speck distribution, per-ring biome histogram + SNOW/LAVA extreme
+# reach); (2) SPAWN↔STATS (world_gen_spawns.gd — the first BST computation anywhere in the
+# codebase, type↔biome coherence + the legendary/egg no-leak invariant, fallback-disjoint
+# leaks, BST↔depth + level-band↔strength analysis); (3) DUNGEON SITES (world_gen_dungeons.gd
+# — per-biome footprint site availability incl. LAVA, anchors-in-extent, spawn-disc
+# exclusion, spawn reachability, the unimplemented spec §19(c) gen-time reachability gate as
+# an advisory). TIER RULE: world_gen_audit_passed gates on the ENFORCING tier only (structural
+# invariants that hold today); every gap needing a future fix rides the warning-tier
+# world_gen_audit_advisory event (NEVER gates) — the advisory_findings ARE the fix-slice
+# punch-list. Headline advisory findings today: LAVA never generates on origin (zero
+# LAVA-dungeon sites; the later fix makes LAVA generate in deep rings and re-pins
+# legendary_spawn_checks.gd EXPECTED_LAVA_ABSENT in lockstep), no biome blending/transition
+# logic (hard-edged biomes + diamond seams at rings 10/28/60), and stats play no role in
+# spawn assignment. The runner builds a FRESH WorldGenerator per seed (never the live
+# _world_gen / shared _rng); the app reaches domain statics through the runner's re-exposed
+# consts (app may not preload domain). Findings: res://.godot-smoke/world-gen-audit-findings.json
+# (per-run) + the curated docs/generated/world-gen-audit-findings.md (committed).

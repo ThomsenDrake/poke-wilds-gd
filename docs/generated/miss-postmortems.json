@@ -148,8 +148,8 @@
     "revert_scope": {
      "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-     "tools/run_playtests.py": "8a612952c08325df0f6538619bbdddda769a5b7333779ebc61e6e2de929f7d99",
-     "tools/godot_dap_smoketest.py": "000ae9712843cffb10e4288e71408824979844beca0b7142341312a849cad9cd",
+     "tools/run_playtests.py": "fdf2e4db5b199821b00447fa941e5757a7c9da61e78c6fb719008ac057cf5a9c",
+     "tools/godot_dap_smoketest.py": "858ed000e53ef5eaaa2d7ffe7ddf531f85496e93dd5c0885f647094aacf2a79c",
      "tools/verify_all.py": "9ba5326acc59f0bf851c24aff944dd35e50df571bae1ba5646efeeb028f78255"
     },
     "re_stamp_log": [
@@ -369,6 +369,20 @@
       "old_pin": "91c99effd60a",
       "new_pin": "9ba5326acc59",
       "reason": "legitimate edit (configurable-encounters slice, review-driven): verify_all.py's double-run lane narration + budget reconciled to the landed eleven-consumer / [5,6] state \u2014 DOUBLE_RUN_RUN_OUTER_TIMEOUT_S [240,240]->[240,300]s (group 2 now six scenarios: 6x45s cap + 15s cold start = 285 -> 300) and the stale 'ten/[5,5]/tenth/other-nine' comments in the module docstring, lane block, and method docstring corrected to eleven/[5,6]. The double-run x2 + determinism_verify cmp --mode trace mechanism miss-002/entry#2 proved is byte-for-byte untouched (only comments + the two outer-budget literals moved); the run_playtests.py / godot_dap_smoketest.py pins and the two nav_audit scope pins are unchanged and still hold"
+     },
+     {
+      "date": "2026-08-01",
+      "file": "tools/run_playtests.py",
+      "old_pin": "8a612952c083",
+      "new_pin": "fdf2e4db5b19",
+      "reason": "legitimate edit (comprehensive world-gen audit slice): appended \"world_gen_audit\" to PLAYTEST_SCENARIOS so the new audit scenario runs in the S7 headless suite. Additive dispatch-list entry only; miss-002's proved honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection + finalize's ok contract) and the determinism seam are byte-for-byte untouched; the two nav_audit scope pins and the verify_all.py pin are unchanged and still hold."
+     },
+     {
+      "date": "2026-08-01",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "000ae9712843",
+      "new_pin": "858ed000e53e",
+      "reason": "legitimate edit (comprehensive world-gen audit slice): added the single-sourced \"world_gen_audit\" event contract to SCENARIO_REQUIREMENTS (boot_started/boot_ready/world_gen_audit_passed + the session_loaded|session_created any; the warning-tier world_gen_audit_advisory is deliberately NOT in 'all' \u2014 it never gates). Additive contract-table entry only; the transport-honesty + failed-events mechanism miss-002 proved is untouched; the nav_audit scope pins and the run_playtests.py / verify_all.py pins are unchanged and still hold."
      }
     ]
    },

@@ -300,6 +300,12 @@ SCENARIO_REQUIREMENTS = {
         "all": ["boot_started", "boot_ready", "encounter_config_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Comprehensive world-gen audit: the enforcing tier gates on world_gen_audit_passed; the
+    # future-fix gaps ride the warning-tier world_gen_audit_advisory event (never in "all").
+    "world_gen_audit": {
+        "all": ["boot_started", "boot_ready", "world_gen_audit_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     # Overworld sweep (shots 22-23, shared baseline dir). Windowed-only like the
     # other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_overworld": {
