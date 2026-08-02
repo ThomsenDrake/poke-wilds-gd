@@ -32,9 +32,8 @@ const SHOT_REGISTRY := {
 	"pokemon": {"range": [20, 21], "seed": 2026072605},
 	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
 	"fishing": {"range": [26, 27], "seed": 2026072804},
-	"world_depth": {"range": [31, 34], "seed": 2026072907},
-	"world_chain": {"range": [35, 36], "seed": 1746331193}, # R11 derived world == world_seed_for(2026072907,(0,-1)) (SplitMix & 0x7fffffff); own sweep so R3's one-world gate holds
-	"retired": [17],
+	"world_depth": {"range": [31, 32], "extra": [34], "seed": 2026072907}, # 33 (beacons) retired with world chaining
+	"retired": [17, 33, 35, 36], # 35/36 (chained world) + 33 (beacons) retired with world chaining (infinite-world slice)
 }
 
 

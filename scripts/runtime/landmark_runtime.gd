@@ -22,7 +22,6 @@ const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
-const SaveMigration := preload("res://scripts/domain/save_migration.gd") # Build 3: the chain-key grammar (active_chain -> Vector2i) for _chain()
 
 const TOWER_TRACK := "res://pokewilds/music/Wilds_HeartTower.ogg" # Calm variant + trigger DEFERRED (spec § Heart Tower; FLAGGED #7)
 const DUSCLOPS_ID := "landmark_dusclops_%d,%d" # per-cell guardian-shaped id (the sim's guardian id grammar)
@@ -216,7 +215,7 @@ func _note_region(player_tile: Vector2i) -> void:
 	var key := landmark_id + "|" + region
 	var first := not _visited.has(key)
 	_visited[key] = true
-	_emit("landmark_entered", {"landmark_id": landmark_id, "tile": _t(player_tile), "chain": "%d,%d" % [_chain().x, _chain().y], "region": region, "first_entry": first})
+	_emit("landmark_entered", {"landmark_id": landmark_id, "tile": _t(player_tile), "region": region, "first_entry": first})
 	if landmark_id == Landmarks.TOWER_ID and first:
 		_emit("landmark_music", {"landmark_id": landmark_id, "track": TOWER_TRACK, "trigger": "entry"}) # trace seam for the field-music switch: play_track_path is headless-gated + emits nothing, so this trace is the headless witness
 		if _music_router != null:
@@ -283,14 +282,8 @@ func _is_mansion_local(faced: Vector2i, local: Vector2i) -> bool:
 			return (landmark["footprint"] as Rect2i).position + local == faced
 	return false
 
-func _chain() -> Vector2i: # Build 3: the ACTIVE chain — world_chain_runtime swaps session.active_chain on a cross; nothing below branches on it.
-	return SaveMigration.chain_for(str(_session.active_chain)) if _session != null else Vector2i.ZERO
-
-# Build 3: a chain-cross makes the per-world first-entry/loot one-shots transient PER-WORLD
-# (world_chain_runtime calls this after the swap); the puzzle STATE rides the frozen seam.
-func note_world_changed() -> void:
-	_visited.clear(); _loot_taken.clear()
-	_current_landmark = ""; _current_region = ""
+func _chain() -> Vector2i: # infinite-world slice: a single seamless origin plane — chain frozen at (0,0); nothing below branches on it.
+	return Vector2i.ZERO
 
 func _world_seed() -> int:
 	return int(_session.world_seed) if _session != null else 0

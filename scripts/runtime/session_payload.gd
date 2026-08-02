@@ -1,11 +1,11 @@
 extends RefCounted
 
 # Phase 7 Build 1 — session payload marshalling EXTRACTED from session_state.gd
-# (spec: world-depth.md § Implementation shape). The shared extraction HOME for the
-# three world-depth builds (strictly serial touches — no merge conflict): Build 2
-# added the legendary_removals key; Build 3 (landed) prepends SaveMigration.migrate
-# to apply_into + emits the v5 keys (root_seed/active_chain/chained_worlds) + nests
-# every world's landmark_state under chained_worlds["<cx>,<cy>"].landmark_state.
+# (spec: world-depth.md § Implementation shape). Build 2 added the legendary_removals
+# key; Build 3 emitted the v5 chain keys; the infinite-world slice (v6) RETIRES them —
+# apply_into still prepends SaveMigration.migrate (now flattening a chain-less v4/v5 save
+# to the single-plane v6 shape), and to_payload writes the flat v6 keys (landmark_state
+# back at its v4 top-level seat, written only when non-empty).
 #
 # No preload cycle: session_state delegates here, so this file takes the session as a
 # parameter and its schema constants (SAVE_VERSION, STARTING_BAG, LEGACY_ITEM_IDS,
@@ -39,15 +39,11 @@ static func to_payload(session: RefCounted, world_overrides: Dictionary, structu
 		"campsite_pokemon": session.campsite_pokemon,
 		"pastures": session.pastures
 	}
-	# Phase 7 Build 3 (v5): chain identity + the per-world chained_worlds dict. The 15
-	# keys above keep v4 keying EXACTLY (semantically the ACTIVE world's); the active
-	# world's puzzle state nests under chained_worlds[active_chain].landmark_state
-	# (EVERY world's puzzle state nests — origin at ["0,0"]; omitted when {} so a
-	# chain-less no-progress save keeps chained_worlds == {}). The v4 top-level
-	# landmark_state seat is gone in v5 (migrate() relocates it on load).
-	payload["root_seed"] = session.root_seed
-	payload["active_chain"] = session.active_chain
-	payload["chained_worlds"] = chained_worlds_for_save(session)
+	# v6 (infinite-world slice): NO chain identity — a single seamless plane. Puzzle state
+	# returns to its v4 top-level seat; written ONLY when non-empty so a no-progress save
+	# keeps its byte shape (the frozen golden fixture carries no landmark_state key).
+	if not (session.landmark_state as Dictionary).is_empty():
+		payload["landmark_state"] = session.landmark_state
 	# Phase 7 Build 2 v4-ADDITIVE (NO SAVE_VERSION bump): gone-for-good legendary removal
 	# keys ("<cx>,<cy>:<SPECIES>", the LegendaryPlacement.removal_key grammar), a
 	# chain-scoped flat list; written ONLY when non-empty so a legendary-untouched save
@@ -84,24 +80,11 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	session.time_of_day_minutes = wrap_time(int(migrated.get("time_of_day_minutes", new_game_minutes)), day_minutes)
 	session.total_steps = maxi(0, int(migrated.get("total_steps", 0)))
 	session.repel_steps = maxi(0, int(migrated.get("repel_steps", 0))) # Phase 4 additive (absent -> 0).
-	# Phase 7 Build 3 (v5): chain identity (absent -> origin backfill; migrate()
-	# guarantees these on every v<=5 payload — the .get defaults are belt-and-braces).
-	session.root_seed = int(migrated.get("root_seed", int(migrated.get("world_seed", 1337))))
-	session.active_chain = str(migrated.get("active_chain", "0,0"))
-	var raw_chained: Variant = migrated.get("chained_worlds", {})
-	session.chained_worlds = (raw_chained as Dictionary).duplicate(true) if raw_chained is Dictionary else {}
-	# The ACTIVE world's puzzle state returns from its chained_worlds[active_chain]
-	# nest to the flat seam var (the nest is the v5 save seat; the live session keeps
-	# the v4 shape for the active world — migrate() moved a v4 top-level key here).
-	# Non-active nests stay BYTE-IDENTICAL in session.chained_worlds: that map is the
-	# world_chain_runtime deserialization source (never normalized here).
-	var active_entry: Variant = session.chained_worlds.get(session.active_chain, {})
-	var raw_landmarks: Variant = (active_entry as Dictionary).get("landmark_state", {}) if active_entry is Dictionary else {}
+	# v6 (infinite-world slice): puzzle state rides flat top-level (migrate() hoists a v5
+	# origin nest back up; absent -> {}). A truly chained v5 save never reaches here — the
+	# load path refuses + preserves it (save_migration.can_represent_infinite).
+	var raw_landmarks: Variant = migrated.get("landmark_state", {})
 	session.landmark_state = (raw_landmarks as Dictionary).duplicate(true) if raw_landmarks is Dictionary else {}
-	if active_entry is Dictionary and (active_entry as Dictionary).has("landmark_state"):
-		(active_entry as Dictionary).erase("landmark_state")
-		if (active_entry as Dictionary).is_empty():
-			session.chained_worlds.erase(session.active_chain)
 	# Phase 7 Build 2 v4-additive (absent -> []): gone-for-good legendary removal keys;
 	# LegendaryPlacement re-derives stamp-time suppression from this set per world/chain.
 	var raw_removals: Variant = migrated.get("legendary_removals", [])
@@ -111,25 +94,6 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch
 	# space (smoke_scenario_runner pokes it directly).
 	session.unlocked_field_moves.clear()
-
-
-# Non-active entries deep-copied as stored, + the ACTIVE world's puzzle state nested
-# under chained_worlds[active_chain].landmark_state; empty landmark_state sub-keys
-# omitted (world-depth.md § Save v5 — "omitted from an entry when {}" so a chain-less
-# no-progress save keeps chained_worlds == {}).
-static func chained_worlds_for_save(session: RefCounted) -> Dictionary:
-	var out := (session.chained_worlds as Dictionary).duplicate(true)
-	for key in out.keys():
-		var entry: Variant = out[key]
-		if entry is Dictionary and (entry as Dictionary).has("landmark_state"):
-			var nested: Variant = (entry as Dictionary)["landmark_state"]
-			if nested is Dictionary and (nested as Dictionary).is_empty():
-				(entry as Dictionary).erase("landmark_state")
-	if not (session.landmark_state as Dictionary).is_empty():
-		if not out.has(session.active_chain) or not (out[session.active_chain] is Dictionary):
-			out[session.active_chain] = {}
-		(out[session.active_chain] as Dictionary)["landmark_state"] = (session.landmark_state as Dictionary).duplicate(true)
-	return out
 
 
 static func wrap_time(minutes: int, day_minutes: int) -> int:

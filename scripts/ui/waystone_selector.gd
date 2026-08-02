@@ -1,13 +1,13 @@
 extends Control
 
-# Phase 7 Build 3 — the multi-beacon SELECTOR (world-depth.md § Teleport Beacons (1);
-# fresh-faq.md:178-192: "you can select one of the Beacons to be Teleported to it").
-# Closes the last-registered-only divergence: a registration-ordered list of the ACTIVE
-# world's edge-band way-stones. The screen is DUMB by layer contract (ui may not import
-# domain per check_architecture): the opener (field_move_actions) supplies the rows off
-# world_chain_runtime.beacon_tiles() — already registration-ordered, so the list order
-# IS the deterministic order — plus a resolve Callable that warps + saves; this screen
-# only lists, navigates, and reports the chosen tile. Z chooses, X/Enter cancels.
+# The way-stone SELECTOR (infinite-world slice; renamed from the Phase-7 beacon selector,
+# which listed edge-band beacons — the edge-beacon concept retired with world chaining).
+# A registration-ordered list of the registered intra-world way-stones. The screen is DUMB
+# by layer contract (ui may not import domain per check_architecture): the opener
+# (field_move_actions) supplies the rows off field_move_runtime.way_stone_tiles() — already
+# registration-ordered, so the list order IS the deterministic order — plus a resolve
+# Callable that warps + saves; this screen only lists, navigates, and reports the chosen
+# tile. Z chooses, X/Enter cancels.
 #
 # WIRING: the argless `closed` signal is input_router's latch contract (a Z-select /
 # X-close this frame must not also fire Main's menu-toggle / context polls). main.gd's

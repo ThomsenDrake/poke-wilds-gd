@@ -88,26 +88,13 @@ const SCENARIOS := {
 	# kind:"legendary"} battle-start trace, the never-encounter exclusion, the white-out
 	# re-battleable + KO gone-for-good rematch rules. Joins the double-run lane.
 	"legendary_spawn": [preload("res://scripts/app/legendary_spawn_scenario.gd"), "run", []],
-	# Phase 7 Build 3 world chaining (world-depth.md § World chaining + § Save v5): the
-	# faithful loop on fixed seed 2026072913 — surf PAST the WORLD_RADIUS edge into
-	# (0,-1) and back, the in-scenario double-run fingerprint (both worlds byte-identical),
-	# per-world persistence (a fence + campsite survive crossing + return + save), the
-	# legendary re-stamp + landmark state independence witnessed, the beacon deltas (the
-	# registry-required beacon_placed + edge suppression + the cross-world ban) and the
-	# v5 chained-world save round-trip. Checks split into world_chain_checks.gd +
-	# world_chain_persist_checks.gd for the app budget; the double-run lane's NINTH
-	# consumer (self-pinned: seed_for_smoke BEFORE new_game; NO rng in the crossing path).
-	"world_chain": [preload("res://scripts/app/world_chain_scenario.gd"), "run", []],
-	# Phase 7 audit R5 (world-depth.md § Teleport Beacons): the multi-beacon SELECTOR
-	# functional choice — two edge beacons registered, the APP teleport route opens the
-	# BeaconSelector, a REAL input pick of the second-registered beacon warps the avatar to
-	# THAT tile (not index 0), plus the registration-order listing + a cancel control.
-	# Needs scenes/ui/BeaconSelector.tscn in Main.tscn (the orchestrator commits both).
-	"beacon_selector": [preload("res://scripts/app/beacon_selector_scenario.gd"), "run", []],
+	# (world_chain + beacon_selector scenarios RETIRED with world chaining — infinite-world
+	# slice: the seamless plane has no edge to cross and no edge beacons. Way-stone teleport
+	# stays, via the renamed WayStoneSelector — its multi-stone CHOICE + avatar-input
+	# ownership witness is:)
+	"waystone_selector": [preload("res://scripts/app/waystone_selector_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
-	"visual_sweep_world_chain": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", []],
-	"visual_sweep_world_chain_update": [preload("res://scripts/app/visual_sweep_world_chain.gd"), "run_sweep", [{"mode": "update"}]],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves
 	# evocative frames + crafted-state sidecars to docs/generated/showcase/. Deliberately outside the
 	# baseline gate machinery — no SHOT_REGISTRY entry, no reconcile()/region-diff gate. Windowed-only.

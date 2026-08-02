@@ -6,10 +6,11 @@ extends RefCounted
 # runtime/field_move_runtime.gd; this helper owns the APP side the runtime cannot
 # touch — repositioning the avatar after a teleport/fly warp, mirroring the ride
 # mount flag onto player_avatar's speed mode, and surfacing player-facing wording.
-# Build 3 (world-depth.md § Teleport Beacons): teleport/fly route through _route_warp —
-# capability + edge suppression refuse FIRST (the runtime traces), then >1 registered
-# beacon opens the multi-beacon SELECTOR ($UI/BeaconSelector), a single beacon warps
-# directly, and zero beacons keep the v4 last-way-stone warp.
+# Teleport/fly route through _route_warp — capability refuses FIRST (the runtime traces),
+# then >1 registered way-stone opens the way-stone SELECTOR ($UI/WayStoneSelector), a single
+# way-stone warps directly, and zero way-stones keep the v4 last-way-stone warp. Way-stones
+# are plain intra-world warp points on the seamless infinite plane (infinite-world slice
+# retired the world-edge beacon concept).
 # Driven from the party-screen FIELD MOVE seam and smoke_context["field_move"]. The
 # capability check is the runtime's (whole-party via field_move_runtime._capable),
 # so mon_index is not needed here — only the move id + the avatar's tile/facing.
@@ -20,7 +21,7 @@ var _runtime: Node = null
 var _world: Node = null
 var _player: Node = null
 var _show_message: Callable = Callable()
-var _selector: Node = null # the $UI/BeaconSelector scene node (lazy; null = absent scene)
+var _selector: Node = null # the $UI/WayStoneSelector scene node (lazy; null = absent scene)
 
 
 func setup(runtime: Node, world: Node, player: Node, show_message: Callable) -> void:
@@ -48,19 +49,19 @@ func route(move_id: String) -> void:
 		_runtime.save_game()
 
 
-# Teleport/Fly policy (world-depth.md § Teleport Beacons (1)(2)): the picker opens ONLY
-# when the warp itself would be allowed — capability + edge suppression refuse first so
-# the runtime traces field_move_refused and the selector never opens on a refused move.
-# >1 registered beacon -> the SELECTOR (registration order, deterministic); exactly one
-# beacon -> a direct warp to it; zero beacons -> the v4 legacy last-way-stone path.
+# Teleport/Fly policy (infinite-world slice: way-stones are plain intra-world warp points;
+# the world-edge beacon concept is retired). The picker opens ONLY when the warp itself
+# would be allowed — capability refuses first so the runtime traces field_move_refused and
+# the selector never opens on a refused move. >1 registered way-stone -> the SELECTOR
+# (registration order, deterministic); exactly one -> a direct warp to it; zero -> the v4
+# legacy last-way-stone path.
 func _route_warp(fm: Variant, move_id: String, player_tile: Vector2i) -> void:
-	var beacons: Array = _beacons()
-	if beacons.size() > 1 and _runtime.party_has_field_move_ability(move_id) \
-			and not _edge_suppressed(fm) and _open_selector(move_id, beacons):
+	var stones: Array = _way_stones(fm)
+	if stones.size() > 1 and _runtime.party_has_field_move_ability(move_id) and _open_selector(move_id, stones):
 		return
 	var result: Dictionary
-	if beacons.size() == 1:
-		result = fm.use_teleport(beacons[0]) if move_id == "teleport" else fm.use_fly(beacons[0])
+	if stones.size() == 1:
+		result = fm.use_teleport(stones[0]) if move_id == "teleport" else fm.use_fly(stones[0])
 	else:
 		result = _invoke(fm, move_id, player_tile) # legacy last stone; a refused warp traces here
 	if bool(result.get("ok", false)) and result.has("tile"):
@@ -70,46 +71,35 @@ func _route_warp(fm: Variant, move_id: String, player_tile: Vector2i) -> void:
 		_runtime.save_game()
 
 
-# The ACTIVE world's edge-band way-stones in registration order — the selector's list
-# order AND the beacon_index order (world_chain_runtime.beacon_tiles; the registry reads
-# the active world's placements, so the list never spans worlds — fresh-faq.md:186).
-func _beacons() -> Array:
-	var chain_runtime: Variant = _runtime.get("world_chain_runtime")
-	if chain_runtime == null or not (chain_runtime as Object).has_method("beacon_tiles"):
+# The registered way-stones in registration (step) order — the selector's list order
+# (field_move_runtime.way_stone_tiles; intra-world warp points on the seamless plane).
+func _way_stones(fm: Variant) -> Array:
+	if fm == null or not (fm as Object).has_method("way_stone_tiles"):
 		return []
-	var tiles: Variant = (chain_runtime as Object).call("beacon_tiles")
+	var tiles: Variant = (fm as Object).call("way_stone_tiles")
 	return tiles if tiles is Array else []
-
-
-# The field_move_runtime gate's own predicate (world_chain_runtime.teleport_suppressed),
-# read BEFORE the picker opens so a suppressed warp refuses with the runtime's trace.
-func _edge_suppressed(fm: Variant) -> bool:
-	var gate: Variant = fm.get("world_chain_gate")
-	if gate == null or not (gate as Object).has_method("teleport_suppressed"):
-		return false
-	return bool((gate as Object).call("teleport_suppressed"))
 
 
 # Opens the selector with registration-ordered rows; its resolve callable warps on Z,
 # its argless closed re-enables the avatar. False when the scene node is absent (an
 # older/headless host) — the caller falls back to the legacy last-stone warp.
-func _open_selector(move_id: String, beacons: Array) -> bool:
+func _open_selector(move_id: String, stones: Array) -> bool:
 	var selector: Node = _selector_node()
 	if selector == null or not selector.has_method("open_selector"):
 		return false
 	_player.input_enabled = false
 	if selector.has_signal("closed") and not selector.closed.is_connected(_on_selector_closed):
 		selector.closed.connect(_on_selector_closed)
-	var title := "TELEPORT BEACONS" if move_id == "teleport" else "FLY TO A BEACON"
-	selector.open_selector(title, _rows(beacons), Callable(self, "_resolve_warp").bind(move_id))
+	var title := "WAY STONES" if move_id == "teleport" else "FLY TO A WAY STONE"
+	selector.open_selector(title, _rows(stones), Callable(self, "_resolve_warp").bind(move_id))
 	return true
 
 
-func _rows(beacons: Array) -> Array:
+func _rows(stones: Array) -> Array:
 	var rows: Array = []
-	for i in range(beacons.size()):
-		var tile: Vector2i = beacons[i]
-		rows.append({"label": "Beacon %d — (%d, %d)" % [i + 1, tile.x, tile.y], "tile": tile})
+	for i in range(stones.size()):
+		var tile: Vector2i = stones[i]
+		rows.append({"label": "Way Stone %d — (%d, %d)" % [i + 1, tile.x, tile.y], "tile": tile})
 	return rows
 
 
@@ -135,7 +125,7 @@ func _selector_node() -> Node:
 	if _selector != null:
 		return _selector
 	var scene: Node = _runtime.get_tree().current_scene
-	_selector = scene.get_node_or_null("UI/BeaconSelector") if scene != null else null
+	_selector = scene.get_node_or_null("UI/WayStoneSelector") if scene != null else null
 	return _selector
 
 
@@ -204,7 +194,6 @@ func _message_for(move_id: String, result: Dictionary) -> String:
 			"charm": return "Charm!"
 	match str(result.get("reason", "")):
 		"not_capable": return "No party Pokemon can do that here."
-		"edge_suppressed": return "It fails so close to the world's edge. Move away from the edge a bit." # Build 3 (fresh-faq.md:190)
 		"no_way_stone": return "There is no way stone to travel to."
 		"unvisited_way_stone": return "You can't fly somewhere you haven't been."
 		"no_boulder": return "There is no boulder here to move."

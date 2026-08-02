@@ -104,17 +104,18 @@ _UNSET = object()  # memoization sentinel (both cached values can legitimately b
 # disposition probes) the shorter run never reached. A budget race, NOT a logic divergence:
 # two COMPLETED runs cmp byte-identical, ts-stripped (all eleven consumers re-proven green
 # under the retuned cap). Retune: cap 30->45s (~45% over the measured worst consumer),
-# outer [100,100]->[240,300]s. The configurable-encounters slice added encounter_config as
-# the ELEVENTH consumer, regrouping [5,5]->[5,6]; each group's outer = its scenario count x
-# the 45s cap + 15s cold-start overhead (group 1: 5x45+15=240; group 2: 6x45+15=285 -> 300),
-# so the outer budgets bound each bounded run's worst case with headroom (measured group
-# totals ~63-88s). Deviation recorded in the repair report.
+# outer [100,100]->[240,300]s. The configurable-encounters slice added encounter_config as a
+# consumer; the infinite-world slice RETIRED world_chain (the seamless plane has no edge to
+# cross), leaving TEN consumers regrouped [5,5]; each group's outer = its scenario count x the
+# 45s cap + 15s cold-start overhead (5x45+15=240 per group), so the outer budgets bound each
+# bounded run's worst case with headroom (measured group totals ~63-88s). Deviation recorded
+# in the repair report.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
                         "encounter_config", "landmark_flow", "shiny_odds", "fishing_flow",
-                        "breed_flow", "legendary_spawn", "world_chain", "night_cycle"]
+                        "breed_flow", "legendary_spawn", "night_cycle"]
 DOUBLE_RUN_GROUPS = [DOUBLE_RUN_SCENARIOS[:5], DOUBLE_RUN_SCENARIOS[5:]]
 DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 45.0
-DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 300.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
+DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 240.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
 def _load_run_playtests_constant(name: str):

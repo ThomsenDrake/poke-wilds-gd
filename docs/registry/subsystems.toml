@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -996,9 +996,7 @@ code_paths = [
   "scripts/domain/landmarks.gd",
   "scripts/domain/legendary_placement.gd",
   "scripts/domain/save_migration.gd",
-  "scripts/domain/world_chain.gd",
   "scripts/runtime/landmark_runtime.gd",
-  "scripts/runtime/world_chain_runtime.gd",
   "scripts/runtime/session_payload.gd",
   "scripts/runtime/entity_markers.gd",
   "scripts/runtime/wild_encounter_draw.gd",
@@ -1007,37 +1005,29 @@ code_paths = [
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
-  "scripts/app/world_chain_scenario.gd",
-  "scripts/app/beacon_selector_scenario.gd",
-  "scripts/app/world_chain_checks.gd",
-  "scripts/app/world_chain_persist_checks.gd",
-  "scripts/app/world_chain_cross_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd",
-  "scripts/app/visual_sweep_world_depth_beacon.gd",
   "scripts/app/visual_sweep_world_depth_oracle.gd",
   "scripts/app/visual_sweep_world_depth_expand.gd",
-  "scripts/app/visual_sweep_world_chain.gd",
   "scripts/app/showcase_capture_scenario.gd",
   "scripts/app/showcase_support.gd",
   "scripts/app/showcase_landmarks.gd",
   "scripts/app/showcase_guardian.gd",
-  "scripts/app/showcase_beacon.gd",
   "scripts/app/showcase_pen.gd",
-  "scripts/app/showcase_chained.gd",
-  "scripts/ui/beacon_selector.gd",
+  "scripts/ui/waystone_selector.gd",
+  "scripts/app/waystone_selector_scenario.gd",
+  "scripts/ui/options_screen.gd",
+  "scripts/ui/menu_context.gd",
 ]
-scene_paths = ["scenes/app/Main.tscn", "scenes/ui/BeaconSelector.tscn"]
+scene_paths = ["scenes/app/Main.tscn", "scenes/ui/WayStoneSelector.tscn"]
 spec_doc = "docs/product-specs/world-depth.md"
 validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
-  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario world_chain",
-  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario beacon_selector",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario waystone_selector",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
-  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_chain",
 ]
 # The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2
 # legendary_encounter battle-start trace (single owning source "GameRuntime", emitted on the
@@ -1052,7 +1042,7 @@ validation_commands = [
 # passed/failed pair registered here in the Phase 7 audit repair lane (R5 — the multi-beacon
 # SELECTOR functional choice; its registry-required domain events are the two beacon_placed
 # registrations + the picked teleport_used warp).
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "world_edge_crossed", "world_chained", "beacon_placed", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "world_chain_passed", "world_chain_failed", "beacon_selector_passed", "beacon_selector_failed", "visual_sweep_world_depth_passed", "visual_sweep_world_chain_passed", "showcase_capture_passed", "showcase_capture_failed"]
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
 quality_bucket = "landmarks"
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —

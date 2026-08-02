@@ -177,6 +177,10 @@ func _on_submenu_closed() -> void:
 
 # The party screen's own signal carries only the move id, so the selected party
 # index is read back from the screen (its _selected holds the confirmed row).
+# Emit FIRST (the field-move route may open the WayStoneSelector MODAL, which disables
+# the avatar and sets main's close-toast suppression while _menu_open), then hide —
+# main._on_menu_closed re-checks the selector before re-enabling input, so the menu
+# close can never clobber the modal's ownership.
 func _on_field_move_requested(move_id: String) -> void:
 	field_move_requested.emit(move_id, int(_party_screen.get("_selected")))
 	hide_menu()

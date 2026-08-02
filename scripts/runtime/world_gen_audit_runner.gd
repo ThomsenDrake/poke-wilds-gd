@@ -9,7 +9,6 @@ extends RefCounted
 # preload domain — check_architecture — so it reaches them through this runtime module).
 
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
-const WorldChain := preload("res://scripts/domain/world_chain.gd")
 const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
 const WorldGenCohesion := preload("res://scripts/domain/world_gen_cohesion.gd")
 const WorldGenSpawns := preload("res://scripts/domain/world_gen_spawns.gd")
@@ -30,7 +29,7 @@ static func run_audit(seeds: Array, species: Dictionary, biome_encounters) -> Di
 		var gen = WorldGenerator.new()
 		gen.setup(seed_int)
 		var per_seed := [["cohesion", WorldGenCohesion.audit(gen, seed_int, WorldGenAudit.SCAN_RADIUS)],
-			["dungeons", WorldGenDungeons.audit(gen, seed_int, Vector2i.ZERO)]] # origin world (active_chain "0,0")
+			["dungeons", WorldGenDungeons.audit(gen, seed_int)]] # chain frozen at origin (seamless plane)
 		for entry in per_seed:
 			var goal := str(entry[0])
 			var result: Dictionary = entry[1]

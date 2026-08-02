@@ -15,7 +15,7 @@ extends RefCounted
 
 # --- scan geometry ---
 const SCAN_RADIUS := 110 # cohesion disc (Manhattan); ~24.4k tiles
-const SITE_SCAN_RADIUS := 96 # dungeon site scan == world_chain.WORLD_RADIUS (the playable disc)
+const SITE_SCAN_RADIUS := 96 # dungeon site scan window (a bounded sample of the infinite plane; decoupled from any world extent since the infinite-world slice)
 const SITE_SCAN_STRIDE := 2 # site-scan sampling step (keeps the footprint sweep cheap)
 
 # --- ring model (mirrors world_generator._ring_candidates thresholds) ---

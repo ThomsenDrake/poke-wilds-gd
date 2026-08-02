@@ -54,8 +54,7 @@ func run(ctx: Dictionary, extra: Dictionary = {}) -> void:
 		SaveStabilitySupport.update_golden(runtime, canon_a, _canon_str, _write_golden, _ensure)
 	else:
 		_check_golden(runtime, canon_a)
-	# Sublane (extracted): the v5 per-world save shape survives save -> reload -> save.
-	SaveStabilitySupport.world_chain_round_trip(runtime, _canon_str, _diff_paths, _ensure)
+	# (The v5 world_chain round-trip sublane retired with world chaining — infinite-world slice.)
 	if _reasons.is_empty():
 		runtime.emit_trace("save_stability_passed", "SmokeScenarios", {"seed": SEED,
 			"mode": "update" if update else "verify", "canon_bytes": canon_a.length(), "digest": abs(canon_a.hash())})

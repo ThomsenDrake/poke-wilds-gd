@@ -1,56 +1,43 @@
 extends RefCounted
 
-# World-generation AUDIT family — DUNGEONS (spec: world-depth.md § Landmarks / § Legendaries,
-# bootstrap-and-overworld.md §19). Pure measurement of biome SITE availability, anchors-in-extent,
-# spawn-disc exclusion and spawn/landmark reachability. NO rng, NO I/O: a pure deterministic
-# function of a live WorldGenerator `gen` (setup(seed)), the int `seed` and the `chain`.
+# World-generation AUDIT family — DUNGEONS (spec: infinite-world.md; world-depth.md
+# § Landmarks / § Legendaries). Pure measurement of biome SITE availability, spawn-disc
+# exclusion and spawn/landmark reachability. NO rng, NO I/O: a pure deterministic function
+# of a live WorldGenerator `gen` (setup(seed)) + the int `seed` (chain frozen at origin —
+# the seamless infinite plane retired chaining).
 #
 # TIER RULE: only structural invariants that HOLD TODAY ride `enforcing_failures` (red on
-# regression): landmarks inside the playable extent, the spawn flood reaching a minimum region.
-# Every gap that needs a FUTURE fix rides `advisory` and NEVER gates: LAVA site availability
-# (LAVA never generates on origin), legendary anchors resolving past the extent / NO_ANCHOR (the
-# LAVA four on origin), and the gen-time landmark reachability gate (spec §19(c), unimplemented).
+# regression): the spawn flood reaching a minimum region. Every gap that needs a FUTURE fix
+# rides `advisory` and NEVER gates: LAVA site availability (LAVA never generates on origin),
+# legendary NO_ANCHOR (the LAVA four on origin), spawn-disc intrusion, and the gen-time
+# landmark reachability gate (spec §19(c), unimplemented).
 
 const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
-const WorldChain := preload("res://scripts/domain/world_chain.gd")
 
 
 # --- public entry -----------------------------------------------------------------
-static func audit(gen, seed: int, chain: Vector2i) -> Dictionary:
+static func audit(gen, seed: int) -> Dictionary:
 	var enforcing: Dictionary = {}
 	var failures: Array = []
 	var advisory: Array = []
 
-	# (1) ADVISORY site availability: stride-scan the playable disc for a representative footprint
+	# (1) ADVISORY site availability: stride-scan the audit window for a representative footprint
 	# (RUINS_SIZE) per land biome; LAVA never generates on origin => zero LAVA-dungeon sites.
 	var site_size: Vector2i = Landmarks.RUINS_SIZE
 	var sites := _site_scan(gen, site_size)
 	advisory.append({"kind": "site_availability", "value": sites.duplicate(),
-		"detail": "Playable-disc centers (stride %d) whose biome fits a %dx%d dungeon footprint (conservative: ROCK counts rock props as non-land, so ROCK is a lower bound — see WorldGenAudit.is_land)." % [WorldGenAudit.SITE_SCAN_STRIDE, site_size.x, site_size.y]})
+		"detail": "Audit-window centers (stride %d) whose biome fits a %dx%d dungeon footprint (conservative: ROCK counts rock props as non-land, so ROCK is a lower bound — see WorldGenAudit.is_land)." % [WorldGenAudit.SITE_SCAN_STRIDE, site_size.x, site_size.y]})
 	if int(sites.get("LAVA", 0)) == 0:
 		advisory.append({"kind": "lava_site_gap", "value": 0,
 			"detail": "LAVA never generates on origin => zero LAVA-dungeon sites (the headline gap; a future fix makes LAVA generate in deep rings)."})
 
-	# Landmarks placed in this world (all three host in every world).
-	var landmarks := Landmarks.landmarks_in_world(seed, chain)
+	# Landmarks placed in this world (all three host; chain frozen at origin).
+	var landmarks := Landmarks.landmarks_in_world(seed, Vector2i.ZERO)
 
-	# (2) ENFORCE landmark_in_extent: anchor + footprint half-diagonal strictly inside the disc.
-	var out_of_extent := 0
-	for landmark in landmarks:
-		var anchor: Vector2i = landmark.get("anchor", Vector2i.ZERO)
-		var footprint: Rect2i = landmark.get("footprint", Rect2i(anchor, Vector2i.ZERO))
-		if not _in_extent(anchor, footprint.size):
-			out_of_extent += 1
-	enforcing["landmarks_out_of_extent"] = out_of_extent
-	if out_of_extent > 0:
-		failures.append("landmark_in_extent: %d landmark footprint(s) reach past the playable disc (ring + half-diagonal >= %d)" % [out_of_extent, WorldChain.WORLD_RADIUS])
-
-	# (3) ADVISORY legendary anchors: some resolve past the extent; the LAVA four resolve NO_ANCHOR.
-	var legend := _legendary_anchors(seed, chain)
-	advisory.append({"kind": "legendary_anchors_out_of_extent", "value": legend["out_of_extent"],
-		"detail": "Legendary anchors that resolved at ring >= %d are unreachable by construction (the bounded anchor search walks rings 60..134)." % WorldChain.WORLD_RADIUS})
+	# (2) ADVISORY legendary anchors: the LAVA four resolve NO_ANCHOR (LAVA never generates).
+	var legend := _legendary_anchors(seed)
 	advisory.append({"kind": "legendary_no_anchor", "value": legend["no_anchor"],
 		"detail": "Legendary species whose affinity biome never generates in this world resolve NO_ANCHOR (the LAVA four on origin)."})
 
@@ -125,12 +112,6 @@ static func _site_scan(gen, size: Vector2i) -> Dictionary:
 	return counts
 
 
-# Anchor + footprint half-diagonal (manhattan) strictly inside the playable disc.
-static func _in_extent(anchor: Vector2i, size: Vector2i) -> bool:
-	var half_diagonal := int(size.x / 2) + int(size.y / 2)
-	return WorldGenAudit.ring_of(anchor) + half_diagonal < WorldChain.WORLD_RADIUS
-
-
 # True when any tile of the footprint rect lies within `radius` manhattan of origin (ring <= radius).
 static func _footprint_touches_disc(footprint: Rect2i, radius: int) -> bool:
 	for tile in _footprint_tiles(footprint):
@@ -150,19 +131,15 @@ static func _footprint_tiles(footprint: Rect2i) -> Array:
 	return tiles
 
 
-# Legendary anchor outcomes: anchored-in/out of the playable extent and the NO_ANCHOR set.
-static func _legendary_anchors(seed: int, chain: Vector2i) -> Dictionary:
-	var out_of_extent := {}
+# Legendary anchor outcomes on the infinite plane (chain frozen at origin): the anchored
+# count + the NO_ANCHOR set (the LAVA four, whose affinity biome never generates on origin).
+static func _legendary_anchors(seed: int) -> Dictionary:
 	var no_anchor: Array = []
 	var anchored := 0
 	for species in LegendaryPlacement.LEGENDARY_IDS:
-		var sid := str(species)
-		var anchor := LegendaryPlacement.anchor_for(seed, chain, sid)
+		var anchor := LegendaryPlacement.anchor_for(seed, Vector2i.ZERO, str(species))
 		if anchor == LegendaryPlacement.NO_ANCHOR:
-			no_anchor.append(sid)
+			no_anchor.append(str(species))
 			continue
 		anchored += 1
-		var ring := WorldGenAudit.ring_of(anchor)
-		if ring >= WorldChain.WORLD_RADIUS:
-			out_of_extent[sid] = ring
-	return {"out_of_extent": out_of_extent, "no_anchor": no_anchor, "anchored": anchored}
+	return {"no_anchor": no_anchor, "anchored": anchored}

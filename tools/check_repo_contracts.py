@@ -643,7 +643,7 @@ def world_depth_rng_issues(root: Path) -> list[str]:
 # directly. Format contract (see SHOT_REGISTRY):
 #   {"<sweep>": {"range": [lo, hi], "extra": [..], "seed": <int>}, ..., "retired": [..]}
 SHOT_REGISTRY_REL = Path("scripts") / "app" / "visual_sweep_baselines.gd"
-RETIRED_WHITELIST = {17}  # shot 17 is the SOLE whitelisted numbering gap
+RETIRED_WHITELIST = {17, 33, 35, 36}  # 17 (original gap) + 33/35/36 retired with world chaining (infinite-world slice)
 BIOME_SHOT_FLOOR = 3      # committed 03_biome_* shots; loud-fail below this
 
 
@@ -686,10 +686,11 @@ def shot_numbering_issues(root: Path) -> list[str]:
     """Shot-numbering completeness against the single-sourced SHOT_REGISTRY.
 
     Every registered shot number (a sweep's range + extra) must be a committed
-    baseline (NN_*.png) or formally retired; the ONLY retired number allowed is 17;
-    committed shots must themselves be registered; and the biome group (03_biome_*)
-    must hold >= BIOME_SHOT_FLOOR shots (loud-fail). Arms progressively until
-    SHOT_REGISTRY exists (cross-builder dependency on the visuals builder)."""
+    baseline (NN_*.png) or formally retired; the ONLY retired numbers allowed are the
+    RETIRED_WHITELIST (17 + 33/35/36 retired with world chaining); committed shots must
+    themselves be registered; and the biome group (03_biome_*) must hold >= BIOME_SHOT_FLOOR
+    shots (loud-fail). Arms progressively until SHOT_REGISTRY exists (cross-builder
+    dependency on the visuals builder)."""
     registry, error = _parse_shot_registry(root)
     if error:
         return [f"SHOT_REGISTRY parse failure in {SHOT_REGISTRY_REL}: {error}"]
@@ -713,11 +714,11 @@ def shot_numbering_issues(root: Path) -> list[str]:
         for number in entry.get("extra") or []:
             registered.setdefault(int(number), sweep)
 
-    # (1) retired whitelist: only shot 17 may be retired.
+    # (1) retired whitelist: only the RETIRED_WHITELIST numbers may be retired.
     for number in sorted(retired):
         if number not in RETIRED_WHITELIST:
             issues.append(f"SHOT_REGISTRY retires shot {number}, but only "
-                          f"{sorted(RETIRED_WHITELIST)} is the whitelisted numbering gap")
+                          f"{sorted(RETIRED_WHITELIST)} are the whitelisted numbering gaps")
 
     # Committed baseline shot numbers + biome count.
     baseline_dir = root / "docs" / "generated" / "visual-baselines"

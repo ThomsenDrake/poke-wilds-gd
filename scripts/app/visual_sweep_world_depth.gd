@@ -13,7 +13,6 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
-const WorldDepthBeaconShot := preload("res://scripts/app/visual_sweep_world_depth_beacon.gd") # 33 (app-220 extraction)
 const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_oracle.gd") # R4 regional pixel oracle (app-220 extraction)
 const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # R11 shots 34-36 + rest probe (app-220 extraction)
 
@@ -65,8 +64,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_player().encounter_chance = 0.0 # no grass battles (and no wild-stream draw) during capture
 	await _ruins_shot()
 	await _mansion_shot()
-	await WorldDepthBeaconShot.run(self)
-	await WorldDepthExpand.run(self) # R11: heart tower (34); chained/guardian ride the world_chain satellite (R3 one-world gate)
+	await WorldDepthExpand.run(self) # R11: heart tower (34). (Shot 33 beacons retired with world chaining; 35/36 rode the retired world_chain satellite.)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()

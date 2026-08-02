@@ -4,7 +4,6 @@ signal tile_changed(tile_position: Vector2i)
 signal encounter_requested(tile_position: Vector2i)
 signal blocked(reason: String, tile: Vector2i)
 
-const WorldChain := preload("res://scripts/domain/world_chain.gd") # Phase 7 Build 3: the pinned edge extent (runtime -> domain)
 const PlayerSpriteFrames := preload("res://scripts/runtime/player_sprite_frames.gd") # walk/run frame build, extracted at the 320 wall
 
 const TILE_SIZE := 16
@@ -160,12 +159,9 @@ func _try_start_step(step_direction: Vector2i) -> void:
 
 	_facing = step_direction
 	var next_tile = tile_position + step_direction
-	if WorldChain.is_outside(next_tile): # Phase 7 Build 3: the step LEAVES the disc — only Surf/Fly cross (faithful loop, fresh-faq.md:182-188)
-		if _try_edge_cross(step_direction, next_tile):
-			return
-		blocked.emit("world_edge", next_tile) # walk-into-boundary refusal (pinned reason; main traces traversal_blocked)
-		_set_sprite_state(_facing, false)
-		return
+	# Seamless infinite plane (infinite-world slice): no world edge — every coordinate is
+	# in-world, so a far tile refuses on its own terrain (water/cliff/prop) like any inland
+	# tile. Chaining (the old WORLD_RADIUS disc + Surf/Fly edge-cross) is retired.
 	if not world.is_tile_walkable(next_tile):
 		blocked.emit(_block_reason_for(next_tile), next_tile)
 		_set_sprite_state(_facing, false)
@@ -180,34 +176,6 @@ func _try_start_step(step_direction: Vector2i) -> void:
 	_target_tile = next_tile
 	_moving = true
 	_set_sprite_state(_facing, true)
-
-
-# Phase 7 Build 3 (world-depth.md § World chaining): stepping PAST the WORLD_RADIUS edge
-# crosses worlds ONLY with Surf (water involved) or Fly armed (faithful loop, fresh-faq.md
-# :182-188). The runtime swaps the SESSION; this swaps the PRESENTATION — the field_move_
-# actions._warp precedent: NO tile_changed (a cross is a warp, not a step, so the step clock
-# + encounter trigger stay quiet); headless callers drive try_cross_edge directly.
-func _try_edge_cross(direction: Vector2i, next_tile: Vector2i) -> bool:
-	var runtime: Node = get_node_or_null("/root/GameRuntime"); var method := _edge_cross_method(runtime, next_tile)
-	if runtime == null or method.is_empty(): return false
-	var result: Dictionary = runtime.world_chain_runtime.try_cross_edge(direction, method)
-	if not bool(result.get("ok", false)): return false
-	set_tile_position(result["tile"]); runtime.world_overridden.emit(result["tile"]) # warp-safe reposition + structure-layer glow re-resolve in the new world
-	if world != null:
-		world.rebuild(int(runtime.get_world_seed())); world.sync_visible(tile_position)
-	return true
-
-# SURF crosses OVER WATER: surf-capable party AND water involved — the tile stood on or the
-# tile pressed into reads WATER (the generator computes past the edge). FLY crosses airborne;
-# neither armed -> "" -> the pinned walk refusal.
-func _edge_cross_method(runtime: Node, next_tile: Vector2i) -> String:
-	if runtime == null or not ("world_chain_runtime" in runtime) or world == null:
-		return ""
-	if runtime.party_has_field_move_ability("surf") and (world.get_tile_biome(tile_position) == "WATER" or world.get_tile_biome(next_tile) == "WATER"):
-		return "surf"
-	if runtime.party_has_field_move_ability("fly"):
-		return "fly"
-	return ""
 
 
 func _update_movement(delta: float) -> void:

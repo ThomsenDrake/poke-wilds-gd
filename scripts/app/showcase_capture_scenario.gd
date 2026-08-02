@@ -16,9 +16,7 @@ const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # pure framing math + rest probe + entity toggle
 const ShowcaseLandmarks := preload("res://scripts/app/showcase_landmarks.gd")
 const ShowcaseGuardian := preload("res://scripts/app/showcase_guardian.gd")
-const ShowcaseBeacon := preload("res://scripts/app/showcase_beacon.gd")
 const ShowcasePen := preload("res://scripts/app/showcase_pen.gd")
-const ShowcaseChained := preload("res://scripts/app/showcase_chained.gd")
 
 const SHOWCASE_DIR := "res://docs/generated/showcase"
 const ORIGIN_SEED := 2026072907 # the world_depth landmark pin (spec § Pinned constants)
@@ -46,19 +44,19 @@ func run(ctx: Dictionary) -> void:
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0 # no grass battles (and no wild-stream draw) during any capture
 	# Phase A — the ORIGIN world (seed 2026072907): spawn vista + the landmark family + the ruins
-	# guardian + the edge beacons. One craft; each satellite repositions the camera per locale.
+	# guardian. One craft; each satellite repositions the camera per locale. (The world-edge beacon
+	# shot 06 retired with world chaining — the infinite-world slice; restored once the WayStone
+	# selector has an infinite-world framing.)
 	if _craft(ORIGIN_SPEC):
 		await _vista_shot()
 		await ShowcaseLandmarks.run(self) # mansion solved (01) + sewer (02) + ruins exterior (03) + heart tower (05)
 		await ShowcaseGuardian.run(self) # ruins underground DUSCLOPS (04)
-		await ShowcaseBeacon.run(self) # world edge + teleport beacons (06)
 	else:
 		_failures.append("origin craft failed: catalog incomplete (party species missing)")
 	# Phase B — the PEN world (seed 2026072605): a fenced pasture with EEVEEs + a ground egg.
 	await ShowcasePen.run(self) # 07
-	# Phase C — a CHAINED world (derived off the origin root): a different overworld + a stationary
-	# legendary in its ring (LAVA-four preferred via a bounded chain search, SNOW Regi fallback).
-	await ShowcaseChained.run(self) # 09 + 10
+	# (Phase C chained-world shots 09 + 10 retired with world chaining — infinite-world slice;
+	# the legendary-ring shot returns once LAVA generates on the infinite plane, Slice 2.)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()

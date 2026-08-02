@@ -72,7 +72,7 @@ func _on_player_tile_changed(tile_position: Vector2i) -> void:
 func _on_player_blocked(reason: String, tile: Vector2i) -> void:
 	if _in_battle or _menu_open:
 		return
-	_message_box.show_message("The world ends here. Only Surf or Fly can go further." if reason == "world_edge" else (reason if not reason.is_empty() else "Can't move there."), 0.8) # Build 3: curated edge wording (the traversal_blocked trace below keeps the pinned raw reason)
+	_message_box.show_message(reason if not reason.is_empty() else "Can't move there.", 0.8) # infinite-world slice: no world edge; the traversal_blocked trace below keeps the pinned raw reason
 	var field_move = _world.tile_requires_field_move(tile) if _world != null else ""
 	_runtime().emit_trace("traversal_blocked", "App.Main", {"tile": _tile_payload(tile),
 		"reason": reason, "requires_field_move": field_move})
@@ -129,7 +129,7 @@ func _toggle_menu() -> void:
 
 func _on_menu_closed() -> void:
 	_menu_open = false
-	_player.input_enabled = true
+	_player.input_enabled = not ($UI/WayStoneSelector.visible if has_node("UI/WayStoneSelector") else false) # a modal way-stone selector owns the avatar until its closed latch (field_move_actions._on_selector_closed); the menu close must not clobber it (the _toggle_menu :119 UI-visibility precedent)
 	_runtime().save_game()
 	_runtime().emit_trace("menu_closed", "App.Main", {})
 	if _suppress_close_toast:

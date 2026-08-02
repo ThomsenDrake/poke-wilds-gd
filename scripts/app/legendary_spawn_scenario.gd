@@ -187,7 +187,7 @@ func _prove_ko(runtime, species_id: String) -> bool:
 		if str(other) != species_id: _ensure(mons._entities.has("legendary_0,0:%s" % str(other)), "ko: the re-stamp dropped the untouched %s" % str(other))
 	return _failures.size() == start
 
-# The pending-seam take + the legendary_encounter payload (species/chain/battle_kind
+# The pending-seam take + the legendary_encounter payload (species/battle_kind
 # + the provable ring gate + stages). {} on any red so the caller bails.
 func _take_and_assert_payload(runtime, species_id: String, cursor: int, stages: int, label: String) -> Dictionary:
 	var battle_mon: Dictionary = runtime.generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
@@ -195,7 +195,7 @@ func _take_and_assert_payload(runtime, species_id: String, cursor: int, stages: 
 	var ok := _ensure(str(battle_mon.get("battle_kind", "")) == "legendary", "%s: battle_kind %s != legendary" % [label, str(battle_mon.get("battle_kind", ""))])
 	ok = _ensure(int(battle_mon.get("attack_stages", 0)) == stages, "%s: attack_stages %d != %d" % [label, int(battle_mon.get("attack_stages", 0)), stages]) and ok
 	ok = _ensure(int(battle_mon.get("ring", 0)) >= LegendaryPlacement.LEGENDARY_RING_MIN, "%s: the encounter's ring %d < %d" % [label, int(battle_mon.get("ring", 0)), LegendaryPlacement.LEGENDARY_RING_MIN]) and ok
-	ok = _ensure(_runner.trace_log_has_since("legendary_encounter", cursor, {"species_id": species_id, "chain": "0,0", "battle_kind": "legendary"}), "%s: no legendary_encounter{chain:0,0,battle_kind:legendary} at battle start" % label) and ok
+	ok = _ensure(_runner.trace_log_has_since("legendary_encounter", cursor, {"species_id": species_id, "battle_kind": "legendary"}), "%s: no legendary_encounter{battle_kind:legendary} at battle start" % label) and ok
 	return battle_mon if ok else {}
 
 # A damaging move that cannot stall (heal/leech would never end the defeat path).

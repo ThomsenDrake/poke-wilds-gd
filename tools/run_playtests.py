@@ -72,7 +72,7 @@ VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
 # path), so it stays out of this set by construction.
 SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_camping", "visual_sweep_storage",
                              "visual_sweep_pokemon", "visual_sweep_overworld",
-                             "visual_sweep_world_depth", "visual_sweep_world_chain")
+                             "visual_sweep_world_depth")
 # The full gate scope (R3): the RED-tier sidecar seed-equality gate + the source-art
 # anchor gate cover the main sweep AND every satellite family. Each sweep clears
 # .godot-smoke/shots at start (clear_shots), so the gate reads exactly THAT family's
@@ -83,9 +83,10 @@ SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_camping", "visual_sweep_storage",
 SWEEP_GATE_SCENARIOS = VISUAL_SWEEP_SCENARIOS + SATELLITE_SWEEP_SCENARIOS
 # R4 regional pixel-oracle scope (audit Major #2): the explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label, ~0 tolerance)
-# runs for the main sweep AND the two world-depth/chain satellites that carry the R4
-# coded-region sidecars (shots 31-36). Before this, apply_region_gate guarded the region
-# diff on scenario=="visual_sweep" alone, so visual_sweep_world_depth / _world_chain
+# runs for the main sweep AND the world-depth satellite that carries the R4
+# coded-region sidecars (shots 31-34; the world_chain satellite RETIRED with chaining).
+# Before this, apply_region_gate guarded the region
+# diff on scenario=="visual_sweep" alone, so visual_sweep_world_depth
 # reconciled through visual_diff.py's 0.5% GLOBAL gate and a sub-0.5% landmark pixel
 # change — the EXACT gap R4 was built to close (visual_sweep_world_depth_oracle.gd:6-8) —
 # stayed green. Each sweep clears .godot-smoke/shots at start, so the diff reads exactly
@@ -100,7 +101,7 @@ REGION_ORACLE_SCENARIOS = smoketest.REGION_ORACLE_SCENARIOS
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "encounter_config", "world_gen_audit", "landmark_flow", "legendary_spawn", "world_chain", "beacon_selector", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update", "visual_sweep_world_chain", "visual_sweep_world_chain_update", "showcase_capture"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "encounter_config", "world_gen_audit", "landmark_flow", "legendary_spawn", "waystone_selector", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update", "showcase_capture"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",
@@ -698,8 +699,8 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     promoted source sidecars is its reason to exist (a baseline re-captured under
     a different world must never be frozen green). The explainable region diff
     below is compare-mode only, scoped to REGION_ORACLE_SCENARIOS (the main sweep
-    + the world_depth / world_chain satellites that carry the R4 coded-region
-    oracle for shots 31-36 — audit Major #2; the other satellites keep the
+    + the world_depth satellite that carries the R4 coded-region
+    oracle for shots 31-34 — audit Major #2; the other satellites keep the
     in-engine global gate).
     """
     scenario = result.get("scenario")
@@ -730,8 +731,8 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
 
     # The explainable region diff below is compare-mode only, scoped to the families
     # that carry the R4 coded-region oracle (REGION_ORACLE_SCENARIOS: main + the
-    # world_depth / world_chain satellites). Audit Major #2: the old guard
-    # (scenario != "visual_sweep") left shots 31-36 region-ungated, so the R4 oracle
+    # world_depth satellite). Audit Major #2: the old guard
+    # (scenario != "visual_sweep") left shots 31-34 region-ungated, so the R4 oracle
     # was populated but INERT for its only owners.
     if scenario not in REGION_ORACLE_SCENARIOS:
         return

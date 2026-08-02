@@ -23,10 +23,9 @@ extends RefCounted
 #   party rides Charizard fly=1 / Rhyperior ride=1; no AUTO_TYPES broadening.
 # - TELEPORT/FLY target WAY STONES (placed way_stone structures; the registry IS the live
 #   placement map — NO separate session key — persisting on the structures save key for
-#   free), step-ordered (last = last-registered); Fly REFUSES an unregistered tile. Phase 7
-#   Build 3's world-edge beacon deltas (the multi-beacon SELECTOR seam, the edge_suppressed
-#   gate, beacon_placed) ride the two injected seams below — world_chain_runtime owns the
-#   policy (this file is AT its 320 wall; the Phase-6 overworld-hook precedent).
+#   free), step-ordered (last = last-registered); Fly REFUSES an unregistered tile. Way
+#   stones are plain INTRA-WORLD warp points on the seamless infinite plane (infinite-world
+#   slice retired the world-edge beacon concept — no edge_suppressed, no beacon_placed).
 # - REPEL rides session_state.repel_steps (an additive, PERSISTED key; note_step_taken
 #   decays it one per step). Documented deviation: the original is a crafted low-level
 #   ITEM; the port suppresses ALL encounters for N steps — generate_wild_encounter
@@ -53,10 +52,6 @@ var _tile_overridden: Callable = Callable() # world_overridden.emit (the harvest
 # Phase-6 plug-in seams: the overworld entities register these; until they land the
 # hooks default to invalid callables so use_attack/use_charm still trace + run clean.
 var overworld_attack_hook: Callable = Callable(); var overworld_charm_hook: Callable = Callable()
-# Phase 7 Build 3 world-chain seams (world_chain_runtime.setup registers BOTH; the beacon
-# policy lives THERE — edge_suppressed gate + beacon_placed + the selector's beacon_tiles).
-var beacon_registered_hook: Callable = Callable() # fired after waystone_registered (beacon_placed when the stone sits in the edge band)
-var world_chain_gate = null # teleport_suppressed() gate for use_teleport/use_fly (null = inert, pre-wiring)
 
 func setup(session_state, catalog, trace_logger, world_generator, night_system, tile_overridden: Callable = Callable()) -> void:
 	_session = session_state
@@ -116,7 +111,6 @@ func register_way_stone(tile: Vector2i) -> Dictionary:
 		_refuse("teleport", {"tile": _t(tile), "reason": "cap_reached"})
 		return {"ok": false, "reason": "cap_reached"}
 	_emit("waystone_registered", {"tile": _t(tile)})
-	if beacon_registered_hook.is_valid(): beacon_registered_hook.call(tile) # Build 3: beacon_placed when edge-band (world_chain_runtime owns the policy)
 	_notify(tile)
 	return {"ok": true, "tile": tile}
 
@@ -126,8 +120,6 @@ func use_teleport(target: Vector2i = Vector2i.MAX) -> Dictionary:
 	if not _capable("teleport"):
 		_refuse("teleport", {"reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}
-	if world_chain_gate != null and world_chain_gate.teleport_suppressed(): # Build 3 edge band (fresh-faq.md:190): Teleport can't skip the chain mechanic
-		_refuse("teleport", {"tile": _t(_session.player_tile), "reason": "edge_suppressed"}); return {"ok": false, "reason": "edge_suppressed"}
 	var dest := last_way_stone() if target == Vector2i.MAX else target
 	if dest == Vector2i.MAX or not is_way_stone(dest):
 		_refuse("teleport", {"tile": _t(dest if dest != Vector2i.MAX else Vector2i.ZERO), "reason": "no_way_stone"})
@@ -141,8 +133,6 @@ func use_fly(target: Vector2i) -> Dictionary:
 	if not _capable("fly"):
 		_refuse("fly", {"tile": _t(target), "reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}
-	if world_chain_gate != null and world_chain_gate.teleport_suppressed(): # Build 3 edge band: Fly-to-beacon is a teleport-class warp (same suppression)
-		_refuse("fly", {"tile": _t(_session.player_tile), "reason": "edge_suppressed"}); return {"ok": false, "reason": "edge_suppressed"}
 	if not is_way_stone(target):
 		_refuse("fly", {"tile": _t(target), "reason": "unvisited_way_stone"})
 		return {"ok": false, "reason": "unvisited_way_stone"}

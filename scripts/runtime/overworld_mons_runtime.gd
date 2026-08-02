@@ -38,7 +38,6 @@ const ContactEncounter := preload("res://scripts/domain/contact_encounter.gd") #
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
-const SaveMigration := preload("res://scripts/domain/save_migration.gd") # Build 3: the chain-key grammar (active_chain -> Vector2i) for the legendary re-stamp
 
 signal encounter_requested(tile: Vector2i) # entity_layer bridges it onto player_avatar's (zero main.gd lines)
 
@@ -139,8 +138,8 @@ func note_warp(tile: Vector2i) -> void:
 	if active:
 		_sim.sync_window(tile, DayPhase.time_of_day_label(int(_session.time_of_day_minutes)))
 
-func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load/CHAIN-CROSS, AFTER the session seed + active_chain + legendary_removals land; the sim owns the records. Build 3 threads the ACTIVE chain (the landmark_runtime._chain precedent).
-	_sim.stamp_legendaries(SaveMigration.chain_for(str(_session.active_chain)))
+func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load, AFTER the session seed + legendary_removals land; the sim owns the records. Infinite-world slice: chain frozen at origin (0,0).
+	_sim.stamp_legendaries(Vector2i.ZERO)
 
 # The forced-battle seam: {} when none; consumed exactly once — game_runtime.generate_wild_
 # encounter calls this BEFORE fishing, so Repel/unlit-night ghosts never touch a provoked
@@ -167,7 +166,7 @@ func note_battle_outcome(outcome: String, enemy: Dictionary) -> void:
 	elif outcome.begins_with("caught"):
 		_remove_entity(entity, OverworldMons.REASON_CAUGHT)
 	if str(entity.get("kind", "")) == "legendary" and (outcome == "victory" or outcome.begins_with("caught")): # gone-for-good PER-WORLD (flagged PORT DECISION inverting wiki :224); a white-out leaves it re-battleable above
-		_session.legendary_removals.append(LegendaryPlacement.removal_key(entity.get("chain", Vector2i.ZERO), str(entity.species_id))) # v4-additive; session_payload marshals
+		_session.legendary_removals.append(LegendaryPlacement.removal_key(Vector2i.ZERO, str(entity.species_id))) # v4-additive; session_payload marshals; infinite-world slice: chain frozen origin (anchor-based re-key in S3)
 
 # Player actions (Attack/Charm hooks, dialogue recruitment, the wild-egg TAKE/Attack binary
 # :248, the interact-provocation memory) live in overworld_mons_actions.gd — extracted at the
@@ -195,7 +194,7 @@ func _arm_pending(entity: Dictionary, mon: Dictionary) -> void:
 	entity["state"] = "engaged"
 	mon["battle_kind"] = str(entity.get("battle_kind", "wild")) # Build 2 seam: a legendary static sets "legendary" (music_router.gd:33); the battle-start path reads it
 	if str(entity.get("kind", "")) == "legendary": # the legendary_encounter payload rides the pending (game_runtime owns the SINGLE trace)
-		mon["tile"] = _t(entity.tile); mon["biome"] = str(entity.get("biome", "")); mon["ring"] = int(entity.get("ring", 0)); mon["chain"] = entity.get("chain", Vector2i.ZERO)
+		mon["tile"] = _t(entity.tile); mon["biome"] = str(entity.get("biome", "")); mon["ring"] = int(entity.get("ring", 0))
 	_pending = mon; _pending_id = str(entity.id); _last_battle_was_entity = true
 	encounter_requested.emit(entity.tile)
 

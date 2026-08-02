@@ -38,7 +38,7 @@ func _ready() -> void:
 	_entries.item_clicked.connect(_on_entry_clicked)
 	_wire_input_latch() # an Enter/X close must set the same-frame latch, or poll_menu_toggle re-fires and shuts the whole StartMenu
 
-# The same-frame latch reach (the BeaconSelector precedent): this screen is a StartMenu child,
+# The same-frame latch reach (the WayStoneSelector precedent): this screen is a StartMenu child,
 # NOT in main.gd's frozen bind_ui_consumers array, so it self-wires `closed` (argless — the
 # latch contract) to the scene's _input_router. No-op when the router is absent (non-Main host).
 func _wire_input_latch() -> void:
