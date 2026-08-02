@@ -11,7 +11,26 @@ extends RefCounted
 # mid-animation (frozen flash modulate, pre-turn message). Every exit path
 # restores sprite positions/modulates and layer visibility, and abort checks
 # let the battle view cancel stale playback when a newer response arrives.
-# Headless-safe: guards missing tree/instance on every step.
+# Headless-safe: guards missing tree/instance on every step. TEARDOWN CONTRACT:
+# the frame waits ride a FrameTicker child (process pulses + ONE final pulse from
+# _exit_tree), so a suspended playback RESUMES during scene teardown and unwinds
+# (restore -> return) instead of leaking its script resources at process exit —
+# the "2 resources still in use at exit" flake class.
+
+# Per-frame pulse source: emits every process frame AND once from _exit_tree, so
+# awaits resume during teardown (process_frame alone never fires then) and the
+# playback unwinds through its normal restore/return path.
+class FrameTicker:
+	extends Node
+	signal pulse
+	var exiting := false # set BEFORE the teardown pulse: the stage's tree pointer outlives its children's _exit_tree notifications, so is_inside_tree() cannot see teardown — this flag can
+	func _process(_delta: float) -> void:
+		if not exiting:
+			pulse.emit()
+	func _exit_tree() -> void:
+		exiting = true
+		pulse.emit()
+
 
 const MAX_SHOWN_FRAMES := 90  # ~3s at a 30fps cadence; long anims frame-skip to fit
 const SOUND_VOLUME_DB := -12.0
@@ -59,15 +78,15 @@ func play(anim: Dictionary, stage: Control, actors: Dictionary, should_abort: Ca
 	var state := _capture_state(actors)
 	var overlay := _overlay_for(stage)
 	overlay.visible = true
-	var tree := stage.get_tree()
+	var ticker := _ticker_for(stage)
 	for i in range(0, source_count, step):
-		if tree == null or not is_instance_valid(stage) or not stage.is_inside_tree() or _aborted(should_abort):
+		if ticker.exiting or not is_instance_valid(stage) or not stage.is_inside_tree() or _aborted(should_abort):
 			break
 		if i < frames.size():
 			overlay.texture = load(frames[i])
 		_apply_frame(hide_layers.get(i, []), translate.get(i, {}), flash.get(i, []), actors, state)
 		stats["frames"] += 1
-		await tree.process_frame
+		await ticker.pulse # resumes on the teardown pulse too (the header's contract)
 	_restore_state(actors, state)
 	if is_instance_valid(overlay):
 		overlay.visible = false
@@ -127,6 +146,17 @@ func _restore_state(actors: Dictionary, state: Dictionary) -> void:
 				item.visible = bool(state["layer_vis"].get(item.get_instance_id(), true))
 
 
+# The stage's cached FrameTicker (the _overlay_for pattern — one per stage).
+func _ticker_for(stage: Control) -> Node:
+	var existing := stage.get_node_or_null("FrameTicker")
+	if existing != null:
+		return existing
+	var ticker := FrameTicker.new()
+	ticker.name = "FrameTicker"
+	stage.add_child(ticker)
+	return ticker
+
+
 func _overlay_for(stage: Control) -> TextureRect:
 	var existing := stage.get_node_or_null(OVERLAY_NAME)
 	if existing is TextureRect:
@@ -167,15 +197,15 @@ func _play_sound(path: String, stage: Control) -> bool:
 # Dummy audio drivers (headless) may never emit finished, so free after the
 # stream's length counted in process frames instead of trusting the signal.
 func _free_sound_later(player: AudioStreamPlayer, stage: Control, delay: float) -> void:
-	var tree := stage.get_tree() if is_instance_valid(stage) else null
-	if tree == null:
+	if not is_instance_valid(stage):
 		player.queue_free()
 		return
+	var ticker := _ticker_for(stage)
 	var frames_left := int(ceil(delay * 60.0)) + 15
 	while frames_left > 0:
-		await tree.process_frame
+		await ticker.pulse
 		frames_left -= 1
-		if not is_instance_valid(player) or not is_instance_valid(stage):
+		if ticker.exiting or not is_instance_valid(player) or not is_instance_valid(stage) or not stage.is_inside_tree():
 			return
 	if is_instance_valid(player):
 		player.queue_free()

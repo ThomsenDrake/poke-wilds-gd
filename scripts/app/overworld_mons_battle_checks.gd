@@ -146,7 +146,7 @@ func _provoke_chase_catch(runtime, mons) -> Array:
 		await get_tree().process_frame
 		var anchor: Vector2i = _anchor("SAVANNA")
 		if anchor == Vector2i.MAX: return []
-		var stand: Vector2i = anchor if anchor_k == 0 else probe.band_point(absi(anchor.x) + absi(anchor.y) + 8 * anchor_k, anchor_k)
+		var stand: Vector2i = anchor if anchor_k == 0 else probe.stand_tile(_world(), anchor + Vector2i(8 * anchor_k, 0) if anchor_k == 1 else anchor + Vector2i(0, 8), "SAVANNA") # retry offsets walk the blob, not the origin ring
 		_runner.teleport_player(_world(), _player(), runtime, stand)
 		runtime.note_player_step()
 		for d in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:

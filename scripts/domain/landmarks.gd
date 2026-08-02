@@ -9,6 +9,7 @@ extends RefCounted
 # the land-test mirrors world_generator's FastNoiseLite elevation channel (deterministic noise).
 
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
+const BiomeField := preload("res://scripts/domain/biome_field.gd") # the ONE elevation/biome source (infinite-world slice 2; the local mirror is gone)
 
 const SALT_LANDMARK_ANCHOR := 0x23 # pinned (scenario contract)
 const ANCHOR_SEARCH_BUDGET := 400
@@ -154,7 +155,7 @@ static func anchor_for(world_seed: int, chain: Vector2i, landmark_id: String) ->
 	var h := OverworldMons._mix(world_seed, chain.x, chain.y * 4 + index, SALT_LANDMARK_ANCHOR)
 	var candidate := _ring_tile(ring, int(h & 3), int((h >> 2) % (ring + 1)))
 	var size: Vector2i = _SIZES[landmark_id]
-	var noise := _elevation_noise(world_seed)
+	var noise := BiomeField.elevation_noise(world_seed)
 	var siblings: Array = []
 	for earlier in range(index):
 		var esize: Vector2i = _SIZES[LANDMARK_IDS[earlier]]
@@ -278,14 +279,6 @@ static func _ring_tile(ring: int, face: int, along: int) -> Vector2i: # Manhatta
 		2:
 			return Vector2i(-(ring - along), -along)
 	return Vector2i(along, -(ring - along))
-static func _elevation_noise(world_seed: int) -> FastNoiseLite: # mirror of world_generator's elevation channel (:29-34)
-	var noise := FastNoiseLite.new()
-	noise.seed = world_seed
-	noise.frequency = 0.010
-	noise.fractal_octaves = 4
-	noise.fractal_lacunarity = 2.0
-	noise.fractal_gain = 0.45
-	return noise
 static func _fits_on_land(noise: FastNoiseLite, anchor: Vector2i, size: Vector2i) -> bool: # land = elevation in (-0.30, 0.55), >= 7 of 9 probes
 	var half := size / 2
 	var probes := [anchor, anchor + Vector2i(-half.x, -half.y), anchor + Vector2i(half.x, -half.y), anchor + Vector2i(-half.x, half.y), anchor + Vector2i(half.x, half.y), anchor + Vector2i(-half.x, 0), anchor + Vector2i(half.x, 0), anchor + Vector2i(0, -half.y), anchor + Vector2i(0, half.y)]

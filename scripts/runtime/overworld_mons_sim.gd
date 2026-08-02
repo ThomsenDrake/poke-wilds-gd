@@ -145,7 +145,7 @@ func slot_anchor(cell: Vector2i, time_label: String) -> Vector2i:
 		return Vector2i.MAX
 	return _find_anchor(cell, _swim_only(_rt_ref.get_ref()._catalog.get_species(species_id)))
 
-# DIVERGENCE #1 (exec-plan mandate): nest + Alpha guardian on ring >= NEST_MIN_RING cells.
+# DIVERGENCE #1 (exec-plan mandate): nest + Alpha guardian only on cells at Manhattan distance >= NEST_MIN_RING of origin (a distance gate, not a biome band).
 # The faithful STREWN single egg stays the common case; a dedicated strewn-egg roll is NOT
 # pinned (no constant in the domain table), so eggs ride nest cells until one lands.
 func _spawn_nest(cell: Vector2i) -> void:
@@ -299,7 +299,7 @@ func _swim_only(entry: Dictionary) -> bool:
 func biome_of(tile: Vector2i) -> String:
 	return str(_rt_ref.get_ref()._world_gen.get_tile_logic(tile).get("biome", ""))
 
-func ring_of(cell: Vector2i) -> int: # Manhattan ring of the cell center (world_generator bands)
+func ring_of(cell: Vector2i) -> int: # Manhattan distance of the cell center from origin (distance-scaled levels; biome bands are retired)
 	var center := OverworldMons.cell_center(cell)
 	return absi(center.x) + absi(center.y)
 

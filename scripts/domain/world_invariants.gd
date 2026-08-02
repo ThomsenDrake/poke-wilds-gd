@@ -3,24 +3,27 @@ extends RefCounted
 # World-generator invariant checks, split out of world_generator.gd (which was
 # at its 320-line ceiling) so the placement map could be added there without
 # overflowing the budget. validate_invariants is the same deterministic-diff +
-# biome-ring + spawn-reachability audit the consistency audit and sweep rely on;
+# biome-band + spawn-reachability audit the consistency audit and sweep rely on;
 # it now runs over a passed generator instead of over `self`, calling back into
 # the generator's public seam (setup / get_tile_logic / find_walkable_spawn /
 # reachable_walkable_count) so generation logic stays single-sourced there.
+#
+# Infinite-world slice 2: the RING ADMISSION rules (inner/middle/outer distance
+# bands) RETIRED with the radial biome model — biomes are climate-field derived
+# (BiomeField), so SNOW/LAVA/DESERT legitimately appear at any distance. What
+# stays load-bearing and is pinned here instead: the ELEVATION-BAND contract
+# (WATER/SAND/ROCK come from elevation alone — coastlines, the beach band the
+# slice-4 spawn rides, and mountains are model-invariant) + the closed biome set.
 
-# Distance bands the ring rules below enforce (inner safe biomes, mid hazards
-# kept out, far extremes kept out). Moved here with validate_invariants because
-# nothing in the generator's hot path reads them.
-const RING_INNER := 10
-const RING_MIDDLE := 28
-const RING_OUTER := 60
+const BiomeField := preload("res://scripts/domain/biome_field.gd")
+
 const SPAWN_REACH_BUDGET := 64
 const SPAWN_REACH_MIN := 12
 
 
-# Cross-checks a generator's determinism, biome rings and spawn reachability for
-# a seed. gen is a live WorldGenerator instance; a second one is built from its
-# script to prove two independent setups agree tile-for-tile.
+# Cross-checks a generator's determinism, elevation-band contract and spawn
+# reachability for a seed. gen is a live WorldGenerator instance; a second one is
+# built from its script to prove two independent setups agree tile-for-tile.
 static func validate_invariants(gen, seed_value: int) -> Dictionary:
 	gen.setup(seed_value)
 	var failures: Array = []
@@ -37,15 +40,24 @@ static func validate_invariants(gen, seed_value: int) -> Dictionary:
 		if str(a["biome"]) != str(b["biome"]) or bool(a["walkable"]) != bool(b["walkable"]) or str(a["requires_field_move"]) != str(b["requires_field_move"]):
 			failures.append("determinism_mismatch @ %d,%d" % [pos.x, pos.y])
 
+	# Elevation-band contract (BiomeField): WATER/SAND/ROCK are elevation-driven in
+	# EVERY biome model — the beach band + coastlines + mountains must never drift
+	# with a climate-table edit. Also pins the closed 11-biome set.
+	var channels := BiomeField.make_channels(seed_value)
 	for pos in _invariant_sample_positions():
-		var distance = abs(pos.x) + abs(pos.y)
 		var biome = str(gen.get_tile_logic(pos)["biome"])
-		if distance < RING_INNER and not _biome_in(biome, ["WATER", "SAND", "PLAINS", "GRASSLAND"]):
-			failures.append("ring_inner_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
-		if distance < RING_MIDDLE and _biome_in(biome, ["DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]):
-			failures.append("ring_middle_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
-		if distance < RING_OUTER and _biome_in(biome, ["SNOW", "LAVA"]):
-			failures.append("ring_outer_violation @ %d,%d (%s)" % [pos.x, pos.y, biome])
+		if not BiomeField.KNOWN_BIOMES.has(biome):
+			failures.append("unknown_biome @ %d,%d (%s)" % [pos.x, pos.y, biome])
+			continue
+		var e := BiomeField.elevation_from(channels, pos)
+		if e < BiomeField.WATER_ELEVATION and biome != "WATER":
+			failures.append("band_violation @ %d,%d (e %.3f < %.2f but %s != WATER)" % [pos.x, pos.y, e, BiomeField.WATER_ELEVATION, biome])
+		elif e < BiomeField.SAND_ELEVATION and biome != "SAND" and e >= BiomeField.WATER_ELEVATION:
+			failures.append("band_violation @ %d,%d (e %.3f in beach band but %s != SAND)" % [pos.x, pos.y, e, biome])
+		elif e >= BiomeField.ROCK_BIOME_ELEVATION and biome != "ROCK":
+			failures.append("band_violation @ %d,%d (e %.3f >= %.2f but %s != ROCK)" % [pos.x, pos.y, e, BiomeField.ROCK_BIOME_ELEVATION, biome])
+		elif e >= BiomeField.SAND_ELEVATION and e < BiomeField.ROCK_BIOME_ELEVATION and ["WATER", "SAND", "ROCK"].has(biome):
+			failures.append("band_violation @ %d,%d (e %.3f inland but %s is an elevation band)" % [pos.x, pos.y, e, biome])
 
 	var spawn = gen.find_walkable_spawn(seed_value)
 	if not bool(gen.get_tile_logic(spawn)["walkable"]):
@@ -69,7 +81,3 @@ static func _invariant_sample_positions() -> Array:
 		for x in range(-70, 71, 14):
 			positions.append(Vector2i(x, y))
 	return positions
-
-
-static func _biome_in(biome: String, allowed: Array) -> bool:
-	return allowed.has(biome)

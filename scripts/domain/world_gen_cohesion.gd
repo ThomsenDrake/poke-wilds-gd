@@ -2,27 +2,30 @@ extends RefCounted
 
 # World-generation AUDIT — cohesion family. Measures biome COHESION over ONE cached
 # Manhattan disc scan: determinism (two same-seed generators agree tile-for-tile),
-# ring admission (the depth gradient holds by construction), hostile adjacency, the
-# geometric ring-seam, region fragmentation, and the per-ring biome histogram with
-# extreme-biome reach. Pure + deterministic: NO rng, NO I/O; every number is a
-# function of the live WorldGenerator (already setup(seed) by the caller) plus the
-# scan radius. TIER RULE: only structural invariants that HOLD TODAY enforce (red on
-# regression) — determinism and ring admission. Every gap that needs a future fix
-# (hostile seams, fragmentation, the LAVA-never-generates headline) rides `advisory`
-# and never gates. Contract + helpers: world_gen_audit.gd.
+# the biome-distribution contract (every biome generates — the climate model's
+# delivering invariant), hostile adjacency, region fragmentation, and the whole-disc
+# biome histogram with extreme-biome presence. Pure + deterministic: NO rng, NO I/O;
+# every number is a function of the live WorldGenerator (already setup(seed) by the
+# caller) plus the scan radius. TIER RULE: only structural invariants that HOLD TODAY
+# enforce (red on regression) — determinism and the biome distribution. Every gap
+# that needs a future fix (hostile seams, fragmentation) rides `advisory` and never
+# gates. Contract + helpers: world_gen_audit.gd.
+#
+# Infinite-world slice 2: the ring-admission check, the ring-seam measurement, and
+# the per-ring histogram bands RETIRED with the radial biome model (biomes are
+# climate-field derived, so a single 110-disc reads as ONE climate region — presence
+# is measured over a wide stride-sampled window instead, where many regions land).
 
 const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
+const BiomeField := preload("res://scripts/domain/biome_field.gd")
 
-# The admission gradient, mirrored from world_generator._ring_candidates so the
-# enforce checks track the same thresholds the generator enforces by construction.
-const INNER_ALLOWED := ["WATER", "SAND", "PLAINS", "GRASSLAND"]
-const MIDDLE_BANNED := ["DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]
-const OUTER_BANNED := ["SNOW", "LAVA"]
-# Admission ring -> control ring (no candidate-set change there) for the seam diff.
-const SEAM_CONTROLS := {10: 20, 28: 40, 60: 80}
 const CARDINAL := [Vector2i.RIGHT, Vector2i.DOWN] # half the 4-hood; avoids double counting
 const ORTHO := [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
-const DIAG := [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+# The distribution window: a single 110-disc reads ~one climate region (the fields
+# correlate at ~150-250 tiles), so presence is measured over a radius-400 disc at
+# stride 4 (20,201 samples spanning ~20 climate regions — the joint LAVA tail lands).
+const DISTRIBUTION_RADIUS := 400
+const DISTRIBUTION_STRIDE := 4
 
 
 static func audit(gen, seed: int, scan_radius: int) -> Dictionary:
@@ -32,11 +35,10 @@ static func audit(gen, seed: int, scan_radius: int) -> Dictionary:
 	var advisory: Array = []
 
 	_check_determinism(gen, seed, scan, enforcing, enforcing_failures)
-	_check_ring_admission(scan, enforcing, enforcing_failures)
+	_check_biome_distribution(gen, enforcing, enforcing_failures)
 	_tabulate_adjacency(scan, advisory)
-	_measure_ring_seam(scan, scan_radius, advisory)
 	_measure_regions(scan, advisory)
-	_measure_histogram(scan, advisory)
+	_measure_distribution(scan, advisory)
 
 	return {
 		"enforcing": enforcing,
@@ -89,23 +91,30 @@ static func _check_determinism(gen, seed: int, scan: Dictionary, enforcing: Dict
 		failures.append("determinism_mismatch: %d tiles differ between two same-seed generators" % mismatches)
 
 
-# ENFORCE: the depth-admission gradient — inner safe biomes only, mid hazards kept
-# out, far extremes kept out. Holds by construction today (mirrors world_invariants).
-static func _check_ring_admission(scan: Dictionary, enforcing: Dictionary, failures: Array) -> void:
-	var biome: Dictionary = scan["biome"]
-	var violations := 0
-	for pos in scan["positions"]:
-		var b := str(biome.get(WorldGenAudit.key(pos), ""))
-		var ring := WorldGenAudit.ring_of(pos)
-		if ring < WorldGenAudit.RING_INNER and not INNER_ALLOWED.has(b):
-			violations += 1
-		elif ring < WorldGenAudit.RING_MIDDLE and MIDDLE_BANNED.has(b):
-			violations += 1
-		elif ring < WorldGenAudit.RING_OUTER and OUTER_BANNED.has(b):
-			violations += 1
-	enforcing["ring_admission_violations"] = violations
-	if violations > 0:
-		failures.append("ring_admission_violation: %d tiles break the depth-admission gradient" % violations)
+# ENFORCE: the climate model's delivering contract — over the wide distribution
+# window the ten COMMON biomes generate per-seed (WATER/SAND/ROCK by elevation,
+# PLAINS/GRASSLAND/FOREST/SAVANNA/DESERT/SWAMP/SNOW by the field; a threshold or
+# frequency edit that kills a common biome reds here). LAVA is the RARE joint tail:
+# a cold-climate window legitimately lacks it, so per-seed LAVA absence is NOT a
+# failure — the presence contract is the runner's cross-seed window count
+# (world_gen_audit_runner; LAVA_WINDOWS_MIN in world_gen_audit.gd), reported here
+# as the lava_present metric.
+static func _check_biome_distribution(gen, enforcing: Dictionary, failures: Array) -> void:
+	var present := {}
+	for pos in WorldGenAudit.disc_positions(DISTRIBUTION_RADIUS):
+		if pos.x % DISTRIBUTION_STRIDE != 0 or pos.y % DISTRIBUTION_STRIDE != 0:
+			continue
+		present[str(gen.get_tile_logic(pos).get("biome", ""))] = true
+	var missing: Array = []
+	for biome in BiomeField.KNOWN_BIOMES:
+		if biome == "LAVA":
+			continue # the rare joint tail rides the cross-seed contract (header)
+		if not present.has(biome):
+			missing.append(biome)
+	enforcing["biomes_missing"] = missing.size()
+	enforcing["lava_present"] = 1 if present.has("LAVA") else 0
+	if not missing.is_empty():
+		failures.append("biome_distribution: %s missing from a %d-radius stride-%d window (the climate field must generate every common biome)" % [str(missing), DISTRIBUTION_RADIUS, DISTRIBUTION_STRIDE])
 
 
 # ADVISORY: tabulate unordered unequal adjacent (4-neighbor) biome pairs; count the
@@ -139,68 +148,6 @@ static func _top_pairs(counts: Dictionary, n: int) -> Dictionary:
 	for i in range(mini(n, entries.size())):
 		out[entries[i][0]] = entries[i][1]
 	return out
-
-
-# ADVISORY: the geometric quantization seam. At an admission ring the candidate set
-# changes, so biome churn ACROSS the contour (radial) spikes relative to ALONG it
-# (tangential); subtract a control ring's same quantity to isolate the seam signal.
-static func _measure_ring_seam(scan: Dictionary, scan_radius: int, advisory: Array) -> void:
-	var result := {}
-	for ring in SEAM_CONTROLS:
-		var seam_ring := _seam(scan, int(ring), scan_radius)
-		var seam_control := _seam(scan, int(SEAM_CONTROLS[ring]), scan_radius)
-		result[int(ring)] = snapped(seam_ring - seam_control, 0.001)
-	advisory.append({"kind": "ring_seam", "value": result,
-		"detail": "Radial-vs-tangential biome churn at each admission ring minus its control; a spike marks the geometric quantization seam."})
-
-
-# Returns (across change-rate) - (along change-rate) for one contour. On the L1
-# diamond no two 4-adjacent tiles share a ring, so radial = orthogonal neighbors
-# (ring +/-1) and tangential = diagonal neighbors that stay on the same ring.
-static func _seam(scan: Dictionary, ring: int, scan_radius: int) -> float:
-	var biome: Dictionary = scan["biome"]
-	var across_edges := 0
-	var across_changes := 0
-	var along_edges := 0
-	var along_changes := 0
-	for pos in _contour(ring, scan_radius):
-		var b := str(biome.get(WorldGenAudit.key(pos), ""))
-		if b == "":
-			continue
-		for dir in ORTHO:
-			var nb := str(biome.get(WorldGenAudit.key(pos + dir), ""))
-			if nb == "":
-				continue
-			across_edges += 1
-			if nb != b:
-				across_changes += 1
-		for dir in DIAG:
-			if WorldGenAudit.ring_of(pos + dir) != ring:
-				continue
-			var nb := str(biome.get(WorldGenAudit.key(pos + dir), ""))
-			if nb == "":
-				continue
-			along_edges += 1
-			if nb != b:
-				along_changes += 1
-	var across_rate := float(across_changes) / float(across_edges) if across_edges > 0 else 0.0
-	var along_rate := float(along_changes) / float(along_edges) if along_edges > 0 else 0.0
-	return across_rate - along_rate
-
-
-# The L1 contour (all tiles with |x|+|y| == ring) inside the scan disc.
-static func _contour(ring: int, scan_radius: int) -> Array:
-	var tiles: Array = []
-	if ring > scan_radius:
-		return tiles
-	if ring == 0:
-		return [Vector2i.ZERO]
-	for y in range(-ring, ring + 1):
-		var x := ring - absi(y)
-		tiles.append(Vector2i(x, y))
-		if x != 0:
-			tiles.append(Vector2i(-x, y))
-	return tiles
 
 
 # ADVISORY: flood-fill connected same-biome regions (4-neighbor); count regions and
@@ -242,40 +189,21 @@ static func _flood_regions(scan: Dictionary) -> Dictionary:
 	return {"region_count": region_count, "speck_count": speck_count}
 
 
-# DATA/ADVISORY: per-ring-band biome histogram, plus first-ring + total count for
-# each EXTREME biome. LAVA total is expected 0 today — the headline gap, advisory.
-static func _measure_histogram(scan: Dictionary, advisory: Array) -> void:
-	var biome: Dictionary = scan["biome"]
-	var histogram := {}
-	var extreme := {}
-	for b in WorldGenAudit.EXTREME_BIOMES:
-		extreme[b] = {"first_ring": -1, "count": 0}
+# DATA/ADVISORY: whole-disc biome histogram (no ring bands — retired with the radial
+# model) + extreme-biome presence counts. LAVA is rare-but-nonzero by design (the
+# climate joint tail; the retired radial gap); the ENFORCING presence contract rides
+# the wide window above — this histogram is the local texture reading.
+static func _measure_distribution(scan: Dictionary, advisory: Array) -> void:
+	var counts := {}
 	for pos in scan["positions"]:
-		var b := str(biome.get(WorldGenAudit.key(pos), ""))
+		var b := str(scan["biome"].get(WorldGenAudit.key(pos), ""))
 		if b == "":
 			continue
-		var ring := WorldGenAudit.ring_of(pos)
-		var band := _ring_band(ring)
-		if not histogram.has(band):
-			histogram[band] = {}
-		(histogram[band] as Dictionary)[b] = int((histogram[band] as Dictionary).get(b, 0)) + 1
-		if extreme.has(b):
-			var entry: Dictionary = extreme[b]
-			entry["count"] = int(entry["count"]) + 1
-			if int(entry["first_ring"]) < 0 or ring < int(entry["first_ring"]):
-				entry["first_ring"] = ring
-	advisory.append({"kind": "ring_histogram", "value": histogram,
-		"detail": "Tiles per biome in each ring band (0-9, 10-27, 28-59, 60+)."})
-	var lava_count := int((extreme.get("LAVA", {}) as Dictionary).get("count", 0))
-	advisory.append({"kind": "extreme_reach", "value": extreme,
-		"detail": "First ring + total count for SNOW/LAVA; LAVA count %d => the headline gap (LAVA never generates on origin)." % lava_count})
-
-
-static func _ring_band(ring: int) -> String:
-	if ring < WorldGenAudit.RING_INNER:
-		return "0-9"
-	if ring < WorldGenAudit.RING_MIDDLE:
-		return "10-27"
-	if ring < WorldGenAudit.RING_OUTER:
-		return "28-59"
-	return "60+"
+		counts[b] = int(counts.get(b, 0)) + 1
+	advisory.append({"kind": "biome_distribution", "value": counts,
+		"detail": "Tiles per biome over the whole disc (no ring bands — the radial model is retired)."})
+	var extreme := {}
+	for b in WorldGenAudit.EXTREME_BIOMES:
+		extreme[b] = int(counts.get(b, 0))
+	advisory.append({"kind": "extreme_presence", "value": extreme,
+		"detail": "SNOW/LAVA tile counts over the disc; LAVA %d — rare-but-nonzero under the climate joint tail (the retired radial quantization gap)." % int(counts.get("LAVA", 0))})

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dd5xvxl3fv7yt"
-path="res://.godot/imported/03_biome_forest.png-979729b3c3f801227d2a7c184988aa53.ctex"
+uid="uid://w4k15b8ritar"
+path="res://.godot/imported/03_biome_swamp.png-b2544ce6bfee8d8da056e7ce768486a1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://docs/generated/visual-baselines/03_biome_forest.png"
-dest_files=["res://.godot/imported/03_biome_forest.png-979729b3c3f801227d2a7c184988aa53.ctex"]
+source_file="res://docs/generated/visual-baselines/03_biome_swamp.png"
+dest_files=["res://.godot/imported/03_biome_swamp.png-b2544ce6bfee8d8da056e7ce768486a1.ctex"]
 
 [params]
 

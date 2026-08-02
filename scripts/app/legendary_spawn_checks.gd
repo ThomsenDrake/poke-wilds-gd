@@ -4,9 +4,10 @@ extends RefCounted
 # at the app 220 budget wall (check_architecture.gd SCRIPT_LIMITS; the world_depth_checks
 # precedent). The scenario keeps the anchor/exclusion/whiteout/ko FLOW; this owns the
 # three proofs that grew past the budget once hardened against vacuous passes:
-#   (1) anchor_set_pin — pins the EXACT derived set under the scenario seed (the SNOW
-#       three anchored, the LAVA four NO_ANCHOR) instead of a >=2 floor, and asserts the
-#       anchored tiles are DISTINCT (no sibling-anchor collision masking one of the seven);
+#   (1) anchor_set_pin — pins the EXACT derived set under the scenario seed (ALL SEVEN
+#       anchored — the climate field generates LAVA, the retired radial gap) instead of
+#       a >=2 floor, and asserts the anchored tiles are DISTINCT (the sibling-exclusion
+#       chain displaces same-region siblings; a collision lets entity_at mask one);
 #   (2) music_seam_pin — the battle-MUSIC seam is observable (music_router emits
 #       music_track_selected, asserted for kind "legendary" -> the beasts track) AND its
 #       production consumer main.gd:92 reads battle_kind off the pending payload (a static
@@ -31,12 +32,13 @@ const Landmarks := LandmarkRuntime.Landmarks
 const ORIGIN := Vector2i.ZERO # Build 2 stamps the origin world (Build 3 threads the active chain)
 const MAIN_SOURCE_PATH := "res://scripts/app/main.gd"
 # The exact derived placement under the scenario's pinned seed (EMPIRICALLY captured off
-# LegendaryPlacement.anchor_for, NOT hardcoded tiles): origin worlds generate ZERO LAVA
-# tiles to ring 400 (the empirical flag), so the SNOW three anchor and the LAVA four
-# resolve NO_ANCHOR. Order == LEGENDARY_IDS iteration order. A salt/affinity regression
-# that moves ANY frozen legendary flips one of these sets and reds the lane.
-const EXPECTED_ANCHORED := ["REGICE", "REGIELEKI", "REGIGIGAS"]
-const EXPECTED_LAVA_ABSENT := ["MEWTWO", "REGIROCK", "REGISTEEL", "REGIDRAGO"]
+# LegendaryPlacement.legendaries_for_world, NOT hardcoded tiles): under the climate field
+# ALL SEVEN anchor (LAVA generates — the retired radial quantization gap is RESOLVED);
+# the NO_ANCHOR set is EMPTY. Order == LEGENDARY_IDS iteration order. A salt/affinity/
+# threshold regression that moves ANY frozen legendary flips one of these sets and reds
+# the lane.
+const EXPECTED_ANCHORED := ["MEWTWO", "REGIROCK", "REGICE", "REGISTEEL", "REGIELEKI", "REGIDRAGO", "REGIGIGAS"]
+const EXPECTED_LAVA_ABSENT: Array = []
 
 
 # Pin the EXACT anchored/NO_ANCHOR partition + tile distinctness. `world_seed` is the LIVE
@@ -44,15 +46,37 @@ const EXPECTED_LAVA_ABSENT := ["MEWTWO", "REGIROCK", "REGISTEEL", "REGIDRAGO"]
 # stamp. Returns "" on pass, a failure label otherwise.
 static func anchor_set_pin(anchored: Array, lava_absent: Array, world_seed: int) -> String:
 	if anchored != EXPECTED_ANCHORED:
-		return "anchor: anchored set %s != the pinned SNOW three %s (a salt/affinity regression moved a frozen legendary off its anchor)" % [str(anchored), str(EXPECTED_ANCHORED)]
+		return "anchor: anchored set %s != the pinned seven %s (a salt/affinity/threshold regression moved a frozen legendary off its anchor)" % [str(anchored), str(EXPECTED_ANCHORED)]
 	if lava_absent != EXPECTED_LAVA_ABSENT:
-		return "anchor: lava_absent set %s != the pinned LAVA four %s (the empirical-flag NO_ANCHOR witness changed)" % [str(lava_absent), str(EXPECTED_LAVA_ABSENT)]
+		return "anchor: lava_absent set %s != [] (under the climate field every frozen legendary anchors; a NO_ANCHOR flags an anchor-scan regression)" % str(lava_absent)
 	var seen: Array = []
-	for species in anchored:
-		var tile: Vector2i = LegendaryPlacement.anchor_for(world_seed, ORIGIN, str(species))
+	for entry in LegendaryPlacement.legendaries_for_world(world_seed, ORIGIN): # the sim's exact source (the sibling-exclusion chain; a per-species anchor_for can disagree by a displaced tile)
+		var tile: Vector2i = entry.get("tile", LegendaryPlacement.NO_ANCHOR)
 		if seen.has(tile):
-			return "anchor: %s shares tile %s with an earlier legendary (a sibling-anchor collision lets entity_at mask one of the seven)" % [str(species), str(tile)]
+			return "anchor: %s shares tile %s with an earlier legendary (a sibling-anchor collision lets entity_at mask one of the seven)" % [str(entry.get("species_id", "")), str(tile)]
 		seen.append(tile)
+	return ""
+
+
+# The sim's exact stamped source set (the sibling-exclusion chain threaded across
+# LEGENDARY_IDS): species -> the derived entry. A per-species anchor_for skips the
+# exclusion and can disagree with the stamp by a displaced tile, so every consumer
+# (the scenario's entity==derived assert, the distinctness pin) derives through here.
+static func expected_anchor_set(world_seed: int) -> Dictionary:
+	var expected := {}
+	for entry in LegendaryPlacement.legendaries_for_world(world_seed, ORIGIN):
+		expected[str(entry.get("species_id", ""))] = entry
+	return expected
+
+
+# SYNTHETIC NO_ANCHOR witness (the natural negative proof is vacuous once all seven
+# anchor under the climate field): a reach-1 box resolves NO_ANCHOR for every species,
+# and legendaries_for_world skips them all — the no-entity skip path stays proven,
+# never silently vacuous. Returns "" on pass.
+static func synthetic_no_anchor_witness(world_seed: int) -> String:
+	var none_count: int = LegendaryPlacement.legendaries_for_world(world_seed, ORIGIN, [], 1).size()
+	if none_count != 0:
+		return "anchor: a reach-1 box still stamped %d legendaries (the NO_ANCHOR skip path regressed)" % none_count
 	return ""
 
 

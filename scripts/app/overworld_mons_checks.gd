@@ -82,10 +82,10 @@ func run_spawn_case(runtime) -> bool:
 			_ensure(false, "spawn: biome %s not found on the band scan" % biome); continue
 		runtime.session.time_of_day_minutes = DAY_MINUTES # the DAY pool label holds for the membership pin
 		var roamers := 0
-		var band_ring := absi(anchor.x) + absi(anchor.y)
-		for k in range(12): # 4 band rings x spread directions: many slot draws along the biome band
+		var offsets := [Vector2i.ZERO, Vector2i(6, 0), Vector2i(-6, 0), Vector2i(0, 6), Vector2i(0, -6), Vector2i(6, 6), Vector2i(-6, 6), Vector2i(6, -6), Vector2i(-6, -6), Vector2i(12, 0), Vector2i(0, 12), Vector2i(-12, 0)]
+		for k in range(12): # 12 anchor-local offsets: many slot draws around the biome blob (climate blobs are local — no ring to spread along)
 			if k % 4 == 0: await get_tree().process_frame # flush the world view's deferred tile frees
-			var stand: Vector2i = probe.stand_tile(_world(), probe.band_point(band_ring + 4 + (k % 4) * 8, k), biome)
+			var stand: Vector2i = probe.stand_tile(_world(), anchor + offsets[k], biome)
 			if stand == Vector2i.MAX: continue
 			_runner.teleport_player(_world(), _player(), runtime, stand)
 			runtime.note_player_step()

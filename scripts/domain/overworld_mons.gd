@@ -42,7 +42,7 @@ const PROVOKED_ATTACK_STAGES := 3 # FAITHFUL :284: chase-catch +3 physical-attac
 const NEST_PRESENT_PCT := 3 # DIVERGENCE #1: nest cell gate (rare; strewn egg is common)
 const NEST_EGGS := 2 # DIVERGENCE #1: wild-egg entities per nest
 const ALPHA_LEVEL_BONUS := 5 # DIVERGENCE #1: guardian level over the distance band
-const NEST_MIN_RING := 10 # DIVERGENCE #1: nests only FOREST-and-beyond bands
+const NEST_MIN_RING := 10 # DIVERGENCE #1: spawn-safety distance gate — no nests within Manhattan 10 of origin (a pure distance gate; the 'FOREST-and-beyond bands' justification died with the ring biome model)
 const GUARDIAN_SPOT_RADIUS := 8 # DIVERGENCE #1: guardian sight widened (it guards)
 # Shared vocabulary (runtime + scenario + audit).
 const DISPOSITION_TIMID := "TIMID"

@@ -4,9 +4,10 @@ extends Node
 # workflow). Runs the audit (world_gen_audit_runner) across a fixed seed list + the live
 # catalog and emits the miss-002-symmetric world_gen_audit_passed / world_gen_audit_failed
 # {failures} over the ENFORCING tier ONLY (structural invariants that hold today: disc
-# determinism, ring admission, pool legendary/egg no-leak, landmark-in-extent, spawn-disc
-# exclusion, spawn reachability). Every future-fix gap — biome blending, BST↔depth spawn
-# coherence, LAVA/dungeon site availability, unreachable anchors — rides the warning-tier
+# determinism, the biome-distribution contract (infinite-world slice 2 — the ten common
+# biomes per seed + LAVA in most windows cross-seed; ring admission RETIRED with the radial
+# model), pool legendary/egg no-leak, spawn reachability). Every future-fix gap — biome
+# blending, stats↔difficulty spawn coherence — rides the warning-tier
 # world_gen_audit_advisory event, which NEVER gates (it is the punch-list for the later fix
 # slices). The audit consumes NO rng (pure function of code + catalog + seeds), so it is
 # deterministic by construction and is deliberately NOT a double-run consumer. Writes a JSON

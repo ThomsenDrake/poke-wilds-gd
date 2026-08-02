@@ -32,7 +32,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 
 ## Intentional limits
 
-- Attack animation playback is a fixed first pass: frames and sounds play, but layer-script coverage may not match every original effect, and 142 moves use the synthesized fallback.
+- Attack animation playback is a fixed first pass: frames and sounds play, but layer-script coverage may not match every original effect, and 142 moves use the synthesized fallback. (Infinite-world slice 2: playback frame waits ride a `FrameTicker` child whose `_exit_tree` pulse lets suspended animations resume + unwind during scene teardown, and `battle_view._exit_tree` bumps the turn player's generation — the 'resources still in use at exit' flake class is closed at the source.)
 - No abilities, weather, held items, or trainer battles.
 - No PC storage-box UI. A full-party capture is non-losing: the overflow Pokemon is held at the player's campsite and retrieved from the party screen (RETRIEVE action). The full storage-box system is a later phase.
 - No move learning UI beyond replacing the oldest move when a fifth move would be learned.

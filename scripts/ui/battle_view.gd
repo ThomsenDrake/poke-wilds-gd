@@ -171,6 +171,10 @@ func _apply_response(response: Dictionary) -> void:
 	_turn_player.play(self, turns, previous_snapshot)
 
 
+func _exit_tree() -> void:
+	_turn_player.generation += 1 # a teardown-resumed playback must never emit battle_finished mid-quit (the FrameTicker's final pulse unwinds it; the generation bump cancels it — the :156 cancel precedent)
+
+
 func is_animating() -> bool: return _animating
 
 

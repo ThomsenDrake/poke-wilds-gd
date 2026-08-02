@@ -17,8 +17,8 @@ const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_or
 
 const TOWER_ID := "heart_tower" # public contract string (landmarks.gd TOWER_ID)
 const LEGENDARY_KIND := "legendary" # overworld_mons_sim new_legendary kind/render_kind
-const GUARDIAN_RING_MIN := 60 # LegendaryPlacement.LEGENDARY_RING_MIN — the distance gate the guardian shot names
-const LEGENDARY_SCAN_HALF := 140 # covers the anchor budget's ring band (60..134) around a center
+const GUARDIAN_RING_MIN := 60 # LegendaryPlacement.LEGENDARY_RING_MIN — the progression floor the guardian shot names (re-justified in slice 2: no longer a biome band)
+const LEGENDARY_SCAN_HALF := 280 # covers the anchor scan's ±256 reach box around a center (slice 2's windowed scan)
 const GUARDIAN_PLAYER_OFFSET := Vector2i(9, 0) # manhattan 9 > GUARDIAN_SPOT_RADIUS(8) (Manhattan sight): out of sight AND on-screen (a (0,9) offset is 432px up — off the 648px window)
 const SHOT_TOWER := "34_heart_tower.png"
 

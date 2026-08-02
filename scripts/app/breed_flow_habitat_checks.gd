@@ -17,7 +17,7 @@ const Phase5 := preload("res://scripts/runtime/phase5_support.gd")
 const Sites := preload("res://scripts/runtime/phase5_sites.gd")
 
 const PAIR_LEVEL := 30
-const SITE_SCAN_RADIUS := 160
+const SITE_SCAN_RADIUS := 320 # climate blobs are wider than the radial bands (the pinned seed's first tree site sits at ring ~227); the budget stays trivial
 const LAY_STEP_CAP := 6000
 const LAY_BATCH := 60
 const EGG_GROUND_CAP := 7 # mirrors breeding_runtime's faithful cap

@@ -23,6 +23,7 @@ static func run_audit(seeds: Array, species: Dictionary, biome_encounters) -> Di
 	# Seed-independent: spawn coherence (catalog + biome tables only), folded once.
 	WorldGenAudit.fold(findings, "spawns", WorldGenSpawns.audit(species, biome_encounters))
 	var tiles_checked := 0
+	var lava_windows := 0
 	var agg := {"cohesion": {}, "dungeons": {}} # kind -> de-duplicated advisory across seeds
 	for seed_value in seeds:
 		var seed_int := int(seed_value)
@@ -39,12 +40,19 @@ static func run_audit(seeds: Array, species: Dictionary, biome_encounters) -> Di
 			_merge_advisory(agg[goal], result.get("advisory", []), seed_int)
 			if goal == "cohesion":
 				tiles_checked += int(result.get("metrics", {}).get("tiles_scanned", 0))
+				lava_windows += int(result.get("enforcing", {}).get("lava_present", 0))
 	for goal in agg.keys():
 		for kind in (agg[goal] as Dictionary).keys():
 			var item: Dictionary = (agg[goal] as Dictionary)[kind]
 			item["goal"] = goal
 			findings["advisory_findings"].append(item)
 			findings["goals"][goal]["advisory"][kind] = item.get("value", null)
+	# Cross-seed LAVA presence (ENFORCING): the rare joint tail must appear in most
+	# windows — a single cold-climate window may lack it, a threshold/frequency
+	# regression drops MANY (world_gen_cohesion.gd's per-seed contract covers the rest).
+	findings["goals"]["cohesion"]["enforcing"]["lava_windows"] = lava_windows
+	if lava_windows < WorldGenAudit.LAVA_WINDOWS_MIN:
+		findings["enforcing_failures"].append("[cohesion] climate_distribution: LAVA present in %d of %d seed windows (< %d — the joint-tail climate regressed; rare LAVA must still appear in most windows)" % [lava_windows, seeds.size(), WorldGenAudit.LAVA_WINDOWS_MIN])
 	return WorldGenAudit.finalize(findings, tiles_checked)
 
 

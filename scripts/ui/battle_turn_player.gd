@@ -18,8 +18,8 @@ func play(view: Node, turns: Array, previous_snapshot: Dictionary, finish := {})
 	var played: Array = await view._animator.play_turns(turns, view._surface, view._surface.anim_actors(), should_abort)
 	for stats in played:
 		view._runtime().emit_trace("attack_animation_played", "BattleView", {"move_id": str(stats.get("move_id", "")), "anim_key": str(stats.get("anim_key", "")), "frames": int(stats.get("frames", 0)), "sound": bool(stats.get("sound", false)), "fallback": bool(stats.get("fallback", false))})
-	if gen != generation:
-		return
+	if gen != generation or not is_instance_valid(view) or not view.is_inside_tree():
+		return # a stale play — or a teardown-resumed one (the FrameTicker's final pulse unwinds playback at quit; never emit battle_finished mid-quit)
 	view._set_animating(false)
 	if finish.is_empty():
 		view._render()

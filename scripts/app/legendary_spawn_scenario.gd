@@ -1,29 +1,29 @@
 extends Node
 
 # Legendary spawn scenario (Phase 7 Build 2; spec: docs/product-specs/world-depth.md
-# § Legendaries). The ring-gated spawn proof extending biome_probe, self-pinned
-# seed_for_smoke(SEED) -> new_game -> rebuild (the breed_flow precedent; joins the
-# double-run lane — legendary stamping is pure _mix, NO rng). (1) ANCHORS — each frozen
-# species anchors at ring >= 60 in its affinity biome (stamped entity == derived anchor,
-# resolver biome == affinity, AGGRESSIVE, battle_kind "legendary") or NO_ANCHOR -> NO
-# entity (negative proof); the anchored/NO_ANCHOR partition is PINNED to the exact derived set
-# under SEED (anchor_set_pin). EMPIRICAL FLAG (gate-enforced, not payload-only): origin worlds
-# generate ZERO LAVA tiles, so the LAVA four resolve NO_ANCHOR — contract-legal ("a world whose
-# ring band lacks a biome simply lacks that biome's legendaries") while "all seven from origin"
-# holds for CANDIDATES only; lava_absent is PINNED to the LAVA four. (2) EXCLUSION — no legendary
-# in any pool (DAY+NIGHT filter, the forced full-catalog fallback, the is_battle_viable TYPE-
-# fallback guard the night-ghost pool shares). (3) ENCOUNTER — chase-catch +3 (:284), the
-# legendary_encounter battle-start trace, player-initiated +0 (:280). (4) WHITE-OUT — defeat leaves
-# it standing, damage persisted, re-battleable (:284/:288). (5) KO — gone-for-good per world (PORT
-# DECISION inverting wiki :224): removal key -> session.legendary_removals, despawn, re-stamp
-# suppression + the to_payload/apply_into round-trip. Battles ride the DIRECT seam under the
-# set_battle latch; play_battle_track rides a verbatim MIMIC of main.gd:92 (latch-bypassed; music_track_selected + a grep pin make it observable).
+# § Legendaries). The climate-anchored spawn proof, self-pinned seed_for_smoke(SEED)
+# -> new_game -> rebuild (the breed_flow precedent; joins the double-run lane —
+# legendary stamping is pure _mix, NO rng). (1) ANCHORS — each frozen species anchors at
+# ring >= LEGENDARY_RING_MIN (the progression floor) in its affinity biome (stamped
+# entity == derived anchor, resolver biome == affinity, AGGRESSIVE, battle_kind
+# "legendary"); the partition is PINNED to the exact derived set under SEED
+# (anchor_set_pin) — ALL SEVEN anchor under the climate field (slice 2: LAVA generates;
+# the radial quantization-tail EMPIRICAL FLAG is RESOLVED). The NO_ANCHOR negative
+# proof rides a SYNTHETIC reach-1 witness (the natural case is vacuous on this seed).
+# (2) EXCLUSION — no legendary in any pool (DAY+NIGHT filter, the forced full-catalog
+# fallback, the is_battle_viable TYPE-fallback guard the night-ghost pool shares).
+# (3) ENCOUNTER — chase-catch +3 (:284), the legendary_encounter battle-start trace,
+# player-initiated +0 (:280). (4) WHITE-OUT — defeat leaves it standing, damage
+# persisted, re-battleable (:284/:288). (5) KO — gone-for-good per world (PORT
+# DECISION inverting wiki :224): removal key -> session.legendary_removals, despawn,
+# re-stamp suppression + the to_payload/apply_into round-trip. Battles ride the DIRECT
+# seam under the set_battle latch; play_battle_track rides a verbatim MIMIC of
+# main.gd:92 (latch-bypassed; music_track_selected + a grep pin make it observable).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 const LegendarySpawnChecks := preload("res://scripts/app/legendary_spawn_checks.gd") # the hardened proofs extracted at the app 220 budget wall
-# Domain access rides the runtime's own preload (the app layer may not preload
-# domain directly — check_architecture.gd's layer table; the landmark_flow precedent).
+# Domain access rides the runtime's own preload (the layer table; the landmark_flow precedent).
 const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
 
 const SEED := 2026073001
@@ -36,8 +36,8 @@ var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
 var _failures: Array = []
 var _oks: Dictionary = {}
-var _anchored: Array = [] # species anchored at ring >= 60 in the affinity biome (the SNOW three on origin seeds)
-var _lava_absent: Array = [] # NO_ANCHOR negative proofs (the empirical flag's loud witness)
+var _anchored: Array = [] # species anchored at ring >= LEGENDARY_RING_MIN in the affinity biome (all seven under the climate field)
+var _lava_absent: Array = [] # NO_ANCHOR species on this seed (EMPTY under the climate field; the synthetic reach-1 witness covers the negative proof)
 
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
@@ -69,17 +69,18 @@ func run(ctx: Dictionary) -> void:
 	_player().encounter_chance = saved_chance; _player().input_enabled = true
 	runtime.session.time_of_day_minutes = DAY_MINUTES
 
-# Every frozen species derives off the LIVE seed (NEVER hardcoded tiles): an anchor resolves
-# -> the sim stamped one entity on that tile (kind/battle_kind/AGGRESSIVE, resolver biome ==
-# affinity, ring >= 60); NO_ANCHOR -> NO entity.
+# Every frozen species derives off the LIVE seed (NEVER hardcoded tiles): an anchor resolves ->
+# one entity on that tile (kind/battle_kind/AGGRESSIVE, biome == affinity, ring >= 60); NO_ANCHOR
+# -> NO entity. The expected set derives through legendaries_for_world (the sim's exact source).
 func _prove_anchors(runtime) -> bool:
 	var start: int = _failures.size()
 	var seed: int = runtime.get_world_seed()
 	var entities: Dictionary = runtime.overworld_mons_runtime._entities
+	var expected: Dictionary = LegendarySpawnChecks.expected_anchor_set(seed) # the sim's exact source set (the sibling-exclusion chain)
 	for species in LegendaryPlacement.LEGENDARY_IDS:
 		var sid := str(species)
 		var id := "legendary_0,0:%s" % sid
-		var anchor: Vector2i = LegendaryPlacement.anchor_for(seed, ORIGIN, sid)
+		var anchor: Vector2i = expected.get(sid, {}).get("tile", LegendaryPlacement.NO_ANCHOR)
 		var entity: Dictionary = entities.get(id, {})
 		if anchor == LegendaryPlacement.NO_ANCHOR:
 			_ensure(entity.is_empty(), "anchor: %s resolved NO_ANCHOR yet entity %s is stamped" % [sid, id])
@@ -93,12 +94,12 @@ func _prove_anchors(runtime) -> bool:
 			_ensure(str(entity.get("kind", "")) == "legendary" and str(entity.get("battle_kind", "")) == "legendary", "anchor: %s kind/battle_kind %s/%s" % [sid, str(entity.get("kind", "")), str(entity.get("battle_kind", ""))])
 			_ensure(str(entity.get("disposition", "")) == "AGGRESSIVE", "anchor: %s disposition %s != AGGRESSIVE" % [sid, str(entity.get("disposition", ""))])
 			_anchored.append(sid)
-	var pin_label := LegendarySpawnChecks.anchor_set_pin(_anchored, _lava_absent, seed) # the EXACT derived set under SEED (SNOW three anchored, LAVA four NO_ANCHOR) + tile distinctness
-	return _ensure(pin_label == "", pin_label) and _failures.size() == start
+	var labels := [LegendarySpawnChecks.anchor_set_pin(_anchored, _lava_absent, seed), LegendarySpawnChecks.synthetic_no_anchor_witness(seed)] # the EXACT derived set + distinctness + the reach-1 NO_ANCHOR witness (vacuous naturally once all seven anchor)
+	return _ensure(str(labels[0]) == "", str(labels[0])) and _ensure(str(labels[1]) == "", str(labels[1])) and _failures.size() == start
 
 # The never-encounter exclusion on EVERY pool path: the per-biome DAY+NIGHT filter, the forced
-# full-catalog fallback (a typeless biome — the ONLY path that could surface a legendary,
-# biome_encounters.gd:124-131), and the is_battle_viable TYPE-fallback guard (biome_encounters.gd:121) the night-ghost pool shares (night_system rides that Callable; none of the seven is GHOST).
+# full-catalog fallback (a typeless biome — the ONLY path that could surface one, biome_encounters.gd:124-131),
+# and the is_battle_viable TYPE-fallback guard (:121) the night-ghost pool shares (none of the seven is GHOST).
 func _prove_exclusion(runtime) -> bool:
 	var start: int = _failures.size()
 	var filter = runtime._biome_encounters
@@ -120,8 +121,8 @@ func _prove_exclusion(runtime) -> bool:
 	LegendarySpawnChecks.curated_exclusion_pin(runtime, _failures); return _failures.size() == start # R6: the curated/extra_ids path the per-biome scan cannot see
 
 # Chase-catch provoked +3 -> the battle-start trace -> a white-out leaves it standing (damage
-# persisted on the entity, dropped to idle) and re-battleable (:284/:288); the white-out REMATCH
-# carries the PERSISTED +3 (:284 stat persistence) + a second legendary_encounter. The :280 no-buff witness rides the KO case's player-initiated FIRST engagement (stages 0).
+# persisted on the entity, dropped to idle) and re-battleable (:284/:288); the REMATCH carries the
+# PERSISTED +3 + a second legendary_encounter. The :280 no-buff witness rides the KO case's FIRST engagement (stages 0).
 func _prove_whiteout(runtime, species_id: String) -> bool:
 	var start: int = _failures.size()
 	var mons = runtime.overworld_mons_runtime
@@ -159,7 +160,7 @@ func _prove_whiteout(runtime, species_id: String) -> bool:
 
 # KO -> gone-for-good per world: overworld_mon_despawned{ko}, the removal key rides session.
 # legendary_removals, a second attempt finds NO target, a re-stamp re-derives suppression, and
-# the to_payload/apply_into round-trip into a fresh session keeps it gone (the untouched return).
+# the payload round-trip into a fresh session keeps it gone (the untouched return).
 func _prove_ko(runtime, species_id: String) -> bool:
 	var start: int = _failures.size()
 	var mons = runtime.overworld_mons_runtime
@@ -187,8 +188,7 @@ func _prove_ko(runtime, species_id: String) -> bool:
 		if str(other) != species_id: _ensure(mons._entities.has("legendary_0,0:%s" % str(other)), "ko: the re-stamp dropped the untouched %s" % str(other))
 	return _failures.size() == start
 
-# The pending-seam take + the legendary_encounter payload (species/battle_kind
-# + the provable ring gate + stages). {} on any red so the caller bails.
+# The pending-seam take + the legendary_encounter payload (species/kind/ring/stages). {} on any red.
 func _take_and_assert_payload(runtime, species_id: String, cursor: int, stages: int, label: String) -> Dictionary:
 	var battle_mon: Dictionary = runtime.generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
 	if not _ensure(str(battle_mon.get("species_id", "")) == species_id, "%s: the seam returned %s, expected %s" % [label, str(battle_mon.get("species_id", "")), species_id]): return {}

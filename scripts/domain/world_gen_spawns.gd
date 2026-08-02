@@ -18,7 +18,7 @@ const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
 const BiomeEncounters := preload("res://scripts/domain/biome_encounters.gd")
 
 const TIMES := ["DAY", "NIGHT"]
-const LEVEL_MAX_AT_RING_0 := 5 # analytic top of the ring-0 band: clampi(2+0/24,2,80)+3
+const LEVEL_MAX_NEAR_ORIGIN := 5 # analytic top of the near-origin level band: clampi(2+0/24,2,80)+3 (encounter_selection.level_from_distance minus its rng jitter)
 const _BST_STAT_KEYS := ["hp", "atk", "def", "spe", "sat", "sdf"]
 
 
@@ -160,59 +160,57 @@ static func _add_fallback_disjoint(advisory: Array, species: Dictionary, pools_b
 	})
 
 
-# ADVISORY bst_depth: per depth tier, the BST distribution (min/p10/median/p90/max) of
-# its biomes' DAY-pool members, plus every BST_HIGH(540)+ mon in a tier-0 (ring<10)
-# biome pool. Flags the missing stats<->depth gating.
+# ADVISORY bst_by_biome: per LAND biome, the BST distribution (min/p10/median/p90/max)
+# of its DAY-pool members, plus every BST_HIGH(540)+ mon anywhere in a land pool.
+# Infinite-world slice 2: the depth-tier table retired with the ring model — biomes
+# carry no spatial depth under the climate field, so the stats<->difficulty gap is
+# measured per biome (any biome can occur near origin at low levels).
 static func _add_bst_depth(advisory: Array, species: Dictionary, biome_encounters, pools_by_biome: Dictionary) -> void:
-	var tier_bsts: Dictionary = {}
-	var high_in_tier0: Array = []
+	var biome_bsts: Dictionary = {}
+	var high_anywhere: Array = []
 	var seen_high: Dictionary = {}
-	for biome in WorldGenAudit.BIOMES:
-		var tier := WorldGenAudit.depth_tier(biome)
-		if tier < 0: # WATER/SAND are elevation-driven, not depth-tiered
-			continue
+	for biome in WorldGenAudit.LAND_BIOMES:
 		var pool: Dictionary = pools_by_biome.get(biome, {})
 		for species_id in (pool.get("ids", []) as Array):
 			var entry: Variant = species.get(species_id, {})
 			if not (entry is Dictionary) or not biome_encounters.is_battle_viable(species_id, entry as Dictionary):
 				continue
 			var bst := bst_of(entry as Dictionary)
-			if not tier_bsts.has(tier):
-				tier_bsts[tier] = []
-			(tier_bsts[tier] as Array).append(bst)
-			if tier == 0 and bst >= WorldGenAudit.BST_HIGH and not seen_high.has(species_id):
+			if not biome_bsts.has(biome):
+				biome_bsts[biome] = []
+			(biome_bsts[biome] as Array).append(bst)
+			if bst >= WorldGenAudit.BST_HIGH and not seen_high.has(species_id):
 				seen_high[species_id] = true
-				high_in_tier0.append(species_id)
+				high_anywhere.append(species_id)
 	var stats: Dictionary = {}
-	for tier_key in tier_bsts.keys():
-		var values: Array = (tier_bsts[tier_key] as Array).duplicate()
+	for biome in biome_bsts.keys():
+		var values: Array = (biome_bsts[biome] as Array).duplicate()
 		values.sort()
-		stats[tier_key] = {
+		stats[biome] = {
 			"min": _percentile(values, 0.0),
 			"p10": _percentile(values, 0.1),
 			"median": _percentile(values, 0.5),
 			"p90": _percentile(values, 0.9),
 			"max": _percentile(values, 1.0),
 		}
-	high_in_tier0.sort()
+	high_anywhere.sort()
 	advisory.append({
-		"kind": "bst_depth",
-		"value": {"tier": stats, "high_in_tier0": high_in_tier0},
-		"detail": "%d high-BST (>= %d) mon(s) sit in tier-0 shallow biome pools => no stats<->depth gating today." % [high_in_tier0.size(), WorldGenAudit.BST_HIGH],
+		"kind": "bst_by_biome",
+		"value": {"biome": stats, "high_anywhere": high_anywhere},
+		"detail": "%d high-BST (>= %d) mon(s) sit in land biome pools; biomes carry no depth under the climate field => no stats<->difficulty gating today." % [high_anywhere.size(), WorldGenAudit.BST_HIGH],
 	})
 
 
-# ADVISORY level_band_strength: the analytic ring-0 level band tops out at level
-# LEVEL_MAX_AT_RING_0 (=5; encounter_selection.level_from_distance minus its rng jitter
-# is clampi(2+d/24,2,80), +3 at most), so any BST_HIGH mon in a tier-0/1 pool is
-# reachable at level 2-5. Lists them — encounter level ignores strength today.
+# ADVISORY level_band_strength: the near-origin level band tops out at level
+# LEVEL_MAX_NEAR_ORIGIN (=5; encounter_selection.level_from_distance minus its rng
+# jitter is clampi(2+d/24,2,80), +3 at most). Under the climate field ANY biome can
+# occur near origin (infinite-world slice 2 retired the ring tiers), so every
+# BST_HIGH mon in ANY land pool is reachable at level 2-5 wherever its biome touches
+# the inner region. Lists them — encounter level ignores strength today.
 static func _add_level_band(advisory: Array, species: Dictionary, biome_encounters, pools_by_biome: Dictionary) -> void:
 	var reachable: Array = []
 	var seen: Dictionary = {}
-	for biome in WorldGenAudit.BIOMES:
-		var tier := WorldGenAudit.depth_tier(biome)
-		if tier < 0 or tier > 1:
-			continue
+	for biome in WorldGenAudit.LAND_BIOMES:
 		var pool: Dictionary = pools_by_biome.get(biome, {})
 		for species_id in (pool.get("ids", []) as Array):
 			if seen.has(species_id):
@@ -227,7 +225,7 @@ static func _add_level_band(advisory: Array, species: Dictionary, biome_encounte
 	advisory.append({
 		"kind": "level_band_strength",
 		"value": reachable,
-		"detail": "%d high-BST mon(s) in tier-0/1 pools are reachable at level 2-%d (ring-0 band) => encounter level ignores strength today." % [reachable.size(), LEVEL_MAX_AT_RING_0],
+		"detail": "%d high-BST mon(s) in land pools are reachable at level 2-%d wherever their biome occurs near origin => encounter level ignores strength today." % [reachable.size(), LEVEL_MAX_NEAR_ORIGIN],
 	})
 
 

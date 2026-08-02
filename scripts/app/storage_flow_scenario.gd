@@ -1,15 +1,14 @@
 extends Node
 
 # Storage Box + party-management scenario (Phase 3; spec: storage-and-party.md).
-# Drives the full box loop through the real runtime + UI + input paths: stand
-# beside a box and an overworld Z opens it through field_action_router's BOX_ID
-# arm (avatar disabled, box_opened) — pre-wiring the scenario opened it directly
-# and gated the polls with set_battle; deposit/withdraw with exact payloads
-# (incl. the party-screen deposit_to_nearest); every storage_refused reason;
-# the non-empty Cut refusal then the empty-box Cut; the confirm-gated release on
-# BOTH branches via REAL keys; box INDEPENDENCE + v4 persistence; the overflow
-# NO-ROUTING proof; the witness guard; the MOVE reorder. The second half lives
-# in storage_flow_party_checks.gd (line budget). Seed-pinned, encounters zeroed,
+# Drives the full box loop through the real runtime + UI + input paths: an
+# overworld Z beside a box opens it through field_action_router's BOX_ID arm
+# (avatar disabled, box_opened); deposit/withdraw with exact payloads (incl. the
+# party-screen deposit_to_nearest); every storage_refused reason; the non-empty
+# Cut refusal then the empty-box Cut; the confirm-gated release on BOTH branches
+# via REAL keys; box INDEPENDENCE + v4 persistence; the overflow NO-ROUTING proof;
+# the witness guard; the MOVE reorder. The second half lives in
+# storage_flow_party_checks.gd (line budget). Seed-pinned, encounters zeroed,
 # dispatcher save-guarded; storage_flow_failed + push_error on any non-pass
 # (miss-002). Accumulated input is on: SmokeTap taps fire the polls that drive the Z seam; _press drives only _unhandled_input (a stray poll dies on overworld_idle's StorageScreen check + _overlay_open + latch).
 
@@ -63,6 +62,7 @@ func run(ctx: Dictionary) -> void:
 
 func _place_structures() -> void: # boxes A + B plus one wall; preconditions keep the witness math from going vacuous
 	var runtime = _runtime()
+	runtime._world_gen.clear_placements() # only this scenario's structures may stand (a polluted boot save's way-stone would join the guard's required set and red the dormancy assert — the nav_audit save-independence precedent; the per-scenario save guard restores afterwards)
 	for item_id in ["log", "dry_soil", "hard_stone", "poke_ball"]: runtime.session.remove_item(item_id, runtime.get_item_count(item_id))
 	runtime.session.add_item("log", 8); runtime.session.add_item("dry_soil", 2); runtime.session.add_item("poke_ball", 5)
 	var carriers := 0
@@ -70,9 +70,8 @@ func _place_structures() -> void: # boxes A + B plus one wall; preconditions kee
 		if runtime.field_move_capable("cut", runtime.session.party[i]): carriers += 1; _cut_index = i
 	_ensure(carriers == 1, "precondition: the party must carry exactly one Cut mon (got %d)" % carriers)
 	_ensure(runtime.party_has_field_move_ability("build"), "precondition: the party is not build-capable")
-	# Boxes cost 2 Log in every biome (their demolish move is always Cut), but the
-	# WALL must sit on the cut-cost shell — SAND/DESERT shells cost hard_stone ->
-	# Smash — so the witness set the guard accumulates is exactly {cut}.
+	# Boxes cost 2 Log in every biome (demolish always Cut), but the WALL must sit on
+	# the cut-cost shell (SAND/DESERT shells cost hard_stone -> Smash), so the witness set is exactly {cut}.
 	var box_tiles := _find_open_tiles(_player().tile_position, 2)
 	_tile_wall = Vector2i.ZERO
 	for radius in range(1, 17): # separate scan: the wall needs no box-gap, only the cut-cost shell

@@ -13,7 +13,7 @@ extends RefCounted
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
 const CELL_SIZE := 8 # mirrors OverworldMons.CELL_SIZE (scenario contract)
-const AXIS_SCAN_MAX := 24576 # ring bound for the biome band discovery (LAVA rides ~1000-3000; generous for arbitrary save seeds)
+const AXIS_SCAN_MAX := 24576 # ring bound for the biome discovery (generous for arbitrary save seeds; the climate field puts LAVA anywhere, so most seeds resolve far inside the cap)
 
 # The full per-entity state over sorted ids — two same-(seed, steps, player-tile)
 # derivations yield the identical string (the determinism proof, scenario + audit).
@@ -52,11 +52,11 @@ func tile_overlap_failures(mons, center: Vector2i, radius: int) -> Array:
 		seen[key] = true
 	return failures
 
-# biome -> stand tile, deterministic: the spoke band scan (biome rings ride Manhattan
-# distance from the origin — the world_generator._pick_biome convention; EIGHT spokes —
-# axes + diagonals — because a rare biome (LAVA/SNOW patches) can thread BETWEEN the four
-# axes on some world seeds), then a local walkable stand tile. WATER stands on LAND within
-# `water_reach` tiles of the patch so water cells enter the spawn window (swim_only only).
+# biome -> stand tile, deterministic: the spoke scan (EIGHT spokes — axes + diagonals —
+# first-seen per biome; the climate field puts every biome somewhere on the plane, and a
+# rare pocket can thread BETWEEN the four axes on some world seeds), then a local walkable
+# stand tile. WATER stands on LAND within `water_reach` tiles of the patch so water cells
+# enter the spawn window (swim_only only).
 func biome_anchors(world, biomes: Array, water_reach: int = 10) -> Dictionary:
 	var first_seen := {}
 	for r in range(0, AXIS_SCAN_MAX, 2):

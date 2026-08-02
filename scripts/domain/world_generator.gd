@@ -1,6 +1,7 @@
 extends RefCounted
 
 const BiomeDefs := preload("res://scripts/domain/biome_defs.gd")
+const BiomeField := preload("res://scripts/domain/biome_field.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const WorldInvariants := preload("res://scripts/domain/world_invariants.gd")
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
@@ -11,9 +12,8 @@ const SPAWN_MIN_WALK_NEIGHBORS := 2
 const SPAWN_MIN_SAFE_NEIGHBORS := 1
 
 var _seed: int = 1337
-var _elevation_noise: FastNoiseLite
+var _climate: Dictionary = {} # BiomeField channels (elevation/temperature/moisture/volcanism), built per setup
 var _tall_grass_noise: FastNoiseLite
-var _biome_noise: FastNoiseLite
 var _defs: Dictionary = {}
 var _textures: Dictionary = {}
 # Two independent sparse maps (one save key each): harvest clears and build
@@ -31,12 +31,7 @@ func setup(seed_value: int) -> void:
 	_seed = seed_value
 	_defs = BiomeDefs.new().definitions()
 
-	_elevation_noise = FastNoiseLite.new()
-	_elevation_noise.seed = _seed
-	_elevation_noise.frequency = 0.010
-	_elevation_noise.fractal_octaves = 4
-	_elevation_noise.fractal_lacunarity = 2.0
-	_elevation_noise.fractal_gain = 0.45
+	_climate = BiomeField.make_channels(_seed) # the ONE biome source (infinite-world slice 2; the radial mirror is gone)
 
 	# Patch-scale noise for tall-grass scatter: 0.16 frequency blobs a handful
 	# of tiles wide, so encounter grass reads as patches, not carpets.
@@ -47,17 +42,10 @@ func setup(seed_value: int) -> void:
 	_tall_grass_noise.fractal_lacunarity = 2.2
 	_tall_grass_noise.fractal_gain = 0.50
 
-	_biome_noise = FastNoiseLite.new()
-	_biome_noise.seed = _seed + 4242
-	_biome_noise.frequency = 0.004
-	_biome_noise.fractal_octaves = 2
-	_biome_noise.fractal_lacunarity = 2.0
-	_biome_noise.fractal_gain = 0.50
-
 
 func get_tile_logic(map_pos: Vector2i) -> Dictionary:
-	var elevation = _elevation_noise.get_noise_2d(map_pos.x, map_pos.y)
-	var biome = _pick_biome(map_pos, elevation)
+	var elevation = BiomeField.elevation_from(_climate, map_pos)
+	var biome = BiomeField.biome_from_e(_climate, map_pos, elevation)
 	var def: Dictionary = _defs[biome]
 
 	var walkable: bool = bool(def["walkable"])
@@ -270,28 +258,6 @@ func _ring_tiles(ring: int) -> Array:
 			if max(abs(x), abs(y)) == ring:
 				tiles.append(Vector2i(x, y))
 	return tiles
-
-
-func _pick_biome(map_pos: Vector2i, elevation: float) -> String:
-	if elevation < -0.30:
-		return "WATER"
-	if elevation < -0.12:
-		return "SAND"
-	var candidates = _ring_candidates(abs(map_pos.x) + abs(map_pos.y))
-	var region = (_biome_noise.get_noise_2d(map_pos.x, map_pos.y) + 1.0) * 0.5
-	var index = clampi(int(region * float(candidates.size())), 0, candidates.size() - 1)
-	return str(candidates[index])
-
-
-func _ring_candidates(distance: int) -> Array:
-	var candidates: Array = ["PLAINS", "GRASSLAND"]
-	if distance >= 10:
-		candidates.append_array(["FOREST", "SAVANNA"])
-	if distance >= 28:
-		candidates.append_array(["DESERT", "SWAMP", "ROCK"])
-	if distance >= 60:
-		candidates.append_array(["SNOW", "LAVA"])
-	return candidates
 
 
 func _texture(path: String, region: Variant) -> Texture2D:

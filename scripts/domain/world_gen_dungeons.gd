@@ -1,16 +1,17 @@
 extends RefCounted
 
-# World-generation AUDIT family — DUNGEONS (spec: infinite-world.md; world-depth.md
-# § Landmarks / § Legendaries). Pure measurement of biome SITE availability, spawn-disc
+# World-generation AUDIT family — DUNGEONS (spec: world-depth.md § Landmarks /
+# § Legendaries; the successor infinite-world.md lands in slice 5). Pure measurement of biome SITE availability, spawn-disc
 # exclusion and spawn/landmark reachability. NO rng, NO I/O: a pure deterministic function
 # of a live WorldGenerator `gen` (setup(seed)) + the int `seed` (chain frozen at origin —
 # the seamless infinite plane retired chaining).
 #
 # TIER RULE: only structural invariants that HOLD TODAY ride `enforcing_failures` (red on
 # regression): the spawn flood reaching a minimum region. Every gap that needs a FUTURE fix
-# rides `advisory` and NEVER gates: LAVA site availability (LAVA never generates on origin),
-# legendary NO_ANCHOR (the LAVA four on origin), spawn-disc intrusion, and the gen-time
-# landmark reachability gate (spec §19(c), unimplemented).
+# rides `advisory` and NEVER gates: spawn-disc intrusion and the gen-time landmark
+# reachability gate (spec §19(c), unimplemented). (Infinite-world slice 2: LAVA now
+# GENERATES under the climate field, so the LAVA-site and legendary NO_ANCHOR gaps
+# closed — both stay measured as advisories so a threshold regression re-opens them LOUDLY.)
 
 const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
@@ -24,22 +25,25 @@ static func audit(gen, seed: int) -> Dictionary:
 	var advisory: Array = []
 
 	# (1) ADVISORY site availability: stride-scan the audit window for a representative footprint
-	# (RUINS_SIZE) per land biome; LAVA never generates on origin => zero LAVA-dungeon sites.
+	# (RUINS_SIZE) per land biome. LAVA generates under the climate field (slice 2), so the
+	# LAVA-site count is now expected nonzero-but-rare; a zero count re-flags the gap LOUDLY.
 	var site_size: Vector2i = Landmarks.RUINS_SIZE
 	var sites := _site_scan(gen, site_size)
 	advisory.append({"kind": "site_availability", "value": sites.duplicate(),
 		"detail": "Audit-window centers (stride %d) whose biome fits a %dx%d dungeon footprint (conservative: ROCK counts rock props as non-land, so ROCK is a lower bound — see WorldGenAudit.is_land)." % [WorldGenAudit.SITE_SCAN_STRIDE, site_size.x, site_size.y]})
 	if int(sites.get("LAVA", 0)) == 0:
 		advisory.append({"kind": "lava_site_gap", "value": 0,
-			"detail": "LAVA never generates on origin => zero LAVA-dungeon sites (the headline gap; a future fix makes LAVA generate in deep rings)."})
+			"detail": "zero LAVA-dungeon sites in the window — the climate field should make LAVA generate (a threshold/frequency regression re-opened the retired radial gap)."})
 
 	# Landmarks placed in this world (all three host; chain frozen at origin).
 	var landmarks := Landmarks.landmarks_in_world(seed, Vector2i.ZERO)
 
-	# (2) ADVISORY legendary anchors: the LAVA four resolve NO_ANCHOR (LAVA never generates).
+	# (2) ADVISORY legendary anchors: species whose reach box lacks an affinity pocket
+	# resolve NO_ANCHOR (under the climate field the SNOW three always resolve and the
+	# LAVA four resolve on most seeds; a nonempty list flags an anchor-scan regression).
 	var legend := _legendary_anchors(seed)
 	advisory.append({"kind": "legendary_no_anchor", "value": legend["no_anchor"],
-		"detail": "Legendary species whose affinity biome never generates in this world resolve NO_ANCHOR (the LAVA four on origin)."})
+		"detail": "Legendary species resolving NO_ANCHOR on this seed (the reach box lacks an affinity pocket; rare under the climate field)."})
 
 	# (4) ADVISORY spawn_disc_exclusion: a landmark footprint CAN intrude within SPAWN_DISC of
 	# origin (measured: the ring-34 Ruins reach manhattan <=24 on some seeds — its footprint's
@@ -81,13 +85,9 @@ static func audit(gen, seed: int) -> Dictionary:
 
 # --- helpers (pure) ---------------------------------------------------------------
 
-# The land biomes (depth-tier >= 0): WATER/SAND are elevation-driven (tier -1) and never site a dungeon.
+# The land biomes: WATER/SAND are the elevation bands and never site a dungeon.
 static func _land_biomes() -> Array:
-	var biomes: Array = []
-	for biome in WorldGenAudit.BIOMES:
-		if WorldGenAudit.depth_tier(str(biome)) >= 0:
-			biomes.append(str(biome))
-	return biomes
+	return WorldGenAudit.LAND_BIOMES.duplicate()
 
 
 # Stride-scan the playable disc (manhattan < SITE_SCAN_RADIUS): count centers per land biome whose
@@ -132,7 +132,8 @@ static func _footprint_tiles(footprint: Rect2i) -> Array:
 
 
 # Legendary anchor outcomes on the infinite plane (chain frozen at origin): the anchored
-# count + the NO_ANCHOR set (the LAVA four, whose affinity biome never generates on origin).
+# count + the NO_ANCHOR set (a species resolves NO_ANCHOR when its reach box lacks an
+# affinity pocket — the SNOW three always anchor; the LAVA four anchor on most seeds).
 static func _legendary_anchors(seed: int) -> Dictionary:
 	var no_anchor: Array = []
 	var anchored := 0

@@ -6,10 +6,12 @@
     ]
   },
   "playtest_entity_soak": {
-    "count": 1,
+    "count": 2,
     "messages": [
-      "Species catalog load complete."
-    ]
+      "Species catalog load complete.",
+      "Overworld sprite missing for ARCEUS; using the placeholder."
+    ],
+    "note": "Re-pinned 1 -> 2 (infinite-world slice 2, 2026-08-02): the climate pools along the entity soak's seeded band now include ARCEUS (the full-catalog fallback path); the overworld sprite table has no ARCEUS entry, so the DESIGNED tiered fallback (overworld_not_found.png) renders it and warns \u2014 honest placeholder, not a render regression."
   },
   "playtest_field_soak": {
     "count": 1,
@@ -18,11 +20,19 @@
     ]
   },
   "playtest_soak": {
-    "count": 3,
+    "count": 10,
     "messages": [
       "Species catalog load complete.",
       "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
+      "Unhandled move effect in battle.",
       "Unhandled move effect in battle."
-    ]
+    ],
+    "note": "Re-pinned 3 -> 10 (infinite-world slice 2, 2026-08-02): the climate-field biome model changed the pools along the soak's seeded walk band, so its battles now encounter a variety of species carrying unimplemented battle effects (SWAGGER/DISABLE/GUST/ROLLOUT/FORESIGHT/RAPID_SPIN/SPLASH \u2014 the engine's documented partial coverage plays them as plain hits and warns, the honest fallback). Same warning CLASS as the pinned 2, higher frequency under the new terrain."
   }
 }

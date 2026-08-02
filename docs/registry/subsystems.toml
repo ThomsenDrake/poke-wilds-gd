@@ -125,6 +125,7 @@ code_paths = [
   "scripts/runtime/player_avatar.gd",
   "scripts/runtime/player_sprite_frames.gd",
   "scripts/domain/biome_defs.gd",
+  "scripts/domain/biome_field.gd",
   "scripts/domain/biome_encounters.gd",
   "scripts/domain/world_generator.gd",
   "scripts/domain/world_overrides.gd",
@@ -1065,13 +1066,13 @@ quality_bucket = "landmarks"
 # their OWN homes: biome_encounters' LEGENDARY_IDS never-encounter exclusion (world_runtime)
 # + session_state/session_payload's v4-additive legendary_removals marshalling
 # (session_runtime). SCENARIO LANE LANDED: scripts/app/legendary_spawn_scenario.gd (the
-# ring-gated spawn proof — anchored SNOW three witnessed, the LAVA four NO_ANCHOR negative
-# proof + lava_absent payload witness per the domain empirical flag; the exclusion over
+# climate-anchored spawn proof — ALL SEVEN anchored witnessed (infinite-world slice 2:
+# the climate field generates LAVA, the retired radial empirical flag RESOLVED), the
+# synthetic reach-1 NO_ANCHOR witness covering the negative proof; the exclusion over
 # every pool path; the chase-catch +3 / legendary_encounter{battle_kind:"legendary"} kind
 # seam; the white-out re-battleable + KO gone-for-good rematch rules), its passed/failed
 # registration above, the requirements row + PLAYTEST_SCENARIOS entry, and the double-run
-# lane regroup to the spec's [4,4] (self-pinned: seed_for_smoke -> new_game -> rebuild;
-# stamping is pure _mix, NO rng).
+# lane (self-pinned: seed_for_smoke -> new_game -> rebuild; stamping is pure _mix, NO rng).
 # PHASE 7 BUILD 1 OF 3 (docs/product-specs/world-depth.md § Landmarks) — landmarks ONLY;
 # legendaries (Build 2) + chaining/save v5 (Build 3) pending. The frozen GENERATOR seam is
 # chain-parametric from day one: Landmarks.tile_logic_for(world_seed, chain, map_pos,
@@ -1192,6 +1193,14 @@ quality_bucket = "landmarks"
 # change; update mode downshifts; v5-shaped writes refused+traced). phase0_scenarios.gd
 # gains the v5 fixture + _v5_fields_ok (v_ok grows to five). The app layer reaches
 # SaveMigration ONLY via the runtime re-export (check_architecture layer table).
+# NOTE (infinite-world slice 1, 2026-08-01): EVERYTHING in the Build-3 chaining narrative
+# below — the PURE world_chain module, world_chain_runtime's try_cross_edge swap, the
+# walk-into-boundary world_edge refusal, the edge-band Teleport Beacons (beacon_placed /
+# edge_suppressed), the world_chain scenario lane, the v5 chained_worlds save shape, and
+# the derived-seed showcase frames — is RETIRED (world chaining is gone; the world is one
+# seamless infinite plane; save schema is v6 with chain-less lossless flatten + chained
+# refusal). It is kept as HISTORICAL context only; the current contract lives in the
+# slice-1/2 NOTEs above and docs/product-specs/world-depth.md's retirement banner.
 # PHASE 7 BUILD 3 OF 3 (world-depth.md § World chaining) — CHAINING LANE LANDED: the PURE
 # scripts/domain/world_chain.gd (world_seed_for — origin returns root_seed UNMIXED, else
 # _mix(root, cx, cy, SALT_WORLD=0x21) & 0x7fffffff; WORLD_RADIUS:=96 Manhattan extent;

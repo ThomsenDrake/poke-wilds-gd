@@ -18,21 +18,21 @@ const SCAN_RADIUS := 110 # cohesion disc (Manhattan); ~24.4k tiles
 const SITE_SCAN_RADIUS := 96 # dungeon site scan window (a bounded sample of the infinite plane; decoupled from any world extent since the infinite-world slice)
 const SITE_SCAN_STRIDE := 2 # site-scan sampling step (keeps the footprint sweep cheap)
 
-# --- ring model (mirrors world_generator._ring_candidates thresholds) ---
-const RING_INNER := 10
-const RING_MIDDLE := 28
-const RING_OUTER := 60
+# --- spawn disc ---
 const SPAWN_DISC := 24 # world_generator.SPAWN_SEARCH_RADIUS — footprints must stay outside
 
 # --- analysis constants ---
 const REACH_BUDGET := 5000 # BFS flood budget for spawn/landmark reachability
 const SPAWN_REACH_MIN := 12 # mirrors world_invariants.SPAWN_REACH_MIN
 const SPECK_THRESHOLD := 8 # a biome region smaller than this is a salt-and-pepper speck
+const LAVA_WINDOWS_MIN := 6 # cross-seed LAVA presence contract: the rare joint tail must appear in at least this many of the audit's 9 seed windows (a cold-climate window may legitimately lack it)
 const BST_HIGH := 540 # provisional "strong mon" base-stat-total (re-pin when the spawn fix lands)
 
 const BIOMES := ["WATER", "SAND", "PLAINS", "GRASSLAND", "FOREST", "SAVANNA", "DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]
-# Depth tier per land biome (the ring-admission gradient); WATER/SAND are elevation-driven, tier -1.
-const TIER_BY_BIOME := {"PLAINS": 0, "GRASSLAND": 0, "FOREST": 1, "SAVANNA": 1, "DESERT": 2, "SWAMP": 2, "ROCK": 2, "SNOW": 3, "LAVA": 3}
+# The land biomes (WATER/SAND are the elevation bands and never site a dungeon). The
+# retired radial TIER_BY_BIOME depth table is gone with the ring model — biomes carry
+# no spatial depth under the climate field (infinite-world slice 2).
+const LAND_BIOMES := ["PLAINS", "GRASSLAND", "FOREST", "SAVANNA", "DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]
 # Hard-hostile adjacencies a cohesive world should avoid (the blending fix's target contract).
 const HOSTILE_PAIRS := [["SNOW", "LAVA"], ["LAVA", "WATER"], ["DESERT", "SNOW"], ["LAVA", "GRASSLAND"], ["SNOW", "SAVANNA"]]
 const EXTREME_BIOMES := ["SNOW", "LAVA"] # the quantization-tail biomes whose reachability is the headline measurement
@@ -80,7 +80,7 @@ static func ring_of(pos: Vector2i) -> int:
 	return absi(pos.x) + absi(pos.y)
 
 
-# Manhattan disc of all tiles with |x|+|y| <= radius (the ring model's natural region).
+# Manhattan disc of all tiles with |x|+|y| <= radius (a bounded sample window of the infinite plane).
 static func disc_positions(radius: int) -> Array:
 	var positions: Array = []
 	for y in range(-radius, radius + 1):
@@ -88,10 +88,6 @@ static func disc_positions(radius: int) -> Array:
 		for x in range(-span, span + 1):
 			positions.append(Vector2i(x, y))
 	return positions
-
-
-static func depth_tier(biome: String) -> int:
-	return int(TIER_BY_BIOME.get(biome, -1))
 
 
 # Unordered biome-pair key for adjacency tabulation (SNOW|LAVA == LAVA|SNOW).
