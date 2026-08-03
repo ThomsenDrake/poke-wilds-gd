@@ -200,13 +200,40 @@ func _prop_key_color(biome: String, prop_path: String) -> String:
 	return ""
 
 
+# Beach-preference spawn scan (faithful "start on a beach" from the original).
+# Deterministic: no rng, no engine hash, fixed ring + direction order. FIRST-
+# MATCH RULE: one pass over rings 0..SPAWN_SEARCH_RADIUS-1 in _ring_tiles'
+# y-then-x order — the FIRST SAND tile that is walkable, touches surf water
+# cardinally and passes _spawn_meets_neighbors wins outright; only when no
+# beach exists within the radius does the EXISTING walkable fallback scan
+# below run, unchanged.
 func find_walkable_spawn(seed_value: int) -> Vector2i:
 	setup(seed_value)
-	for ring in range(0, SPAWN_SEARCH_RADIUS):
+	for ring in range(0, SPAWN_SEARCH_RADIUS): # beach pass: first beach candidate wins
+		for tile in _ring_tiles(ring):
+			if _is_beach_spawn(tile):
+				return tile
+	for ring in range(0, SPAWN_SEARCH_RADIUS): # unchanged walkable fallback scan
 		for tile in _ring_tiles(ring):
 			if bool(get_tile_logic(tile)["walkable"]) and _spawn_meets_neighbors(tile):
 				return tile
 	return Vector2i.ZERO
+
+
+# Beach candidate gate: SAND + walkable (a landmark footprint near origin can
+# stamp the tile non-walkable through the resolver) + at least one cardinal
+# neighbor whose resolved logic requires surf (WATER), checked in fixed
+# [UP, DOWN, LEFT, RIGHT] order, + the standard neighbor gate. WATER is
+# non-walkable, so a sandbar with only water neighbors fails the gate and is
+# rejected, keeping SPAWN_REACH_MIN spawn reachability intact.
+func _is_beach_spawn(tile: Vector2i) -> bool:
+	var logic = get_tile_logic(tile)
+	if str(logic["biome"]) != "SAND" or not bool(logic["walkable"]):
+		return false
+	for direction in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+		if str(get_tile_logic(tile + direction)["requires_field_move"]) == "surf":
+			return _spawn_meets_neighbors(tile)
+	return false
 
 
 # `blocked` is one extra tile treated as unwalkable — the build trap guard's

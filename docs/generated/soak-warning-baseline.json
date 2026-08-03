@@ -20,7 +20,7 @@
     ]
   },
   "playtest_soak": {
-    "count": 10,
+    "count": 8,
     "messages": [
       "Species catalog load complete.",
       "Unhandled move effect in battle.",
@@ -29,10 +29,8 @@
       "Unhandled move effect in battle.",
       "Unhandled move effect in battle.",
       "Unhandled move effect in battle.",
-      "Unhandled move effect in battle.",
-      "Unhandled move effect in battle.",
       "Unhandled move effect in battle."
     ],
-    "note": "Re-pinned 3 -> 10 (infinite-world slice 2, 2026-08-02): the climate-field biome model changed the pools along the soak's seeded walk band, so its battles now encounter a variety of species carrying unimplemented battle effects (SWAGGER/DISABLE/GUST/ROLLOUT/FORESIGHT/RAPID_SPIN/SPLASH \u2014 the engine's documented partial coverage plays them as plain hits and warns, the honest fallback). Same warning CLASS as the pinned 2, higher frequency under the new terrain."
+    "note": "Re-pinned 10 -> 8 (infinite-world slice 4, 2026-08-03): the beach spawn shifted the soak's seeded walk band, so its battles now hit 7 unimplemented-effect mons instead of 9 (the beach spawn changes which wild mons the soak encounters). Same warning CLASS (Unhandled move effect, the engine's documented partial coverage plays them as plain hits and warns \u2014 the honest fallback), lower frequency under the beach spawn."
   }
 }

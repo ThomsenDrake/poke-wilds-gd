@@ -111,6 +111,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["boot_started", "boot_ready", "content_scatter_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "seed_choice": {
+        "all": ["boot_started", "boot_ready", "seed_choice_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "waystone_selector": {
         "all": ["boot_started", "boot_ready", "waystone_registered", "teleport_used",
                 "waystone_selector_passed"],

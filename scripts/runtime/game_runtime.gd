@@ -102,9 +102,9 @@ func ensure_initialized() -> void:
 	new_game()
 
 
-func new_game() -> void:
+func new_game(custom_seed: int = -1) -> void:
 	var starter = _build_starter()
-	var world_seed = int(_rng.randi() & 0x7fffffff) # the infinite-world seed (infinite-world slice: one seamless plane; the old chain-root framing is retired)
+	var world_seed: int = custom_seed if custom_seed >= 0 else int(_rng.randi() & 0x7fffffff) # the infinite-world seed (infinite-world slice: one seamless plane): the start menu's SeedPrompt choice, or the shared _rng draw — the starter draw above ALWAYS runs first, so a custom seed skips ONLY this one draw (the pinned stream order)
 	_world_gen.clear_overrides(); _world_gen.clear_placements()
 	session.world_seed = world_seed; session.landmark_state = {} # BEFORE the scan: the landmark resolver seam reads
 	# both off the SESSION (footprints + the door overlay), so a pre-reset scan rates candidates against the PREVIOUS world's footprints and can commit a walled spawn; find_walkable_spawn's own setup(seed) reseeds the generator (no explicit setup here), and the scan draws no shared _rng.

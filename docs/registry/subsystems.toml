@@ -251,6 +251,7 @@ code_paths = [
   "scripts/ui/bag_screen.gd",
   "scripts/ui/menu_context.gd",
   "scripts/ui/options_screen.gd",
+  "scripts/ui/seed_prompt.gd",
 ]
 scene_paths = [
   "scenes/ui/StartMenu.tscn",
@@ -1007,6 +1008,7 @@ code_paths = [
   "scripts/app/landmark_actions.gd",
   "scripts/app/landmark_flow_scenario.gd",
   "scripts/app/content_scatter_scenario.gd",
+  "scripts/app/seed_choice_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
@@ -1033,6 +1035,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario waystone_selector",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario content_scatter",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario seed_choice",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
 ]
 # The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2
@@ -1050,6 +1053,16 @@ validation_commands = [
 # registrations + the picked teleport_used warp).
 required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
 quality_bucket = "landmarks"
+# INFINITE-WORLD SLICE 4 (creation-time seed choice + beach spawn): scripts/app/
+# seed_choice_scenario.gd joins code_paths — the self-pinned witness for
+# new_game(custom_seed) (custom seed S := 2026080401: two re-pinned runs derive
+# byte-identical world_seed/spawn/stride-sample fingerprints — the custom path skips
+# ONLY the world_seed draw; the starter shiny draw ALWAYS runs first, so the party is
+# never compared), the beach-preference spawn (spawn (5,4) is SAND + walkable + a
+# cardinal surf neighbor under S), and the random path (seed_for_smoke(2026072810) +
+# no-arg new_game -> the hard-pinned world_seed 1319840800, the entity-soak precedent
+# pair). The seed_choice_passed/failed rows ride trace-events.md + the requirements
+# row + PLAYTEST_SCENARIOS (the content_scatter precedent); NOT a double-run consumer.
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
 # LEGENDARY_IDS, flagged SNOW/LAVA affinity, pure _mix ring-≥60 anchors bounded to 300, the

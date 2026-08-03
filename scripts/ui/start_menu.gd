@@ -21,12 +21,11 @@ signal new_game_requested
 signal field_move_requested(move_id: String, mon_index: int)
 
 const MenuContext := preload("res://scripts/ui/menu_context.gd") # context Callable resolution, extracted at the 220 wall
+const SeedPrompt := preload("res://scripts/ui/seed_prompt.gd") # NEW GAME custom-seed entry, extracted at the 220 wall
 
 const RUNTIME_METHODS := {
-	"get_party_snapshot": "get_party_snapshot",
-	"set_party_lead": "set_party_lead",
-	"save_game": "save_game",
-	"new_game": "new_game",
+	"get_party_snapshot": "get_party_snapshot", "set_party_lead": "set_party_lead",
+	"save_game": "save_game", "new_game": "new_game",
 	"get_campsite_pokemon": "get_campsite_pokemon", "retrieve_campsite_mon": "retrieve_campsite_mon",
 	"deposit_to_nearest": "deposit_to_nearest", "box_tile_near": "box_tile_near",
 	"get_player_tile": "get_player_tile", "pen_tile_near": "pen_tile_near",
@@ -58,6 +57,7 @@ const ENTRY_CLOSE := 5
 var _raw_context: Dictionary = {}
 var _context: Dictionary = {}
 var _awaiting_confirm := false
+var _seed_prompt: Control
 
 func _ready() -> void:
 	visible = false
@@ -73,6 +73,8 @@ func _ready() -> void:
 	if confirm_box != null and confirm_box.has_signal("confirmed"):
 		confirm_box.connect("confirmed", _on_new_game_confirmed)
 		confirm_box.connect("cancelled", _on_new_game_cancelled)
+	_seed_prompt = SeedPrompt.new(); add_child(_seed_prompt) # sceneless: built + wired here (Main.tscn stays untouched)
+	_seed_prompt.seed_confirmed.connect(_on_new_game_confirmed); _seed_prompt.cancelled.connect(_on_new_game_cancelled)
 	setup(_raw_context)
 
 func setup(context: Dictionary) -> void:
@@ -98,6 +100,7 @@ func hide_menu() -> void:
 	var confirm_box := get_node_or_null("../MessageBox")
 	if confirm_box != null and confirm_box.call("is_confirming"):
 		confirm_box.call("hide_message") # drop a pending confirm; toasts survive
+	_seed_prompt.close_prompt() # a pending seed entry drops with the menu (silent: no cancelled)
 	_awaiting_confirm = false
 	_party_screen.close_screen()
 	_bag_screen.close_screen()
@@ -113,7 +116,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# THIRD-LAST UI child since Phase 3 (StorageScreen and CampMenu follow, both
 	# self-gated on visibility), so it still receives unhandled input BEFORE the
 	# MessageBox sibling that owns the confirm answer and would otherwise starve it.
-	if not visible or _submenu_open() or _awaiting_confirm:
+	if _awaiting_confirm and not _seed_prompt.visible and (event.is_action_pressed("move_left") or event.is_action_pressed("move_right")):
+		_open_seed_prompt(); get_viewport().set_input_as_handled(); return # the confirm-phase seed gesture — Z/X keep falling through to the MessageBox answer
+	if not visible or _submenu_open() or _awaiting_confirm or _seed_prompt.visible:
 		return
 	if event.is_action_pressed("move_up"):
 		_move_selection(-1)
@@ -153,13 +158,15 @@ func _begin_new_game_confirm() -> void:
 		return
 	_awaiting_confirm = true
 	new_game_requested.emit()
-	confirm_box.call("show_confirm", "Start a new game? Your current save will be erased.")
+	confirm_box.call("show_confirm", "Start a new game? Your current save will be erased.", "←/→: custom seed")
 
-func _on_new_game_confirmed() -> void:
+func _open_seed_prompt() -> void: get_node("../MessageBox").call("hide_message"); _seed_prompt.open_prompt() # the confirm drops and the prompt supersedes it; _awaiting_confirm STAYS set until the prompt answers
+
+func _on_new_game_confirmed(seed_value: int = -1) -> void:
 	# The confirmed signal is SHARED (the StorageScreen's RELEASE rides it too):
 	if not _awaiting_confirm: return # a confirm this menu did not open is not a reset
 	_awaiting_confirm = false
-	_call_context("new_game")
+	_call_context("new_game", [seed_value]) # -1 (the MessageBox Z) keeps the runtime's random draw; a SeedPrompt seed rides through
 	hide_menu(); game_reset.emit()
 
 func _on_new_game_cancelled() -> void: _awaiting_confirm = false

@@ -33,10 +33,10 @@ func show_message(text: String, duration_seconds: float = 2.0) -> void:
 	_timer.start(max(duration_seconds, 0.1))
 
 
-func show_confirm(text: String) -> void:
+func show_confirm(text: String, key_hint: String = "") -> void:
 	_timer.stop()
 	_confirming = true
-	_label.text = text + "\n(Z: Yes   X: No)"
+	_label.text = text + "\n(Z: Yes   X: No" + ("" if key_hint.is_empty() else "   " + key_hint) + ")" # an optional hint rides the answer line so the box stays two lines (the StartMenu seed gesture)
 	visible = true
 
 

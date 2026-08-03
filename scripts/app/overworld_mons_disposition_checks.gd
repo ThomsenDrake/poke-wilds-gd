@@ -17,6 +17,14 @@ const FLEE_STEPS := 6 # mirrors OverworldMons.FLEE_STEPS
 const CHASE_RADIUS := 8 # mirrors OverworldMons.CHASE_RADIUS
 const DESPAWN_CELLS := 3 # mirrors OverworldMons.DESPAWN_CELLS
 const ADJACENT := Vector2i(1, 0)
+# Slot-presence contract mirrors (OverworldMons): the respot check repositions onto a cell
+# with a derivable roamer, since the slice-4 beach spawn can land in an entity-sparse patch.
+const SALT_PRESENT := 0x1 # mirrors OverworldMons.SALT_PRESENT
+const SPAWN_PRESENT_PCT := 25 # mirrors OverworldMons.SPAWN_PRESENT_PCT
+const SLOTS_PER_CELL := 1 # mirrors OverworldMons.SLOTS_PER_CELL
+const _K0 := 0x6C62272E07BB0142; const _K1 := 0x62B821756295C58D # mirrors OverworldMons SplitMix
+const _K2 := 0x4A5A6B2D0E8F3C97; const _K3 := 0x5851F42D4C957F2D
+const _MASK := 0x7FFFFFFFFFFFFFFF
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -104,7 +112,8 @@ func _run_ride_gait_chase(runtime, mons) -> void:
 
 func _run_despawn_respot(runtime, mons) -> void:
 	_reset(mons)
-	var home: Vector2i = _player().tile_position
+	var home: Vector2i = _entity_home(_player().tile_position) # slice-4: the beach spawn can land in an entity-sparse patch; reposition onto a cell with a derivable roamer so re-derivation is observable
+	_runner.teleport_player(_world(), _player(), runtime, home)
 	var far_tile: Vector2i = home + Vector2i(CELL_SIZE * (DESPAWN_CELLS + 2), 0)
 	var entity_id := _inject(mons, "MACHOP", far_tile, "FRIENDLY") # species-neutral: sync_window's distance gate is disposition-blind
 	runtime.note_player_step() # sync_window un-materializes anything past DESPAWN_CELLS
@@ -163,6 +172,31 @@ func _species_for_disposition(runtime, mons, wanted: String) -> String:
 			return str(species_id)
 	return ""
 
+
+# The nearest cell (ring-ordered, deterministic) with a derivable roamer slot, its center
+# as the return tile; falls back to the start tile when nothing presents within 6 cells.
+func _entity_home(start: Vector2i) -> Vector2i:
+	var home_cell: Vector2i = Vector2i(_floor_div(start.x, CELL_SIZE), _floor_div(start.y, CELL_SIZE))
+	for radius in range(0, 7):
+		for cy in range(home_cell.y - radius, home_cell.y + radius + 1):
+			for cx in range(home_cell.x - radius, home_cell.x + radius + 1):
+				if radius > 0 and maxi(absi(cx - home_cell.x), absi(cy - home_cell.y)) != radius:
+					continue
+				var cell := Vector2i(cx, cy)
+				if _slot_present(cell):
+					return cell * CELL_SIZE + Vector2i(CELL_SIZE / 2, CELL_SIZE / 2)
+	return start
+
+func _slot_present(cell: Vector2i) -> bool: # mirrors OverworldMons.is_slot_present(cell, slot 0)
+	var a := cell.x
+	var b := cell.y * maxi(1, SLOTS_PER_CELL) + 0
+	return _mix(_seed, a, b, SALT_PRESENT) % 100 < SPAWN_PRESENT_PCT
+
+func _mix(world_seed: int, a: int, b: int, salt: int) -> int: # mirrors OverworldMons._mix SplitMix64
+	var h := (world_seed * _K0 + a * _K1 + b * _K2 + salt * _K3) & _MASK
+	h = ((h ^ (h >> 30)) * _K0) & _MASK
+	h = ((h ^ (h >> 27)) * _K1) & _MASK
+	return (h ^ (h >> 31)) & _MASK
 
 func _floor_div(value: int, divisor: int) -> int:
 	return int(floor(float(value) / float(divisor)))
