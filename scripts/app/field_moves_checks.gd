@@ -50,6 +50,7 @@ func check_flash() -> void:
 	var runtime = _runtime()
 	runtime.session.time_of_day_minutes = NIGHT_MINUTES
 	runtime._world_gen.clear_placements() # crafted dark: no campfire/torch anywhere
+	runtime.session.repel_steps = 0; runtime.field_move_runtime.clear_flash() # CLEAN STATE (slice 3): a prior scenario's repel/flash would suppress every ghost draw, starving the dark control
 	var dark_tile: Vector2i = runtime.session.player_tile + FAR_OFFSET
 	_runner.teleport_player(_world(), _player(), runtime, dark_tile)
 	_runner.swap_party(runtime, ["MACHOP"], FieldMovesParty.PARTY_LEVEL) # non-flash control

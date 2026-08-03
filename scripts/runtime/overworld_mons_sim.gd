@@ -94,7 +94,7 @@ func sync_window(player_tile: Vector2i, time_label: String) -> void:
 	var player_cell := OverworldMons.cell_for_tile(player_tile)
 	for entity in _rt_ref.get_ref()._live_list(): # the invented distance un-materialization (re-derives on return)
 		if str(entity.get("kind", "")) == "legendary":
-			continue # Build 2: world-fixed statics are window-exempt (re-stamped ONLY on a world change)
+			continue # world-fixed statics are window-exempt; the repeating LAIRS cull/re-derive in _lairs.sync_lairs below (slice 3)
 		if not OverworldMons.in_spawn_band(entity.cell, player_cell):
 			_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_DISTANCE, false)
 	var edge := OverworldMons.DESPAWN_CELLS
@@ -102,6 +102,7 @@ func sync_window(player_tile: Vector2i, time_label: String) -> void:
 		for cx in range(player_cell.x - edge, player_cell.x + edge + 1):
 			_spawn_slot(Vector2i(cx, cy), time_label)
 			_spawn_nest(Vector2i(cx, cy))
+	_rt_ref.get_ref()._lairs.sync_lairs(player_tile) # slice 3: repeating lairs (window-scoped)
 
 func _spawn_slot(cell: Vector2i, time_label: String) -> void:
 	var slot_id := "mon_%d,%d" % [cell.x, cell.y]
@@ -179,13 +180,12 @@ func _spawn_nest(cell: Vector2i) -> void:
 		_rt_ref.get_ref()._emit("nest_found", {"tile": _rt_ref.get_ref()._t(guardian.get("tile", OverworldMons.cell_center(cell))), "guardian_species_id": str(guardian.get("species_id", "")), "eggs": eggs})
 
 # Phase 7 Build 2 (world-depth.md § Legendaries): the frozen seven as world-fixed STATIONARY
-# statics, stamped on world load/new-game (game_runtime calls the runtime delegator AFTER the
-# session's seed + legendary_removals land). Gone-for-good PER-WORLD (flagged PORT DECISION
-# inverting wiki :224) rides the persistent removal set; they share CLASS_STATIONARY + forced
-# AGGRESSIVE + the guardian's +3 chase-catch, but NEVER nest machinery (no ring, no pool) and
-# are window-exempt (no cull above); a world change (new_game/load; Build 3 chain-cross) drops the previous statics + their removal marks, so each world re-derives from its own seed.
+# statics, stamped on world load/new-game (AFTER the session's seed + legendary_removals land).
+# Gone-for-good PER-INSTANCE (the flagged PORT DECISION inverting wiki :224) rides the persistent
+# removal set; CLASS_STATIONARY + forced AGGRESSIVE + the guardian's +3, NEVER nest machinery, window-exempt; a world change (new_game/load) drops the previous statics, re-deriving per seed.
 func stamp_legendaries(chain: Vector2i) -> void:
 	var rt = _rt_ref.get_ref()
+	rt._lairs.clear_instance_state() # world change: drop the previous world's lair damage/stages (slice 3)
 	for id in rt._entities.keys():
 		if str((rt._entities[id] as Dictionary).get("kind", "")) == "legendary":
 			rt._entities.erase(id); rt._removed.erase(id)
@@ -234,7 +234,7 @@ func new_legendary(id: String, chain: Vector2i, species_id: String, tile: Vector
 	var cell := OverworldMons.cell_for_tile(tile)
 	var mon := new_mon(id, OverworldMons.CLASS_STATIONARY, 0, cell, species_id, tile, OverworldMons.guardian_level_for(int(_rt_ref.get_ref()._session.world_seed), cell, ring), OverworldMons.DISPOSITION_AGGRESSIVE)
 	mon["kind"] = "legendary"; mon["render_kind"] = "legendary"; mon["battle_kind"] = LegendaryPlacement.BATTLE_KIND_LEGENDARY
-	mon["biome"] = biome; mon["ring"] = ring; mon["chain"] = chain
+	mon["biome"] = biome; mon["ring"] = ring; mon["chain"] = chain; mon["anchor"] = tile # the stamp tile IS the anchor — chase moves `tile`, removals key off `anchor` (slice 3)
 	return mon
 
 func new_egg(id: String, egg_index: int, cell: Vector2i, species_id: String, tile: Vector2i) -> Dictionary:

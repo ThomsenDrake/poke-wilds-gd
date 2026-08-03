@@ -54,7 +54,7 @@ static func run(s: Node) -> void:
 
 # Walkable camera tile on a manhattan ring around the guardian: distance 9..18 keeps it beyond the
 # Manhattan-8 aggro sight, and the |dx|<=12 / |dy|<=6 filter keeps the guardian inside the canonical
-# +-13/+-7 frame (screen_tile_rect). Iterating each ring from dx=+-dist (dy=0) outward biases toward
+# +-13/+-7 frame (the canonical window's tile extent). Iterating each ring from dx=+-dist (dy=0) outward biases toward
 # the most horizontal — best-centered — tile first. Vector2i.MAX when the chamber floor never leaves
 # the guardian's sight (loud-failed by the caller).
 static func _camera_ring_out_of_sight(world: Node, guard: Vector2i) -> Vector2i:

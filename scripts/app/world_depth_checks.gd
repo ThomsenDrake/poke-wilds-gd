@@ -8,6 +8,7 @@ const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
 # Domain access rides the runtimes' own preloads (the app layer may not preload
 # domain directly — check_architecture.gd's layer table).
 const Landmarks := LandmarkRuntime.Landmarks
+const ContentScatter := LandmarkRuntime.ContentScatter
 const Structures := BuildRuntime.Structures
 
 const ORIGIN := Vector2i.ZERO
@@ -24,9 +25,8 @@ func setup(ctx: Dictionary, runner, failures: Array, mansion_origin: Vector2i) -
 	_ctx = ctx; _runner = runner; _failures = failures; _mansion_origin = mansion_origin
 
 
-# The mansion-exclusive proof: PKMNMANSION grounds the pool (DITTO spawns nowhere else —
-# breed_flow cross-relies on Ditto-as-universal-parent), live draws stay INSIDE it, and a
-# tile ONE STEP past the footprint reverts to the world-biome pool (scope is footprint-local).
+# The mansion-exclusive proof: PKMNMANSION grounds the pool (DITTO spawns nowhere else — breed_flow
+# cross-relies on that), live draws stay INSIDE it, and one step past the footprint reverts to the world pool.
 func run_mansion_pool_case(runtime) -> bool:
 	var start: int = _failures.size()
 	var inside := _first_token_tile(runtime, Landmarks.MANSION_ID, Landmarks.TOKEN_MANSION)
@@ -61,10 +61,9 @@ func run_mansion_pool_case(runtime) -> bool:
 	return _failures.size() == start
 
 
-# Ruins scope off the live token tables: RUINS_OUTER grounds (BELDUM/SOLROCK), RUINS_INNER
-# = the Lunatone pool + the curated high-level statics (VOLCARONA 38-45 — the flagged-
-# divergence witness pinning the SHIPPED curation, not the wiki); underground tiles carry
-# encounter=FALSE and the DUSCLOPS guardian materializes aggressive under opt-in activation.
+# Ruins scope off the live token tables: RUINS_OUTER grounds (BELDUM/SOLROCK), RUINS_INNER =
+# the Lunatone pool + the curated high-level statics (VOLCARONA 38-45 — the flagged-divergence
+# witness pinning the SHIPPED curation); underground tiles are encounter=FALSE, DUSCLOPS aggressive.
 func run_ruins_case(runtime) -> bool:
 	var start: int = _failures.size()
 	var outer := _first_token_tile(runtime, Landmarks.RUINS_ID, Landmarks.TOKEN_RUINS_OUTER)
@@ -136,10 +135,12 @@ func run_save_roundtrip_case(runtime) -> bool:
 	return _failures.size() == start
 
 
-# --- helpers ------------------------------------------------------------------------
 func _seam_mansion(runtime) -> Dictionary: # the FROZEN seam — the checks never key the save surface directly
 	var all: Dictionary = runtime.session.landmark_state_for(ORIGIN)
-	var raw: Variant = all.get(Landmarks.MANSION_ID, {})
+	var mansion := _landmark(runtime, Landmarks.MANSION_ID)
+	var fp: Rect2i = mansion.get("footprint", Rect2i()) # slice 3: the origin instance key off the live footprint anchor
+	var key := ContentScatter.instance_key(Landmarks.MANSION_ID, fp.position + fp.size / 2) if not mansion.is_empty() else ""
+	var raw: Variant = all.get(key, {})
 	return Landmarks.mansion_state_from(raw if raw is Dictionary else {})
 
 
@@ -172,10 +173,9 @@ func _first_walkable(runtime, landmark_id: String) -> Dictionary:
 	return {}
 
 
-# One step past the mansion's west edge, vertically centered — the SPECIFIC geometric tile:
-# anchor disjoint INCLUDES borders, so one step past any edge is un-stamped BY CONSTRUCTION;
-# a stamp there is a real anchor-seam regression, named loudly (the dx-walk selector this
-# replaced guaranteed half its own assert and could never red on it).
+# One step past the mansion's west edge, vertically centered: anchor disjoint INCLUDES
+# borders, so one step past any edge is un-stamped BY CONSTRUCTION; a stamp there is a real
+# anchor-seam regression, named loudly.
 func _outside_tile(runtime) -> Dictionary:
 	var mid_y: int = _mansion_origin.y + int(Landmarks.MANSION_SIZE.y / 2)
 	var first := Vector2i(_mansion_origin.x - 1, mid_y)

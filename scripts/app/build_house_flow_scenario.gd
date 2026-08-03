@@ -7,7 +7,7 @@ extends Node
 # occupancy, persist across a save round-trip, and DEMOLISH every piece with an EXACT
 # full refund (the build/occupancy/save/demolish phases live in build_house_flow_build
 # for the app budget — the placement_flow -> placement_flow_demolition split). The site
-# scan requires a uniform-biome 3x3 so one biome prices every piece. Seed-pinned,
+# scan requires a uniform-biome 3x3 so one biome prices every piece. Seed-pinned + fresh new_game,
 # encounters zeroed, dispatcher save-guarded; build_house_failed + push_error on any
 # non-pass (miss-002).
 
@@ -33,6 +33,9 @@ func run(ctx: Dictionary) -> void:
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
 	runtime.seed_for_smoke(SEED)
+	runtime.new_game() # DETERMINISTIC world+spawn (infinite-world slice 3): the site scan reads tile logic
+	_world().rebuild(runtime.get_world_seed()) # outward from the player, and scattered-landmark footprints make
+	_runner.resync_player_tile(_world(), _player(), runtime) # far tiles non-placeable — inherit no prior scenario's state.
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	runtime.session.time_of_day_minutes = DAY_MINUTES
@@ -41,7 +44,7 @@ func run(ctx: Dictionary) -> void:
 		_failures.append("fixture: %s" % problem)
 	if _failures.is_empty():
 		_center = _find_house_center(_player().tile_position)
-		if _center == Vector2i.ZERO:
+		if _center == Vector2i.MAX: # MAX = not found; ZERO is a VALID site (sentinel-collision fix, slice 3)
 			_failures.append("site: no uniform-biome placeable 3x3 within %d rings" % SCAN_RADIUS)
 	if _failures.is_empty():
 		_oks["harvest_ok"] = _harvest_materials()
@@ -107,7 +110,7 @@ func _find_house_center(start: Vector2i) -> Vector2i:
 		for tile in _runner.ring_around(start, ring):
 			if _all_placeable(tile):
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX # not found — ZERO is a valid site, so MAX is the sentinel (slice 3)
 
 
 func _all_placeable(center: Vector2i) -> bool:

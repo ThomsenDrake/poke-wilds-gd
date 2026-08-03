@@ -1,6 +1,6 @@
 extends Node
 
-# SAVE STABILITY pin (pre-Phase-7 suite, v5-guarded in Phase 7 Build 3): new_game
+# SAVE STABILITY pin (pre-Phase-7 suite; v6-guarded in infinite-world slice 1): new_game
 # under seed_for_smoke, scripted v4-surface mutations (campsite deposit/withdraw,
 # stone/rod bag, repel_steps, pastures), then save -> reload -> save with a
 # byte-compare of the CANONICALIZED payload (keys sorted, ts/version stripped —
@@ -8,10 +8,11 @@ extends Node
 # owns stability). The committed golden at docs/generated/golden-saves/v4_golden.json
 # STAYS a v4 fixture — the migration WITNESS: the guard canonicalizes
 # SaveMigration.migrate(golden) before the compare (the ONLY pinned guard change), so
-# live v5 == migrated golden exactly (chain-less + puzzle-untouched => the delta is
-# precisely the three identity keys). mode=update DOWNSHIFTS first so the witness
-# regenerates v4-shaped; a v5-shaped write is REFUSED + traced. A world_chain
-# round-trip sublane pins the per-world v5 save shape. miss-002: a red names its cause.
+# live v6 == migrated golden exactly (chain-less + puzzle-untouched => the delta is
+# precisely the version key; slice 3's instance re-key normalizes any landmark_state).
+# mode=update DOWNSHIFTS first so the witness regenerates v4-shaped; an unrepresentable
+# write is REFUSED + traced. (The world_chain round-trip sublane RETIRED with chaining.)
+# miss-002: a red names its cause.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const Sites := preload("res://scripts/runtime/phase5_sites.gd")

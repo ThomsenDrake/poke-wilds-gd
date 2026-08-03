@@ -27,7 +27,7 @@ const LegendarySpawnChecks := preload("res://scripts/app/legendary_spawn_checks.
 const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
 
 const SEED := 2026073001
-const ORIGIN := Vector2i.ZERO # Build 2 stamps the origin world (Build 3 threads the active chain)
+const ORIGIN := Vector2i.ZERO # stamps the origin world (chain frozen — slice 1)
 const DAY_MINUTES := 600
 const PROVOKED_ATTACK_STAGES := 3 # mirrors OverworldMons.PROVOKED_ATTACK_STAGES (:284)
 const WHITEOUT_ENEMY_HP := 9999 # the white-out subject survives one hit so the persisted damage is observable
@@ -158,14 +158,14 @@ func _prove_whiteout(runtime, species_id: String) -> bool:
 	_ensure(str(runtime.run_from_battle().get("outcome", "")) == "escaped", "whiteout: the rematch escape failed")
 	return _failures.size() == start
 
-# KO -> gone-for-good per world: overworld_mon_despawned{ko}, the removal key rides session.
-# legendary_removals, a second attempt finds NO target, a re-stamp re-derives suppression, and
-# the payload round-trip into a fresh session keeps it gone (the untouched return).
+# KO -> gone-for-good per instance: overworld_mon_despawned{ko}, the removal key rides
+# legendary_removals, a second attempt finds NO target, a re-stamp re-derives suppression, and the payload round-trip keeps it gone.
 func _prove_ko(runtime, species_id: String) -> bool:
 	var start: int = _failures.size()
 	var mons = runtime.overworld_mons_runtime
 	var id := "legendary_0,0:%s" % species_id
-	var tile: Vector2i = mons._entities.get(id, {}).get("tile", Vector2i.MAX)
+	var entity_ko: Dictionary = mons._entities.get(id, {})
+	var tile: Vector2i = entity_ko.get("tile", Vector2i.MAX); var anchor: Vector2i = entity_ko.get("anchor", tile) # removals key off `anchor` (chase moves `tile`; slice 3)
 	var atk: Dictionary = mons.attack_entity(tile)
 	if not _ensure(bool(atk.get("ok", false)), "ko: attack on %s refused (%s)" % [species_id, str(atk.get("reason", ""))]): return false
 	var cursor: int = _runner.trace_log_line_count()
@@ -177,7 +177,7 @@ func _prove_ko(runtime, species_id: String) -> bool:
 	var victory: Dictionary = runtime.perform_battle_move(_damaging_move_index(runtime.battle_runtime._player_mon))
 	if not _ensure(str(victory.get("outcome", "")) == "victory", "ko: outcome %s != victory" % str(victory.get("outcome", ""))): return false
 	_ensure(_runner.trace_log_has_since("overworld_mon_despawned", cursor, {"species_id": species_id, "reason": "ko"}), "ko: no overworld_mon_despawned{reason:ko}")
-	_ensure((runtime.session.legendary_removals as Array).has("0,0:%s" % species_id), "ko: the removal key 0,0:%s never reached session.legendary_removals (%s)" % [species_id, str(runtime.session.legendary_removals)])
+	_ensure((runtime.session.legendary_removals as Array).has(LegendaryPlacement.removal_key(anchor, species_id)), "ko: the removal key %s never reached session.legendary_removals (%s)" % [LegendaryPlacement.removal_key(anchor, species_id), str(runtime.session.legendary_removals)])
 	var roundtrip := LegendarySpawnChecks.roundtrip_removal(runtime, species_id, _anchored) # the save marshalling round-trip (to_payload/apply_into into a fresh session)
 	_ensure(roundtrip == "", roundtrip)
 	var again: Dictionary = mons.attack_entity(tile) # the second encounter attempt finds it gone
@@ -188,7 +188,7 @@ func _prove_ko(runtime, species_id: String) -> bool:
 		if str(other) != species_id: _ensure(mons._entities.has("legendary_0,0:%s" % str(other)), "ko: the re-stamp dropped the untouched %s" % str(other))
 	return _failures.size() == start
 
-# The pending-seam take + the legendary_encounter payload (species/kind/ring/stages). {} on any red.
+# The pending-seam take + the legendary_encounter payload (species/kind/ring/stages). {} on any red, so the caller bails.
 func _take_and_assert_payload(runtime, species_id: String, cursor: int, stages: int, label: String) -> Dictionary:
 	var battle_mon: Dictionary = runtime.generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
 	if not _ensure(str(battle_mon.get("species_id", "")) == species_id, "%s: the seam returned %s, expected %s" % [label, str(battle_mon.get("species_id", "")), species_id]): return {}

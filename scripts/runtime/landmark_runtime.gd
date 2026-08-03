@@ -19,6 +19,8 @@ extends RefCounted
 # swap point is _chain() ONLY.
 
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
+const LandmarkScatter := preload("res://scripts/domain/landmark_scatter.gd") # scattered instances beyond the origin core (slice 3; composed at the resolver boundary)
+const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the instance-key parse (slice 3)
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
@@ -30,6 +32,7 @@ const ROOM_DOOR_LOCAL := Vector2i(7, 5)
 const SEWER_DOOR_LOCAL := Vector2i(4, 5)
 const JOURNAL_STUDY_LOCAL := Vector2i(6, 6)
 const UNDERGROUND_GUARD_LOCAL := Vector2i(10, 5) # ruins underground floor (_R_SPECIAL walkable)
+const GUARDIAN_SCAN_TILES := 96 # slice 3: scattered-ruins guardian scan half-extent (spawn band + footprint + margin)
 
 var _session = null
 var _catalog = null
@@ -56,12 +59,13 @@ func tile_logic_for_active(map_pos: Vector2i, base_logic: Dictionary) -> Diction
 	if _session == null:
 		return base_logic # pre-setup (a view rebuild racing the runtime): inert, never a wrong-seed stamp
 	var logic: Dictionary = Landmarks.tile_logic_for(_world_seed(), _chain(), map_pos, base_logic)
+	logic = LandmarkScatter.tile_logic_for_window(_world_seed(), map_pos, logic) # slice 3: scattered instances (inert inside the origin core)
 	if str(logic.get("landmark_id", "")) != Landmarks.MANSION_ID:
 		return logic
-	var region := Landmarks.region_at(_world_seed(), _chain(), map_pos)
+	var region := str(logic.get("landmark_region", "")) # stamped by the consult (no second lookup)
 	if region != "room_door" and region != "sewer_door":
 		return logic
-	if not Landmarks.mansion_door_walkable(_mansion_state(), region):
+	if not Landmarks.mansion_door_walkable(_mansion_state(str(logic.get("landmark_instance", ""))), region):
 		return logic
 	logic["walkable"] = true
 	logic["block_reason"] = "" # open doors carry no refusal (the traversal hint dies with the reason)
@@ -84,34 +88,37 @@ func interact(faced: Vector2i) -> Dictionary:
 	return {}
 
 func interact_statue(faced: Vector2i) -> Dictionary:
-	var index := Landmarks.mansion_statue_index(_world_seed(), _chain(), faced)
-	if index < 0:
-		return {"handled": false}
-	var result: Dictionary = Landmarks.toggle_mansion_statue(_mansion_state(), index)
+	var mansion := _mansion_at(faced) # instance-aware (slice 3): a SCATTERED mansion's statue resolves too
+	if mansion.is_empty(): return {"handled": false}
+	var index := Landmarks.mansion_statue_index_local(faced - mansion["origin"])
+	if index < 0: return {"handled": false}
+	var key: String = mansion["key"] # the faced statue's instance
+	var result: Dictionary = Landmarks.toggle_mansion_statue(_mansion_state(key), index)
 	var payload: Dictionary = result.get("payload", {}) if result.get("payload", {}) is Dictionary else {}
 	if payload.is_empty(): # out-of-range: skip LOUDLY (miss-002 — every failure path names its cause)
 		_warn("Statue toggle skipped: index out of range.", {"tile": _t(faced), "index": index})
 		return {"handled": true, "message": "The statue does not budge."}
-	_write_mansion(result.get("state", {}))
+	_write_mansion(key, result.get("state", {}))
 	_emit("puzzle_state_changed", payload)
 	var solved := bool(payload.get("solved", false))
-	return {"handled": true, "solved": solved, "refresh": _door_tiles(),
+	return {"handled": true, "solved": solved, "refresh": _door_tiles(faced),
 		"message": "The basement seal grinds open somewhere below!" if solved else "The statue clicks. Its eyes stay lit."}
 
 # Z on the room door: key-gated (the key is a BAG item from the interior table).
 func use_key_at(faced: Vector2i) -> Dictionary:
 	if not _is_mansion_local(faced, ROOM_DOOR_LOCAL):
 		return {"handled": false}
-	if bool(_mansion_state().get("key_taken", false)):
+	var key: String = _mansion_at(faced)["key"]
+	if bool(_mansion_state(key).get("key_taken", false)):
 		return {"handled": true, "message": "The room door stands open."}
 	if _session.get_item_count(Landmarks.MANSION_KEY_ID) <= 0:
 		return {"handled": true, "message": "The room door is locked. A brass keyhole glints."}
 	if not _session.remove_item(Landmarks.MANSION_KEY_ID, 1):
 		return {"handled": true, "message": "The room door is locked."}
-	var result: Dictionary = Landmarks.take_mansion_key(_mansion_state())
-	_write_mansion(result.get("state", {}))
+	var result: Dictionary = Landmarks.take_mansion_key(_mansion_state(key))
+	_write_mansion(key, result.get("state", {}))
 	_emit("key_item_used", result.get("payload", {}) if result.get("payload", {}) is Dictionary else {}) # auxiliary trace (documented, not registry-required)
-	return {"handled": true, "refresh": _door_tiles(), "message": "The Mansion Key turns. The room door swings open."}
+	return {"handled": true, "refresh": _door_tiles(faced), "message": "The Mansion Key turns. The room door swings open."}
 
 # Lore pickups — flavor is PORT-WRITTEN (the scrapes give no journal text; FLAGGED #8).
 func interact_journal(faced: Vector2i) -> Dictionary:
@@ -119,25 +126,25 @@ func interact_journal(faced: Vector2i) -> Dictionary:
 	var at_study := _is_mansion_local(faced, JOURNAL_STUDY_LOCAL)
 	if not at_table and not at_study:
 		return {"handled": false}
-	if at_table and _session.get_item_count(Landmarks.MANSION_KEY_ID) == 0 and not bool(_mansion_state().get("key_taken", false)):
-		return _take_key() # the key lies beside this journal; pickup precedes lore
+	if at_table and _session.get_item_count(Landmarks.MANSION_KEY_ID) == 0 and not bool(_mansion_state(_mansion_at(faced)["key"]).get("key_taken", false)):
+		return _take_key(faced) # the key lies beside this journal; pickup precedes lore
 	var text := "\"...the three guardians must all burn bright before the seal below will yield.\"" if at_table else "\"...they built the laboratory beneath the courtyard. What grew down there was no accident.\""
 	return {"handled": true, "message": text}
 
 func interact_loot(faced: Vector2i) -> Dictionary:
 	if not _is_mansion_local(faced, Landmarks.MANSION_LOOT_TILE):
 		return {"handled": false}
-	if _loot_taken.has("courtyard_shelf"):
+	var loot_key: String = _mansion_at(faced)["key"] + "|courtyard_shelf" # per-instance one-shot (every scattered mansion has its own shelf)
+	if _loot_taken.has(loot_key):
 		return {"handled": true, "message": "Only dust left on the shelf."}
-	_loot_taken["courtyard_shelf"] = true
+	_loot_taken[loot_key] = true
 	_session.add_item(Landmarks.MANSION_LOOT_BALL_ID, 1) # FLAGGED #11: Ultra Ball until Phase 8 ball tiers
 	return {"handled": true, "message": "A %s rolls off the dusty shelf." % Landmarks.MANSION_LOOT_BALL_ID}
 
-# Ruins glowing statues + the underground painting (decorative; glow BEHAVIOR undocumented
-# — the port renders a static emissive frame, FLAGGED). Mansion walls fall through.
+# Ruins glowing statues + the underground painting (decorative; glow BEHAVIOR undocumented — the port renders a static emissive frame, FLAGGED). Mansion walls fall through.
 func interact_decor(faced: Vector2i) -> Dictionary:
-	var logic: Dictionary = Landmarks.tile_logic_for(_world_seed(), _chain(), faced, {})
-	if logic.is_empty():
+	var logic: Dictionary = tile_logic_for_active(faced, {}) # composed consult (slice 3): a scattered ruins' statue/painting answers too
+	if str(logic.get("landmark_id", "")) == "":
 		return {"handled": false}
 	match str(logic.get("block_reason", "")):
 		"A glowing statue hums.":
@@ -155,7 +162,7 @@ func encounter_scope_for(tile_pos: Vector2i, fallback_biome: String) -> Dictiona
 	if token == "":
 		return {"token": "", "biome": fallback_biome}
 	var scope := {"token": token, "biome": str(logic.get("biome", fallback_biome)),
-		"landmark_id": str(logic.get("landmark_id", "")), "region": Landmarks.region_at(_world_seed(), _chain(), tile_pos),
+		"landmark_id": str(logic.get("landmark_id", "")), "region": str(logic.get("landmark_region", "")),
 		"extra_ids": [], "curated": {}}
 	if token == Landmarks.TOKEN_RUINS_INNER: # faithful Lunatone pool + FLAGGED #9 curated high-level statics
 		scope["extra_ids"] = Landmarks.RUINS_INNER_CURATED.keys()
@@ -200,9 +207,9 @@ func level_for_scope(scope: Dictionary, species_id: String, tile_pos: Vector2i, 
 
 # --- Entry traces + tower music ------------------------------------------------------
 func _note_region(player_tile: Vector2i) -> void:
-	var logic: Dictionary = Landmarks.tile_logic_for(_world_seed(), _chain(), player_tile, {})
+	var logic: Dictionary = tile_logic_for_active(player_tile, {}) # the composed consult (origin three + scattered)
 	var landmark_id := str(logic.get("landmark_id", ""))
-	var region := Landmarks.region_at(_world_seed(), _chain(), player_tile) if landmark_id != "" else ""
+	var region := str(logic.get("landmark_region", "")) if landmark_id != "" else ""
 	if landmark_id == _current_landmark and region == _current_region:
 		return
 	var previous := _current_landmark
@@ -212,10 +219,11 @@ func _note_region(player_tile: Vector2i) -> void:
 		if previous == Landmarks.TOWER_ID and _music_router != null and _world_gen != null:
 			_music_router.play_biome_track(str(_world_gen.get_tile_logic(player_tile).get("biome", ""))) # restore the host theme on exit
 		return
-	var key := landmark_id + "|" + region
+	var instance := str(logic.get("landmark_instance", landmark_id)) # per-instance first-entry (a second tower's entry + music still fire)
+	var key := instance + "|" + region
 	var first := not _visited.has(key)
 	_visited[key] = true
-	_emit("landmark_entered", {"landmark_id": landmark_id, "tile": _t(player_tile), "region": region, "first_entry": first})
+	_emit("landmark_entered", {"landmark_id": landmark_id, "tile": _t(player_tile), "region": region, "first_entry": first, "instance": instance})
 	if landmark_id == Landmarks.TOWER_ID and first:
 		_emit("landmark_music", {"landmark_id": landmark_id, "track": TOWER_TRACK, "trigger": "entry"}) # trace seam for the field-music switch: play_track_path is headless-gated + emits nothing, so this trace is the headless witness
 		if _music_router != null:
@@ -230,13 +238,15 @@ func _note_region(player_tile: Vector2i) -> void:
 func _ensure_ruins_guardian(player_tile: Vector2i) -> void:
 	if _overworld_mons == null or not bool(_overworld_mons.active):
 		return # activation gate: non-opt-in smoke scenarios stay entity-free (baseline protection)
-	var ruins: Dictionary = {}
 	for landmark in Landmarks.landmarks_in_world(_world_seed(), _chain()):
 		if str(landmark["landmark_id"]) == Landmarks.RUINS_ID:
-			ruins = landmark
-	if ruins.is_empty():
-		return
-	var tile: Vector2i = (ruins["footprint"] as Rect2i).position + UNDERGROUND_GUARD_LOCAL
+			_spawn_ruins_guardian(landmark["footprint"], player_tile)
+	for inst in LandmarkScatter.instances_in_window(_world_seed(), player_tile, GUARDIAN_SCAN_TILES): # slice 3: a scattered ruins gets its guardian too
+		if str(inst.get("landmark_id", "")) == Landmarks.RUINS_ID:
+			_spawn_ruins_guardian(inst["footprint"], player_tile)
+
+func _spawn_ruins_guardian(footprint: Rect2i, player_tile: Vector2i) -> void:
+	var tile: Vector2i = footprint.position + UNDERGROUND_GUARD_LOCAL
 	var cell := OverworldMons.cell_for_tile(tile)
 	if not OverworldMons.in_spawn_band(OverworldMons.cell_for_tile(player_tile), cell):
 		return # the same band the sim's distance despawn rides; re-injected on re-entry
@@ -252,35 +262,45 @@ func _ensure_ruins_guardian(player_tile: Vector2i) -> void:
 	(entities as Dictionary)[id] = sim.new_mon(id, OverworldMons.CLASS_STATIONARY, 0, cell, Landmarks.RUINS_UNDERGROUND_SPECIES, tile, level, OverworldMons.DISPOSITION_AGGRESSIVE)
 	_emit("landmark_entity_spawned", {"species_id": Landmarks.RUINS_UNDERGROUND_SPECIES, "tile": _t(tile), "landmark_id": Landmarks.RUINS_ID, "disposition": OverworldMons.DISPOSITION_AGGRESSIVE})
 
-# --- Seam + mansion helpers ----------------------------------------------------------
-func _mansion_state() -> Dictionary:
+# --- Seam + mansion helpers (instance-keyed, slice 3) ---------------------------------
+# The frozen seam stays (whole-dict landmark_state_for/set_landmark_state); the KEYS are
+# per-instance "pkmn_mansion@ax,ay" off the footprint anchor, so every mansion instance
+# carries independent puzzle state. The instance is resolved from the stamped logic.
+func _mansion_state(instance_key: String) -> Dictionary:
 	if _session == null:
 		return Landmarks.default_mansion_state()
 	var all: Dictionary = _session.landmark_state_for(_chain()) # FROZEN SEAM — never the keying
-	var raw: Variant = all.get(Landmarks.MANSION_ID, {})
+	var raw: Variant = all.get(instance_key, {})
 	return Landmarks.mansion_state_from(raw if raw is Dictionary else {})
 
-func _write_mansion(next_state: Dictionary) -> void:
+func _write_mansion(instance_key: String, next_state: Dictionary) -> void:
 	var all: Dictionary = _session.landmark_state_for(_chain())
-	all[Landmarks.MANSION_ID] = next_state
-	_session.set_landmark_state(_chain(), all) # FROZEN SEAM — Build 3 extends the resolution, not this caller
+	all[instance_key] = next_state
+	_session.set_landmark_state(_chain(), all) # FROZEN SEAM — merge by construction (never clobbers a sibling instance)
 
-func _take_key() -> Dictionary:
+func _take_key(faced: Vector2i) -> Dictionary:
 	_session.add_item(Landmarks.MANSION_KEY_ID, 1)
-	return {"handled": true, "refresh": _door_tiles(), "message": "A brass key lies beside the journal. You take it."} # refresh -> route_landmark persists the pickup immediately (a reload before the door arm no longer drops the bagged key)
+	return {"handled": true, "refresh": _door_tiles(faced), "message": "A brass key lies beside the journal. You take it."} # refresh -> route_landmark persists the pickup immediately (a reload before the door arm no longer drops the bagged key)
 
-func _door_tiles() -> Array: # world tiles of both mansion doors (puzzle flips -> view refresh)
-	for landmark in Landmarks.landmarks_in_world(_world_seed(), _chain()):
-		if str(landmark["landmark_id"]) == Landmarks.MANSION_ID:
-			var origin: Vector2i = (landmark["footprint"] as Rect2i).position
-			return [origin + ROOM_DOOR_LOCAL, origin + SEWER_DOOR_LOCAL]
-	return []
+# The mansion instance owning `tile` ({} when none): the stamped instance key parses to the anchor (the additive landmark_instance the consults carry).
+func _mansion_at(tile: Vector2i) -> Dictionary:
+	var logic: Dictionary = tile_logic_for_active(tile, {})
+	if str(logic.get("landmark_id", "")) != Landmarks.MANSION_ID:
+		return {}
+	var parsed := ContentScatter.parse_instance_key(str(logic.get("landmark_instance", "")))
+	if parsed.is_empty():
+		return {}
+	return {"anchor": parsed["anchor"], "key": str(logic.get("landmark_instance", "")), "origin": (parsed["anchor"] as Vector2i) - Landmarks.MANSION_SIZE / 2}
+
+func _door_tiles(faced: Vector2i) -> Array: # world tiles of the faced mansion's doors (puzzle flips -> view refresh)
+	var mansion := _mansion_at(faced)
+	if mansion.is_empty():
+		return []
+	return [mansion["origin"] + ROOM_DOOR_LOCAL, mansion["origin"] + SEWER_DOOR_LOCAL]
 
 func _is_mansion_local(faced: Vector2i, local: Vector2i) -> bool:
-	for landmark in Landmarks.landmarks_in_world(_world_seed(), _chain()):
-		if str(landmark["landmark_id"]) == Landmarks.MANSION_ID:
-			return (landmark["footprint"] as Rect2i).position + local == faced
-	return false
+	var mansion := _mansion_at(faced)
+	return not mansion.is_empty() and mansion["origin"] + local == faced
 
 func _chain() -> Vector2i: # infinite-world slice: a single seamless origin plane — chain frozen at (0,0); nothing below branches on it.
 	return Vector2i.ZERO

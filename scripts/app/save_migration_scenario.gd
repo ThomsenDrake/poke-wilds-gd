@@ -3,13 +3,15 @@ extends Node
 # Save-migration scenario, EXTRACTED from phase0_scenarios.gd for the app 220-line budget
 # (the wild_battle_scenario precedent): v1/v2->v3->v4->v5->v6 — v3 structures, v4 contents +
 # pastures, v5 CHAIN-LESS -> v6 lossless flatten (delta == {version: 6}) + the pinned byte
-# witnesses + the CHAINED-v5 REFUSAL witness (predicate AND the load-path _preserve guarantee),
-# future refusal, corrupt recovery.
+# witnesses + the CHAINED-v5 REFUSAL witness (predicate AND the load-path _preserve), future refusal, corrupt recovery.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const SaveStabilitySupport := preload("res://scripts/app/save_stability_support.gd")
+const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd") # the anchor derivation rides the runtime's own preload (the layer table)
+const Landmarks := LandmarkRuntime.Landmarks
+const ContentScatter := LandmarkRuntime.ContentScatter
 # Domain access rides the runtime's own preload (app may not preload domain — check_architecture's layer table).
 const SaveMigration := SessionState.SaveMigration
 const GOLDEN_PATH := "res://docs/generated/golden-saves/v4_golden.json" # v4 migration witness (shared with save_stability)
@@ -17,12 +19,12 @@ const GOLDEN_PATH := "res://docs/generated/golden-saves/v4_golden.json" # v4 mig
 const MIGRATION_MON := {"species_id": "CHIKORITA", "name": "Chikorita", "level": 5, "exp": 125,
 	"max_hp": 20, "current_hp": 20, "status": "PSN", "sleep_turns": 2,
 	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}]}
-# Penned mon with the full habitat sub-dict the Steel-stone cadence rides; the fixture pen has NO fence ring, so load relocates it to the campsite hold.
+# Penned mon with the full habitat sub-dict the Steel-stone cadence rides; the fixture pen has NO fence ring, so load relocates it.
 const PASTURE_MON := {"species_id": "EEVEE", "name": "Eevee", "level": 30, "exp": 0,
 	"max_hp": 30, "current_hp": 30, "status": "", "sleep_turns": 2, "happiness": 220,
 	"moves": [{"move_id": "TACKLE", "pp": 35, "max_pp": 35, "power": 40}],
 	"habitat": {"satisfied": true, "last_drop_day": 3, "last_stone_day": 1}}
-# Additive party-egg shape (Breeding.build_egg): max_hp/current_hp 0; the nested payload carries the child — normalize_loaded_mon passes it by shape.
+# Additive party-egg shape (Breeding.build_egg): the nested payload carries the child — normalize passes it by shape.
 const MIGRATION_EGG := {"species_id": "EGG", "name": "Egg", "level": 5, "exp": 0,
 	"max_hp": 0, "current_hp": 0, "status": "", "sleep_turns": 0, "moves": [],
 	"is_shiny": false, "is_egg": true,
@@ -102,9 +104,8 @@ func run(ctx: Dictionary, host: Node) -> void:
 			checks += 1
 		else:
 			fail = "future version was not refused non-destructively"
-	# CHAINED v5 refusal (infinite-world slice): a truly chained v5 save cannot be represented
-	# on the single plane — can_represent_infinite refuses it (the load path preserves it to
-	# .chained.bak + starts fresh), while a chain-less v5 save is accepted (lossless flatten).
+	# CHAINED v5 refusal (infinite-world slice): a truly chained v5 save cannot be represented on
+	# one plane — can_represent_infinite refuses it (preserved to .chained.bak + fresh start); a chain-less v5 flattens losslessly.
 	var chained_refused := false
 	if fail.is_empty():
 		chained_refused = not SaveMigration.can_represent_infinite(CHAINED_V5_FIXTURE) \
@@ -113,8 +114,7 @@ func run(ctx: Dictionary, host: Node) -> void:
 			checks += 1
 		else:
 			fail = "chained v5 refusal: can_represent_infinite must refuse a chained save and accept a chain-less one"
-	# CHAINED refusal LOAD-PATH: the refusal rides save_store._preserve, which arms live-path
-	# protection on preserve-failure so a write can never clobber the un-preserved chained save.
+	# CHAINED refusal LOAD-PATH: the refusal rides save_store._preserve, arming live-path protection on failure so a write never clobbers the un-preserved save.
 	if fail.is_empty():
 		fail = SaveStabilitySupport.chained_refusal_preserve_test(runtime.save_store, Callable(self, "_write_fixture"), CHAINED_V5_FIXTURE)
 		if fail.is_empty():
@@ -192,16 +192,18 @@ func _v4_fields_ok(runtime) -> bool:
 
 # v5 CHAIN-LESS -> v6 (infinite-world slice): migrate() flattens losslessly — world_seed
 # preserved (frozen origin identity), the origin chained_worlds["0,0"].landmark_state hoisted
-# to the top-level landmark_state seat, chain identity dropped + save_migration's pinned byte
-# witnesses green (golden delta EXACTLY {version: 6}; relocation byte-verbatim + migrate()
-# never mutates its argument + the chained-refusal witness).
+# to the top-level seat and re-keyed to the per-instance grammar (slice 3, derived from the
+# payload's own world_seed), chain identity dropped + the pinned byte witnesses green
+# (golden delta EXACTLY {version: 6}; relocation value byte-verbatim at the re-keyed seat +
+# the removals normalization + argument purity + the chained-refusal witness).
 func _v5_fields_ok(runtime) -> bool:
 	var session = runtime.session
 	if int(session.world_seed) != 4242:
 		return false
-	var mansion: Dictionary = (session.landmark_state as Dictionary).get("pkmn_mansion", {})
+	var expected := ContentScatter.instance_key("pkmn_mansion", Landmarks.anchor_for(4242, Vector2i.ZERO, "pkmn_mansion"))
+	var mansion: Dictionary = (session.landmark_state as Dictionary).get(expected, {})
 	if not bool(mansion.get("unlocked", false)):
-		return false # the hoisted puzzle state must land on the flat seat
+		return false # the hoisted puzzle state must land on the re-keyed instance seat
 	var golden: Variant = JSON.parse_string(FileAccess.get_file_as_string(GOLDEN_PATH))
 	return golden is Dictionary and SaveMigration.byte_witness_issues(golden as Dictionary, SessionState.SAVE_VERSION).is_empty()
 

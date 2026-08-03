@@ -107,6 +107,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["boot_started", "boot_ready", "save_migration_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "content_scatter": {
+        "all": ["boot_started", "boot_ready", "content_scatter_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "waystone_selector": {
         "all": ["boot_started", "boot_ready", "waystone_registered", "teleport_used",
                 "waystone_selector_passed"],

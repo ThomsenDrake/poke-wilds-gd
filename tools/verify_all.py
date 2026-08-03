@@ -133,17 +133,15 @@ def _load_run_playtests_constant(name: str):
     return getattr(module, name)
 
 
-# S9 windowed satellite sweep families (shots 15-23 + 30-36, windowed-diffed one-command
-# alongside the main visual_sweep). SINGLE-SOURCED from run_playtests.py (R3) so the
-# orchestrator's loop and the runner's gates cover the identical family set by
+# S9 windowed satellite sweep families (shots 15-23 + 30-34 minus retired, windowed-diffed
+# one-command alongside the main visual_sweep). SINGLE-SOURCED from run_playtests.py (R3) so
+# the orchestrator's loop and the runner's gates cover the identical family set by
 # construction. visual_sweep_fishing (26-27) is registered in the smoke list + windowed
 # sets but is NOT one of these families per the frozen contract's "shots 15-23" wording
-# -- it runs via the PLAYTEST_SCENARIOS path. world_depth ([31,34]: 31-32 + 33_beacon +
-# the R11 34_heart_tower) joins as the Phase 7 Build 1 landmark satellite (world-depth.md
-# § Smoke validation; its own seed + state), and the R11 world_chain family ([35,36], the
-# derived-world seed world_seed_for(2026072907,(0,-1)) single-sourced from SHOT_REGISTRY)
-# covers the non-origin states — its OWN family because R3's sidecar seed-equality gate
-# demands exactly one deterministic world per run.
+# -- it runs via the PLAYTEST_SCENARIOS path. world_depth ([31,32] + extra [34]: the Ruins
+# inner chamber, the Mansion room, the R11 heart tower — 33_beacon RETIRED with world
+# chaining) joins as the Phase 7 Build 1 landmark satellite (world-depth.md § Smoke
+# validation; its own seed + state).
 SATELLITE_SWEEP_SCENARIOS = list(_load_run_playtests_constant("SATELLITE_SWEEP_SCENARIOS"))
 
 # "warn" maps to GREEN on purpose: a warn-tier refusal (R6 vision-review

@@ -82,17 +82,20 @@ const SCENARIOS := {
 	# world_depth_checks.gd for the app budget; joins the double-run lane). The
 	# world-depth sweep (shots 31-32) is windowed-only like the other satellites.
 	"landmark_flow": [preload("res://scripts/app/landmark_flow_scenario.gd"), "run", []],
-	# Phase 7 Build 2 legendaries (world-depth.md § Legendaries): the ring-gated spawn
-	# proof — the frozen seven anchored in the origin world (SNOW three; the LAVA four
-	# NO_ANCHOR witnessed, the domain empirical flag), the legendary_encounter{battle_
-	# kind:"legendary"} battle-start trace, the never-encounter exclusion, the white-out
-	# re-battleable + KO gone-for-good rematch rules. Joins the double-run lane.
+	# Phase 7 Build 2 legendaries (world-depth.md § Legendaries): the climate-anchored
+	# spawn proof — ALL SEVEN anchored (slice 2: LAVA generates; the synthetic reach-1
+	# NO_ANCHOR witness), the legendary_encounter{battle_kind:"legendary"} battle-start
+	# trace, the never-encounter exclusion, the white-out re-battleable + KO gone-for-good
+	# (per-instance, slice 3) rematch rules. Joins the double-run lane.
 	"legendary_spawn": [preload("res://scripts/app/legendary_spawn_scenario.gd"), "run", []],
 	# (world_chain + beacon_selector scenarios RETIRED with world chaining — infinite-world
 	# slice: the seamless plane has no edge to cross and no edge beacons. Way-stone teleport
 	# stays, via the renamed WayStoneSelector — its multi-stone CHOICE + avatar-input
 	# ownership witness is:)
 	"waystone_selector": [preload("res://scripts/app/waystone_selector_scenario.gd"), "run", []],
+	# Infinite-world slice 3: the chunk-hash scattering witness — origin-core preservation,
+	# scattered-instance discovery + per-instance puzzle state, repeating-lair lifecycle.
+	"content_scatter": [preload("res://scripts/app/content_scatter_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves

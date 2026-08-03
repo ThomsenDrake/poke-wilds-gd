@@ -212,8 +212,7 @@ func _try_trigger_encounter() -> void:
 	if _rng.randf() <= trigger_chance:
 		encounter_requested.emit(tile_position)
 
-# Settings read rides the /root/GameRuntime autoload (the _try_edge_cross precedent); no
-# runtime (a bare avatar) -> {} == off.
+# Settings read rides the /root/GameRuntime autoload; no runtime (a bare avatar) -> {} == off.
 func _encounter_settings() -> Dictionary:
 	var runtime: Node = get_node_or_null("/root/GameRuntime")
 	return runtime.session.get_encounter_settings() if runtime != null and "session" in runtime else {}

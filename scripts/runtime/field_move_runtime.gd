@@ -127,7 +127,7 @@ func use_teleport(target: Vector2i = Vector2i.MAX) -> Dictionary:
 	_emit("teleport_used", {"from": _t(_session.player_tile), "tile": _t(dest)})
 	return {"ok": true, "tile": dest}
 
-# --- FLY (to a VISITED/registered way stone; edge-fly chaining is Phase 7) -----
+# --- FLY (to a VISITED/registered way stone; intra-world only — the seamless plane retired edge-fly with chaining) -----
 
 func use_fly(target: Vector2i) -> Dictionary:
 	if not _capable("fly"):

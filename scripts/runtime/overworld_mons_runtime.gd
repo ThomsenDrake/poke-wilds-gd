@@ -34,6 +34,7 @@ extends RefCounted
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const OverworldMonsSim := preload("res://scripts/runtime/overworld_mons_sim.gd")
 const OverworldMonsActions := preload("res://scripts/runtime/overworld_mons_actions.gd") # player-action surface, extracted at the 320 wall
+const OverworldMonsLairs := preload("res://scripts/runtime/overworld_mons_lairs.gd") # repeating legendary lairs (window-scoped), extracted at the sim's 320 wall (slice 3)
 const ContactEncounter := preload("res://scripts/domain/contact_encounter.gd") # the shared-tile collision predicate (contact-only default)
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
@@ -44,6 +45,7 @@ signal encounter_requested(tile: Vector2i) # entity_layer bridges it onto player
 var active := true # activation gate: the smoke dispatcher flips it for non-opt-in scenarios
 var _sim = OverworldMonsSim.new()
 var _actions = OverworldMonsActions.new()
+var _lairs = OverworldMonsLairs.new()
 var _session = null
 var _catalog = null
 var _rules = null
@@ -71,6 +73,7 @@ func setup(session_state, catalog, pokemon_rules, trace_logger, world_generator,
 	_world_gen = world_generator; _biome_encounters = biome_encounters; _field_move_runtime = field_move_runtime
 	_sim.setup(self)
 	_actions.setup(self)
+	_lairs.setup(self)
 	if field_move_runtime != null:
 		field_move_runtime.overworld_attack_hook = Callable(_actions, "on_attack_hook")
 		field_move_runtime.overworld_charm_hook = Callable(_actions, "on_charm_hook")
@@ -165,8 +168,9 @@ func note_battle_outcome(outcome: String, enemy: Dictionary) -> void:
 		_remove_entity(entity, OverworldMons.REASON_KO)
 	elif outcome.begins_with("caught"):
 		_remove_entity(entity, OverworldMons.REASON_CAUGHT)
-	if str(entity.get("kind", "")) == "legendary" and (outcome == "victory" or outcome.begins_with("caught")): # gone-for-good PER-WORLD (flagged PORT DECISION inverting wiki :224); a white-out leaves it re-battleable above
-		_session.legendary_removals.append(LegendaryPlacement.removal_key(Vector2i.ZERO, str(entity.species_id))) # v4-additive; session_payload marshals; infinite-world slice: chain frozen origin (anchor-based re-key in S3)
+	_lairs.note_instance_state(entity) # slice 3: a lair's white-out damage/stages survive the window cull (the origin seven never cull)
+	if str(entity.get("kind", "")) == "legendary" and (outcome == "victory" or outcome.begins_with("caught")): # gone-for-good PER INSTANCE (flagged PORT DECISION inverting wiki :224); a white-out leaves it re-battleable above
+		_session.legendary_removals.append(LegendaryPlacement.removal_key(entity.get("anchor", entity.get("tile", Vector2i.ZERO)), str(entity.species_id))) # v4-additive; session_payload marshals; slice 3: anchor-keyed (per-instance)
 
 # Player actions (Attack/Charm hooks, dialogue recruitment, the wild-egg TAKE/Attack binary
 # :248, the interact-provocation memory) live in overworld_mons_actions.gd — extracted at the

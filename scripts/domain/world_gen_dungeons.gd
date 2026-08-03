@@ -14,6 +14,8 @@ extends RefCounted
 # closed — both stay measured as advisories so a threshold regression re-opens them LOUDLY.)
 
 const WorldGenAudit := preload("res://scripts/domain/world_gen_audit.gd")
+const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the chunk rolls (slice 3)
+const LandmarkScatter := preload("res://scripts/domain/landmark_scatter.gd") # the scattered-instance derivation (slice 3)
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
 
@@ -45,6 +47,13 @@ static func audit(gen, seed: int) -> Dictionary:
 	advisory.append({"kind": "legendary_no_anchor", "value": legend["no_anchor"],
 		"detail": "Legendary species resolving NO_ANCHOR on this seed (the reach box lacks an affinity pocket; rare under the climate field)."})
 
+	# (1b) ADVISORY content density (infinite-world slice 3): the chunk-hash scattering,
+	# measured over the chunks whose centers sit BEYOND the origin core out to ring ~512 —
+	# scattered landmark instances, legendary lairs (per affinity biome), and dungeon-site
+	# rolls (present + footprint-fitting). The regression net for the future dungeon slice.
+	advisory.append({"kind": "content_density", "value": _content_density(gen, seed),
+		"detail": "Scattered landmarks / legendary lairs / dungeon sites across the beyond-core chunk sample (the infinite plane's content rates)."})
+
 	# (4) ADVISORY spawn_disc_exclusion: a landmark footprint CAN intrude within SPAWN_DISC of
 	# origin (measured: the ring-34 Ruins reach manhattan <=24 on some seeds — its footprint's
 	# inner edge lands inside the spawn disc). This is a placement gap for the dungeon-placement
@@ -71,7 +80,9 @@ static func audit(gen, seed: int) -> Dictionary:
 	# landmark reports not_verified — the public seam exposes no visited set to confirm a footprint.
 	var reachability := {}
 	for landmark in landmarks:
-		reachability[str(landmark.get("landmark_id", ""))] = "not_verified"
+		var fp: Rect2i = landmark.get("footprint", Rect2i())
+		var ikey := ContentScatter.instance_key(str(landmark.get("landmark_id", "")), fp.position + fp.size / 2)
+		reachability[ikey] = "not_verified" # per-instance key (slice 3: repeating ids never collapse)
 	advisory.append({"kind": "landmark_reachability", "value": reachability,
 		"detail": "gen-time reachability gate is unimplemented (spec §19(c)); footprint reachability from spawn is not verified."})
 
@@ -84,6 +95,35 @@ static func audit(gen, seed: int) -> Dictionary:
 
 
 # --- helpers (pure) ---------------------------------------------------------------
+
+# The beyond-core chunk sample for the density metric: chunk centers with Manhattan ring in
+# (ORIGIN_CORE_RADIUS, 512] — bounded, never the plane.
+static func _content_density(gen, seed: int) -> Dictionary:
+	var landmarks_found: Array = []
+	var lairs := 0
+	var sites_present := 0
+	var sites_fit := 0
+	var chunks_sampled := 0
+	for cy in range(-8, 9):
+		for cx in range(-8, 9):
+			var chunk := Vector2i(cx, cy)
+			var ring := ContentScatter.ring_of(ContentScatter.chunk_center(chunk))
+			if ring <= ContentScatter.ORIGIN_CORE_RADIUS or ring > 512:
+				continue
+			chunks_sampled += 1
+			var instance := LandmarkScatter.instance_for_chunk(seed, chunk)
+			if not instance.is_empty():
+				landmarks_found.append(str(instance.get("instance_key", "")))
+			if ContentScatter.dungeon_site_present(seed, chunk):
+				sites_present += 1
+				if WorldGenAudit.footprint_fits(gen, ContentScatter.dungeon_site_center(seed, chunk), Landmarks.RUINS_SIZE):
+					sites_fit += 1
+			for species_id in LegendaryPlacement.LEGENDARY_IDS:
+				if LegendaryPlacement.lair_for_chunk(seed, chunk, str(species_id)) != LegendaryPlacement.NO_ANCHOR:
+					lairs += 1
+	return {"chunks": chunks_sampled, "landmarks": landmarks_found.size(), "landmark_keys": landmarks_found,
+		"lairs": lairs, "dungeon_sites": sites_present, "dungeon_sites_fit": sites_fit}
+
 
 # The land biomes: WATER/SAND are the elevation bands and never site a dungeon.
 static func _land_biomes() -> Array:

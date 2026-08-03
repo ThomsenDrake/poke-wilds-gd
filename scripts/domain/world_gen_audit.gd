@@ -4,10 +4,11 @@ extends RefCounted
 # the comprehensive world-gen workflow). Pure measurement, NO rng, NO I/O: every result is
 # a pure function of (code, catalog, seed) so the audit is deterministic and its findings
 # are the regression net for the later world-gen fix slices (blending, stat-aware spawns,
-# LAVA/dungeon sites). Three families fold into ONE findings dict here:
-#   world_gen_cohesion.gd  — biome adjacency / seams / regions / per-ring histogram
-#   world_gen_spawns.gd    — type↔biome coherence, BST↔depth, level-band↔strength
-#   world_gen_dungeons.gd  — biome site availability, anchors-in-extent, reachability
+# dungeon sites). Three families fold into ONE findings dict here:
+#   world_gen_cohesion.gd  — determinism, biome distribution, adjacency, region fragmentation
+#   world_gen_spawns.gd    — type↔biome coherence, BST-by-biome, level-band↔strength
+#   world_gen_dungeons.gd  — biome site availability, chunk-hash content density, reachability
+# (Infinite-world slice 2 retired the radial ring model's admission/seam/bands/extent checks.)
 # Each family returns {enforcing_failures: Array[String], advisory: Array[Dictionary],
 # metrics: Dictionary}; the runner folds them via fold() + finalize(). TIER RULE: only
 # structural invariants that hold TODAY enforce (red on regression); every gap that needs

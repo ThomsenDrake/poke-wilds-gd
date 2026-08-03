@@ -10,6 +10,7 @@ extends RefCounted
 
 const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const BiomeField := preload("res://scripts/domain/biome_field.gd") # the ONE elevation/biome source (infinite-world slice 2; the local mirror is gone)
+const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the instance-key grammar (slice 3; no cycle — it never imports this file)
 
 const SALT_LANDMARK_ANCHOR := 0x23 # pinned (scenario contract)
 const ANCHOR_SEARCH_BUDGET := 400
@@ -23,8 +24,7 @@ const RUINS_INNER_CURATED := {"VOLCARONA": [38, 45], "GOLURK": [38, 45]}
 const RUINS_UNDERGROUND_SPECIES := "DUSCLOPS"
 const MANSION_KEY_ID := "mansion_key"
 const MANSION_LOOT_BALL_ID := "poke_ball"  # FLAGGED #11: Ultra Ball until Phase 8 ball tiers
-# Dormant source tokens (catalog spawn_biomes carry them VERBATIM): footprint-scoped
-# ONLY — NOT aliased in biome_encounters (port-wide aliasing would admit Beldum everywhere).
+# Dormant source tokens (catalog spawn_biomes carry them VERBATIM): footprint-scoped ONLY — NOT aliased in biome_encounters (port-wide aliasing would admit Beldum everywhere).
 const TOKEN_MANSION := "PKMNMANSION"
 const TOKEN_RUINS_OUTER := "RUINS_OUTER"
 const TOKEN_RUINS_INNER := "RUINS_INNER"
@@ -114,9 +114,15 @@ static func tile_logic_for(world_seed: int, chain: Vector2i, map_pos: Vector2i, 
 	var hit := _lookup(world_seed, chain, map_pos)
 	if hit.is_empty():
 		return base_logic
-	var cell: Dictionary = hit["cell"]
+	var logic := cell_logic_for(hit["cell"], str(hit["landmark_id"]), base_logic)
+	# The instance key (slice 3): "id@ax,ay" off the footprint anchor — additive per-instance identity; landmark_id stays BARE.
+	logic["landmark_instance"] = ContentScatter.instance_key(str(hit["landmark_id"]), (hit["footprint"] as Rect2i).position + (hit["footprint"] as Rect2i).size / 2)
+	return logic
+# The cell -> logic stamp, the SINGLE source (landmark_scatter.gd's consult rides it too — a mirror would drift).
+static func cell_logic_for(cell: Dictionary, landmark_id: String, base_logic: Dictionary) -> Dictionary:
 	var logic := base_logic.duplicate()
-	logic["landmark_id"] = str(hit["landmark_id"])
+	logic["landmark_id"] = landmark_id
+	logic["landmark_region"] = str(cell["region"]) # slice 3: the consults' region reads ride the stamp (no second lookup; covers scattered instances)
 	logic["encounter_token"] = str(cell["token"])
 	logic["walkable"] = bool(cell["walkable"])
 	logic["encounter"] = bool(cell["encounter"])
@@ -135,6 +141,8 @@ static func mansion_statue_index(world_seed: int, chain: Vector2i, map_pos: Vect
 	if str(hit.get("landmark_id", "")) != MANSION_ID:
 		return -1
 	return _M_STATUE_TILES.find(map_pos - (hit["footprint"] as Rect2i).position)
+# Instance-aware statue index (slice 3): footprint-relative, so a SCATTERED mansion's statues resolve (the origin _lookup sees only the origin three).
+static func mansion_statue_index_local(local: Vector2i) -> int: return _M_STATUE_TILES.find(local)
 # Door walkability FROM PUZZLE STATE: the seam stamps both doors sealed; landmark_runtime overlays this via the frozen location-keyed seam, never the keying.
 static func mansion_door_walkable(state: Dictionary, region: String) -> bool:
 	if region == "room_door":
@@ -144,8 +152,7 @@ static func mansion_door_walkable(state: Dictionary, region: String) -> bool:
 	return false
 
 # --- Anchors (pure SplitMix; bounded search; never absent; siblings disjoint) ------
-# The search ALSO requires disjoint (borders included) from earlier-anchored siblings (LANDMARK_IDS order;
-# sibling anchors re-derive by the same pure recursion — cache never feeds derivation): one step past ANY edge stays un-stamped.
+# The search ALSO requires disjoint (borders included) from earlier-anchored siblings (LANDMARK_IDS order; sibling anchors re-derive by the same pure recursion — cache never feeds derivation): one step past ANY edge stays un-stamped.
 static func anchor_for(world_seed: int, chain: Vector2i, landmark_id: String) -> Vector2i:
 	var index := LANDMARK_IDS.find(landmark_id)
 	if index < 0:

@@ -25,7 +25,7 @@ const LandmarkGuardianChecks := preload("res://scripts/app/landmark_guardian_che
 const Landmarks := LandmarkRuntime.Landmarks
 
 const SEED := 2026072907
-const ORIGIN := Vector2i.ZERO # Build 1: the origin world (any-world asserts ride world_chain)
+const ORIGIN := Vector2i.ZERO # the origin world — the seamless plane retired chaining (infinite-world slice 1)
 const DAY_MINUTES := 600 # DAY pools for the scope asserts (nocturnal ghosts never perturb them)
 const STATUE_LOCALS := [Vector2i(6, 7), Vector2i(7, 7), Vector2i(8, 7)] # Landmarks._M_STATUE_TILES (private; the spec's locals)
 const ROOM_DOOR_LOCAL := Vector2i(7, 5) # landmark_runtime.ROOM_DOOR_LOCAL (private const)

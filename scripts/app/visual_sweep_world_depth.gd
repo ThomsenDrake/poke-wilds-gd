@@ -3,8 +3,8 @@ extends Node
 # Deterministic world-depth driver for the visual sweep (Phase 7; spec: docs/product-
 # specs/world-depth.md § Smoke validation). STANDALONE satellite: the Ruins inner chamber
 # + glowing statue pair (31), the Mansion room with the statue grid + both doors open (32),
-# and a world edge with two registered way-stone beacons + the multi-beacon selector open
-# (33 — shot extracted to visual_sweep_world_depth_beacon.gd at this file's app-220 wall).
+# and the R11 Heart Tower base chamber (34, via visual_sweep_world_depth_expand.gd). The
+# 33_beacon edge shot RETIRED with world chaining (infinite-world slice 1).
 # Footprints are found by PROBING the view's tile logic for the landmark_id stamp (app never
 # preloads domain); puzzle state is CRAFTED through the frozen seam. NO rng: byte-stable.
 # The entity layer stays INERT and encounter_chance is pinned 0, so no pending seam can arm.
@@ -14,7 +14,8 @@ const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_oracle.gd") # R4 regional pixel oracle (app-220 extraction)
-const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # R11 shots 34-36 + rest probe (app-220 extraction)
+const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # R11 shot 34 + rest probe (app-220 extraction)
+const ShowcaseSupport := preload("res://scripts/app/showcase_support.gd") # the instance-keyed mansion-state write (slice 3)
 
 const DEFAULT_THRESHOLD_PCT := 0.5
 const RUINS_ID := "desert_ruins" # public contract strings (trace payloads, spec § Landmarks)
@@ -97,7 +98,7 @@ func _mansion_shot() -> void:
 		_failures.append("%s: camera tile %s token '%s'/walkable %s unexpected (domain layout drift)" % [SHOT_MANSION, tile, logic.get("encounter_token", ""), logic.get("walkable")]); return
 	# Craft the SOLVED puzzle through the frozen seam (never the keying), then rebuild
 	# so the resolver's door overlay re-stamps both doors open through the tile cache.
-	_runtime().session.set_landmark_state(Vector2i.ZERO, CRAFTED_MANSION_STATE.duplicate(true))
+	ShowcaseSupport.write_mansion_state(_runtime(), footprint, (CRAFTED_MANSION_STATE as Dictionary)[MANSION_ID])
 	_world().rebuild(int(_crafted["world_seed"]))
 	for door_region in MANSION_DOOR_LOCALS:
 		var door_tile: Vector2i = footprint.position + MANSION_DOOR_LOCALS[door_region]

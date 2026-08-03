@@ -104,7 +104,10 @@ static func roundtrip_removal(runtime, species_id: String, anchored: Array) -> S
 	var payload: Dictionary = runtime.session.to_save_payload({}, {})
 	var fresh = SessionState.new()
 	fresh.apply_loaded_state(payload, runtime.session.get_party_snapshot())
-	var key := "0,0:%s" % species_id
+	var key := ""
+	for entry in LegendaryPlacement.legendaries_for_world(runtime.get_world_seed(), ORIGIN): # slice 3: the removal key is the species' CANONICAL origin anchor
+		if str(entry.get("species_id", "")) == species_id:
+			key = LegendaryPlacement.removal_key(entry.get("tile", LegendaryPlacement.NO_ANCHOR), species_id)
 	if not (fresh.legendary_removals as Array).has(key):
 		return "ko: the to_payload/apply_into round-trip lost the removal key %s (fresh set %s) — a KO'd legendary would respawn on save-load" % [key, str(fresh.legendary_removals)]
 	var present: Array = []

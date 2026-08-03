@@ -891,6 +891,7 @@ code_paths = [
   "scripts/domain/overworld_mons.gd",
   "scripts/runtime/overworld_mons_runtime.gd",
   "scripts/runtime/overworld_mons_sim.gd",
+  "scripts/runtime/overworld_mons_lairs.gd",
   "scripts/runtime/overworld_mons_actions.gd",
   "scripts/domain/contact_encounter.gd",
   "scripts/runtime/overworld_mons_probe.gd",
@@ -996,6 +997,8 @@ layer = "runtime"
 code_paths = [
   "scripts/domain/landmarks.gd",
   "scripts/domain/legendary_placement.gd",
+  "scripts/domain/content_scatter.gd",
+  "scripts/domain/landmark_scatter.gd",
   "scripts/domain/save_migration.gd",
   "scripts/runtime/landmark_runtime.gd",
   "scripts/runtime/session_payload.gd",
@@ -1003,6 +1006,7 @@ code_paths = [
   "scripts/runtime/wild_encounter_draw.gd",
   "scripts/app/landmark_actions.gd",
   "scripts/app/landmark_flow_scenario.gd",
+  "scripts/app/content_scatter_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
@@ -1028,6 +1032,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario landmark_flow",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_spawn",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario waystone_selector",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario content_scatter",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
 ]
 # The two Build-1 plan traces (single owning source string "LandmarkRuntime"), the Build-2

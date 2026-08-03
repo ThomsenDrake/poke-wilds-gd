@@ -24,11 +24,14 @@ class FrameTicker:
 	extends Node
 	signal pulse
 	var exiting := false # set BEFORE the teardown pulse: the stage's tree pointer outlives its children's _exit_tree notifications, so is_inside_tree() cannot see teardown — this flag can
+	var exit_hook: Callable = Callable() # the battle view's generation bump — fires BEFORE the pulse, so a teardown-resumed playback unwinds INSTEAD of emitting battle_finished mid-quit
 	func _process(_delta: float) -> void:
 		if not exiting:
 			pulse.emit()
 	func _exit_tree() -> void:
 		exiting = true
+		if exit_hook.is_valid():
+			exit_hook.call() # before the pulse: the parent view's own _exit_tree runs AFTER this child's, too late to cancel the unwind
 		pulse.emit()
 
 
@@ -146,13 +149,19 @@ func _restore_state(actors: Dictionary, state: Dictionary) -> void:
 				item.visible = bool(state["layer_vis"].get(item.get_instance_id(), true))
 
 
-# The stage's cached FrameTicker (the _overlay_for pattern — one per stage).
+# The stage's cached FrameTicker (the _overlay_for pattern — one per stage). The exit hook
+# wires the battle view's teardown bump through a DOCUMENTED REACH (stage -> viewport ->
+# view; the field_action_router._toggle_campfire precedent) so the bump precedes the pulse.
 func _ticker_for(stage: Control) -> Node:
 	var existing := stage.get_node_or_null("FrameTicker")
 	if existing != null:
 		return existing
 	var ticker := FrameTicker.new()
 	ticker.name = "FrameTicker"
+	var view: Node = stage.get_parent()
+	if view != null: view = view.get_parent()
+	if view != null and view.has_method("_on_animation_teardown"):
+		ticker.exit_hook = Callable(view, "_on_animation_teardown")
 	stage.add_child(ticker)
 	return ticker
 

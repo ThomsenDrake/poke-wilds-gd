@@ -40,7 +40,7 @@ static func _mansion_shots(s: Node) -> void:
 	var fp := ShowcaseSupport.find_footprint(s._world(), MANSION_ID, SPIRAL_CAP)
 	if fp.size == Vector2i.ZERO:
 		s._failures.append("%s: no %s stamp within spiral cap %d (anchor seam broken)" % [SHOT_STATUE_ROOM, MANSION_ID, SPIRAL_CAP]); return
-	s._runtime().session.set_landmark_state(Vector2i.ZERO, SOLVED_MANSION.duplicate(true))
+	ShowcaseSupport.write_mansion_state(s._runtime(), fp, (SOLVED_MANSION as Dictionary)[MANSION_ID]) # the instance-keyed merge (slice 3)
 	s._world().rebuild(int(s._runtime().get_world_seed()))
 	for door in MANSION_DOOR_LOCALS:
 		var door_tile: Vector2i = fp.position + MANSION_DOOR_LOCALS[door]

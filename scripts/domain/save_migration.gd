@@ -13,6 +13,10 @@ extends RefCounted
 # migrate() returns a DEEP COPY: GDScript Dictionaries are BY-REFERENCE, so an in-place
 # transform would silently fake the golden compare by aliasing.
 #
+const Landmarks := preload("res://scripts/domain/landmarks.gd") # origin anchors for the instance re-key (same layer — no cycle)
+const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd") # origin legendary anchors (same layer — no cycle)
+const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the instance-key grammar (same layer — no cycle)
+
 # NO preload cycle: this module imports NOTHING from runtime — the schema constant
 # (SAVE_VERSION) is passed as an argument (the session_payload.gd sibling pattern;
 # session_state.gd stays the single owner of the schema constants).
@@ -44,7 +48,10 @@ static func chain_for(world_id: String) -> Vector2i:
 static func migrate(payload: Dictionary, save_version: int = 6) -> Dictionary:
 	var out: Dictionary = payload.duplicate(true)
 	if int(out.get("version", 1)) >= save_version:
-		return out # v6 pass-through (still a copy) OR the newer-build refusal shape
+		# v6 pass-through STILL normalizes the slice-3 key grammar (bare landmark_state ids /
+		# frozen "0,0:" removal keys from the pre-scatter builds); a NEWER build's payload is
+		# untouched (the refusal shape).
+		return normalize_instance_keys(out) if int(out.get("version", 1)) == 6 else out
 	if int(out.get("version", 1)) < 5:
 		out["root_seed"] = int(out.get("world_seed", 1337))
 		out["active_chain"] = world_id_for(Vector2i.ZERO)
@@ -61,6 +68,7 @@ static func migrate(payload: Dictionary, save_version: int = 6) -> Dictionary:
 		var origin: Variant = (chained as Dictionary).get(world_id_for(Vector2i.ZERO), {})
 		if origin is Dictionary and (origin as Dictionary).has("landmark_state"):
 			out["landmark_state"] = (origin as Dictionary)["landmark_state"]
+	out = normalize_instance_keys(out) # AFTER the hoist — a hoisted legacy key must re-key too
 	out["version"] = save_version
 	return out
 
@@ -111,6 +119,41 @@ static func downshift(payload: Dictionary) -> Dictionary:
 	return out
 
 
+# v6 key-grammar normalization (infinite-world slice 3): legacy BARE landmark_state ids
+# ("pkmn_mansion") re-key to per-instance "id@ax,ay", and frozen "0,0:SPECIES" removal keys
+# re-key to the origin anchor "<ax>,<ay>:<SPECIES>" — both derived from the payload's OWN
+# world_seed (the origin anchors are pure functions of it; the canonical sibling chain is
+# removal-independent, so a load-time derivation matches every runtime re-derivation).
+# Lossless (unknown keys survive verbatim), idempotent (keyed payloads pass through).
+static func normalize_instance_keys(payload: Dictionary) -> Dictionary:
+	var out: Dictionary = payload.duplicate(true)
+	var seed := int(out.get("world_seed", 1337)) # the 1337 fallback matches migrate/apply_into, so a seed-less payload re-keys against the same world it loads into
+	var state: Variant = out.get("landmark_state", null)
+	if state is Dictionary and not (state as Dictionary).is_empty():
+		var rekeyed := {}
+		for key in (state as Dictionary).keys():
+			var k := str(key)
+			if k.contains("@") or not Landmarks.LANDMARK_IDS.has(k):
+				rekeyed[k] = (state as Dictionary)[key] # already keyed, or an unknown id — verbatim, never drop data
+			else:
+				rekeyed[ContentScatter.instance_key(k, Landmarks.anchor_for(seed, Vector2i.ZERO, k))] = (state as Dictionary)[key]
+		out["landmark_state"] = rekeyed
+	var removals: Variant = out.get("legendary_removals", null)
+	if removals is Array and not (removals as Array).is_empty():
+		var origin := {} # species -> the canonical origin anchor
+		for entry in LegendaryPlacement.legendaries_for_world(seed, Vector2i.ZERO):
+			origin[str(entry.get("species_id", ""))] = entry.get("tile", Vector2i.ZERO)
+		var rekeys: Array = []
+		for raw in (removals as Array):
+			var k := str(raw)
+			if k.begins_with("0,0:") and origin.has(k.substr(4)):
+				rekeys.append(LegendaryPlacement.removal_key(origin[k.substr(4)], k.substr(4)))
+			else:
+				rekeys.append(k)
+		out["legendary_removals"] = rekeys
+	return out
+
+
 # --- Pinned byte-preservation witnesses ---------------------------------------------
 # PURE + runtime-free; the phase0 save_migration checker calls this with the committed
 # golden + SessionState.SAVE_VERSION. Returns issue strings (empty = green) so a red NAMES
@@ -138,17 +181,34 @@ static func byte_witness_issues(golden_v4: Dictionary, save_version: int) -> Arr
 		issues.append("golden: migrate() changed more than the version key (the v6 flatten must be the identity on a chain-less save)")
 	if int(migrated.get("version", 0)) != save_version:
 		issues.append("golden: the migrated payload is not version %d" % save_version)
-	# SECOND witness: a v4 top-level landmark_state survives migration BYTE-VERBATIM at the
-	# top level (the v5 nest+hoist is the identity), NO chain keys survive, argument untouched.
+	# SECOND witness: a v4 top-level landmark_state survives migration at the top level with
+	# its VALUE BYTE-VERBATIM and the key re-keyed to the instance grammar (slice 3: the v5
+	# nest+hoist is the identity; the normalize pass moves ONLY the key), NO chain keys
+	# survive, argument untouched.
 	var state := {"pkmn_mansion": {"statues": [true, false, true], "unlocked": false, "key_taken": false}}
 	var v4 := {"version": 4, "world_seed": 555, "landmark_state": state.duplicate(true)}
 	var moved := migrate(v4, save_version)
-	if not moved.has("landmark_state") or (moved["landmark_state"] as Dictionary) != state:
-		issues.append("relocation: the top-level landmark_state is not byte-identical after migration")
+	var expected_key := ContentScatter.instance_key("pkmn_mansion", Landmarks.anchor_for(555, Vector2i.ZERO, "pkmn_mansion"))
+	var moved_state: Variant = moved.get("landmark_state", {})
+	if not (moved_state is Dictionary) or (moved_state as Dictionary).size() != 1 or not (moved_state as Dictionary).has(expected_key) or (moved_state as Dictionary)[expected_key] != state["pkmn_mansion"]:
+		issues.append("relocation: the landmark_state value is not byte-identical at the re-keyed instance seat after migration")
 	if moved.has("chained_worlds") or moved.has("root_seed") or moved.has("active_chain"):
 		issues.append("relocation: a chain key survived the v6 flatten")
 	if not v4.has("landmark_state") or int(v4.get("version", 0)) != 4:
 		issues.append("relocation: migrate() MUTATED its argument (GDScript dicts are by-reference — it must deep-copy)")
+	# REMOVALS witness (slice 3): a legacy frozen "0,0:<SPECIES>" key normalizes to the origin
+	# anchor key, losslessly (the canonical chain is removal-independent), argument untouched.
+	var mewtwo_anchor: Vector2i = LegendaryPlacement.NO_ANCHOR
+	for entry in LegendaryPlacement.legendaries_for_world(555, Vector2i.ZERO):
+		if str(entry.get("species_id", "")) == "MEWTWO":
+			mewtwo_anchor = entry.get("tile", LegendaryPlacement.NO_ANCHOR)
+	var v6 := {"version": 6, "world_seed": 555, "legendary_removals": ["0,0:MEWTWO"]}
+	var normed := migrate(v6, save_version)
+	var removals_out: Variant = normed.get("legendary_removals", [])
+	if mewtwo_anchor == LegendaryPlacement.NO_ANCHOR or not (removals_out is Array) or (removals_out as Array) != [LegendaryPlacement.removal_key(mewtwo_anchor, "MEWTWO")]:
+		issues.append("relocation: the legacy removal key did not normalize to the origin anchor key")
+	if (v6["legendary_removals"] as Array) != ["0,0:MEWTWO"]:
+		issues.append("relocation: migrate() MUTATED its argument's removals (GDScript arrays are by-reference — it must deep-copy)")
 	# REFUSAL witness: a truly chained v5 save is NOT representable on one plane, while a
 	# chain-less v5 save IS (lossless flatten).
 	var chained := {"version": 5, "world_seed": 555, "root_seed": 555, "active_chain": "0,-1",

@@ -9,6 +9,11 @@ extends RefCounted
 # Spiral from the world origin for the first tile stamped with the resolver's landmark_id, then walk
 # the stamp out to its rect. Deterministic in the active world seed; Rect2i() (zero size) on cap
 # exhaustion — the caller loud-fails, never a silent skip (miss-002).
+const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd") # the instance-key grammar rides the runtime's own preload (app may not preload domain)
+const ContentScatter := LandmarkRuntime.ContentScatter
+
+
+
 static func find_footprint(world: Node, landmark_id: String, cap: int) -> Rect2i:
 	for radius in range(cap + 1):
 		for cell in spiral_ring(radius):
@@ -45,3 +50,11 @@ static func teleport(s: Node, tile: Vector2i) -> void:
 	s._runner.teleport_player(s._world(), s._player(), s._runtime(), tile)
 	s._world().set_time_of_day(720)
 	s._world().sync_visible(tile)
+# The per-instance mansion-state write (slice 3): the frozen seam MERGES at the origin
+# mansion's instance key — never a bare-id whole-dict replace (that would clobber every
+# sibling instance's puzzle state).
+static func write_mansion_state(runtime, footprint: Rect2i, state: Dictionary) -> void:
+	var anchor: Vector2i = footprint.position + footprint.size / 2
+	var all: Dictionary = runtime.session.landmark_state_for(Vector2i.ZERO)
+	all[ContentScatter.instance_key("pkmn_mansion", anchor)] = state
+	runtime.session.set_landmark_state(Vector2i.ZERO, all)

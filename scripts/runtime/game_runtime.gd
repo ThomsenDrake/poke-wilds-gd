@@ -98,7 +98,7 @@ func ensure_initialized() -> void:
 		_initialized = true
 		return
 	if not payload.is_empty(): # parsed-but-unapplicable save: preserve player data before new_game()
-		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store.preserve_save(".unusable.bak")})
+		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store._preserve(".unusable.bak")}) # _preserve ARMS live-path protection on failure (the .chained.bak precedent — never clobber on a failed preserve)
 	new_game()
 
 
