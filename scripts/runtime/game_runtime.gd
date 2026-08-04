@@ -6,6 +6,7 @@ const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const FieldMoves := preload("res://scripts/domain/field_moves.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
+const SessionPayload := preload("res://scripts/runtime/session_payload.gd") # the creation-identity normalizers (begin_created_game mirrors the load path)
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const BattleRuntime := preload("res://scripts/runtime/battle_runtime.gd")
 const BuildRuntime := preload("res://scripts/runtime/build_runtime.gd")
@@ -56,6 +57,7 @@ var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_run
 var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
 var _initialized = false
+var _boot_save_loaded := false # set ONLY in ensure_initialized's session_loaded branch (the title-screen CONTINUE gate)
 
 func _ready() -> void:
 	_rng.randomize()
@@ -84,23 +86,32 @@ func _ready() -> void:
 	music_router.setup(trace) # under this autoload so its lazy player is in the tree and audible
 	add_child(music_router)
 
-
-func ensure_initialized() -> void:
+func ensure_initialized(silent_new_game: bool = true) -> void:
 	if _initialized:
 		return
 	catalog.load_all()
 	var payload = save_store.load_payload()
 	if not payload.is_empty() and int(payload.get("version", 1)) < SessionState.SAVE_VERSION and not SessionState.SaveMigration.can_represent_infinite(payload): # infinite-world slice: a TRULY CHAINED legacy save can't be one plane — preserve + fresh start (.newer.bak precedent); chain-less flattens losslessly in apply
-		warn("GameRuntime", "Chained save cannot represent a single infinite world; preserved it and starting fresh.", {"preserved_path": save_store._preserve(".chained.bak")}); new_game(); return # _preserve ARMS live-path protection on preserve-failure (the .corrupt.bak/.newer.bak precedent — the autosave can never clobber the un-preserved chained save)
+		warn("GameRuntime", "Chained save cannot represent a single infinite world; preserved it and starting fresh.", {"preserved_path": save_store._preserve(".chained.bak")}) # _preserve ARMS live-path protection on preserve-failure (the .corrupt.bak/.newer.bak precedent — the autosave can never clobber the un-preserved chained save)
+		if silent_new_game: new_game()
+		return
 	if not payload.is_empty() and _apply_loaded_payload(payload):
 		trace.emit_event("session_loaded", "GameRuntime", {
 			"party_size": session.party.size(), "player_tile": _tile_payload(session.player_tile)})
-		_initialized = true
+		_boot_save_loaded = true; _initialized = true
 		return
 	if not payload.is_empty(): # parsed-but-unapplicable save: preserve player data before new_game()
 		warn("GameRuntime", "Save parsed but could not be applied; preserved it and starting fresh.", {"preserved_path": save_store._preserve(".unusable.bak")}) # _preserve ARMS live-path protection on failure (the .chained.bak precedent — never clobber on a failed preserve)
-	new_game()
+	if silent_new_game: new_game()
 
+# Creation-flow seam (title_flow slice): commits identity/odds through the SAME normalizers the load path
+# rides (session_payload), THEN the pinned new_game draw order (starter shiny first, world seed second). No choice consumes the shared _rng; the pause-menu path never rides this seam.
+func begin_created_game(creation: Dictionary) -> void:
+	session.player_name = SessionPayload.normalize_player_name(creation.get("player_name", SessionState.DEFAULT_PLAYER_NAME))
+	session.player_avatar = SessionPayload.normalize_player_avatar(creation.get("player_avatar", SessionState.DEFAULT_PLAYER_AVATAR))
+	session.shiny_odds_choice = SessionPayload.normalize_shiny_odds(creation.get("shiny_odds", SessionState.SHINY_ODDS_DEFAULT))
+	PokemonRules.shiny_odds = session.shiny_odds_choice
+	new_game(int(creation.get("world_seed", -1)))
 
 func new_game(custom_seed: int = -1) -> void:
 	var starter = _build_starter()
@@ -114,7 +125,6 @@ func new_game(custom_seed: int = -1) -> void:
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,
 		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
-
 
 func save_game() -> void: # split save: clears + placements stay two keys; the merged map is view-only
 	if not save_store.write_payload(session.to_save_payload(_world_gen.overrides_for_save(), _world_gen.placements_for_save())):
@@ -133,6 +143,7 @@ func warn(source: String, message: String, payload: Dictionary = {}) -> void:
 
 func get_world_seed() -> int: return session.world_seed
 func get_player_tile() -> Vector2i: return session.player_tile
+func has_loaded_save() -> bool: return _boot_save_loaded
 
 func set_player_tile(tile_position: Vector2i) -> void: session.player_tile = tile_position
 
@@ -231,12 +242,7 @@ func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictiona
 	return wild_encounter_draw.draw(tile_pos, biome) # Build-2 extraction: scope + night ghosts + the draw + shiny_rolled
 
 
-# Phase 7 Build 2 (world-depth.md § Legendaries :161): the registry-REQUIRED battle-start trace, SINGLE owner — distinct from the generic stationary-spawn so the ring gate is provable; no-op for every non-legendary forced battle.
-func _trace_legendary_encounter(mon: Dictionary) -> void:
-	if str(mon.get("battle_kind", "")) != "legendary":
-		return
-	trace.emit_event("legendary_encounter", "GameRuntime", {"species_id": str(mon.get("species_id", "")), "tile": mon.get("tile", [0, 0]), "biome": str(mon.get("biome", "")), "ring": int(mon.get("ring", 0)), "battle_kind": "legendary"})
-
+func _trace_legendary_encounter(mon: Dictionary) -> void: WildEncounterDraw.trace_legendary(mon, trace)
 
 func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 	night_system.begin_battle(wild_mon)
@@ -286,7 +292,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 				normalized_party.append(pokemon_rules.normalize_loaded_mon(mon_variant))
 	if normalized_party.is_empty():
 		return false
-	session.apply_loaded_state(payload, normalized_party)
+	session.apply_loaded_state(payload, normalized_party); PokemonRules.shiny_odds = maxi(1, session.shiny_odds_choice)
 	_world_gen.setup(session.world_seed) # re-seed to the loaded world, then restore overrides exactly
 	_world_gen.clear_overrides()
 	var saved_overrides: Variant = payload.get("world_overrides", {})
@@ -301,13 +307,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 
 
 func _build_starter() -> Dictionary:
-	var starter := EncounterSelection.build_starter(catalog, pokemon_rules, _rng, Callable(catalog, "get_move"))
-	if starter.is_empty():
-		trace.warning("GameRuntime", "Species catalog is empty; starting a new game without a starter.", {})
-	else:
-		trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(starter.get("species_id", "")), "is_shiny": bool(starter.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "starter"})
-	return starter
-
+	return EncounterSelection.build_starter_traced(catalog, pokemon_rules, _rng, Callable(catalog, "get_move"), trace)
 
 func _tile_payload(tile_position: Vector2i) -> Array: return [tile_position.x, tile_position.y]
 

@@ -14,6 +14,25 @@ Everything you need to play, on one page. The same keys work everywhere — what
 
 `X` plays two roles: cancel in menus and battle, and hold-to-run in the overworld. These contexts never overlap — while any menu or screen is open, `X` only cancels; with nothing open, holding it makes you run.
 
+## Starting out (title screen & new game)
+
+When you launch the game, a black splash card ("POKÉWILDS", with a fan-remake credit line) shows for about two seconds — **any key skips it**. The title screen then comes up over the title art:
+
+- **CONTINUE** — appears **only when a save loaded**; it takes you straight back into your world.
+- **NEW GAME** — always available (with no save on disk it is the only entry).
+
+Up/Down moves the selection, `Z` activates. Choosing NEW GAME with a save on disk asks you to confirm first — "Start a new game? Your current save will be erased." — with **`Z` = yes** and **`X` = no** (cancel stays on the title). With no save there is nothing to erase, so the game goes straight to creation.
+
+**Creation is five steps**, in order. On every step **`Z`** activates or advances and **`X`** goes back one step (`X` on the first step returns to the title):
+
+1. **SEED** — the world seed. RANDOM is the one-press default; press **Left or Right** to open the custom-seed entry, type a number (arrow keys move the cursor, Up/Down bump the digit, Backspace deletes, `Z` confirms, `X` backs out), and `Z` advances.
+2. **SHINY RATE** — **Left/Right** cycles the shiny odds through 1/32, 1/64, 1/128, 1/256, 1/512, and 1/1024. The default is the faithful 1/256 (marked `(DEFAULT)`).
+3. **NAME** — `Z` opens an on-screen keyboard: a grid of **A–Z plus DEL and OK**. The arrow keys move the cursor (it wraps around the grid), `Z` presses the highlighted cell — letters append, DEL deletes — and OK confirms. Names are at most **8 characters**; if you confirm without typing anything, your name is **PLAYER**. `X` backs out to the NAME step.
+4. **AVATAR** — `Z` opens a grid of the **24 original player sprites** with a larger preview of the highlighted one; steer with the arrows and confirm with `Z`. The default is **ben**. `X` backs out.
+5. **GO!** — a summary of your name, avatar, shiny rate, and seed. `Z` begins: a short "Generating... please wait..." beat plays, and your game starts — a beach spawn with a level-5 **MACHOP** as your starter (it knows how to Build).
+
+Your NAME, AVATAR, and SHINY RATE choices are kept: the pause-menu NEW GAME (see [Start Menu](#start-menu-enter-in-the-overworld)) is still the one-confirm mid-play reset, and it keeps your name, avatar, and shiny odds — only the world itself starts over.
+
 ## Overworld
 
 - **Move** by holding any direction. You step one tile at a time and automatically face the way you last stepped. Pressing two directions at once moves you horizontally.
@@ -64,7 +83,7 @@ Either way you leave, your movement returns and the game saves.
 
 ### Start Menu (`Enter` in the overworld)
 
-Entries: **POKEMON**, **BAG**, **SAVE**, **NEW GAME**, **CLOSE**.
+Entries: **POKEMON**, **BAG**, **SAVE**, **OPTIONS**, **NEW GAME**, **CLOSE**.
 
 - **Up/Down** moves the selection (it wraps around). **`Z`** activates the selected entry. **`X`** or **`Enter`** closes the menu. Clicking an entry activates it too.
 - **SAVE** saves the game — and closing the menu saves as well ("Saved.").
@@ -185,7 +204,7 @@ Wild Pokémon and wild eggs look **identical** shiny or not in the overworld —
 - **Eggs**: two happy, comfortable Pokémon breed when they're a compatible pair — a female with a male of the same egg group, or **Ditto with almost anything breedable**. Genderless and legendary Pokémon cannot breed at all, even with a Ditto — faithful to the original (a flagged constant is the one-edit workaround; see [Differences from the Original PokeWilds](#differences-from-the-original-pokewilds)). Eggs appear inside the pen (at most seven before the pair stops laying). An egg's status screen shows its species, gender, moves, and whether it's shiny — BEFORE it hatches.
 - **Hatching**: pick an egg up (it joins your party, taking a slot) and WALK — eggs hatch after enough steps, into a level-5 Pokémon. Egg moves are inherited from the FATHER.
 - **Drops**: a happy, comfortable penned Pokémon leaves you a material once per in-game day — by type (Normal → Manure, Bug → Silky Thread, Flying → Soft Feather, and so on; a Miltank leaves Moo Moo Milk). These penned drops are the primary source of crafting materials; winning battles against matching types still yields their material as a secondary source.
-- **Shinies**: every Pokémon — wild, hatched, or caught — has a 1 in 256 chance of being shiny. A shiny looks completely normal in the overworld until you battle it (alternate colors + a sparkle) or check its status (a sparkle icon next to its gender) — eggs show the icon before hatching. The odds aren't adjustable in the menu yet.
+- **Shinies**: every Pokémon — wild, hatched, or caught — has a 1 in 256 chance of being shiny by default. A shiny looks completely normal in the overworld until you battle it (alternate colors + a sparkle) or check its status (a sparkle icon next to its gender) — eggs show the icon before hatching. The odds ARE adjustable — but only when you start a new game: the SHINY RATE creation step cycles them through 1/32 up to 1/1024 (see [Starting out](#starting-out-title-screen--new-game)); the pause menu has no odds entry.
 
 ## Landmarks
 
@@ -257,7 +276,9 @@ Keyboard only: the party screen, the bag item list, and confirm dialogs (`Z` / `
 - **Repel vs. roaming mons**: Repel wards the grass-encounter stream only; visible roaming Pokémon are unaffected. Inference — the original documents Repel (a crafted item) against wild encounters and says nothing about roaming mons; the two encounter sources never mix in this port either.
 - **Overworld mons are transient**: nothing about roaming Pokémon, nests, or wild eggs is saved — reloading resettles the overworld from the world seed and step count (recruited mons and taken eggs persist via the party, of course). The original documents no relog-respawn rule to mine.
 - **Night ghosts aggressive on SWAMP/FOREST**: the original's Ghost-type dwell (Damp/Mystic/Cursed Soil tiles) is ported as Ghost-type roamers turning aggressive at night in swamp and forest biomes (the soil tiles don't exist in the port). Flagged.
-- **Shinies**: 1 in 256 and invisible in the overworld until battle or status, exactly as the original; the original's promised user-adjustable odds aren't a menu option yet.
+- **Shinies**: 1 in 256 by default and invisible in the overworld until battle or status, exactly as the original; the original's promised user-adjustable odds are now in — but only as a new-game creation choice (the SHINY RATE step), never a pause-menu option.
+- **Splash card and title screen**: the original boots to a NEW / LOAD menu over a save-file list, plus a LOCAL / HOST / JOIN multiplayer row (`strings.properties`); the HOST/JOIN multiplayer is NOT ported — out of scope for this port (flagged). This single-save port instead shows a short black splash card ("POKÉWILDS" + a fan-remake credit line — FLAGGED invention: no logo/copyright/credit strings exist anywhere in sources) and a title screen with CONTINUE (only when a save loaded) and NEW GAME — a concretization of the original's NEW/LOAD split (flagged).
+- **Creation-flow concretizations**: the original's dialog order (file name → world size → shiny rate → character name → player → Begin!) is ported as SEED → SHINY RATE → NAME → AVATAR → GO!, following the i18n string order, with two drops: the file-name step is NOT ported (single-save port — flagged) and world size became the world SEED step (already flagged as the infinite-world slice's replacement in the world spec). The shiny ladder itself — 1/32, 1/64, 1/128, 1/256, 1/512, 1/1024 — is a flagged invention around the faithful 1/256 (the sources anchor only 1/256 plus the FAQ's promised "adjustable in a subsequent update"). The NAME grid keyboard (A–Z + DEL + OK), its 8-character cap, and the PLAYER default name are flagged concretizations (the original's `default` string names the save FILE, not the trainer — sources give no name cap). The avatar default **ben** is the pre-slice hardcoded sheet kept as the default (all 24 originals are now pickable). The "Generating... please wait..." line is faithful to the i18n string; the short wait itself is invented theater (flagged) — world generation is instant.
 - **Fishing tiers are global for now**: rods work exactly as the original (cast by water, better rod → better Pokémon), but the hooked species list is the same in every biome until per-biome fishing tables arrive.
 - **Evolution stones — obtaining them (faithful + port additions)**: using them from the bag works — `Z` on a stone opens the party picker and evolves the chosen Pokémon (shiny-safe; no effect consumes nothing). World acquisition is now in, split honestly between what the original documents and what this port adds:
   - **Faithful — Beach Dig → Water Stone.** Dig on the beach (sandy shore tiles) can turn up items alongside the dry sand, and the pool matches the original's Beach "Dig Items" exactly: Big Pearl, Water Stone, Clear Glass, and Revive (Water Stone being the evolution stone in the set). This is the only stone source the original's scrapes document.

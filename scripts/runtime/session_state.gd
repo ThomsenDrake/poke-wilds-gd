@@ -37,6 +37,14 @@ const LEGACY_ITEM_IDS := {"pokeball": "poke_ball"}
 const ENCOUNTER_MODES := ["off", "classic", "anywhere"]
 const ENCOUNTER_RATE_MIN := 0.02; const ENCOUNTER_RATE_MAX := 0.50
 const ENCOUNTER_RATE_STEP := 0.02; const ENCOUNTER_RATE_DEFAULT := 0.12
+# New-game creation identity + shiny odds (title_flow slice): v6-ADDITIVE, NO bump; absent
+# save keys backfill with these defaults (session_payload marshals write-only-when-non-default).
+const DEFAULT_PLAYER_NAME := "PLAYER"
+const DEFAULT_PLAYER_AVATAR := "ben"
+const SHINY_ODDS_DEFAULT := 256
+const SHINY_ODDS_CHOICES := [32, 64, 128, 256, 512, 1024] # FLAGGED invention ladder around the faithful 1/256
+const PLAYER_NAME_MAX := 8
+const CREATION_DEFAULTS := {"player_name": DEFAULT_PLAYER_NAME, "player_avatar": DEFAULT_PLAYER_AVATAR, "shiny_odds": SHINY_ODDS_DEFAULT}
 
 var world_seed: int = 1337
 var player_tile: Vector2i = Vector2i.ZERO
@@ -55,6 +63,9 @@ var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts d
 var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
 var legendary_removals: Array = [] # Phase 7 Build 2 v4-additive: gone-for-good legendary keys "<cx>,<cy>:<SPECIES>" (world-depth.md § Persistence; absent in save -> []).
 var encounter_settings: Dictionary = {} # Configurable-encounter opt-in (additive; absent/{} == "off" contact-only). session_payload marshals; title-screen Options configures.
+var player_name: String = DEFAULT_PLAYER_NAME
+var player_avatar: String = DEFAULT_PLAYER_AVATAR
+var shiny_odds_choice: int = SHINY_ODDS_DEFAULT
 
 
 func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Vector2i = Vector2i.ZERO) -> void:
@@ -72,6 +83,7 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	repel_steps = 0
 	landmark_state = {}
 	legendary_removals = []
+	# player_name/player_avatar/shiny_odds_choice deliberately NOT reset: creation identity persists across new games (the encounter_settings precedent).
 	if not starter.is_empty():
 		party.append(starter)
 
@@ -81,11 +93,11 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 # Build 3 prepends SaveMigration.migrate(data) FIRST inside apply_into (a pure copy),
 # then reads the v5 keys with new-game defaults (origin backfill).
 func apply_loaded_state(data: Dictionary, normalized_party: Array) -> void:
-	SessionPayload.apply_into(self, data, normalized_party, STARTING_BAG, LEGACY_ITEM_IDS, DAY_MINUTES, NEW_GAME_TIME_OF_DAY, SAVE_VERSION)
+	SessionPayload.apply_into(self, data, normalized_party, STARTING_BAG, LEGACY_ITEM_IDS, DAY_MINUTES, NEW_GAME_TIME_OF_DAY, SAVE_VERSION, CREATION_DEFAULTS)
 
 
 func to_save_payload(world_overrides: Dictionary = {}, structures_overrides: Dictionary = {}) -> Dictionary:
-	return SessionPayload.to_payload(self, world_overrides, structures_overrides, SAVE_VERSION)
+	return SessionPayload.to_payload(self, world_overrides, structures_overrides, SAVE_VERSION, CREATION_DEFAULTS)
 
 
 # --- Frozen location-keyed landmark state seam (world-depth.md § Persistence) -----

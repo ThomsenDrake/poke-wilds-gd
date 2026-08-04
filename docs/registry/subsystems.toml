@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/main_smoke_context.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -23,8 +23,33 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_stability",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed"]
 quality_bucket = "bootstrap"
+# TITLE-FLOW SLICE (new-game flow + startup splash): scripts/app/new_game_flow_scenario.gd
+# + scripts/app/new_game_flow_checks.gd join code_paths (the SmokeScenarios home, the
+# save_migration_scenario precedent) — the gate drives the REAL TitleScreen/CreationScreen
+# through the player-boot seam (begin_boot -> MessageBox save-wipe confirm -> creation
+# steps SEED/SHINY/NAME/AVATAR/GO) with PIN 2026080601 + the probed beach-spawn WORLD_SEED
+# 2026080602, ending on the exact creation_confirmed payload + world/persistence witnesses.
+# Self-pinned (seed_for_smoke BEFORE creation), NOT a double-run consumer (the seed_choice
+# precedent); the new_game_flow_passed/failed pair rides the requirements row +
+# PLAYTEST_SCENARIOS only (NOT SMOKE_SCENARIOS — --include-smoke concatenates the two lists
+# without dedup, so a double membership would run it twice). The ui screens ride the
+# NEW title_flow entry's code_paths; scripts/app/main_smoke_context.gd joins THIS entry's
+# code_paths above (smoke-context assembly EXTRACTED from main.gd's smoke_context() at the
+# 220 wall — every old key reproduced EXACTLY + the title_screen/creation_screen keys the
+# scenario drives; _smoke_set_battle stays in main.gd, it mutates main fields).
+# TITLE-FLOW SLICE co-modification (main.gd restructure): the boot tail is SPLIT —
+# consume_requested_scenario moved BEFORE ensure_initialized, and ensure_initialized(
+# silent_new_game := scenario present) keeps scenario boots on the pre-slice path
+# BYTE-FOR-BYTE (silent new_game on absent/corrupt/refused save, boot toast, world sync at
+# boot) while PLAYER boots go load-only + splash/title, never auto-starting a game or
+# writing a save. _enter_world (avatar set + world sync + input enable) is the shared
+# CONTINUE/creation landing; _toggle_menu + the context poll gain same-line TitleScreen/
+# CreationScreen visibility guards (the StorageScreen precedent); _on_game_reset re-applies
+# session.player_avatar same-line (identity persists across the pinned pause-menu reset —
+# the encounter_settings precedent); both new screens join the same-line bind_ui_consumers
+# array with argless closed signals (the latch contract — the title_flow entry's note).
 # PRE-PHASE-7 SUITE EXPANSION (user-approved full deep-dive expansion; the four new
 # scenarios are miss-002-compliant: symmetric <name>_passed / <name>_failed{reasons}
 # markers). rng_joint_pin + save_stability live HERE (the SmokeScenarios home; the
@@ -82,6 +107,22 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
+# entry owns the screens): game_runtime.gd's ensure_initialized gains the silent_new_game
+# flag (default true — scenario boots keep the silent new_game on absent/corrupt/refused
+# save; PLAYER boots pass false: load-only, NEVER new_game, NEVER a save write) +
+# has_loaded_save() (_boot_save_loaded, set ONLY in the session_loaded branch — the
+# title-screen CONTINUE gate), and the creation seam begin_created_game(creation) commits
+# player_name/player_avatar/shiny_odds_choice + PokemonRules.shiny_odds BEFORE the pinned
+# new_game(world_seed) draw order (starter shiny FIRST at stream index 0; the choices
+# consume NO _rng; the pause-menu path never rides this seam). _apply_loaded_payload
+# re-applies the odds same-line. session_state.gd gains the creation constants +
+# player_name/player_avatar/shiny_odds_choice vars — reset_for_new_game deliberately does
+# NOT clear them (identity persists across new games, the encounter_settings precedent);
+# session_payload.gd marshals the three ADDITIVE v6 keys (player_name/player_avatar/
+# shiny_rate) write-only-when-non-default with load normalizers — NO SAVE_VERSION bump,
+# the encounter_settings/landmark_state byte-shape precedent (the frozen goldens carry
+# none of the keys and stay byte-identical).
 # PRE-PHASE-7 SUITE EXPANSION co-modification: game_runtime.gd:207 seed_for_smoke now
 # ALSO pins player_avatar._rng (wall-clock-seeded today at player_avatar.gd:42,47; the
 # trigger draw is :205), so the determinism seam covers the FULL rng surface (encounter +
@@ -146,6 +187,17 @@ validation_commands = [
 ]
 required_trace_events = ["world_rebuilt", "biome_entered"]
 quality_bucket = "world"
+# TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
+# entry owns the screens): player_sprite_frames.gd's build gains the avatar_name
+# parameter (format-string sheet paths res://pokewilds/player/<name>-walking.png +
+# -running.png replacing the two hardcoded consts; fallback chain requested walk -> ben
+# walk -> kris walk -> null mirrors the LEGACY fallback; a missing run sheet falls back
+# to the walk sheet as before — all eight walk/run animations rebuild sheet-agnostic) and
+# player_avatar.gd gains set_avatar(name) (idempotent: rebuilds the frames + re-applies
+# the current facing state; _rng untouched — seed_for_smoke pin safe). DEFAULT_PLAYER_
+# AVATAR "ben" IS the pre-slice hardcoded default, so every committed baseline keeps its
+# exact pixels; the callers are main._enter_world (boot CONTINUE + title creation) +
+# _on_game_reset (identity persists across the pinned pause-menu reset).
 # PHASE 7 BUILD 1 CO-MODIFICATION (the `landmarks` subsystem entry owns the detail note):
 # world_generator.gd consults a pure landmark_resolver Callable at the SINGLE mutation
 # boundary (:109-114) — Landmarks.tile_logic_for stamps footprint tiles (adding the
@@ -281,6 +333,57 @@ validation_commands = [
 ]
 required_trace_events = ["menu_opened", "menu_closed", "save_written", "mon_retrieved"]
 quality_bucket = "ui"
+
+[[subsystems]]
+name = "title_flow"
+status = "active"
+layer = "ui"
+code_paths = [
+  "scripts/ui/title_screen.gd",
+  "scripts/ui/creation_screen.gd",
+  "scripts/ui/name_entry.gd",
+  "scripts/ui/avatar_picker.gd",
+]
+scene_paths = [
+  "scenes/ui/TitleScreen.tscn",
+  "scenes/ui/CreationScreen.tscn",
+]
+spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
+validation_commands = [
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario new_game_flow",
+]
+required_trace_events = ["splash_shown", "splash_closed", "title_shown", "title_continued", "title_new_game_chosen", "creation_confirmed"]
+quality_bucket = "bootstrap"
+# TITLE-FLOW SLICE (new-game flow + startup splash): splash + title are PHASES of ONE
+# scene (TitleScreen.tscn — a black card phase, then the pokewilds/title_bg1.png art +
+# the entry list); creation is its OWN scene (CreationScreen.tscn, five steps SEED ->
+# SHINY RATE -> NAME -> AVATAR -> GO! hosting three sceneless overlays — a SECOND
+# SeedPrompt instantiation (seed_prompt.gd UNCHANGED), the NameEntry 7x4 grid keyboard
+# (A-Z + DEL + OK, cap 8), and the AvatarPicker 24-set grid). BOOT SPLIT: main.gd
+# consumes the scenario request BEFORE ensure_initialized — a scenario boot (a
+# .godot-smoke/scenario.json request present) keeps the pre-slice path BYTE-FOR-BYTE
+# (ensure_initialized(true): silent new_game on absent/corrupt/refused save, boot toast,
+# world sync at boot); a PLAYER boot goes ensure_initialized(false) — load-only, NEVER
+# new_game, NEVER a save write — then TitleScreen.begin_boot(has_loaded_save()): splash
+# (2.0s or any-key) -> title (CONTINUE only when a save loaded; absent/corrupt/newer/
+# chained/unusable saves all preserve non-destructively and show NEW GAME only) -> NEW
+# GAME reuses the MessageBox sibling's confirm with the PINNED pause-menu wording ->
+# creation -> GameRuntime.begin_created_game -> beach spawn with the level-5 MACHOP
+# starter. LATCH CONTRACT: both screens join input_router.bind_ui_consumers (main.gd's
+# same-line bind array) with ARGLESS closed signals emitted on EVERY hide (splash skip,
+# final confirm, cancel), and _toggle_menu / the context poll carry same-line
+# TitleScreen/CreationScreen visibility guards (the StorageScreen precedent). The
+# new_game_flow_passed/failed gate pair is app_bootstrap's — registered on that entry's
+# required_trace_events (the SmokeScenarios home); the scenario drives these REAL screens
+# through main_smoke_context's title_screen/creation_screen keys. FLAGGED inventions (the
+# spec § Boot, splash, title, and creation): the splash-card content; the CONTINUE/
+# NEW-GAME title concretization over the original's NEW/LOAD + file list (HOST/JOIN
+# multiplayer NOT ported — strings.properties:13); the dropped file-name creation step
+# (single-save port); the shiny ladder [32, 64, 128, 256, 512, 1024] around the faithful
+# 1/256; the name grid (7x4 A-Z + DEL + OK, cap 8, default "PLAYER"); the avatar default
+# ben (the pre-slice hardcoded sheet); the 0.6s generating beat (string faithful, wait
+# invented).
 
 [[subsystems]]
 name = "harvest_loop"
@@ -454,6 +557,19 @@ validation_commands = [
 ]
 required_trace_events = ["campfire_lit", "rested", "campsite_established", "night_hazard_spawned", "retreat_blocked", "evolution_time_gate", "camp_survival_passed", "night_cycle_passed", "time_evolution_passed", "visual_sweep_camping_passed"]
 quality_bucket = "camping"
+# TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
+# entry owns the screens): encounter_selection.gd splits the starter from the fallback —
+# STARTER_SPECIES_ID := "MACHOP" (the faithful starter: "You start with a Machop, which
+# knows how to Build", .firecrawl/wiki-getting-started.md:60; corrects the former
+# UNFLAGGED CHIKORITA starter) vs FALLBACK_SPECIES_ID := "CHIKORITA" (the wild empty-pool
+# fallback — UNCHANGED on purpose; its warning payload + data_audit expectations stay
+# pin-adjacent). The starter species lookup (starter_species_entry) is a constant catalog
+# read — rng-free, NO stream shift; the ONE starter shiny draw is unchanged (its odds now
+# witness the creation knob). The _build_starter trace/warning body EXTRACTS to
+# EncounterSelection.build_starter_traced (game_runtime keeps the forwarder; the exact
+# "GameRuntime" source string — the species_entry_for pin-safe precedent), and
+# game_runtime's _trace_legendary_encounter static moves to wild_encounter_draw.gd's
+# trace_legendary (landmarks-owned file; game_runtime keeps the one-line forwarder).
 # CROSS-SUBSYSTEM CO-MODIFICATION: camping_loop EXTENDS four budget-owned files by
 # EXTRACTION + same-line edit only, never by growth — scripts/runtime/game_runtime.gd
 # (session_runtime-owned, stays AT the 320 budget: the campsite accessors and the
@@ -1067,6 +1183,15 @@ validation_commands = [
 # + the random-path pin).
 required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "waystone_selector_passed", "waystone_selector_failed", "content_scatter_passed", "content_scatter_failed", "seed_choice_passed", "seed_choice_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
 quality_bucket = "landmarks"
+# TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
+# entry owns the screens): session_payload.gd's marshalling seat (the encounter_settings/
+# landmark_state precedent) gains the three ADDITIVE creation-identity keys (player_name/
+# player_avatar/shiny_rate; defaults "PLAYER"/"ben"/256; write-only-when-non-default,
+# load normalizers snap the name/avatar/odds ladder — NO SAVE_VERSION bump; the frozen
+# golden fixtures carry none of the keys and stay byte-identical). scripts/runtime/
+# wild_encounter_draw.gd (THIS entry's code_paths) absorbs game_runtime's
+# _trace_legendary_encounter as the trace_legendary static (source string "GameRuntime"
+# unchanged — pin-safe log greps; game_runtime keeps the one-line forwarder at its wall).
 # INFINITE-WORLD SLICE 4 (creation-time seed choice + beach spawn): scripts/app/
 # seed_choice_scenario.gd joins code_paths — the self-pinned witness for
 # new_game(custom_seed) (custom seed S := 2026080401: two re-pinned runs derive

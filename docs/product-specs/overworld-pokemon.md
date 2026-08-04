@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-01
+Last verified: 2026-08-04
 Review cadence days: 21
 Source paths: scripts/domain/overworld_mons.gd, scripts/runtime/overworld_mons_runtime.gd, scripts/runtime/overworld_mons_sim.gd, scripts/runtime/overworld_mons_probe.gd, scripts/runtime/entity_layer.gd, scripts/app/overworld_entity_actions.gd, scripts/app/overworld_mons_scenario.gd, scripts/app/overworld_mons_checks.gd, scripts/app/overworld_mons_battle_checks.gd, scripts/app/world_entity_audit.gd, scripts/app/visual_sweep_overworld.gd, scripts/runtime/game_runtime.gd, scripts/runtime/field_move_runtime.gd, scripts/runtime/fishing_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/domain/biome_encounters.gd, scripts/domain/encounter_selection.gd, scripts/domain/world_generator.gd, scripts/domain/breeding.gd, scripts/data/pokemon_catalog.gd, scripts/app/field_action_router.gd, scripts/app/field_move_actions.gd, scripts/app/world_consistency_audit.gd, scripts/app/world_spatial_audit.gd, scripts/app/qa_scenarios.gd, scripts/runtime/smoke_scenario_runner.gd, scenes/app/Main.tscn
 
@@ -186,3 +186,7 @@ The configurable-encounters slice (§ Configurable encounters — the user decis
 ## Infinite-world slice (co-modification note)
 
 The player-action surface (Attack/Charm hooks, dialogue recruitment, the wild-egg TAKE/Attack binary :248, the interact-provocation memory) is EXTRACTED to `scripts/runtime/overworld_mons_actions.gd` at the 320 wall (the runtime keeps one-line public delegators, so every call site — `overworld_entity_actions`, `playtest_bot_entity`, the app checks — is unchanged). The shared-tile CONTACT seam (§ Configurable encounters) lives in `overworld_mons_runtime._check_player_contact`, called inside `note_player_step` AFTER `step_triggers` (an already-armed chase-catch keeps first refusal) and BEFORE roam/sync, behind the `active` gate so every non-overworld baseline stays byte-stable. With world chaining retired (seamless plane), `stamp_legendaries` freezes its `chain` at origin `(0,0)`; the `legendary_encounter` trace drops its `chain` field. Egg contact never battles (the TAKE/Attack binary is unchanged).
+
+## New-game flow slice (co-modification note)
+
+The new-game-flow slice ([bootstrap-and-overworld.md](bootstrap-and-overworld.md) § Boot, splash, title, and creation) co-mods this subsystem's shared `scenes/app/Main.tscn` scene OWNERSHIP only: the `$UI` CanvasLayer gains the `TitleScreen` + `CreationScreen` instances (the boot-time splash/title/creation flow). NO overworld-mons behavior changes — entity spawning, disposition, the contact seam, and the derived-hash stream are untouched; the entity layer's `Main` child position and self-wiring are unchanged, and scenario boots bypass the title screens entirely, so every overworld baseline + scenario stays byte-identical.

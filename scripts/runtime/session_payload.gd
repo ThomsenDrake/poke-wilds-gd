@@ -9,9 +9,9 @@ extends RefCounted
 #
 # No preload cycle: session_state delegates here, so this file takes the session as a
 # parameter and its schema constants (SAVE_VERSION, STARTING_BAG, LEGACY_ITEM_IDS,
-# DAY_MINUTES, NEW_GAME_TIME_OF_DAY) as explicit arguments — session_state stays the
-# single owner of the schema constants. SaveMigration (domain) imports nothing from
-# runtime, so the Build-3 preload below closes no cycle.
+# DAY_MINUTES, NEW_GAME_TIME_OF_DAY, CREATION_DEFAULTS) as explicit arguments —
+# session_state stays the single owner of the schema constants. SaveMigration (domain)
+# imports nothing from runtime, so the Build-3 preload below closes no cycle.
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const WorldOverrides := preload("res://scripts/domain/world_overrides.gd")
@@ -20,7 +20,7 @@ const SaveMigration := preload("res://scripts/domain/save_migration.gd")
 
 
 # Session -> save payload (the existing 15 v4 keys, unchanged shape).
-static func to_payload(session: RefCounted, world_overrides: Dictionary, structures_overrides: Dictionary, save_version: int) -> Dictionary:
+static func to_payload(session: RefCounted, world_overrides: Dictionary, structures_overrides: Dictionary, save_version: int, creation_defaults: Dictionary) -> Dictionary:
 	var payload := {
 		"version": save_version,
 		"world_seed": session.world_seed,
@@ -55,13 +55,23 @@ static func to_payload(session: RefCounted, world_overrides: Dictionary, structu
 	# save keeps the exact pre-feature byte shape (the golden fixture carries no key).
 	if not (session.encounter_settings as Dictionary).is_empty():
 		payload["encounter_settings"] = session.encounter_settings
+	# Creation identity + shiny odds (v6-additive, NO bump — the additive v6 pass-through
+	# preserves the keys): each written ONLY when non-default so a default-identity save
+	# keeps the exact pre-feature byte shape (the encounter_settings precedent; the frozen
+	# golden fixture carries none of the three keys).
+	if str(session.player_name) != str(creation_defaults.get("player_name", "PLAYER")):
+		payload["player_name"] = session.player_name
+	if str(session.player_avatar) != str(creation_defaults.get("player_avatar", "ben")):
+		payload["player_avatar"] = session.player_avatar
+	if int(session.shiny_odds_choice) != int(creation_defaults.get("shiny_odds", 256)):
+		payload["shiny_rate"] = session.shiny_odds_choice
 	return payload
 
 
 # Payload -> session; absent keys backfill with new-game defaults (the schema is
 # ADDITIVE after v2). Build 3 prepends SaveMigration.migrate FIRST (a PURE copy —
 # `data` is never mutated), then reads the v5 keys.
-static func apply_into(session: RefCounted, data: Dictionary, normalized_party: Array, starting_bag: Dictionary, legacy_item_ids: Dictionary, day_minutes: int, new_game_minutes: int, save_version: int) -> void:
+static func apply_into(session: RefCounted, data: Dictionary, normalized_party: Array, starting_bag: Dictionary, legacy_item_ids: Dictionary, day_minutes: int, new_game_minutes: int, save_version: int, creation_defaults: Dictionary) -> void:
 	var migrated: Dictionary = SaveMigration.migrate(data, save_version)
 	session.world_seed = int(migrated.get("world_seed", 1337))
 	session.player_tile = Vector2i(int(migrated.get("player_x", 0)), int(migrated.get("player_y", 0)))
@@ -91,6 +101,11 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	session.legendary_removals = (raw_removals as Array).duplicate(true) if raw_removals is Array else []
 	# Encounter opt-in (v5-additive; absent/{} == "off" — the contact-only default).
 	session.encounter_settings = normalize_encounter_settings(migrated.get("encounter_settings", {}))
+	# Creation identity + shiny odds (v6-additive, NO bump; absent keys backfill from the
+	# creation defaults — the additive v6 pass-through preserves them for older builds too).
+	session.player_name = normalize_player_name(migrated.get("player_name", creation_defaults.get("player_name", "PLAYER")))
+	session.player_avatar = normalize_player_avatar(migrated.get("player_avatar", creation_defaults.get("player_avatar", "ben")))
+	session.shiny_odds_choice = normalize_shiny_odds(migrated.get("shiny_rate", creation_defaults.get("shiny_odds", 256)))
 	# Legacy `unlocked_field_moves` key is ignored; the dict stays as audit scratch
 	# space (smoke_scenario_runner pokes it directly).
 	session.unlocked_field_moves.clear()
@@ -111,6 +126,28 @@ static func normalize_encounter_settings(raw: Variant) -> Dictionary:
 		return {}
 	var rate := clampf(float((raw as Dictionary).get("rate", 0.12)), 0.02, 0.50)
 	return {"mode": mode, "rate": clampf(roundf(rate / 0.02) * 0.02, 0.02, 0.50)} # snap to the 0.02 ladder, mirroring the setter (a hand-edited off-ladder rate never rolls as-saved)
+
+
+# Creation identity + shiny odds load normalizers (the creation UI and
+# GameRuntime.begin_created_game are the LIVE validators; these mirror them for the load
+# path — documented duplication so this file takes no session-const dependency, the
+# normalize_encounter_settings precedent).
+static func normalize_player_name(raw: Variant) -> String:
+	var cleaned := ""
+	for ch in str(raw).to_upper():
+		if ch >= "A" and ch <= "Z":
+			cleaned += ch
+	return "PLAYER" if cleaned.is_empty() else cleaned.left(8) # empty/garbage -> DEFAULT_PLAYER_NAME; the 8-char cap mirrors PLAYER_NAME_MAX
+
+
+static func normalize_player_avatar(raw: Variant) -> String:
+	var cleaned := str(raw).to_lower().strip_edges()
+	return "ben" if cleaned.is_empty() else cleaned # empty -> DEFAULT_PLAYER_AVATAR; file existence NOT validated (the frame-builder fallback chain owns a missing sheet)
+
+
+static func normalize_shiny_odds(raw: Variant) -> int:
+	var odds := int(raw)
+	return odds if [32, 64, 128, 256, 512, 1024].has(odds) else 256 # snap to the SHINY_ODDS_CHOICES ladder, else SHINY_ODDS_DEFAULT
 
 
 # The same normalization the runtime applies to a loaded party, run here so

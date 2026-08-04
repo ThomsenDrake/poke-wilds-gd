@@ -99,6 +99,10 @@ const SCENARIOS := {
 	# Infinite-world slice 4: creation-time seed choice — custom-seed determinism (two
 	# re-pinned runs byte-identical), the beach-preference spawn, the random-path pin.
 	"seed_choice": [preload("res://scripts/app/seed_choice_scenario.gd"), "run", []],
+	# Title-flow gate: splash -> title -> creation (seed/shiny/name/avatar/GO) driven
+	# through the real screens — world + persistence witnesses (checks split into
+	# new_game_flow_checks.gd for the app budget; self-pinned, NOT a double-run consumer).
+	"new_game_flow": [preload("res://scripts/app/new_game_flow_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves

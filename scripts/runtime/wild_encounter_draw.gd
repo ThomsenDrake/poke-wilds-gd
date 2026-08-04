@@ -3,11 +3,12 @@ extends RefCounted
 # Phase 7 Build 2 — the wild-draw tail EXTRACTED from game_runtime.generate_wild_encounter
 # at the 320 wall (world-depth.md § Implementation shape :186 "EXTRACT another block"; the
 # encounter_selection precedent). game_runtime keeps the SEAM ORDER (entity pending FIRST,
-# fishing SECOND, the repel gate, the wild draw LAST) + the Build-2 legendary_encounter
-# battle-start trace; this owns the draw itself: the footprint-local landmark scope, the
-# night-ghost branch, the shared encounter _rng (injected by REFERENCE — never a new
-# generator, the pinned wild stream) and the every-creation shiny_rolled trace (source
-# string "GameRuntime" — byte-identical to the pre-extraction emit).
+# fishing SECOND, the repel gate, the wild draw LAST); this owns the draw itself: the
+# footprint-local landmark scope, the night-ghost branch, the shared encounter _rng
+# (injected by REFERENCE — never a new generator, the pinned wild stream), the
+# every-creation shiny_rolled trace (source string "GameRuntime" — byte-identical to the
+# pre-extraction emit) and the Build-2 legendary_encounter battle-start trace
+# (trace_legendary below; game_runtime keeps the forwarder — new-game flow slice).
 
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
@@ -47,3 +48,12 @@ func _pick_encounter_species(biome: String) -> String:
 	# Night danger: unlit-night draws may become shadow ghosts (night_system rolls the shared _rng; empty by day or in light).
 	var ghost: String = _night_system.try_ghost_species(_session.player_tile)
 	return ghost if not ghost.is_empty() else EncounterSelection.pick_wild_species(_catalog, _biome_encounters, biome, DayPhase.time_of_day_label(_session.time_of_day_minutes), _rng, _trace)
+
+
+# Phase 7 Build 2 (world-depth.md § Legendaries :161): the registry-REQUIRED battle-start
+# trace, SINGLE owner — distinct from the generic stationary-spawn so the ring gate is
+# provable; no-op for every non-legendary forced battle. game_runtime forwards here.
+static func trace_legendary(mon: Dictionary, trace) -> void:
+	if str(mon.get("battle_kind", "")) != "legendary":
+		return
+	trace.emit_event("legendary_encounter", "GameRuntime", {"species_id": str(mon.get("species_id", "")), "tile": mon.get("tile", [0, 0]), "biome": str(mon.get("biome", "")), "ring": int(mon.get("ring", 0)), "battle_kind": "legendary"})

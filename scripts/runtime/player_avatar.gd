@@ -5,6 +5,7 @@ signal encounter_requested(tile_position: Vector2i)
 signal blocked(reason: String, tile: Vector2i)
 
 const PlayerSpriteFrames := preload("res://scripts/runtime/player_sprite_frames.gd") # walk/run frame build, extracted at the 320 wall
+const SessionState := preload("res://scripts/runtime/session_state.gd") # creation-flow identity defaults (DEFAULT_PLAYER_AVATAR)
 
 const TILE_SIZE := 16
 const ACTION_MOVE_UP := "move_up"
@@ -37,11 +38,12 @@ var _move_from = Vector2.ZERO
 var _move_to = Vector2.ZERO
 var _target_tile = Vector2i.ZERO
 var _facing = Vector2i.DOWN
+var _avatar_name := SessionState.DEFAULT_PLAYER_AVATAR # creation-flow avatar sheet set; default ben = the pre-slice pixels
 var _rng = RandomNumberGenerator.new()
 
 
 func _ready() -> void:
-	_setup_sprite_frames()
+	set_avatar(_avatar_name)
 	_rng.randomize()
 	tile_position = start_tile
 	position = Vector2(tile_position.x * TILE_SIZE, tile_position.y * TILE_SIZE)
@@ -64,6 +66,16 @@ func _setup_canvas_order() -> void:
 func setup(world_renderer) -> void:
 	world = world_renderer
 	position = world.map_to_world(tile_position)
+
+
+# Avatar-swap seam (title-flow slice), idempotent: stores the name, rebuilds the walk/run
+# frames from the <name> sheets (the SAME builder + fallback chain _ready rides), then
+# re-applies the current facing so the sprite never resets to frame-0-down mid-view.
+# _rng is untouched (seed_for_smoke pins the trigger-draw stream).
+func set_avatar(avatar_name: String) -> void:
+	_avatar_name = avatar_name
+	_setup_sprite_frames()
+	_set_sprite_state(_facing, false)
 
 
 func set_tile_position(new_tile_position: Vector2i) -> void:
@@ -260,7 +272,7 @@ func _direction_to_animation(direction: Vector2i) -> StringName:
 func _setup_sprite_frames() -> void:
 	# Frame build extracted to player_sprite_frames.gd at the 320 wall (presentation-only);
 	# null (no walk sheet loadable) keeps the scene-default frames, as before.
-	var frames := PlayerSpriteFrames.build()
+	var frames := PlayerSpriteFrames.build(_avatar_name)
 	if frames != null:
 		_sprite.sprite_frames = frames
 

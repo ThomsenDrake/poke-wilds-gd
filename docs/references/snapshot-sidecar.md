@@ -46,7 +46,7 @@ Each VALID `visual_sweep` capture writes a canonical JSON sidecar next to its PN
 
 ### Injection split
 
-`RenderIntrospection.collect(ctx, shot_name, crafted_state)` builds `{crafted_state, capture_env, labels, draw_order, cursor_pairs, expected_regions, canary_rect, palette_regions}`. `capture()` injects `{shot, shot_seq, ts_msec, trace_cursor, window, validity}` plus the rest-probe booleans (`entities_at_rest`, `player_lerp_complete`) when `options.rest_probe` was set and converts the intermediate `palette_regions` spec into `palettes` by scanning the readback image, then stringifies and writes. `sidecar_path` (`""` when none) also joins the `snapshot_captured` trace payload and `capture()`'s return dict. The collector consumes the existing `smoke_context()` ctx dict from `main.gd` — `main.gd` stays untouched.
+`RenderIntrospection.collect(ctx, shot_name, crafted_state)` builds `{crafted_state, capture_env, labels, draw_order, cursor_pairs, expected_regions, canary_rect, palette_regions}`. `capture()` injects `{shot, shot_seq, ts_msec, trace_cursor, window, validity}` plus the rest-probe booleans (`entities_at_rest`, `player_lerp_complete`) when `options.rest_probe` was set and converts the intermediate `palette_regions` spec into `palettes` by scanning the readback image, then stringifies and writes. `sidecar_path` (`""` when none) also joins the `snapshot_captured` trace payload and `capture()`'s return dict. The collector consumes the smoke ctx dict — assembled by `scripts/app/main_smoke_context.gd` (the title-flow slice extracted it from `main.gd`'s former `smoke_context()`; every key reproduced exactly).
 
 ### Label roots per shot kind
 

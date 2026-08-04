@@ -6,6 +6,7 @@ const CryPlayer := preload("res://scripts/runtime/cry_player.gd")
 const InputRouter := preload("res://scripts/app/input_router.gd")
 const FieldActionRouter := preload("res://scripts/app/field_action_router.gd")
 const StructureLayer := preload("res://scripts/runtime/structure_layer.gd")
+const MainSmokeContext := preload("res://scripts/app/main_smoke_context.gd")
 
 @onready var _world = $World
 @onready var _player = $Player
@@ -25,9 +26,10 @@ var _suppress_close_toast = false
 var _battle_enemy_dex := 0
 
 func _ready() -> void:
-	_input_router.configure_input_map(); _input_router.bind_ui_consumers([$UI/CampMenu, _start_menu, _message_box, $UI/StorageScreen])
+	_input_router.configure_input_map(); _input_router.bind_ui_consumers([$UI/CampMenu, _start_menu, _message_box, $UI/StorageScreen, $UI/TitleScreen, $UI/CreationScreen])
 	_runtime().emit_trace("boot_started", "App.Main", {"scene": "res://scenes/app/Main.tscn"})
-	_runtime().ensure_initialized()
+	var smoke_scenario = _smoke_runner.consume_requested_scenario() # consumed BEFORE ensure_initialized (title_flow boot split): scenario presence IS the silent-new-game flag
+	_runtime().ensure_initialized(not smoke_scenario.is_empty())
 	# Registered next to the music router so its player enters the tree.
 	_cry_player.setup(_runtime().trace)
 	_runtime().add_child(_cry_player)
@@ -46,18 +48,20 @@ func _ready() -> void:
 	_structure_layer.build_finished.connect(Callable(_field_router, "on_build_finished"))
 	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu, $UI/StorageScreen)
 	_connect_signals()
-	_sync_world_from_runtime()
-	_message_box.show_message("Port in progress: Explore, battle, catch, and save with Enter.", 4.0)
+	if not smoke_scenario.is_empty(): # SCENARIO BOOT: today's path exactly — world sync + toast at boot, dispatch below
+		_sync_world_from_runtime()
+		_message_box.show_message("Port in progress: Explore, battle, catch, and save with Enter.", 4.0)
 	_runtime().emit_trace("boot_ready", "App.Main", {"player_tile": _tile_payload(_player.tile_position)})
-
-	var smoke_scenario = _smoke_runner.consume_requested_scenario()
 	if not smoke_scenario.is_empty():
-		_smoke_scenarios.call_deferred("run", smoke_scenario, smoke_context())
+		_smoke_scenarios.call_deferred("run", smoke_scenario, MainSmokeContext.build(self))
+	else: # PLAYER BOOT: no world sync/toast/save here — the title flow owns the screen until _enter_world
+		_player.input_enabled = false
+		$UI/TitleScreen.begin_boot(_runtime().has_loaded_save())
 
 
 func _process(_delta: float) -> void:
 	_input_router.poll_menu_toggle()
-	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving() and not _structure_layer.is_active() and not $UI/StorageScreen.visible)
+	_input_router.poll_context_action(not _in_battle and not _menu_open and not _player.is_moving() and not _structure_layer.is_active() and not $UI/StorageScreen.visible and not $UI/TitleScreen.visible and not $UI/CreationScreen.visible)
 
 
 func _on_player_tile_changed(tile_position: Vector2i) -> void:
@@ -116,7 +120,7 @@ func _on_battle_finished(outcome: String, message: String) -> void:
 
 
 func _toggle_menu() -> void:
-	if _in_battle or _structure_layer.is_active() or $UI/CampMenu.visible or $UI/StorageScreen.visible:
+	if _in_battle or _structure_layer.is_active() or $UI/CampMenu.visible or $UI/StorageScreen.visible or $UI/TitleScreen.visible or $UI/CreationScreen.visible:
 		return
 	_menu_open = not _menu_open
 	_player.input_enabled = not _menu_open
@@ -149,7 +153,7 @@ func _on_context_action() -> void:
 
 
 func _on_game_reset() -> void:
-	_sync_world_from_runtime()
+	_sync_world_from_runtime(); _player.set_avatar(_runtime().session.player_avatar) # SAME-LINE avatar re-apply: identity persists across the pinned pause-menu reset (the encounter_settings precedent)
 	_message_box.show_message("New game started.", 1.4)
 
 
@@ -170,6 +174,17 @@ func _connect_signals() -> void:
 	_start_menu.closed.connect(_on_menu_closed)
 	_start_menu.game_reset.connect(_on_game_reset)
 	_start_menu.field_move_requested.connect(_on_field_move_requested)
+	$UI/TitleScreen.continue_chosen.connect(_enter_world)
+	$UI/CreationScreen.creation_confirmed.connect(_on_creation_confirmed)
+	$UI/TitleScreen.new_game_chosen.connect($UI/CreationScreen.open_screen) # direct signal->method: creation opens straight from the title, no handler
+	$UI/CreationScreen.cancelled.connect($UI/TitleScreen.show_title) # direct signal->method: SEED-step X returns to the title
+
+
+# Title-flow entrypoints: CONTINUE and the confirmed creation both land in _enter_world.
+func _enter_world() -> void: _player.set_avatar(_runtime().session.player_avatar); _sync_world_from_runtime(); _player.input_enabled = true
+
+func _on_creation_confirmed(creation: Dictionary) -> void:
+	_runtime().begin_created_game(creation); _enter_world()
 
 
 func _runtime() -> Node:
@@ -199,21 +214,6 @@ func _play_biome_music() -> void:
 
 func _tile_payload(tile_position: Vector2i) -> Array:
 	return [tile_position.x, tile_position.y]
-
-func smoke_context() -> Dictionary:
-	return {
-		"world": _world,
-		"player": _player,
-		"runtime": _runtime(),
-		"battle_view": _battle_view,
-		"start_menu": _start_menu, "camp_menu": $UI/CampMenu,
-		"message_box": _message_box,
-		"music_router": _music_router(),
-		"structure_layer": _structure_layer,
-		"toggle_menu": Callable(self, "_toggle_menu"),
-		"set_battle": Callable(self, "_smoke_set_battle"), "field_move": Callable(self, "_on_field_move_requested")
-	}
-
 
 func _smoke_set_battle(active: bool) -> void:
 	_in_battle = active

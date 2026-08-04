@@ -178,8 +178,8 @@
     "revert_scope": {
      "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-     "tools/run_playtests.py": "dd5d78b7f3a50ee77dc88f82147910820e7d74776867ed532e9fd8012767820c",
-     "tools/godot_dap_smoketest.py": "879153b44bda0ae98995b50bf8a60fa04b1a402105966aba90c9ddb89709ff20",
+     "tools/run_playtests.py": "6059b06bda52b1b59298208b1e15e1c6f4d06cce7df576d121e7ca83b4e9ac4a",
+     "tools/godot_dap_smoketest.py": "b69d00fbb7565779cf95a9b38e41cf8e9c4f20ea5eb1f964b6a14aa043a955ec",
      "tools/verify_all.py": "6fe7d1bfb1105538d61754eadc071c4e271b544e032f0fb4148e8f9e9fbb4015"
     },
     "re_stamp_log": [
@@ -490,6 +490,27 @@
       "old_pin": "e0d444408ef1",
       "new_pin": "6fe7d1bfb110",
       "reason": "legitimate edit (infinite-world slice 5): the top docstring's S6.5/S8-S9 step lines were stale (\"eleven rng-consumers\", \"[5,6] groups\", \"240+300s+cmp\", \"the six satellite sweep families (shots 15-23 + 30-36)\") \u2014 restated to the committed reality (TEN consumers regrouped [5,5] with 240s per-group outers after slice 1 RETIRED the world_chain consumer; the FIVE satellite families over shots 15-23 + 30-34 minus retired). Comment-only docstring correction, NO config change \u2014 the DOUBLE_RUN_* constants + the S9 single-sourced family loop are untouched. The double-run x2 + determinism_verify cmp mechanism miss-002 proved is byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "tools/run_playtests.py",
+      "old_pin": "dd5d78b7f3a5",
+      "new_pin": "39184b21fdc7",
+      "reason": "legitimate edit (new-game flow slice): registered new_game_flow in PLAYTEST_SCENARIOS + SMOKE_SCENARIOS. Registration-only additive change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "879153b44bda",
+      "new_pin": "b69d00fbb756",
+      "reason": "legitimate edit (new-game flow slice): registered new_game_flow in SCENARIO_REQUIREMENTS. Registration-only additive change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "tools/run_playtests.py",
+      "old_pin": "39184b21fdc7",
+      "new_pin": "6059b06bda52",
+      "reason": "legitimate edit (new-game flow slice, arithmetic fix): new_game_flow was registered in BOTH PLAYTEST_SCENARIOS and SMOKE_SCENARIOS, but --include-smoke concatenates the lists without dedup, so the suite ran it twice (58 runs). Removed from SMOKE_SCENARIOS; it stays in PLAYTEST_SCENARIOS (the seed_choice precedent), so the suite is 57 scenarios (44 playtest + 13 smoke). Membership-only change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
      }
     ]
    },
