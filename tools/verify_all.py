@@ -7,11 +7,14 @@ mutates their behavior, or touches their exit-code contracts:
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
   S5-S6  determinism    determinism_verify.py pins + canary
-  S6.5   double-run     eleven rng-consumers x2 headless, cmp --mode trace (240+300s+cmp)
-                        ([5,6] groups; encounter_config, the eleventh, joins group 1)
+  S6.5   double-run     TEN rng-consumers x2 headless, cmp --mode trace (240s per-group
+                        outer + 10s cmp; [5,5] groups — infinite-world slice 1 RETIRED the
+                        world_chain consumer with world chaining; the lane's full history
+                        rides the DOUBLE_RUN ledger below)
   S7     headless suite run_playtests.py --include-smoke (PLAYTEST_FORCE_HEADLESS=1)
   S8-S9  windowed lanes run_playtests.py --scenario ui_render_audit / visual_sweep
-                        + the six satellite sweep families (shots 15-23 + 30-36)
+                        + the FIVE satellite sweep families (shots 15-23 + 30-34 minus
+                        retired — 17/33/35/36 are whitelisted numbering gaps)
   S10    legibility     generate_legibility_report.py (generate-only, NOT gated)
 
 then runs post-refusals R1-R6 (head_sha==HEAD, stamp shape, windowed stamps vs

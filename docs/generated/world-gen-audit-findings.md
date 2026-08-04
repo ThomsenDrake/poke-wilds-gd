@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-02
+Last verified: 2026-08-03
 Review cadence days: 90
-Source paths: scripts/domain/biome_field.gd, scripts/domain/world_gen_audit.gd, scripts/domain/world_gen_cohesion.gd, scripts/domain/world_gen_spawns.gd, scripts/domain/world_gen_dungeons.gd, scripts/runtime/world_gen_audit_runner.gd, scripts/app/world_gen_audit_scenario.gd
+Source paths: scripts/domain/biome_field.gd, scripts/domain/content_scatter.gd, scripts/domain/landmark_scatter.gd, scripts/domain/world_gen_audit.gd, scripts/domain/world_gen_cohesion.gd, scripts/domain/world_gen_spawns.gd, scripts/domain/world_gen_dungeons.gd, scripts/runtime/world_gen_audit_runner.gd, scripts/app/world_gen_audit_scenario.gd
 
 # World-Generation Audit — Findings
 
@@ -9,19 +9,26 @@ The comprehensive world-gen audit (`world_gen_audit` scenario) mechanically meas
 procedural world across a fixed 9-seed list (`1337, 1, 42, 20260101, 31337, 999983,
 2026072907, 2026072913, 2026073001`), consuming no rng (a pure function of code + catalog +
 seeds). It scans a Manhattan disc of radius 110 (~24,421 tiles/seed) for cohesion metrics, a
-radius-400 stride-4 window (~20k samples) for the biome-distribution contract, and the
-playable disc (radius 96) for dungeon sites. **Enforcing-tier** invariants (green today, gate
-on regression) are separated from **advisory-tier** findings (future-fix gaps, warning-tier,
-never gate). This document is the curated companion to the per-run
+radius-400 stride-4 window (~20k samples) for the biome-distribution contract, the
+origin-adjacent disc (radius 96) for dungeon sites, and — since infinite-world slice 3 — a
+bounded beyond-core CHUNK sample (chunk-center Manhattan rings 97-512, 140 chunks) for the
+content-density rates of the scattered plane. **Enforcing-tier** invariants (green today,
+gate on regression) are separated from **advisory-tier** findings (future-fix gaps,
+warning-tier, never gate). This document is the curated companion to the per-run
 `res://.godot-smoke/world-gen-audit-findings.json`.
 
-Numbers below are from the 2026-08-02 run — the FIRST run under the infinite-world slice-2
-climate field (`biome_field.gd`: temperature/moisture/volcanism channels; WATER/SAND/ROCK
-stay elevation-driven). The radial ring model (biome candidates at Manhattan 10/28/60) is
-RETIRED, and with it the ring-admission, ring-seam, and landmark-in-extent checks. Counts
+Numbers below are from the 2026-08-03 run (the infinite-world slice-5 consolidation; the
+2026-08-02 run was the FIRST under the slice-2 climate field — `biome_field.gd`:
+temperature/moisture/volcanism channels; WATER/SAND/ROCK stay elevation-driven). The radial
+ring model (biome candidates at Manhattan 10/28/60) is RETIRED, and with it the
+ring-admission, ring-seam, and landmark-in-extent checks. Slices 3-4 left every number
+below unchanged EXCEPT the Goal-3 additions (origin-core preservation kept the measured
+region byte-identical; the beach spawn shifts the session spawn but every scan here is
+seed/origin-anchored): the `content_density` advisory is NEW (slice 3) and the landmark
+reachability keys are now PER-INSTANCE (the slice-3 content-scatter key grammar). Counts
 (hostile adjacency, specks, intrusions) are the WORST value across the 9 seeds;
-distributions/values are from a representative seed — re-run the scenario for the current
-numbers.
+distributions/values are from a representative seed (`value_seed` in the JSON) — re-run the
+scenario for the current numbers.
 
 ## Enforcing invariants (all GREEN — the gate)
 
@@ -99,8 +106,18 @@ gradient) + level-vs-strength shaping. Promotes `level_band_strength` toward enf
   anchors distinct and inside the 300-probe budget, ring ≥ 60 (the progression floor).
 - **Spawn-disc intrusion:** 1 landmark footprint reaches within Manhattan 24 of origin on one
   seed (the gen-time exclusion gate is unimplemented — advisory, spec §19(c)).
-- **Landmark reachability:** not_verified for all three (the §19(c) gen-time gate is
-  unimplemented).
+- **Landmark reachability:** not_verified for all three ORIGIN instances (the §19(c) gen-time
+  gate is unimplemented). Since slice 3 the keys are PER-INSTANCE content-scatter keys
+  (`pkmn_mansion@-25,-15`, `desert_ruins@0,34`, `heart_tower@3,-45` on the representative
+  seed) — scattered copies carry their own keys when the gate lands.
+- **Content density beyond the core (NEW — slice 3):** the 140-chunk sample (chunk-center
+  rings 97-512) measures the scattered plane's content rates — representative seed 1337:
+  3 dungeon sites (all 3 fit a RUINS_SIZE footprint), 0 scattered landmarks, 0 lairs. The
+  sample is small BY CONSTRUCTION (expected counts at the FLAGGED densities are O(1-3):
+  12‰ landmarks, 3‰ lairs per species, 20‰ sites); the advisory is the beyond-core content
+  regression net for the future dungeon slice, NOT a density gate (the `content_scatter`
+  scenario pins actual discovery + lifecycle, and origin-core preservation keeps the rates
+  structural, not positional).
 
 **Fix (still open):** the dungeon placement slice (regi areas, towers, pre-generated
 structures) + the §19(c) reachability gate + the LAVA-pocket site policy above.

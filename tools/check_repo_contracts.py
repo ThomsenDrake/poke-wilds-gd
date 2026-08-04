@@ -604,13 +604,14 @@ def sim_rng_setup_issues(root: Path) -> list[str]:
 
 
 def _world_depth_determinism_files(root: Path) -> list[Path]:
-    """world-depth.md § Determinism scope: every domain module plus the two
-    world-depth runtimes. The *_sim.gd glob above does not reach these files, so
-    this list is the extension's coverage (world_chain_runtime.gd arms lazily —
-    Build 3 lands it; the ban holds the moment it exists)."""
+    """world-depth.md § Determinism scope: every domain module plus the
+    world-depth runtime (landmark_runtime). The *_sim.gd glob above does not reach
+    these files, so this list is the extension's coverage. (Infinite-world slice 1
+    RETIRED world chaining — the former second runtime world_chain_runtime.gd is
+    deleted with the chain predicates; the seamless plane derives everything from
+    the ONE world seed.)"""
     files = list(root.glob("scripts/domain/**/*.gd"))
-    for rel in ("scripts/runtime/landmark_runtime.gd",
-                "scripts/runtime/world_chain_runtime.gd"):
+    for rel in ("scripts/runtime/landmark_runtime.gd",):
         path = root / rel
         if path.exists():
             files.append(path)
@@ -619,21 +620,22 @@ def _world_depth_determinism_files(root: Path) -> list[Path]:
 
 def world_depth_rng_issues(root: Path) -> list[str]:
     """Static determinism rule codifying world-depth.md § Determinism's NO-new-rng
-    contract: per-world seeds + landmark/legendary anchors are PURE SplitMix hashes
-    of (root_seed, chain coords), so scripts/domain/** + the two world-depth
-    runtimes must never CONSTRUCT a RandomNumberGenerator (a construction — not a
-    threaded parameter: pick_species_for/level_for_scope legitimately receive the
-    shared _rng to consume it in the pinned order). The three legitimate owners
-    (game_runtime, battle_runtime, player_avatar) live outside this scope, so the
-    ban needs no allowlist. Extends sim_rng_setup_issues."""
+    contract: the world seed + landmark/legendary anchors + chunk-hash scattering
+    are PURE SplitMix hashes of (world_seed, coords), so scripts/domain/** + the
+    world-depth runtime must never CONSTRUCT a RandomNumberGenerator (a
+    construction — not a threaded parameter: pick_species_for/level_for_scope
+    legitimately receive the shared _rng to consume it in the pinned order). The
+    three legitimate owners (game_runtime, battle_runtime, player_avatar) live
+    outside this scope, so the ban needs no allowlist. Extends
+    sim_rng_setup_issues."""
     issues: list[str] = []
     for path in _world_depth_determinism_files(root):
         text = path.read_text(encoding="utf-8")
         if re.search(r"RandomNumberGenerator\s*\.\s*new\s*\(", text):
             issues.append(
                 f"{relative_path(path, root)}: constructs RandomNumberGenerator.new(); "
-                "world-depth domain + runtimes are rng-free (pure SplitMix hashes of "
-                "(root_seed, chain) — world-depth.md § Determinism)")
+                "world-depth domain + runtime are rng-free (pure SplitMix hashes of "
+                "(world_seed, coords) — world-depth.md § Determinism)")
     return issues
 
 

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-29
+Last verified: 2026-08-03
 Review cadence days: 21
 Source paths: scripts/domain/field_moves.gd, scripts/runtime/night_system.gd, scripts/runtime/player_avatar.gd, scripts/domain/structures.gd, scripts/runtime/session_state.gd, scripts/app/field_action_router.gd, scripts/runtime/game_runtime.gd, scripts/runtime/build_runtime.gd, scripts/runtime/harvest_runtime.gd, scripts/runtime/harvest_resolver.gd, scripts/app/field_moves_flow_scenario.gd, scripts/app/field_moves_dig_checks.gd
 
@@ -84,8 +84,8 @@ DECISION: every Phase-4 state is **ADDITIVE on save schema v4 — no version bum
 ## Scope boundary (Phase 6 / Phase 7 deferrals)
 
 - **Attack / Charm are HOOKS only.** The overworld-Pokémon ENTITIES (spawn/roam/flee/aggro, recruit, nests, Alphas) land in Phase 6; Phase 4 wires the field-move side (the hook callable + trace) so Phase 6 plugs in. No overworld-mon state is asserted in Phase 4.
-- **Fly is to-VISITED-Way-Stone only.** Edge-fly (Surf/Fly off a map edge generates an adjacent world) is the Phase 7 world-chaining trigger — NOT built here.
-- **Teleport is intra-world only.** World-edge **Teleport Beacons** for world chaining are Phase 7; the Way-Stone (intra-world warp) / Beacon (edge warp) naming split is kept clean.
+- **Fly is to-VISITED-Way-Stone only.** Edge-fly (Surf/Fly off a map edge generates an adjacent world) is the Phase 7 world-chaining trigger — NOT built here. **RETIRED (infinite-world slice 1):** edge-fly chaining LANDED in Phase 7 Build 3 and was then RETIRED with world chaining — the seamless plane has no edge to fly off, so Fly is intra-world only ([infinite-world.md](infinite-world.md)).
+- **Teleport is intra-world only.** World-edge **Teleport Beacons** for world chaining are Phase 7; the Way-Stone (intra-world warp) / Beacon (edge warp) naming split is kept clean. **RETIRED (infinite-world slice 1):** the edge-beacon concept is RETIRED with world chaining — Way Stones are the ONLY warp points on the seamless plane, and the Way-Stone/Beacon split is historical ([infinite-world.md](infinite-world.md)).
 - **Ride is speed only** (no ledge-climbing); **Power is movable boulders only** (landmark-gate use is Phase 7).
 - **Repel** is the field-move simplification (all encounters, N steps) — the faithful crafted-item, low-level-only Repel stays out.
 - **Flash** keeps its faithful passive light; the active caller is a convenience that never diverges from "same range as a campfire."
@@ -121,7 +121,7 @@ The Phase 7 Build 1 repair pass fixes a latent sentinel collision in this subsys
 
 ## Phase 7 post-suite audit (co-modification note)
 
-The Phase-7 audit repair removes the DORMANT `_rng` injection from `field_move_runtime.gd`: the extraction's `setup` carried the shared `game_runtime._rng` "so any roll stays deterministic", but none of the eight moves ever ROLLED — the stored generator was a never-read var (the audit's dormant-injection finding). The injection is DELETED (`setup` loses the `rng` parameter; the `game_runtime` call site loses the argument, mirroring the Phase-6 `overworld_mons_runtime` "NO `_rng`" same-line comment precedent) rather than kept under a static never-consumed check: the file holds its 320 wall exactly after the removal, and the header names the re-injection route (the `fishing_runtime` precedent, pinned by `seed_for_smoke`) for a future roll. The field-move capability model, the Fly/Teleport lifecycle rules, the beacon seams, and the DIG-step rng purity are unchanged.
+The Phase-7 audit repair removes the DORMANT `_rng` injection from `field_move_runtime.gd`: the extraction's `setup` carried the shared `game_runtime._rng` "so any roll stays deterministic", but none of the eight moves ever ROLLED — the stored generator was a never-read var (the audit's dormant-injection finding). The injection is DELETED (`setup` loses the `rng` parameter; the `game_runtime` call site loses the argument, mirroring the Phase-6 `overworld_mons_runtime` "NO `_rng`" same-line comment precedent) rather than kept under a static never-consumed check: the file holds its 320 wall exactly after the removal, and the header names the re-injection route (the `fishing_runtime` precedent, pinned by `seed_for_smoke`) for a future roll. The field-move capability model, the Fly/Teleport lifecycle rules, the beacon seams (since RETIRED with world chaining — infinite-world slice 1), and the DIG-step rng purity are unchanged.
 
 ## Infinite-world slice — way-stone teleport (co-modification note)
 

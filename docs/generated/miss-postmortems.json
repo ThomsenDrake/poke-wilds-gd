@@ -180,7 +180,7 @@
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
      "tools/run_playtests.py": "dd5d78b7f3a50ee77dc88f82147910820e7d74776867ed532e9fd8012767820c",
      "tools/godot_dap_smoketest.py": "879153b44bda0ae98995b50bf8a60fa04b1a402105966aba90c9ddb89709ff20",
-     "tools/verify_all.py": "e0d444408ef15770c9e348f1dc44503fcc0c55326ebd2cfd85c0f4986426200e"
+     "tools/verify_all.py": "6fe7d1bfb1105538d61754eadc071c4e271b544e032f0fb4148e8f9e9fbb4015"
     },
     "re_stamp_log": [
      {
@@ -483,6 +483,13 @@
       "old_pin": "9886151cb2f4",
       "new_pin": "879153b44bda",
       "reason": "legitimate edit (infinite-world slice 4): added the seed_choice SCENARIO_REQUIREMENTS row (boot_started/boot_ready/seed_choice_passed + the session any-pair). Additive contract-table edit only; the transport-honesty + failed-events mechanism miss-002 proved is untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
+     },
+     {
+      "date": "2026-08-03",
+      "file": "tools/verify_all.py",
+      "old_pin": "e0d444408ef1",
+      "new_pin": "6fe7d1bfb110",
+      "reason": "legitimate edit (infinite-world slice 5): the top docstring's S6.5/S8-S9 step lines were stale (\"eleven rng-consumers\", \"[5,6] groups\", \"240+300s+cmp\", \"the six satellite sweep families (shots 15-23 + 30-36)\") \u2014 restated to the committed reality (TEN consumers regrouped [5,5] with 240s per-group outers after slice 1 RETIRED the world_chain consumer; the FIVE satellite families over shots 15-23 + 30-34 minus retired). Comment-only docstring correction, NO config change \u2014 the DOUBLE_RUN_* constants + the S9 single-sourced family loop are untouched. The double-run x2 + determinism_verify cmp mechanism miss-002 proved is byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
      }
     ]
    },

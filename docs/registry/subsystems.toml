@@ -114,6 +114,12 @@ quality_bucket = "runtime"
 # session_state -> session_payload -> save_migration. The frozen v4 golden fixture stays
 # the migration WITNESS (save_stability's one pinned guard line canonicalizes
 # migrate(golden); update mode downshifts; a v5-shaped write is refused — app_bootstrap).
+# INFINITE-WORLD (slice 1, RETIRES the v5 shape above): SAVE_VERSION is now 6 — the
+# root_seed/active_chain/chained_worlds vars + accessors are DELETED, landmark_state is back
+# at its TOP-LEVEL v4 seat (per-instance "id@ax,ay" keys since slice 3), and migrate() is the
+# v4/v5 -> v6 FLATTEN (chain-less lossless, delta == {version: 6}; truly chained v5 saves are
+# refused non-destructively to .chained.bak). The seam's chain parameter is vestigial (always
+# the origin). Current contract: docs/product-specs/infinite-world.md § Save v6.
 
 [[subsystems]]
 name = "world_runtime"
@@ -151,6 +157,14 @@ quality_bucket = "world"
 # verbatim; the type-sentinel fallback keys on the HOST world-biome; "" outside footprints
 # => byte-identical pools). world_view.gd renders the stamped landmark tiles through the
 # existing map render path.
+# INFINITE-WORLD ARC (slices 1-4 LANDED 2026-08-02..03; successor spec docs/product-specs/
+# infinite-world.md): the world is ONE seamless infinite plane — world chaining RETIRED (the
+# landmarks entry owns the historical Build-3 chaining notes + the slice-1 retirement NOTE).
+# scripts/domain/biome_field.gd (slice 2) is the ONE biome_at source — elevation/temperature/
+# moisture/volcanism climate channels + the priority table (every threshold FLAGGED;
+# WATER/SAND/ROCK stay elevation-driven), LAVA generates as the rare hot+dry+volcanic joint
+# tail; find_walkable_spawn prefers a beach (slice 4 — the spawn shift re-pinned the
+# spawn-dependent baselines + the save_stability golden).
 
 [[subsystems]]
 name = "pokemon_data"
@@ -1045,13 +1059,13 @@ validation_commands = [
 # sweep has NO _failed trace — its failure paths ride push_error captured by both
 # transports' ERROR_MARKERS, loud never silent). key_item_used is a documented auxiliary
 # (trace-events.md), NOT registry-required. The legendary_spawn scenario's passed/failed
-# pair registered here in the scenario lane (Build 2); the world_chain scenario's
-# passed/failed pair registered here in the Build 3 scenario lane (the three chain
-# traces above are its registry-required domain events); the beacon_selector scenario's
-# passed/failed pair registered here in the Phase 7 audit repair lane (R5 — the multi-beacon
-# SELECTOR functional choice; its registry-required domain events are the two beacon_placed
-# registrations + the picked teleport_used warp).
-required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
+# pair registered here in the scenario lane (Build 2). INFINITE-WORLD: the world_chain +
+# beacon_selector scenario pairs RETIRED with world chaining (slice 1); their SUCCESSORS
+# registered here — waystone_selector (the multi-stone teleport choice + the avatar-input
+# ownership pin), content_scatter (slice 3: origin-core preservation + per-instance state
+# + the lair lifecycle), and seed_choice (slice 4: custom-seed determinism + beach spawn
+# + the random-path pin).
+required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "waystone_selector_passed", "waystone_selector_failed", "content_scatter_passed", "content_scatter_failed", "seed_choice_passed", "seed_choice_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
 quality_bucket = "landmarks"
 # INFINITE-WORLD SLICE 4 (creation-time seed choice + beach spawn): scripts/app/
 # seed_choice_scenario.gd joins code_paths — the self-pinned witness for
@@ -1063,6 +1077,20 @@ quality_bucket = "landmarks"
 # no-arg new_game -> the hard-pinned world_seed 1319840800, the entity-soak precedent
 # pair). The seed_choice_passed/failed rows ride trace-events.md + the requirements
 # row + PLAYTEST_SCENARIOS (the content_scatter precedent); NOT a double-run consumer.
+# INFINITE-WORLD SLICE 3 (chunk-hash content scattering): scripts/domain/content_scatter.gd
+# + scripts/domain/landmark_scatter.gd + scripts/app/content_scatter_scenario.gd join
+# code_paths (scripts/runtime/overworld_mons_lairs.gd — the repeating-lair window-scoped
+# lifecycle — rides the overworld_mons entry's code_paths, one owner per file). Landmark
+# instances scatter beyond the origin core (ORIGIN_CORE_RADIUS 96 / SCATTER_MIN_RING 112
+# suppression; FLAGGED densities landmark 12 per-mille / lair 3 per-mille per species /
+# dungeon-site 20 per-mille; instance-key grammar "id@x,y"); legendary lairs REPEAT across
+# the plane (FLAGGED divergence — the original's "one each" is unfindable on an infinite
+# plane; per-instance anchor-keyed removals, session-scoped instance state); landmark_state
+# re-keyed per-instance with lossless v6 load normalization. ORIGIN-CORE PRESERVATION is the
+# pinning discipline: the 3 origin landmarks + 7 origin legendary anchors stay byte-identical
+# (baselines did NOT move). content_scatter (pin 2026080301) witnesses the origin core +
+# scatter discovery + per-instance state + the lair lifecycle; NOT a double-run consumer.
+# See docs/product-specs/infinite-world.md § Chunk-hash content scattering.
 # PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
 # LEGENDARY_IDS, flagged SNOW/LAVA affinity, pure _mix ring-≥60 anchors bounded to 300, the
@@ -1132,21 +1160,25 @@ quality_bucket = "landmarks"
 # verify_all regroup is [5,5] — Build 2's legendary_spawn + Build 3's world_chain + the
 # Phase-7 audit's night_cycle (the tenth consumer) completed it; SUPERSEDED — the
 # configurable-encounters slice added encounter_config as the eleventh consumer, regrouping
-# [5,6] with DOUBLE_RUN_RUN_OUTER_TIMEOUT_S [240,300]s). The visual_sweep_world_depth satellite (seed 2026072907; shot range
-# [31,34] single-sourced in the visual_sweep_baselines.gd registry) baselines
+# [5,6] with DOUBLE_RUN_RUN_OUTER_TIMEOUT_S [240,300]s; SUPERSEDED AGAIN — infinite-world
+# slice 1 RETIRED the world_chain consumer with world chaining, leaving TEN consumers
+# regrouped [5,5], outer [240,240]s, and the infinite-world scenarios (content_scatter,
+# seed_choice) deliberately stay OUT of the lane). The visual_sweep_world_depth satellite (seed 2026072907; shot range
+# [31,32] + extra [34], single-sourced in the visual_sweep_baselines.gd registry) baselines
 # 31_ruins_interior + 32_mansion (puzzle state CRAFTED through the frozen seam, never
-# played live) + the Build-3 33_beacon (visual_sweep_world_depth_beacon.gd) + the R11
+# played live) + the R11
 # 34_heart_tower (visual_sweep_world_depth_expand.gd; asserted on rendered wall/decor
 # props — the tower has NO encounter token); the R4 regional oracle (visual_sweep_world_depth_oracle.gd)
-# merges projected landmark/beacon/tower tiles into the sidecars — 31/32/35/36 carry
-# expected_regions.ink + canary_rect, while 33_beacon + 34_heart_tower are ink-only (canary_rect
-# empty: the beacon selector overlay + the tower decor's alpha edge are not strict-canary-safe, so
-# the ink overlap gate is their red tier, visual_region_diff.py:40). A dropped statue/decor/beacon/
-# tower/guardian sprite reds via visual_region_diff.py instead of hiding under the 0.5% global gate. The
-# R11 world_chain satellite is its OWN family (range [35,36]: 35_chained_world +
-# 36_legendary_guardian; the derived-world seed world_seed_for(2026072907,(0,-1)) —
-# 1746331193 (the SplitMix mix & 0x7fffffff) — single-sourced from SHOT_REGISTRY; its own sweep so R3's
-# one-world seed-equality gate holds). Baselines CAPTURED, 0.0% drift.
+# merges projected landmark/tower tiles into the sidecars — 31/32 carry
+# expected_regions.ink + canary_rect, while 34_heart_tower is ink-only (canary_rect
+# empty: the tower decor's alpha edge is not strict-canary-safe, so
+# the ink overlap gate is its red tier, visual_region_diff.py:40). A dropped statue/decor/
+# tower/guardian sprite reds via visual_region_diff.py instead of hiding under the 0.5% global gate.
+# RETIRED with world chaining (infinite-world slice 1): the Build-3 33_beacon shot
+# (visual_sweep_world_depth_beacon.gd deleted) and the R11 world_chain satellite family
+# (range [35,36]: 35_chained_world + 36_legendary_guardian; the derived-world seed
+# world_seed_for(2026072907,(0,-1)) — 1746331193 — single-sourced from SHOT_REGISTRY);
+# 33/35/36 are whitelisted numbering gaps on the registry's retired list. Baselines CAPTURED, 0.0% drift.
 # CROSS-SUBSYSTEM CO-MODIFICATION (files stay OWNED BY their home subsystem — one owner
 # per file, never double-listed in code_paths):
 #   scripts/domain/world_generator.gd — the SINGLE mutation-boundary resolver hook
@@ -1180,8 +1212,8 @@ quality_bucket = "landmarks"
 #     logic -> the existing map render; interior props per the spec's asset notes).
 #     Owned by world_runtime.
 #   scripts/app/visual_sweep_baselines.gd — the SHOT_REGISTRY world_depth entry (range
-#     [31, 34], seed 2026072907) + the Phase-7-audit world_chain entry (range [35, 36],
-#     seed world_seed_for(2026072907,(0,-1)) = 1746331193 — baselines 31-36 total).
+#     [31, 32] + extra [34], seed 2026072907; the Phase-7-audit world_chain entry (range
+#     [35, 36]) RETIRED with world chaining — 33/35/36 on the retired whitelist).
 #     Owned by app_bootstrap/vision_fidelity (the NEW visual_sweep_registry_support.gd
 #     extraction — the R3 registry single-source + the R11 rest-probe/legendary-framing
 #     helpers the world-depth satellites share with every OTHER satellite — is listed
@@ -1218,7 +1250,9 @@ quality_bucket = "landmarks"
 # the derived-seed showcase frames — is RETIRED (world chaining is gone; the world is one
 # seamless infinite plane; save schema is v6 with chain-less lossless flatten + chained
 # refusal). It is kept as HISTORICAL context only; the current contract lives in the
-# slice-1/2 NOTEs above and docs/product-specs/world-depth.md's retirement banner.
+# SUCCESSOR SPEC docs/product-specs/infinite-world.md (slices 1-4 + the slice-5 doc
+# consolidation; it SUPERSEDES world-depth.md § World chaining / § Save v5) and in
+# world-depth.md's retirement banner.
 # PHASE 7 BUILD 3 OF 3 (world-depth.md § World chaining) — CHAINING LANE LANDED: the PURE
 # scripts/domain/world_chain.gd (world_seed_for — origin returns root_seed UNMIXED, else
 # _mix(root, cx, cy, SALT_WORLD=0x21) & 0x7fffffff; WORLD_RADIUS:=96 Manhattan extent;
@@ -1319,3 +1353,14 @@ quality_bucket = "world"
 # _world_gen / shared _rng); the app reaches domain statics through the runner's re-exposed
 # consts (app may not preload domain). Findings: res://.godot-smoke/world-gen-audit-findings.json
 # (per-run) + the curated docs/generated/world-gen-audit-findings.md (committed).
+# NOTE (infinite-world slices 2-3): the headline LAVA finding above is RESOLVED — the climate
+# field (scripts/domain/biome_field.gd, world_runtime) generates LAVA as the rare hot+dry+
+# volcanic joint tail (~0.02-0.9% of tiles per seed, present in 8 of the audit's 9 windows),
+# so lava_site_gap flipped from expected-zero to rare-but-nonzero, and the ring admission /
+# ring-seam / extent checks RETIRED with the radial model. The enforcing tier is NOW disc
+# determinism + the biome-distribution contract (ten common biomes per 400-radius stride-4
+# seed window + LAVA in >= LAVA_WINDOWS_MIN of 9 windows cross-seed) + pool no-leak + spawn
+# reachability; blending + stat-aware spawns remain the open advisories. Slice 3 added the
+# beyond-core content_density advisory + instance-keyed landmark reachability; origin-core
+# preservation is the audit's pinning discipline. See docs/product-specs/infinite-world.md
+# § Smoke validation.
