@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/main_smoke_context.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -50,6 +50,34 @@ quality_bucket = "bootstrap"
 # session.player_avatar same-line (identity persists across the pinned pause-menu reset —
 # the encounter_settings precedent); both new screens join the same-line bind_ui_consumers
 # array with argless closed signals (the latch contract — the title_flow entry's note).
+# GBC RESTYLE SLICE wave 0 co-modification (title/creation rebuilt on the battle
+# 160x144 stage idiom; the `title_flow` entry owns the screens + the shared gbc_*
+# library): the app-side surface is (a) new_game_flow_scenario.gd + new_game_flow_
+# checks.gd RETARGETED to the restyle seams — title.entry_labels()/selected_entry()/
+# entry_row_text(i) (the old EntryPanel/Entries ItemList reads), creation.step_title_
+# label()/step_value_label() (the old Panel/Margin/VBox node reads), creation.seed_
+# edit_active() (the old _seed_prompt.visible witness) — with the typed-digit unicode
+# loop kept VERBATIM (the digits now land in the in-stage digit row; Z commits), the
+# name-grid walk (A->S->H->OK, cells 0->18->7->27, COLUMNS 7) + the avatar walk
+# (ben(0)->kris(11)) UNCHANGED, and ALL trace pins + the creation_confirmed payload
+# FROZEN; (b) the NEW scripts/app/new_game_flow_geo.gd geometry witnesses (the
+# red-before proof carriers: the name/avatar plates must sit fully on-screen — RED on
+# the ce1571b 0x0-root anchor-collapse that put the grid three-quarters off-window,
+# GREEN on the stage rebuild; the existing suite's witnesses were geometry-blind);
+# (c) the NEW scripts/app/visual_sweep_title.gd capture module + SHOT_REGISTRY main-
+# extra growth [24,25,28,29] -> + [37,38,39,40,41] — five title baselines
+# (37_title_splash, 38_title_entries, 39_creation_seed, 40_creation_name,
+# 41_creation_avatar) ride the MAIN sweep (the visual_sweep_day_menu.gd precedent;
+# called from visual_sweep.gd right after _menu_shots): the module drives ctx["title_
+# screen"]/ctx["creation_screen"] exactly like new_game_flow (begin_boot/show_title/
+# open_screen + step navigation) but NEVER presses the GO-confirm — no session_
+# created, no session/world mutation — then hides both screens and restores; the
+# shots inherit the sweep's CRAFTED_STATE sidecar world_seed + the sweep-global
+# shot_seq, so the RED-tier sidecar seed-equality gate is green BY CONSTRUCTION (no
+# second world, NO tools/** edits, no miss-002 re-stamp ritual; a standalone title
+# satellite family was rejected — it would have needed its own crafted seed +
+# SATELLITE_SWEEP_SCENARIOS/WINDOWED/SCENARIO_REQUIREMENTS registrations for zero
+# gate benefit).
 # PRE-PHASE-7 SUITE EXPANSION (user-approved full deep-dive expansion; the four new
 # scenarios are miss-002-compliant: symmetric <name>_passed / <name>_failed{reasons}
 # markers). rng_joint_pin + save_stability live HERE (the SmokeScenarios home; the
@@ -343,6 +371,15 @@ code_paths = [
   "scripts/ui/creation_screen.gd",
   "scripts/ui/name_entry.gd",
   "scripts/ui/avatar_picker.gd",
+  # GBC RESTYLE SLICE wave 0: the stage idiom rebuild — shared 160x144 stage
+  # library (gbc_stage/gbc_widgets/gbc_digit_row) + the per-screen 220-wall
+  # extractions (title_screen_stage, creation_screen_stage, creation_screen_render).
+  "scripts/ui/gbc_stage.gd",
+  "scripts/ui/gbc_widgets.gd",
+  "scripts/ui/gbc_digit_row.gd",
+  "scripts/ui/title_screen_stage.gd",
+  "scripts/ui/creation_screen_stage.gd",
+  "scripts/ui/creation_screen_render.gd",
 ]
 scene_paths = [
   "scenes/ui/TitleScreen.tscn",
@@ -356,11 +393,41 @@ validation_commands = [
 required_trace_events = ["splash_shown", "splash_closed", "title_shown", "title_continued", "title_new_game_chosen", "creation_confirmed"]
 quality_bucket = "bootstrap"
 # TITLE-FLOW SLICE (new-game flow + startup splash): splash + title are PHASES of ONE
-# scene (TitleScreen.tscn — a black card phase, then the pokewilds/title_bg1.png art +
-# the entry list); creation is its OWN scene (CreationScreen.tscn, five steps SEED ->
-# SHINY RATE -> NAME -> AVATAR -> GO! hosting three sceneless overlays — a SECOND
-# SeedPrompt instantiation (seed_prompt.gd UNCHANGED), the NameEntry 7x4 grid keyboard
-# (A-Z + DEL + OK, cap 8), and the AvatarPicker 24-set grid). BOOT SPLIT: main.gd
+# scene (TitleScreen.tscn — a black card phase, then the composed title art + the entry
+# list); creation is its OWN scene (CreationScreen.tscn, five steps SEED -> SHINY RATE
+# -> NAME -> AVATAR -> GO! hosting the NameEntry 7x4 grid keyboard (A-Z + DEL + OK,
+# cap 8) and the AvatarPicker 24-set grid). GBC RESTYLE SLICE wave 0 (the stage idiom
+# rebuild — the code_paths above): BOTH screens + BOTH overlays now render in native
+# 160x144 stages via the NEW shared library gbc_stage.gd + gbc_widgets.gd (the
+# BattleView SubViewport idiom ported verbatim: integer-scale layout with 16px padding,
+# stage_point inverse map, fonts.ttf@7 apply_font with an ink parameter, NEAREST on
+# every art TextureRect; opaque black Backing hides the unsynced boot world) + the
+# per-screen 220-wall extractions (title_screen_stage, creation_screen_stage,
+# creation_screen_render). The ce1571b pokewilds/title_bg1.png art is RETIRED (pixel
+# probe: 160x144, 19,200/23,040 px fully transparent — the ONLY content a 160x24
+# box-outline fragment strip across the top rows; unusable as full-screen art; the
+# submodule file stays untouched, the reference is GONE) — the title is COMPOSED art:
+# menu/gsc/background1.png full stage (load-guarded, black fallback) + a white
+# wordmark plate ("POKÉWILDS" in black ink — FLAGGED invention: no logo asset exists
+# anywhere in the submodule, the wordmark is composed text, the divergence-8 splash
+# lineage; the É glyph is has_char-verified at build with the pre-approved "POKEWILDS"
+# degrade so a submodule font drift can never ship a tofu box — fonts.ttf carries it
+# today) + the textbox_bg2.png bottom entry band (CONTINUE/NEW GAME black-ink row list
+# + black arrow cursor). The creation SEED step's SECOND SeedPrompt instantiation is
+# DELETED: the step carries the in-stage gbc_digit_row (SeedPrompt's digit-edit state
+# ported VERBATIM — typed unicode 48-57 append, cursor move, digit bump, Backspace,
+# MAX_SEED 0x7fffffff cap, "[d]" cursor marking; seed_prompt.gd itself UNCHANGED — the
+# pause menu keeps its own instance); L/R toggles edit mode, Z commits, X leaves edit.
+# Ink contract: black ink on white plates; white ink ONLY on the pure-black splash.
+# Stage children get EXPLICIT integer offsets only — NEVER set_anchors_preset on a
+# parented node (the rect-preserving preset baked the ce1571b 0x0-root collapse that
+# pinned the overlays at 0x0 and put the name grid three-quarters off-window; the
+# stage library makes the class structurally impossible, and app_bootstrap's
+# new_game_flow_geo.gd geometry witnesses pin it red-before/green-after). The
+# Splash/EntryPanel node names SURVIVE as contentless visibility witnesses; every
+# trace name/payload, latch signal, input semantic, and the creation_confirmed payload
+# is BYTE-FROZEN (the scenario retargets + the 37-41 baseline shots ride the
+# app_bootstrap entry's note). BOOT SPLIT: main.gd
 # consumes the scenario request BEFORE ensure_initialized — a scenario boot (a
 # .godot-smoke/scenario.json request present) keeps the pre-slice path BYTE-FOR-BYTE
 # (ensure_initialized(true): silent new_game on absent/corrupt/refused save, boot toast,

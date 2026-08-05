@@ -1,7 +1,12 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/title_screen.gd" id="1_tscr"]
-[ext_resource type="Texture2D" path="res://pokewilds/title_bg1.png" id="2_art"]
+
+; GBC stage idiom (restyle slice wave 0): the scene shrinks to root + script +
+; SplashTimer. The 160x144 stage (Backing/ScreenViewport/ScreenDisplay), the
+; splash/title cards and the contentless "Splash"/"EntryPanel" visibility
+; witnesses are all built by the script — stage children carry EXPLICIT integer
+; offsets only (never set_anchors_preset on a parented node).
 
 [node name="TitleScreen" type="Control"]
 visible = false
@@ -13,69 +18,6 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_tscr")
-
-[node name="Art" type="TextureRect" parent="."]
-visible = false
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-texture = ExtResource("2_art")
-texture_filter = 0
-expand_mode = 1
-stretch_mode = 6
-
-[node name="Splash" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 1)
-
-[node name="VBox" type="VBoxContainer" parent="Splash"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/separation = 16
-alignment = 1
-
-[node name="TitleLabel" type="Label" parent="Splash/VBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 48
-text = "POKÉWILDS"
-horizontal_alignment = 1
-
-[node name="CreditLabel" type="Label" parent="Splash/VBox"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "a fan remake of PokeWilds — original game by SheerSt"
-horizontal_alignment = 1
-
-[node name="EntryPanel" type="PanelContainer" parent="."]
-visible = false
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -110.0
-offset_top = -100.0
-offset_right = 110.0
-offset_bottom = -28.0
-grow_horizontal = 2
-grow_vertical = 0
-
-[node name="Entries" type="ItemList" parent="EntryPanel"]
-layout_mode = 2
 
 [node name="SplashTimer" type="Timer" parent="."]
 wait_time = 2.0

@@ -1,16 +1,23 @@
 extends Control
 
-# Startup splash + title menu as PHASES of one scene (title_flow slice; spec:
-# docs/product-specs/bootstrap-and-overworld.md). PHASE SPLASH: a black card
-# ("POKÉWILDS" + credit line — FLAGGED invention text; the strings are pinned)
-# shown for 2.0s or until ANY action press skips it; PHASE TITLE: the
-# title_bg1 art + the CONTINUE/NEW GAME entry list (CONTINUE only when a save
-# loaded). main.gd calls begin_boot() on PLAYER boots only — scenario boots
-# bypass this screen entirely.
+# Startup splash + title menu as PHASES of one scene, rebuilt on the GBC stage
+# idiom (restyle slice wave 0; spec: docs/product-specs/bootstrap-and-overworld.md):
+# a native 160x144 stage via scripts/ui/gbc_stage.gd (the BattleView SubViewport
+# idiom), integer-scaled into the window. PHASE SPLASH: opaque black stage + two
+# centered WHITE-ink fonts.ttf@7 lines (white ink is legal ONLY here, on the
+# pure-black backing) shown 2.0s or until ANY action press skips them. PHASE
+# TITLE: gsc/background1.png full-stage art (load-guarded, black fallback) + a
+# white wordmark plate (black ink) + the textbox_bg2.png bottom entry band with
+# a black-ink gbc_widgets row list (CONTINUE only when a save loaded) and the
+# black arrow cursor. The opaque Backing hides the unsynced boot world (main.gd
+# syncs only in _enter_world). Stage art lives in the viewport, so the scenario's
+# visibility witnesses ride two contentless root children that KEEP THEIR NAMES:
+# "Splash" and "EntryPanel". Stage composition lives in title_screen_stage.gd
+# (the 220-wall extraction; menu_context.gd precedent).
 #
 # Traces ride the runtime's emit_trace seam, self-wired through
 # /root/GameRuntime (the options_screen/storage_screen precedent); the names
-# and payloads are a FROZEN contract with the new_game_flow gate scenario:
+# and payloads are a FROZEN CONTRACT with the new_game_flow gate scenario:
 # splash_shown, splash_closed{reason: key|timeout}, title_shown{has_save,
 # entries} (re-emitted on back-from-creation), title_continued{party_size},
 # title_new_game_chosen.
@@ -22,29 +29,41 @@ extends Control
 # The save-wipe confirm reuses the MessageBox SIBLING (both screens are $UI
 # children — Main.tscn wiring guarantees it; start_menu precedent). MessageBox
 # confirmed/cancelled are SHARED with StartMenu + StorageScreen, so the
-# handlers gate on _awaiting_confirm before acting (start_menu :165 precedent).
+# handlers gate on _awaiting_confirm before acting (start_menu precedent).
 
 signal continue_chosen
 signal new_game_chosen
 signal closed # argless latch — emits on EVERY hide (the bind_ui_consumers contract)
+
+const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
+const TitleStage := preload("res://scripts/ui/title_screen_stage.gd")
 
 const ENTRY_CONTINUE := "CONTINUE"
 const ENTRY_NEW_GAME := "NEW GAME"
 const CONFIRM_TEXT := "Start a new game? Your current save will be erased."
 const SPLASH_SKIP_ACTIONS: PackedStringArray = ["move_up", "move_down", "move_left", "move_right", "action_a", "action_b", "start"]
 
-@onready var _art: TextureRect = $Art
-@onready var _splash: ColorRect = $Splash
-@onready var _entry_panel: PanelContainer = $EntryPanel
-@onready var _entries: ItemList = $EntryPanel/Entries
 @onready var _splash_timer: Timer = $SplashTimer
 
+var _splash: Control # contentless visibility witness (scenario: get_node("Splash").visible)
+var _entry_panel: Control # contentless visibility witness (get_node("EntryPanel").visible)
+var _splash_card: Control # stage group: the two white-ink splash labels
+var _title_card: Control # stage group: background + wordmark plate + entry band
+var _rows # GbcWidgets.RowList over the entry band (black ink + black arrow cursor)
 var _has_save := false
 var _in_splash := false
 var _awaiting_confirm := false
 
 func _ready() -> void:
 	visible = false
+	var parts := GbcStage.build(self) # {viewport, stage, display, backing}
+	GbcStage.on_resized(self, parts.display)
+	var built := TitleStage.build(parts.stage)
+	_splash_card = built.splash_card
+	_title_card = built.title_card
+	_rows = built.rows
+	_splash = TitleStage.witness(self, "Splash")
+	_entry_panel = TitleStage.witness(self, "EntryPanel")
 	_splash_timer.timeout.connect(_on_splash_timeout)
 	var confirm_box := get_node_or_null("../MessageBox")
 	if confirm_box != null and confirm_box.has_signal("confirmed"):
@@ -57,9 +76,10 @@ func begin_boot(has_save: bool) -> void:
 	_has_save = has_save
 	_in_splash = true
 	_awaiting_confirm = false
-	_art.visible = false
-	_entry_panel.visible = false
+	_splash_card.visible = true
+	_title_card.visible = false
 	_splash.visible = true
+	_entry_panel.visible = false
 	visible = true
 	_splash_timer.start()
 	_trace("splash_shown", {})
@@ -68,7 +88,8 @@ func begin_boot(has_save: bool) -> void:
 func show_title() -> void:
 	_in_splash = false
 	_splash.visible = false
-	_art.visible = true
+	_splash_card.visible = false
+	_title_card.visible = true
 	_rebuild_entries()
 	_entry_panel.visible = true
 	visible = true
@@ -81,6 +102,12 @@ func hide_screen() -> void:
 	visible = false
 	closed.emit()
 
+# --- Scenario seams (restyle design §2.1; the old EntryPanel/Entries ItemList reads) ---
+func entry_labels() -> Array: return _entry_labels()
+func selected_entry() -> int: return _rows.selected()
+func select_entry(index: int) -> void: _rows.select(index)
+func entry_row_text(index: int) -> String: return _rows.row_text(index)
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -92,9 +119,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _awaiting_confirm: # the MessageBox sibling owns Z/X while the save-wipe confirm is open
 		return
 	if event.is_action_pressed("move_up"):
-		_move_selection(-1)
+		_rows.move(-1)
 	elif event.is_action_pressed("move_down"):
-		_move_selection(1)
+		_rows.move(1)
 	elif event.is_action_pressed("action_a"):
 		_activate_selected()
 	else:
@@ -119,28 +146,15 @@ func _is_any_action_pressed(event: InputEvent) -> bool:
 	return false
 
 func _rebuild_entries() -> void:
-	_entries.clear()
-	for label in _entry_labels():
-		_entries.add_item(label)
-	_entries.select(0)
+	_rows.set_rows(_entry_labels()) # resets the cursor to row 0 (the CONTINUE start)
 
 func _entry_labels() -> Array:
 	return [ENTRY_CONTINUE, ENTRY_NEW_GAME] if _has_save else [ENTRY_NEW_GAME]
 
-func _move_selection(direction: int) -> void:
-	if _entries.item_count == 0:
-		return
-	_entries.select(wrapi(_selected_entry() + direction, 0, _entries.item_count))
-	_entries.ensure_current_is_visible()
-
-func _selected_entry() -> int:
-	var selected := _entries.get_selected_items()
-	return int(selected[0]) if not selected.is_empty() else 0
-
 func _activate_selected() -> void:
-	if _entries.item_count == 0:
+	if _rows.row_count() == 0:
 		return
-	if _entries.get_item_text(_selected_entry()) == ENTRY_CONTINUE:
+	if _rows.row_text(_rows.selected()) == ENTRY_CONTINUE:
 		_trace("title_continued", {"party_size": _party_size()})
 		hide_screen()
 		continue_chosen.emit()

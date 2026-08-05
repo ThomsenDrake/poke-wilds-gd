@@ -26,7 +26,7 @@ const CANONICAL_WINDOW_SIZE := Vector2i(1152, 648)
 # battle-reserved 09-12 + build 13-14 inside its range; 17 is camping-reserved but was
 # never committed -- the sole whitelisted numbering gap.
 const SHOT_REGISTRY := {
-	"main": {"range": [1, 14], "extra": [24, 25, 28, 29], "seed": 20260717},
+	"main": {"range": [1, 14], "extra": [24, 25, 28, 29, 37, 38, 39, 40, 41], "seed": 20260717}, # 37-41 title/creation (restyle wave 0)
 	"camping": {"range": [15, 16], "seed": 20260723},
 	"storage": {"range": [18, 19], "seed": 2026072404},
 	"pokemon": {"range": [20, 21], "seed": 2026072605},

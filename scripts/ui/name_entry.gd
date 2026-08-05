@@ -1,17 +1,23 @@
 extends Control
 
-# On-screen name-entry grid for the creation flow (title-flow slice), added by
-# creation_screen.gd at runtime (no scene node — the seed_prompt.gd precedent).
-# 28 cells in a 7x4 grid: A-Z, then DEL, then OK. Arrows wrap-nav (left/right +-1,
-# up/down +-COLUMNS), Z presses the cell, X backs out to the NAME step. Letters
-# append up to SessionState.PLAYER_NAME_MAX (FLAGGED cap — Gen-2-era 8); at the cap
-# a letter press is ignored (DEL first). OK confirms whatever is shown, INCLUDING
-# the empty name — the creation payload then falls back to DEFAULT_PLAYER_NAME.
-# Type-to-entry is impossible: letters collide with the InputMap (A/D/W/S move, Z/X
-# confirm/cancel), which is why this is a grid keyboard. Pure input UI — no rng, no
-# game state. The entry SURVIVES across opens (seed_prompt precedent: tweak, don't retype).
+# On-screen name-entry grid for the creation flow, rebuilt as a GBC stage widget
+# (restyle slice wave 0): a white plate PanelContainer with fonts.ttf@7 black ink
+# that lives INSIDE the CreationScreen 160x144 stage (creation_screen.gd parents
+# it there), so it can never collapse to 0x0 or drift off-window — the stage
+# idiom's explicit-integer-offset rule makes the old anchor-preset defect class
+# impossible. 28 cells in a 7x4 grid: A-Z, then DEL, then OK. Arrows wrap-nav
+# (left/right +-1, up/down +-COLUMNS), Z presses the cell, X backs out to the
+# NAME step. Letters append up to SessionState.PLAYER_NAME_MAX (FLAGGED cap —
+# Gen-2-era 8); at the cap a letter press is ignored (DEL first). OK confirms
+# whatever is shown, INCLUDING the empty name — the creation payload then falls
+# back to DEFAULT_PLAYER_NAME. The cursor is the INVERTED cell (black cell +
+# white glyph — authentic GBC inversion). The entry SURVIVES across opens
+# (tweak, don't retype). Input arrives via creation_screen's _unhandled_input
+# delegating to handle_input(): the screen ROOT owns input (battle idiom) —
+# the stage is a pure render surface.
 
 const SessionState := preload("res://scripts/runtime/session_state.gd")
+const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 
 signal name_confirmed(text: String)
 signal cancelled
@@ -20,57 +26,56 @@ const COLUMNS := 7
 const CELL_DEL := 26
 const CELL_OK := 27
 const CELL_COUNT := 28
-const COLOR_CURSOR := Color(1.0, 0.85, 0.3, 1.0)
-const COLOR_IDLE := Color(0.9, 0.92, 0.96, 1.0)
+const CELL_W := 18 # stage px: 7 columns fit the 134px plate
+const CELL_H := 12 # 8px row pitch + gap; 4 rows fit the plate
+const PLATE_RECT := Rect2(13, 6, 134, 90) # fully on-stage (the geo witness)
 
+var plate: PanelContainer # the geo witness reads this member (new_game_flow_geo)
+var _name_label: Label # "NAME — %s_" — the trailing _ is the insertion point
 var _cells: Array = [] # Labels; index == cell id (0-25 letters, DEL, OK)
-var _name_label: Label
+var _cursor_bg: ColorRect # the inverted-cell backing (black; glyph goes white)
 var _text := ""
 var _cursor := 0
 
 func _ready() -> void:
 	visible = false
-	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var dim := ColorRect.new() # the seed_prompt Dim shade
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0, 0, 0, 0.6)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
-	var panel := PanelContainer.new() # centered OVER the creation panel (added after it, so drawn on top)
-	panel.set_anchors_preset(Control.PRESET_CENTER)
-	panel.offset_left = -168.0
-	panel.offset_top = -120.0
-	panel.offset_right = 168.0
-	panel.offset_bottom = 120.0
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_bottom", 8)
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	_name_label = Label.new()
-	_name_label.add_theme_font_size_override("font_size", 16)
-	vbox.add_child(_name_label)
-	var grid := GridContainer.new()
-	grid.columns = COLUMNS
+	plate = PanelContainer.new()
+	plate.name = "Plate"
+	plate.position = PLATE_RECT.position
+	plate.size = PLATE_RECT.size
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new() # the white plate with a 1px black border
+	style.bg_color = Color.WHITE
+	style.border_color = Color.BLACK
+	style.set_border_width_all(1)
+	style.set_content_margin_all(0.0)
+	plate.add_theme_stylebox_override("panel", style)
+	add_child(plate)
+	var content := Control.new() # PanelContainer sizes it to the plate rect
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.add_child(content)
+	_name_label = GbcStage.make_label("", Vector2i(5, 4), Color.BLACK, content)
+	_name_label.size = Vector2(124, 8)
+	var grid := Control.new()
+	grid.position = Vector2(5, 16)
+	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(grid)
+	_cursor_bg = ColorRect.new()
+	_cursor_bg.color = Color.BLACK
+	_cursor_bg.size = Vector2(CELL_W, CELL_H - 2)
+	_cursor_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	grid.add_child(_cursor_bg)
 	for i in CELL_COUNT:
-		var cell := Label.new()
-		cell.text = _cell_text(i)
-		cell.add_theme_font_size_override("font_size", 14)
-		grid.add_child(cell)
+		var cell := GbcStage.make_label(_cell_text(i), Vector2i((i % COLUMNS) * CELL_W, (i / COLUMNS) * CELL_H), Color.BLACK, grid)
+		cell.size = Vector2(CELL_W, 8)
+		cell.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_cells.append(cell)
-	vbox.add_child(grid)
-	var hint := Label.new()
-	hint.text = "(arrows: move   Z: press   X: done)"
-	hint.add_theme_font_size_override("font_size", 12)
-	vbox.add_child(hint)
-	margin.add_child(vbox)
-	panel.add_child(margin)
-	add_child(panel)
+	# Explicit two-line wrap: Label autowrap proved unreliable at fonts.ttf@7
+	# (the one-line render bled past the plate — off-stage ink); both lines fit
+	# the 124px content width.
+	var hint := GbcStage.make_label("(arrows: move\nZ: press   X: done)", Vector2i(5, 68), Color.BLACK, content)
+	hint.size = Vector2(124, 16)
 
 func open_entry() -> void:
 	_refresh()
@@ -79,9 +84,10 @@ func open_entry() -> void:
 func close_entry() -> void: # silent (screen hide): no cancelled — the closer owns its own state
 	visible = false
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not visible:
-		return
+# Creation-screen-delegated input (the screen root owns _unhandled_input).
+# Returns true when consumed; Enter and friends stay unhandled so the router
+# latch keeps working.
+func handle_input(event: InputEvent) -> bool:
 	if event.is_action_pressed("action_a"):
 		_activate()
 	elif event.is_action_pressed("action_b"):
@@ -96,8 +102,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_down", true):
 		_move(COLUMNS)
 	else:
-		return # Enter and friends stay unhandled (the router latch keeps working)
-	get_viewport().set_input_as_handled()
+		return false
+	return true
 
 func _move(delta: int) -> void:
 	_cursor = posmod(_cursor + delta, CELL_COUNT)
@@ -112,13 +118,14 @@ func _activate() -> void:
 		return # already hidden — no refresh
 	elif _text.length() < SessionState.PLAYER_NAME_MAX:
 		_text += _cell_text(_cursor) # letters live below CELL_DEL
-	# at the cap a letter press is ignored (the event is still consumed below)
+	# at the cap a letter press is ignored (the event is still consumed)
 	_refresh()
 
 func _refresh() -> void:
 	for i in CELL_COUNT:
-		(_cells[i] as Label).modulate = COLOR_CURSOR if i == _cursor else COLOR_IDLE
-	_name_label.text = "NAME — %s_" % _text # the trailing _ is the insertion point
+		(_cells[i] as Label).add_theme_color_override("font_color", Color.WHITE if i == _cursor else Color.BLACK)
+	_cursor_bg.position = Vector2((_cursor % COLUMNS) * CELL_W, (_cursor / COLUMNS) * CELL_H - 1)
+	_name_label.text = "NAME — %s_" % _text
 
 func _cell_text(index: int) -> String:
 	if index == CELL_DEL:

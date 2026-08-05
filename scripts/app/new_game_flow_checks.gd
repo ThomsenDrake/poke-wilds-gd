@@ -8,8 +8,8 @@ extends Node
 # driving tap carries an injection WITNESS — state only real delivery can
 # produce — so degraded delivery fails red, never vacuous.
 # Part 4 rides the real player-boot seam: TitleScreen.begin_boot(true) ->
-# MessageBox save-wipe confirm -> CreationScreen; WORLD_SEED rides the
-# SeedPrompt as unicode digit events (no InputMap action exists for digits);
+# MessageBox save-wipe confirm -> CreationScreen; WORLD_SEED rides the in-stage
+# seed digit row as unicode digit events (no InputMap action exists for digits);
 # the NameEntry grid walks A->S->H->OK (cells 0->18->7->27) and the
 # AvatarPicker grid walks ben(0)->kris(11); the part ends on the EXACT
 # creation_confirmed payload. Part 5 re-derives the beach spawn off the PURE
@@ -18,6 +18,7 @@ extends Node
 
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
+const Geo := preload("res://scripts/app/new_game_flow_geo.gd")
 
 # The scenario's pins, mirrored here (single pin set per file, the menu_checks precedent).
 const WORLD_SEED := 2026080602 # probed beach spawn (the scenario's WORLD_SEED)
@@ -46,12 +47,10 @@ func _part_4_creation() -> void:
 	var creation := _creation()
 	title.begin_boot(true) # has_save: NEW GAME must ride the real save-wipe confirm gate
 	await _tap("action_a") # splash skip
-	var entries: ItemList = title.get_node("EntryPanel/Entries")
-	if not _expect(not title.get_node("Splash").visible and entries.item_count == 2, "4: injection witness: the splash skip did not raise the with-save title"):
+	if not _expect(not title.get_node("Splash").visible and title.entry_labels().size() == 2, "4: injection witness: the splash skip did not raise the with-save title"):
 		return
 	await _tap("move_down") # CONTINUE -> NEW GAME
-	var selected: PackedInt32Array = entries.get_selected_items()
-	if not _expect(selected.size() > 0 and entries.get_item_text(int(selected[0])) == "NEW GAME", "4: precondition witness: the cursor did not land on NEW GAME"):
+	if not _expect(title.entry_row_text(title.selected_entry()) == "NEW GAME", "4: precondition witness: the cursor did not land on NEW GAME"):
 		return
 	var cursor: int = _runner.trace_log_line_count()
 	await _tap("action_a") # NEW GAME: the MessageBox sibling confirm must open first
@@ -61,19 +60,18 @@ func _part_4_creation() -> void:
 	_expect(_runner.trace_log_has_since("title_new_game_chosen", cursor), "4: no title_new_game_chosen trace after the confirmed NEW GAME")
 	if not _expect(creation.visible and not title.visible, "4: injection witness: the confirm did not swap title -> creation"):
 		return
-	var title_label: Label = creation.get_node("Panel/Margin/VBox/Title")
-	var value_label: Label = creation.get_node("Panel/Margin/VBox/Value")
+	var title_label: Label = creation.step_title_label() # restyle seam (design §3.1; the old Panel/Margin/VBox reads)
+	var value_label: Label = creation.step_value_label()
 	# SEED step: RANDOM is the one-press default; move_left is the custom-seed gesture.
 	if not _expect(title_label.text == "WORLD SEED" and value_label.text == "RANDOM", "4: the seed step opened on '%s'/'%s', not WORLD SEED/RANDOM" % [title_label.text, value_label.text]):
 		return
 	await _tap("move_left")
-	var prompt: Control = creation._seed_prompt
-	if not _expect(prompt.visible, "4: injection witness: move_left did not open the SeedPrompt"):
+	if not _expect(creation.seed_edit_active(), "4: injection witness: move_left did not open the seed digit row"):
 		return
-	for character in str(WORLD_SEED): # digits ride unicode key events (seed_prompt's typed-digit branch reads unicode 48-57)
+	for character in str(WORLD_SEED): # digits ride unicode key events (the digit row's typed-digit branch reads unicode 48-57)
 		await _tap_digit(int(character))
-	await _tap("action_a") # the prompt's Z confirm stores the typed seed
-	_expect(not prompt.visible, "4: injection witness: Z did not close the SeedPrompt")
+	await _tap("action_a") # the digit row's Z commit stores the typed seed
+	_expect(not creation.seed_edit_active(), "4: injection witness: Z did not commit the seed digit row")
 	if not _expect(value_label.text == str(WORLD_SEED), "4: the seed step shows '%s', not the typed %d" % [value_label.text, WORLD_SEED]):
 		return
 	await _tap("action_a") # advance
@@ -92,15 +90,14 @@ func _part_4_creation() -> void:
 	var entry: Control = creation._name_entry
 	if not _expect(entry.visible, "4: injection witness: Z did not open the NameEntry grid"):
 		return
+	Geo.new().check(entry, "name grid", _failures)
 	var name_label: Label = entry._name_label
 	await _tap("action_a") # A (cell 0)
 	if not _expect(name_label.text == "NAME — A_", "4: the grid press shows '%s', not 'NAME — A_' (the cursor missed cell 0)" % name_label.text):
 		return
-	await _flush("move_down", 2) # A(0) +14 -> 14 (down x2, the 7-wide grid)
-	await _flush("move_right", 4) # 14 +4 -> S(18)
+	await _flush("move_down", 2); await _flush("move_right", 4) # A(0) +14 -> 14 -> S(18)
 	await _tap("action_a")
-	await _flush("move_up", 1) # S(18) -7 -> 11
-	await _flush("move_left", 4) # 11 -4 -> H(7)
+	await _flush("move_up", 1); await _flush("move_left", 4) # S(18) -7 -> 11 -> H(7)
 	await _tap("action_a")
 	await _flush("move_right", 20) # H(7) +20 -> OK(27) — the wrap nav carries the long flush
 	await _tap("action_a") # OK confirms back to the step
@@ -116,6 +113,7 @@ func _part_4_creation() -> void:
 	var picker: Control = creation._avatar_picker
 	if not _expect(picker.visible, "4: injection witness: Z did not open the AvatarPicker grid"):
 		return
+	Geo.new().check(picker, "avatar grid", _failures)
 	await _flush("move_right", 11) # ben(0) -> kris(11)
 	var picker_label: Label = picker._name_label
 	if not _expect(picker_label.text == AVATAR, "4: the picker cursor is '%s', not %s (the index math drifted)" % [picker_label.text, AVATAR]):
@@ -196,8 +194,8 @@ func _flush(action: String, count: int) -> void:
 	SmokeTap.inject_release(action)
 	await get_tree().process_frame
 
-# One typed digit for the SeedPrompt: unicode + matching keycode/physical_keycode
-# (seed_prompt's branch reads unicode 48-57), press -> frame -> release.
+# One typed digit for the seed digit row: unicode + matching keycode/physical_keycode
+# (gbc_digit_row's branch reads unicode 48-57), press -> frame -> release.
 func _tap_digit(digit: int) -> void:
 	var press := InputEventKey.new()
 	press.unicode = 48 + digit; press.keycode = 48 + digit; press.physical_keycode = 48 + digit; press.pressed = true

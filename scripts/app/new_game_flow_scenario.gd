@@ -99,11 +99,9 @@ func _part_3_continue() -> void:
 	await SmokeTap.tap(get_tree(), "action_a") # splash skip
 	if not _expect(not title.get_node("Splash").visible, "3: injection witness: the splash skip did not run"):
 		return
-	var entries: ItemList = title.get_node("EntryPanel/Entries")
 	_expect(_entry_labels(title) == ["CONTINUE", "NEW GAME"], "3: the with-save entries %s != [CONTINUE, NEW GAME]" % str(_entry_labels(title)))
 	_expect(_runner.trace_log_has_since("title_shown", cursor, {"has_save": true}), "3: no title_shown{has_save:true} trace")
-	var selected: PackedInt32Array = entries.get_selected_items()
-	_expect(selected.size() > 0 and entries.get_item_text(int(selected[0])) == "CONTINUE", "3: the cursor did not start on CONTINUE")
+	_expect(title.entry_row_text(title.selected_entry()) == "CONTINUE", "3: the cursor did not start on CONTINUE")
 	var party_before := _party_ids()
 	await SmokeTap.tap(get_tree(), "action_a") # CONTINUE
 	_expect(_runner.trace_log_has_since("title_continued", cursor), "3: no title_continued trace")
@@ -118,12 +116,8 @@ func _restore() -> void: # EVERY exit path: accumulated input off, avatar drivab
 	_title().hide_screen()
 	_creation().close_screen()
 
-func _entry_labels(title) -> Array:
-	var entries: ItemList = title.get_node("EntryPanel/Entries")
-	var labels: Array = []
-	for i in entries.item_count:
-		labels.append(entries.get_item_text(i))
-	return labels
+func _entry_labels(title) -> Array: # restyle seam: the old EntryPanel/Entries ItemList reads (design §3.1)
+	return title.entry_labels()
 
 func _party_ids() -> Array:
 	var ids: Array = []

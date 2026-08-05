@@ -78,13 +78,13 @@
     "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode \u2014 machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar \u2014 and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole \u2014 regenerated baselines were. REGEN-UNDER-BREAK (update mode \u2014 machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap \u2014 prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole). RE-STAMP 2026-08-02 (infinite-world slice 2 \u2014 the climate-field biome re-capture): the four battle sidecar.json files drifted in EXACTLY two run-position metadata keys (trace_cursor, ts_msec) \u2014 the visual_sweep_update re-capture under the new climate terrain re-emitted every sidecar; the four battle PNGs are byte-identical (verified: the battle shots are pixel-immune to terrain, the blank-bg DECIDUEYE craft). The deterministic-art-anchor gate held (no anchor_refusals \u2014 the R4 canary_rects + the glyph oracle regions are unchanged), the region-diff compare after the update is GREEN, and the sidecar seed gate confirmed every fresh sidecar's world_seed/shot_seq equals its predecessor's before the rewrite. The (C) honest-reporting mechanism is untouched (no tool edits this slice). Old pins: 09_battle.png d72d8ee50be5\u2026, 09_battle.png.sidecar.json 9d8c3c634ea3\u2026, 10_battle_moves.png e15936689279\u2026, 10_battle_moves.png.sidecar.json 30120ed10089\u2026, 11_battle_after_attack.png 169989acd846\u2026, 11_battle_after_attack.png.sidecar.json 918f834a1040\u2026, 12_battle_items.png ba1a0c59b602\u2026, 12_battle_items.png.sidecar.json da72cec352af\u2026. RE-STAMP 2026-08-03 (infinite-world slice 4 baseline re-pin): the beach spawn shifted the spawn-dependent visual baselines, so the battle sidecars' run-position metadata (trace_cursor/ts_msec) drifted; the battle PNGs stay PIXEL-IDENTICAL (the blank battle background is terrain-invariant \u2014 only the sidecar trace position moved). The HP-bar plant's revert CONTRACTS (the 11px HP bar + the battle-pixel revert proof) are unchanged; the revert_scope sidecar pins are re-stamped to the re-pinned baselines. Changed: 09_battle.png.sidecar.json a29d25a3f9b5\u21921e0ae6065e5b, 10_battle_moves.png.sidecar.json abb58661d408\u21926b6bc657a69e, 11_battle_after_attack.png.sidecar.json 3b68d5ed1a5d\u219217193c98a53a, 12_battle_items.png.sidecar.json 961f63b4d8c0\u2192a422bc863698.",
     "revert_scope": {
      "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
-     "docs/generated/visual-baselines/09_battle.png.sidecar.json": "1e0ae6065e5b9cd94ff413915cd26c9b592d76cff19eb54a843b19199fcd0270",
+     "docs/generated/visual-baselines/09_battle.png.sidecar.json": "9293332d09b81b6d95ec7c15fc07378c17e27991bc3106a8109559899b08f1f1",
      "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
-     "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "6b6bc657a69e0d22aa99ed011ab18669e3082c2527e91018174471f5dced35f2",
+     "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "0e6c82a2b5f314c0b99069cd11261eb660679c0d07983949922a55ebcfcc83a1",
      "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
-     "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "17193c98a53a0b1bca8d5322cc7b34d911aaad7b7acda0bb61c615bda2debfc8",
+     "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "5c545d09e1a43b140428eead5f724c38b874bbcb7a6573de6cc6782660f48edb",
      "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
-     "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "a422bc863698cb3ab9de5aaa131a52df0efd8e1c59ec405e1c4c61e53ffe225d"
+     "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "0ea4e00cc0a75590847e7d6641634bd4fb0cda877291c6251cf2a3a7dadafcdc"
     },
     "re_stamp_log": [
      {
@@ -114,6 +114,34 @@
       "old_pin": "961f63b4d8c0",
       "new_pin": "a422bc863698",
       "reason": "infinite-world slice 4 baseline re-pin: beach spawn shifted spawn-dependent sidecar trace_cursor/ts_msec; battle PNGs pixel-identical; HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/09_battle.png.sidecar.json",
+      "old_pin": "1e0ae6065e5b",
+      "new_pin": "9293332d09b8",
+      "reason": "title-flow restyle baseline mint (shots 37-41) re-captured the main family; battle PNGs pixel-identical, sidecar trace_cursor/ts_msec drifted; HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json",
+      "old_pin": "6b6bc657a69e",
+      "new_pin": "0e6c82a2b5f3",
+      "reason": "title-flow restyle baseline mint (shots 37-41) re-captured the main family; battle PNGs pixel-identical, sidecar trace_cursor/ts_msec drifted; HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json",
+      "old_pin": "17193c98a53a",
+      "new_pin": "5c545d09e1a4",
+      "reason": "title-flow restyle baseline mint (shots 37-41) re-captured the main family; battle PNGs pixel-identical, sidecar trace_cursor/ts_msec drifted; HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/12_battle_items.png.sidecar.json",
+      "old_pin": "a422bc863698",
+      "new_pin": "0ea4e00cc0a7",
+      "reason": "title-flow restyle baseline mint (shots 37-41) re-captured the main family; battle PNGs pixel-identical, sidecar trace_cursor/ts_msec drifted; HP-bar plant revert contracts unchanged."
      }
     ]
    },

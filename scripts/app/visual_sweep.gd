@@ -17,6 +17,7 @@ const RenderIntrospection := preload("res://scripts/app/render_introspection.gd"
 const VisualSweepBuild := preload("res://scripts/app/visual_sweep_build.gd")
 const VisualSweepBattle := preload("res://scripts/app/visual_sweep_battle.gd")
 const VisualSweepDayMenu := preload("res://scripts/app/visual_sweep_day_menu.gd")
+const VisualSweepTitle := preload("res://scripts/app/visual_sweep_title.gd")
 const VisualSweepReport := preload("res://scripts/app/visual_sweep_report.gd")
 
 const WALK_STEPS := 4
@@ -77,6 +78,8 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	await _capture("05_dawn.png")
 	_world().set_time_of_day(CRAFTED_STATE["time_of_day"])
 	await _menu_shots()
+	# Title/creation shots 37-41 (visual_sweep_title.gd): new_game_flow-shaped drive, never confirms GO.
+	await VisualSweepTitle.run(self)
 	# Battle shots 09-12 live in visual_sweep_battle.gd (app budget extraction).
 	var battle := VisualSweepBattle.new()
 	add_child(battle)
