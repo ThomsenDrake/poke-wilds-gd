@@ -236,7 +236,7 @@
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
      "tools/run_playtests.py": "ec123059aee8c20ea7531c38bddd83a2bab68f50c6f46cf4aa98f860c019803e",
      "tools/godot_dap_smoketest.py": "17758e6118a65906c7c214fff8e6d4e723ecc71460d702b029d693655b827f38",
-     "tools/verify_all.py": "1c9921922886b2ff3c95f0b7282e9085132e985983f5d8486b88af7777a36c5c"
+     "tools/verify_all.py": "7eca615169249ecc335368e16eb42f4b8802bf1d88874846329407072df4c394"
     },
     "re_stamp_log": [
      {
@@ -616,6 +616,13 @@
       "old_pin": "6e536562a667",
       "new_pin": "17758e6118a6",
       "reason": "legitimate edit (vision-suite expansion Track A.3): visual_sweep_farfield(+_update) registered in SCENARIO_REQUIREMENTS + WINDOWED_SUBPROCESS/WINDOWED_ONLY sets. Additive dispatch-table change; (C) honest-reporting mechanism intact. (A) determinism seam untouched; nav_audit pins hold"
+     },
+     {
+      "date": "2026-08-06",
+      "file": "tools/verify_all.py",
+      "old_pin": "1c9921922886",
+      "new_pin": "7eca61516924",
+      "reason": "legitimate edit (vision-suite expansion Track C.2): optional --with-play-agent S8.5 lane wires tools/commandcode_play_agent.py (windowed DAP play agent; default off; SKIP under --skip-windowed). Additive orchestrator flag; double-run lane + honest-reporting mechanism untouched; nav_audit pins hold"
      }
     ]
    },

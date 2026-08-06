@@ -465,6 +465,31 @@ class Runner:
                                 if scenario == "visual_sweep":
                                     self._vision_review_fresh()  # R6 memo: sample freshness the MOMENT the main sweep regenerated the review — later satellite captures land in .godot-smoke/shots and must not pollute the main-only manifest scope
 
+                # --- S8.5: optional Command Code play agent (Track C.2) ---
+                # Default OFF locally; --with-play-agent opts in. Under
+                # --skip-windowed / missing binary it SKIP-with-reason (never PASS).
+                # The agent is windowed-only (real pixels + DAP input); headless
+                # force env is cleared so the agent can self-skip honestly.
+                if not self.fail_fast_stop and getattr(args, "with_play_agent", False):
+                    if args.skip_windowed:
+                        self.record_skip("commandcode_play_agent", "windowed",
+                                         "windowed lane skipped (--skip-windowed)")
+                    elif self.binary_missing:
+                        self.record_skip("commandcode_play_agent", "windowed",
+                                         "godot binary missing (run_playtests exit 2)")
+                    else:
+                        self.run_tool(
+                            "commandcode_play_agent", "windowed",
+                            py("commandcode_play_agent.py") + [
+                                "--project", str(ROOT),
+                                "--godot-bin", bin_,
+                                "--timeout", "180",
+                                "--no-cmd",  # deterministic DAP drive; cmd pre-pass opt-in later
+                            ],
+                            pop_force_headless=True,
+                            outer_timeout=300.0, retry_once=False,
+                            exit_map={0: "pass", 1: "fail", 2: "error"})
+
         # --- S10: legibility report (generate-only, findings already gated) ---
         if not self.fail_fast_stop:
             entry = self.run_tool(
@@ -925,6 +950,9 @@ def main() -> int:
     parser.add_argument("--skip-windowed", action="store_true",
                         help="display-less environments: report the windowed pixel lanes "
                              "as SKIP (never PASS) and suppress the windowed refusals")
+    parser.add_argument("--with-play-agent", action="store_true",
+                        help="opt-in S8.5 Command Code play agent (windowed DAP drive; "
+                             "default off locally; skipped under --skip-windowed)")
     parser.add_argument("--timeout", type=float, default=120,
                         help="per-scenario wall-clock budget (s) for the headless suite "
                              "(default 120)")
