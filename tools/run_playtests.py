@@ -75,13 +75,15 @@ VISION_REVIEW_SCENARIOS = (
     "visual_sweep_pokemon", "visual_sweep_pokemon_update",
     "visual_sweep_overworld", "visual_sweep_overworld_update",
     "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+    "visual_sweep_farfield", "visual_sweep_farfield_update",
 )
 # The six satellite sweep families. verify_all.py single-sources THIS tuple for its
 # S9 windowed loop (R3) so the orchestrator and the gates can never drift on which
 # families receive pixel and mandatory model review.
 SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_fishing", "visual_sweep_camping",
                               "visual_sweep_storage", "visual_sweep_pokemon",
-                              "visual_sweep_overworld", "visual_sweep_world_depth")
+                              "visual_sweep_overworld", "visual_sweep_world_depth",
+                              "visual_sweep_farfield")
 # The full gate scope (R3): the RED-tier sidecar seed-equality gate + the source-art
 # anchor gate cover the main sweep AND every satellite family. Each sweep clears
 # .godot-smoke/shots at start (clear_shots), so the gate reads exactly THAT family's
@@ -110,7 +112,7 @@ REGION_ORACLE_SCENARIOS = smoketest.REGION_ORACLE_SCENARIOS
 FORCE_HEADLESS_ENV = smoketest.FORCE_HEADLESS_ENV
 force_headless = smoketest.force_headless
 
-PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "encounter_config", "world_gen_audit", "landmark_flow", "legendary_spawn", "waystone_selector", "content_scatter", "seed_choice", "new_game_flow", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update", "showcase_capture", "temporal_flow"]
+PLAYTEST_SCENARIOS = ["playtest_journey", "playtest_soak", "nav_audit", "texture_audit", "data_audit", "layout_audit", "world_consistency_audit", "ui_render_audit", "battle_anim", "display_matrix", "harvest_flow", "placement_flow", "input_gate", "battle_end_input", "storage_flow", "camp_survival", "craft_flow", "night_cycle", "time_evolution", "field_moves_flow", "build_house_flow", "breed_flow", "shiny_odds", "habitat_drops", "fishing_flow", "overworld_mons", "encounter_config", "world_gen_audit", "landmark_flow", "legendary_spawn", "waystone_selector", "content_scatter", "seed_choice", "new_game_flow", "playtest_breed_soak", "playtest_field_soak", "rng_joint_pin", "save_stability", "playtest_entity_soak", "visual_sweep_fishing", "visual_sweep_fishing_update", "visual_sweep_world_depth", "visual_sweep_world_depth_update", "visual_sweep_farfield", "visual_sweep_farfield_update", "showcase_capture", "temporal_flow"]
 SMOKE_SCENARIOS = [
     "boot",
     "overworld_step",

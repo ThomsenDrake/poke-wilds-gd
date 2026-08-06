@@ -105,6 +105,9 @@ const SCENARIOS := {
 	"new_game_flow": [preload("res://scripts/app/new_game_flow_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
+	# Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+	"visual_sweep_farfield": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", []],
+	"visual_sweep_farfield_update": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", [{"mode": "update"}]],
 	# Bounded temporal capture (battle attack/capture adapters) — windowed-only.
 	"temporal_flow": [preload("res://scripts/app/temporal_flow_scenario.gd"), "run", []],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves

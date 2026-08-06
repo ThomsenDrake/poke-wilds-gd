@@ -33,6 +33,7 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
                                  "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+                                 "visual_sweep_farfield", "visual_sweep_farfield_update",
                                  "showcase_capture", "temporal_flow"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
@@ -51,6 +52,7 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_overworld", "visual_sweep_overworld_update",
                            "visual_sweep_fishing", "visual_sweep_fishing_update",
                            "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+                           "visual_sweep_farfield", "visual_sweep_farfield_update",
                            "showcase_capture", "temporal_flow"}
 
 # R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
@@ -367,6 +369,16 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_world_depth_update": {
         "all": ["visual_sweep_world_depth_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+    # Windowed-only like the other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
+    "visual_sweep_farfield": {
+        "all": ["visual_sweep_farfield_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    "visual_sweep_farfield_update": {
+        "all": ["visual_sweep_farfield_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Showcase capture (NOT a baseline sweep): crafts the coolest locales + saves evocative frames to

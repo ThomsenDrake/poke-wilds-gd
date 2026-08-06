@@ -234,8 +234,8 @@
     "revert_scope": {
      "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-     "tools/run_playtests.py": "1700192d52ca668f51a1f70a7b775b2f4da69067ec0de3bc239de766ddfa1fcf",
-     "tools/godot_dap_smoketest.py": "6e536562a667e7144ba9a0b24d27e0231ec997cd0f6d88585c1048a7a9847787",
+     "tools/run_playtests.py": "ec123059aee8c20ea7531c38bddd83a2bab68f50c6f46cf4aa98f860c019803e",
+     "tools/godot_dap_smoketest.py": "17758e6118a65906c7c214fff8e6d4e723ecc71460d702b029d693655b827f38",
      "tools/verify_all.py": "1c9921922886b2ff3c95f0b7282e9085132e985983f5d8486b88af7777a36c5c"
     },
     "re_stamp_log": [
@@ -602,6 +602,20 @@
       "old_pin": "b69d00fbb756",
       "new_pin": "6e536562a667",
       "reason": "legitimate edit (vision-suite expansion Track A.2): temporal_flow registered in SCENARIO_REQUIREMENTS + WINDOWED_SUBPROCESS/WINDOWED_ONLY sets so it transport-skips honestly under PLAYTEST_FORCE_HEADLESS; farfield registrations deferred until the sweep script lands. Additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism intact: ERROR_MARKERS still carries ('SCRIPT ERROR', 'Parse Error', 'ERROR: '), failed_event_entry still collects structured *_failed reasons (temporal_flow_failed rides it). The (A) determinism seam is untouched; nav_audit scope pins unchanged and still hold"
+     },
+     {
+      "date": "2026-08-06",
+      "file": "tools/run_playtests.py",
+      "old_pin": "1700192d52ca",
+      "new_pin": "ec123059aee8",
+      "reason": "legitimate edit (vision-suite expansion Track A.3): visual_sweep_farfield(+_update) registered in PLAYTEST_SCENARIOS / SATELLITE_SWEEP_SCENARIOS / VISION_REVIEW_SCENARIOS — distant scatter+lair satellite (shots 42-43). Additive dispatch-table change; (C) honest-reporting mechanism intact (ERROR_MARKERS single-sourced, failed_event_entry collects visual_sweep_farfield_failed). (A) determinism seam untouched; nav_audit pins hold"
+     },
+     {
+      "date": "2026-08-06",
+      "file": "tools/godot_dap_smoketest.py",
+      "old_pin": "6e536562a667",
+      "new_pin": "17758e6118a6",
+      "reason": "legitimate edit (vision-suite expansion Track A.3): visual_sweep_farfield(+_update) registered in SCENARIO_REQUIREMENTS + WINDOWED_SUBPROCESS/WINDOWED_ONLY sets. Additive dispatch-table change; (C) honest-reporting mechanism intact. (A) determinism seam untouched; nav_audit pins hold"
      }
     ]
    },

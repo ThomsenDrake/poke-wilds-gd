@@ -9,14 +9,26 @@ const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
 
 
 # World-layer draw_order (Ground/Prop/Player) + EntityLayer mons_y_sort/nest_rings.
-static func collect_world(ctx: Dictionary, result: Dictionary, draw_order_fn: Callable) -> void:
+static func collect_world(ctx: Dictionary, result: Dictionary) -> void:
 	var world: Node = ctx.get("world")
 	if world == null:
 		return
 	var root: Node = world.get_tree().current_scene if world.get_tree() != null else null
-	var nodes := [world.get_node_or_null("GroundLayer"), world.get_node_or_null("PropLayer"), ctx.get("player")]
-	draw_order_fn.call(nodes, result,
-		func(item): return str(root.get_path_to(item)) if root != null else str(item.name))
+	var nodes: Array = [world.get_node_or_null("GroundLayer"), world.get_node_or_null("PropLayer"), ctx.get("player")]
+	var canvas: Array = []
+	for item in nodes:
+		if item is CanvasItem:
+			canvas.append(item)
+	canvas.sort_custom(func(a, b): return WorldDrawOrder.draws_over(b, a))
+	for item in canvas:
+		var sort_y := WorldDrawOrder.y_sort_key(item)
+		result["draw_order"].append({
+			"node": str(root.get_path_to(item)) if root != null else str(item.name),
+			"z": WorldDrawOrder.effective_z(item),
+			"y_sort": null if is_nan(sort_y) else sort_y,
+			"texture": "",
+			"rect": []
+		})
 	collect_entities(ctx, result)
 
 
@@ -35,13 +47,12 @@ static func collect_entities(ctx: Dictionary, result: Dictionary) -> void:
 		if child is CanvasItem and (child as CanvasItem).visible:
 			sprites.append(child)
 	sprites.sort_custom(func(a, b): return WorldDrawOrder.draws_over(b, a))
-	var namer := func(item): return str(root.get_path_to(item)) if root != null else str(item.name)
 	var mons_y_sort: Array = []
 	var nest_rings: Array = []
 	for item in sprites:
 		var sort_y := WorldDrawOrder.y_sort_key(item)
 		var rect := _canvas_item_rect(item)
-		var node_path := str(namer.call(item))
+		var node_path := str(root.get_path_to(item)) if root != null else str(item.name)
 		var entry := {"node": node_path, "z": WorldDrawOrder.effective_z(item),
 			"y_sort": null if is_nan(sort_y) else sort_y, "texture": _texture_path(item),
 			"rect": rect}
@@ -55,12 +66,18 @@ static func collect_entities(ctx: Dictionary, result: Dictionary) -> void:
 	result["mons_y_sort"] = mons_y_sort
 	result["nest_rings"] = nest_rings
 	if not nest_rings.is_empty():
-		var ink: Array = (result.get("expected_regions") or {}).get("ink", [])
+		var expected: Variant = result.get("expected_regions", {})
+		if not (expected is Dictionary):
+			expected = {"ink": [], "forbidden": [], "strings": []}
+		var ink: Array = []
+		var existing = (expected as Dictionary).get("ink", [])
+		if existing is Array:
+			ink = (existing as Array).duplicate()
 		for nest in nest_rings:
-			if nest.get("rect") is Array and not (nest["rect"] as Array).is_empty():
-				ink.append(nest["rect"])
-		var expected: Dictionary = result.get("expected_regions", {})
-		expected["ink"] = ink
+			var nest_rect: Variant = nest.get("rect")
+			if nest_rect is Array and not (nest_rect as Array).is_empty():
+				ink.append(nest_rect)
+		(expected as Dictionary)["ink"] = ink
 		result["expected_regions"] = expected
 
 

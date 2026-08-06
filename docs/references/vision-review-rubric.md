@@ -74,7 +74,7 @@ NOTE: all seven menu questions also have DETERMINISTIC answerers now: menu sidec
 - Is text kerning consistent, with no fused letters, broken glyph spacing, or awkward gaps?
 - Are battle labels, bars, and cursors aligned consistently to their intended rows and plates?
 
-## Camping states (`15_camp_night_lit`, `16_craft_menu` — `17_dawn_after_rest` is formally RETIRED: camping-reserved, never committed, the sole whitelisted numbering gap in the shot-range registry)
+## Camping states (`15_camp_night_lit`, `16_craft_menu` — `17_dawn_after_rest` is formally RETIRED: camping-reserved, never committed; farfield owns shots 42–43 instead of reusing retired 17/33/35/36)
 
 - In `15_camp_night_lit`, is a warm glow visible around the fire (campfire and
   torch) over the night tint, with no glow where the fire is extinguished?

@@ -18,7 +18,7 @@ static func collect(ctx: Dictionary, shot: String, crafted: Dictionary) -> Dicti
 	match _shot_kind(shot):
 		"battle": _collect_battle(ctx, result)
 		"menu": _collect_menu(ctx, result, shot)
-		"overworld": MonsCollect.collect_world(ctx, result, _collect_draw_order)
+		"overworld": MonsCollect.collect_world(ctx, result)
 	return result
 
 static func _collect_battle(ctx: Dictionary, result: Dictionary) -> void:

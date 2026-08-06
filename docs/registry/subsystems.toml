@@ -1298,7 +1298,7 @@ code_paths = [
   "scripts/app/legendary_spawn_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
   "scripts/app/world_depth_checks.gd",
-  "scripts/app/visual_sweep_world_depth.gd",
+  "scripts/app/visual_sweep_world_depth.gd", "scripts/app/visual_sweep_farfield.gd",
   "scripts/app/visual_sweep_world_depth_oracle.gd",
   "scripts/app/visual_sweep_world_depth_expand.gd",
   "scripts/app/showcase_capture_scenario.gd",
