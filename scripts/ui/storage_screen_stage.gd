@@ -98,10 +98,14 @@ static func build(stage: Control) -> Dictionary:
 	MenuList.art(stage, MenuList.BACKGROUND_PATH)
 	var box_title := MenuList.plate_label(GbcWidgets.plate(Rect2(4, 4, 76, 12), stage), Rect2(3, 2, 70, 8), "STORAGE BOX")
 	var party_title := MenuList.plate_label(GbcWidgets.plate(Rect2(84, 4, 72, 12), stage), Rect2(3, 2, 66, 8), "PARTY 0/6")
+	var box_plate := GbcWidgets.plate(Rect2(4, 18, 76, 78), stage)
+	box_plate.name = "BoxPlate"
 	var box_column := Column.new()
-	box_column.setup(GbcWidgets.plate(Rect2(4, 18, 76, 78), stage), 4)
+	box_column.setup(box_plate, 4)
+	var party_plate := GbcWidgets.plate(Rect2(84, 18, 72, 78), stage)
+	party_plate.name = "PartyPlate"
 	var party_column := Column.new()
-	party_column.setup(GbcWidgets.plate(Rect2(84, 18, 72, 78), stage), 4)
+	party_column.setup(party_plate, 4)
 	var detail_label := MenuList.wrapped_label(GbcWidgets.plate(Rect2(4, 100, 100, 30), stage), Rect2(3, 2, 94, 26))
 	var hint_label := MenuList.plate_label(GbcWidgets.plate(Rect2(4, 134, 152, 10), stage), Rect2(3, 1, 146, 8))
 	var action_plate := GbcWidgets.plate(Rect2(108, 88, 48, 42), stage)

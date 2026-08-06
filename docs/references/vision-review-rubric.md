@@ -83,7 +83,10 @@ NOTE: all seven menu questions also have DETERMINISTIC answerers now: menu sidec
 
 ## Overworld mon states (`22_roaming_mons`, `23_nest_alpha`, `30_night_roamers`)
 
-NOTE: both questions below remain MODEL-ONLY, banked on VLM restoration — no deterministic class implements y-sort / nest-ring judgment; while the model is down they are counted UNANSWERED (first-class, never faked).
+NOTE: both questions have deterministic answerers (`y_sort_changed` /
+`nest_ring_changed` over sidecar `mons_y_sort` / `nest_rings`) PLUS model-vision
+judgment. Deterministic classes fire when both baseline and fresh sidecars carry
+the fields (re-pin via `visual_sweep_overworld_update` after collector land).
 
 - In `22_roaming_mons`, do the roaming mons visibly y-sort against props and the
   player (a mon south of a prop/player draws over it, north draws under), with
@@ -97,6 +100,11 @@ NOTE: both questions below remain MODEL-ONLY, banked on VLM restoration — no d
 - At EVERY window size: is the text pixel-crisp (uniform stroke widths, no
   shimmering/uneven glyph columns), the surface centered with even margins,
   and nothing clipped at the surface edges?
+
+## Temporal states
+
+- Is the attack animation a single clean frame sequence without ghosting?
+- Does the frame order match the semantic phase progression?
 
 ## Satellite sweep states (fishing, storage, Pokémon, overworld, world-depth)
 

@@ -126,8 +126,13 @@ def _answers_questions_issues(anchors: list[dict]) -> list[str]:
     vision_review = _load_vision_review()
     if vision_review is None:
         return []
-    scene_to_group = {scene: group
-                      for group, scene in (vision_review.ANCHOR_SCENE_BY_GROUP or {}).items()}
+    scene_to_group: dict[str, str] = {}
+    for group, scenes in (vision_review.ANCHOR_SCENE_BY_GROUP or {}).items():
+        if isinstance(scenes, (list, tuple, set)):
+            for scene in scenes:
+                scene_to_group[str(scene)] = group
+        elif isinstance(scenes, str):
+            scene_to_group[scenes] = group
     answerable_by_group: dict[str, set[str]] = {}
     for group, decls in (vision_review.QUESTION_ANSWERERS or {}).items():
         answerable_by_group[group] = {fp for fp, kinds in decls

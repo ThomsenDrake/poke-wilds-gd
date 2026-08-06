@@ -85,9 +85,36 @@ KIND_COLOR = {
 KIND_ORDER = {"cursor": 0, "string": 1, "label": 2, "ink": 3, "anchor": 4,
               "canary": 5, "draw": 6, "palette:canary": 7}
 
-# Shot-group -> scene whose baked-art overlay nodes art-anchors.toml anchors; the
-# region table carries anchor:<id> regions only for shots of that group.
-ANCHOR_SCENE_BY_GROUP = {"battle": "scenes/ui/BattleView.tscn"}
+# Shot-group -> scene(s) whose baked-art overlay nodes art-anchors.toml anchors;
+# the region table carries anchor:<id> regions only for shots of that group.
+# A value may be a single scene string or a list of scenes (menu group spans
+# multiple UI plates that share the same rubric group).
+ANCHOR_SCENE_BY_GROUP: dict[str, str | list[str]] = {
+    "battle": "scenes/ui/BattleView.tscn",
+    "menu": [
+        "scenes/ui/StartMenu.tscn",
+        "scenes/ui/PartyScreen.tscn",
+        "scenes/ui/BagScreen.tscn",
+        "scenes/ui/StorageScreen.tscn",
+        "scenes/ui/CampMenu.tscn",
+    ],
+}
+
+
+def _anchor_scenes_for_group(group: str | None) -> set[str]:
+    """Normalize ANCHOR_SCENE_BY_GROUP[group] to a set of scene paths.
+
+    Handles both the legacy single-string value (battle) and the multi-scene
+    list value (menu). Unknown / absent group -> empty set.
+    """
+    if not group:
+        return set()
+    val = ANCHOR_SCENE_BY_GROUP.get(group)
+    if val is None:
+        return set()
+    if isinstance(val, (list, tuple, set)):
+        return {str(v) for v in val}
+    return {str(val)}
 
 
 def _load(name: str, path: Path):
@@ -209,18 +236,31 @@ def _build_region_table(base: dict | None, fresh: dict | None, window: list[int]
             rect = node.get("rect")
             if _valid_rect(rect) and any(rect):  # overworld nodes carry rect [] -> ungroundable
                 add(f"draw:{node['node']}", "draw", _stage_to_display(_ri(rect), window), source)
+        # Track A.1: overworld_mons deterministic regions (mons_y_sort / nest_rings).
+        for i, entry in enumerate(sidecar.get("mons_y_sort") or []):
+            if isinstance(entry, dict) and _valid_rect(entry.get("rect")) and any(entry.get("rect") or []):
+                add(f"mons_y_sort:{i}", "mons_y_sort", _ri(entry["rect"]), source,
+                    {"node": str(entry.get("node", "")), "kind": str(entry.get("kind", "")),
+                     "y_sort": entry.get("y_sort")})
+        for i, entry in enumerate(sidecar.get("nest_rings") or []):
+            if isinstance(entry, dict) and _valid_rect(entry.get("rect")) and any(entry.get("rect") or []):
+                add(f"nest_ring:{i}", "nest_ring", _ri(entry["rect"]), source,
+                    {"node": str(entry.get("node", ""))})
 
     # anchor:<id> -- the FIRST region kind whose rect is ART-TRUTH, not sidecar/code
     # output (the G1<->G2 bridge): the art-anchors.toml stage_rects for the shot's
     # scene group, mapped stage->display via the single _stage_to_display home, so
     # grounding + VLM citations resolve them like any other region. The meta carries
     # the stage-space truth the default reviewer's anchor_drift class compares to.
-    scene = ANCHOR_SCENE_BY_GROUP.get(group) if group else None
-    if scene:
+    # _stage_to_display uses the single documented k formula for ALL groups (battle
+    # and menu plates share the same 160x144 -> window mapping: k = floor(min((w-32)/160,
+    # (h-32)/144)), centered).
+    anchor_scenes = _anchor_scenes_for_group(group)
+    if anchor_scenes:
         for anchor in _art_geometry().load_registry(ROOT):
             aid = anchor.get("id")
             rect = anchor.get("stage_rect")
-            if anchor.get("scene") != scene or not (isinstance(aid, str) and aid and _valid_rect(rect)):
+            if anchor.get("scene") not in anchor_scenes or not (isinstance(aid, str) and aid and _valid_rect(rect)):
                 continue
             add(f"anchor:{aid}", "anchor", _stage_to_display(_ri(rect), window), "registry",
                 {"anchor_id": aid, "stage_rect": _ri(rect), "tol_px": int(anchor.get("tol_px", 0)),
@@ -502,6 +542,59 @@ def default_reviewer(ctx: dict) -> list[dict]:
                                 {"source": "both", "field": f"expected_regions.strings[text={e['text']}]",
                                  "baseline": _ri(e["region"]), "fresh": _ri(fe["region"])}))
 
+    # --- Track A.1: mons_y_sort / nest_rings (overworld_mons deterministic classes) ---
+    # Both sidecars must carry the field (graceful during baseline re-pin transition);
+    # a missing field never fabricates a finding. Order + y_sort keys + grounded rects.
+    base_mons = [e for e in (base.get("mons_y_sort") or []) if isinstance(e, dict) and e.get("node")]
+    fresh_mons = [e for e in (fresh.get("mons_y_sort") or []) if isinstance(e, dict) and e.get("node")]
+    if base_mons and fresh_mons:
+        base_seq = [(e.get("node"), e.get("y_sort"), e.get("z")) for e in base_mons]
+        fresh_seq = [(e.get("node"), e.get("y_sort"), e.get("z")) for e in fresh_mons]
+        if base_seq != fresh_seq:
+            # Prefer a grounded mons_y_sort:{i} region; fall back to first fresh rect.
+            rid, bbox = "mons_y_sort:0", None
+            for i, e in enumerate(fresh_mons):
+                cand = f"mons_y_sort:{i}"
+                if ctx["region_table"].get(cand, {}).get("rects"):
+                    rid, bbox = cand, ctx["region_table"][cand]["rects"][0]
+                    break
+            if bbox is None and _valid_rect(fresh_mons[0].get("rect")):
+                bbox = _ri(fresh_mons[0]["rect"])
+            if bbox is not None:
+                findings.append(_mk(shot, "y_sort_changed", rid, bbox, "medium", "high",
+                                    "mons y-sort order changed",
+                                    "Roaming-mon y-sort sequence (node/y_sort/z) changed vs baseline — "
+                                    "a mon south of a prop/player must draw over it.",
+                                    {"source": "both", "field": "mons_y_sort",
+                                     "baseline": base_seq, "fresh": fresh_seq}))
+    base_nests = [e for e in (base.get("nest_rings") or []) if isinstance(e, dict)]
+    fresh_nests = [e for e in (fresh.get("nest_rings") or []) if isinstance(e, dict)]
+    if base_nests and fresh_nests:
+        for i, bn in enumerate(base_nests):
+            fn = fresh_nests[i] if i < len(fresh_nests) else None
+            brect, frect = bn.get("rect"), (fn or {}).get("rect")
+            if fn is None or not _valid_rect(brect) or not _valid_rect(frect):
+                continue
+            if _ri(brect) != _ri(frect) or str(bn.get("node")) != str(fn.get("node")):
+                rid = f"nest_ring:{i}"
+                if not ctx["region_table"].get(rid, {}).get("rects"):
+                    rid = "nest_ring:0" if ctx["region_table"].get("nest_ring:0", {}).get("rects") else rid
+                bbox = _ri(brect)
+                findings.append(_mk(shot, "nest_ring_changed", rid, bbox, "medium", "high",
+                                    "nest ring changed",
+                                    f"Ground nest ring '{bn.get('node')}' rect/presence changed vs baseline.",
+                                    {"source": "both", "field": f"nest_rings[{i}]",
+                                     "baseline": {"node": bn.get("node"), "rect": _ri(brect)},
+                                     "fresh": {"node": fn.get("node"), "rect": _ri(frect)}}))
+    elif base_nests and not fresh_nests:
+        bn = base_nests[0]
+        if _valid_rect(bn.get("rect")):
+            findings.append(_mk(shot, "nest_ring_changed", "nest_ring:0", _ri(bn["rect"]), "medium", "high",
+                                "nest ring missing",
+                                "Baseline nest ring is absent from the fresh capture.",
+                                {"source": "both", "field": "nest_rings",
+                                 "baseline": bn, "fresh": []}))
+
     # --- cluster_unexplained: one per unexplained cluster intersecting a region ---
     ungroundable_clusters = 0
     for cluster in clusters:
@@ -740,6 +833,7 @@ RUBRIC_GROUPS = [
     ("camping", "Camping states"),
     ("overworld_mons", "Overworld mon states"),
     ("display_matrix", "Display-matrix states"),
+    ("temporal", "Temporal states"),
     ("satellite", "Satellite sweep states"),
 ]
 
@@ -756,8 +850,9 @@ RUBRIC_GROUPS = [
 # sidecars' expected_regions.strings (every menu label's window-space ink rect +
 # UiRenderModel's curated per-shot texts; the expected_region_changed class diffs
 # them baseline-vs-fresh, so row-alignment / clipping / presence drift is a
-# finding). The two overworld_mons questions stay MODEL-ONLY — banked on VLM
-# restoration (no deterministic class implements y-sort / nest-ring judgment).
+# finding). The two overworld_mons questions gain deterministic answerers
+# (y_sort_changed / nest_ring_changed over mons_y_sort / nest_rings sidecars)
+# PLUS model-vision judgment.
 QUESTION_ANSWERERS = {
     "battle": [
         ("cursor vertically centered", [KIND_DETERMINISTIC, KIND_MODEL]),
@@ -787,7 +882,11 @@ QUESTION_ANSWERERS = {
         ("hp bars visible and color-graded", [KIND_DETERMINISTIC, KIND_MODEL]),
         ("clipped, overlapping, or escaping", [KIND_DETERMINISTIC, KIND_MODEL]),
         ("spaced consistently", [KIND_MODEL]),
-        ("aligned to a consistent grid", [KIND_MODEL]),
+        # Grid-alignment has both answers: menu plates that land art-anchored rows
+        # get byte-truth geometry from anchor_drift (KIND_ART_ANCHOR) -- the row
+        # rect IS the baked plate -- plus expected_regions drift still guards
+        # un-anchored rows; un-anchored plates remain VLM-judged.
+        ("aligned to a consistent grid", [KIND_ART_ANCHOR, KIND_DETERMINISTIC, KIND_MODEL]),
     ],
     "display_matrix": [
         ("every window size", [KIND_MODEL]),
@@ -797,8 +896,12 @@ QUESTION_ANSWERERS = {
         ("recipe names + ingredient counts legible", [KIND_MODEL]),
     ],
     "overworld_mons": [
-        ("roaming mons visibly y-sort", [KIND_MODEL]),
-        ("ground nest ring", [KIND_MODEL]),
+        ("roaming mons visibly y-sort", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("ground nest ring", [KIND_DETERMINISTIC, KIND_MODEL]),
+    ],
+    "temporal": [
+        ("single clean frame sequence without ghosting", [KIND_MODEL]),
+        ("frame order match", [KIND_MODEL]),
     ],
     "satellite": [
         ("focal content intact", [KIND_MODEL]),
@@ -811,9 +914,9 @@ QUESTION_ANSWERERS = {
 # Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
 # parsed inventory drifts from these counts the run records a loud warning
 # (advisory in this slice; a RED check_repo_contracts backstop is the documented
-# follow-up). Totals: 6 + 2 + 7 + 7 + 2 + 2 + 1 + 4 = 31 rubric questions.
+# follow-up). Totals: 6 + 2 + 7 + 7 + 2 + 2 + 1 + 2 + 4 = 33 rubric questions.
 EXPECTED_QUESTION_COUNTS = {
-    "overworld": 6, "day_night": 2, "menu": 7, "battle": 7, "camping": 2, "overworld_mons": 2, "display_matrix": 1, "satellite": 4,
+    "overworld": 6, "day_night": 2, "menu": 7, "battle": 7, "camping": 2, "overworld_mons": 2, "display_matrix": 1, "temporal": 2, "satellite": 4,
 }
 
 ANSWER_VERDICTS = ("yes", "no")
@@ -920,7 +1023,7 @@ def _unanswered_reason(group_key: str, capable: list[str]) -> str:
     if group_key == "overworld":
         base += "; overworld shots carry zero groundable regions"
     if group_key == "overworld_mons":
-        base += "; model-only questions banked on VLM restoration (no deterministic class implements y-sort / nest-ring judgment)"
+        base += "; deterministic y_sort_changed / nest_ring_changed classes answer when sidecars carry mons_y_sort / nest_rings"
     return base
 
 
@@ -1091,6 +1194,114 @@ def rubric_inventory_issues(rubric_text: str) -> list[str]:
     return issues
 
 
+def _prior_findings_for_shot(shot_name: str, bundle_dir: Path) -> list[dict]:
+    """Prior vision-review.json findings for this shot (filtered by stem).
+
+    Best-effort, degrade-on-absent: [] when the prior file is missing, unreadable,
+    or has no entry for this shot. Each entry is a compact summary so the bundle
+    stays small while the model sees known false positives. Never raises."""
+    try:
+        candidates: list[Path] = []
+        try:
+            # bundle_dir = output_dir / "vision-review" / stem  -> output_dir = parent.parent
+            candidates.append(bundle_dir.parent.parent / "vision-review.json")
+        except Exception:
+            pass
+        candidates.append(ROOT / ".godot-smoke" / "vision-review.json")
+        doc = None
+        for cand in candidates:
+            try:
+                if cand.is_file():
+                    loaded = _load_json(cand)
+                    if isinstance(loaded, dict) and loaded.get("shots") is not None:
+                        doc = loaded
+                        break
+            except Exception:
+                continue
+        if not isinstance(doc, dict):
+            return []
+        stem = Path(shot_name).stem
+        out: list[dict] = []
+        for entry in doc.get("shots") or []:
+            if not isinstance(entry, dict):
+                continue
+            sname = str(entry.get("shot") or "")
+            if Path(sname).stem != stem:
+                continue
+            for f in entry.get("findings") or []:
+                if not isinstance(f, dict):
+                    continue
+                compact = {}
+                for k in ("finding_id", "class", "region_id", "severity", "confidence", "note"):
+                    v = f.get(k)
+                    if v is not None:
+                        compact[k] = v
+                # keep explanation truncated so context.json stays bounded
+                if isinstance(f.get("explanation"), str) and f["explanation"]:
+                    compact["explanation"] = str(f["explanation"])[:160]
+                out.append(compact)
+                if len(out) >= 8:
+                    break
+            if len(out) >= 8:
+                break
+        return out
+    except Exception:
+        return []
+
+
+def _legibility_lines_for_shot(shot_name: str, bundle_dir: Path) -> list[str]:
+    """Legibility-report CVD/contrast lines mentioning this shot.
+
+    Parses .godot-smoke/legibility-report.md for canary/label contrast + CVD
+    collapse lines for the shot (name or stem must appear). Best-effort: []
+    when the file is absent or unparseable. Never raises."""
+    try:
+        candidates: list[Path] = []
+        try:
+            candidates.append(bundle_dir.parent.parent / "legibility-report.md")
+        except Exception:
+            pass
+        candidates.append(ROOT / ".godot-smoke" / "legibility-report.md")
+        text = None
+        for cand in candidates:
+            try:
+                if cand.is_file():
+                    text = cand.read_text(encoding="utf-8")
+                    break
+            except Exception:
+                continue
+        if not text:
+            return []
+        stem = Path(shot_name).stem
+        lines: list[str] = []
+        for raw in text.splitlines():
+            if stem not in raw and shot_name not in raw:
+                continue
+            low = raw.lower()
+            # keep only contrast/CVD-relevant mentions; still keep any shot mention as fallback
+            is_relevant = any(k in low for k in (
+                "ratio", "contrast", "cvd", "collapse", "deutan", "protan", "tritan",
+                "canary", "deltae", "wcag"))
+            stripped = raw.strip()
+            if stripped.startswith("- "):
+                stripped = stripped[2:]
+            elif stripped.startswith("* "):
+                stripped = stripped[2:]
+            stripped = stripped.strip()
+            if not stripped:
+                continue
+            if len(stripped) > 240:
+                stripped = stripped[:237] + "..."
+            # prefer relevant lines, but keep any shot line (cap ensures no overflow)
+            if is_relevant or stem in raw:
+                lines.append(stripped)
+            if len(lines) >= 8:
+                break
+        return lines[:8]
+    except Exception:
+        return []
+
+
 def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clusters,
                     table, bundle_dir, vd, canvas_mod, window, rubric_text) -> tuple[dict, dict]:
     """Returns (bundle-relative paths, som_legend): the legend maps region_id to
@@ -1145,6 +1356,10 @@ def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clus
         json.dumps(expected, indent=2, sort_keys=True), encoding="utf-8")
     (bundle_dir / "rubric.txt").write_text(_rubric_section(name, rubric_text), encoding="utf-8")
 
+    # Enrichment (bundle assembly): prior findings (false-positive memory) + CVD/contrast
+    # legibility lines so the model sees known issues. Degrade gracefully when files absent.
+    prior = _prior_findings_for_shot(name, bundle_dir)
+    legibility_lines = _legibility_lines_for_shot(name, bundle_dir)
     context = {
         "shot": name, "shot_kind": stem.split("_")[0], "window": window,
         "crafted_state": (fresh_sidecar or base_sidecar or {}).get("crafted_state"),
@@ -1154,6 +1369,10 @@ def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clus
         "region_table": {rid: {"kind": e["kind"], "rects": e["rects"], "source": e["source"]}
                          for rid, e in table.items()},
         "som_legend": legend,
+        "prior_findings": prior,
+        "prior_findings_count": len(prior),
+        "legibility_lines": legibility_lines,
+        "legibility_source": "legibility-report.md",
     }
     (bundle_dir / "context.json").write_text(json.dumps(context, indent=2, sort_keys=True), encoding="utf-8")
 
@@ -1386,6 +1605,19 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             "cite": "region_id resolvable in region_table",
             "intersect": "bbox must pass rects_overlap against >=1 registered rect",
             "enforcement": "ungrounded findings are dropped and counted"}
+        # Bundle enrichment for model reviewers: prior findings (false-positive memory)
+        # + CVD/contrast legibility lines. Degrade gracefully when files absent; read
+        # from the just-written context.json (already enriched by assemble_bundle) so
+        # vision_review is the single writer and public_ctx stays in sync with context.json.
+        try:
+            _enrich_ctx = _load_json(bundle_dir / "context.json")
+            if isinstance(_enrich_ctx, dict):
+                # keys added: prior_findings, prior_findings_count, legibility_lines, legibility_source
+                for _k in ("prior_findings", "prior_findings_count", "legibility_lines", "legibility_source"):
+                    if _k in _enrich_ctx:
+                        public_ctx[_k] = _enrich_ctx[_k]
+        except Exception:
+            pass  # degrade, not crash -- model simply sees no prior/legibility context
 
         if reviewer_cmd:
             raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)

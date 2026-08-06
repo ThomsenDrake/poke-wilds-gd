@@ -7,17 +7,18 @@ extends RefCounted
 const UiRenderModel := preload("res://scripts/app/ui_render_model.gd")
 const UiRenderArt := preload("res://scripts/app/ui_render_art.gd")
 const WorldDrawOrder := preload("res://scripts/app/world_draw_order.gd")
+const MonsCollect := preload("res://scripts/app/render_introspection_mons.gd")
 
 const SIDECAR_SUFFIX := ".sidecar.json"
 
 static func collect(ctx: Dictionary, shot: String, crafted: Dictionary) -> Dictionary:
 	var result := {"crafted_state": crafted.duplicate(true), "capture_env": _capture_env(), "labels": [],
 		"draw_order": [], "cursor_pairs": [], "canary_rect": [], "palette_regions": {"canary": [], "hud": []},
-		"expected_regions": {"ink": [], "forbidden": [], "strings": []}}
+		"expected_regions": {"ink": [], "forbidden": [], "strings": []}, "mons_y_sort": [], "nest_rings": []}
 	match _shot_kind(shot):
 		"battle": _collect_battle(ctx, result)
 		"menu": _collect_menu(ctx, result, shot)
-		"overworld": _collect_world(ctx, result)
+		"overworld": MonsCollect.collect_world(ctx, result, _collect_draw_order)
 	return result
 
 static func _collect_battle(ctx: Dictionary, result: Dictionary) -> void:
@@ -54,7 +55,7 @@ static func _collect_menu(ctx: Dictionary, result: Dictionary, shot: String) -> 
 	if menu == null:
 		return
 	_collect_labels(menu, result, Rect2(), false)
-	# Menu expected strings: visible labels' ink rects + curated texts (menu rubric answerer).
+	MonsCollect.collect_menu_stage(menu, result)
 	var texts := {}
 	for label in UiRenderModel.visible_labels(menu):
 		texts[str(label.text)] = _int_rect(UiRenderModel.ink_rect(label))
@@ -95,15 +96,6 @@ static func _hud_palette_regions(state: String, display_rect: Rect2) -> Array:
 		"battle_moves", "battle_item":
 			interiors = [UiRenderArt.SIDE_INTERIOR, UiRenderArt.MOVE_INTERIOR]
 	return interiors.map(func(interior): return UiRenderModel.map_region(interior, display_rect))
-
-static func _collect_world(ctx: Dictionary, result: Dictionary) -> void:  # draw order bounded to the layer nodes + player (not every sprite)
-	var world: Node = ctx.get("world")
-	if world == null:
-		return
-	var root: Node = world.get_tree().current_scene
-	var nodes := [world.get_node_or_null("GroundLayer"), world.get_node_or_null("PropLayer"), ctx.get("player")]
-	_collect_draw_order(nodes, result,
-		func(item): return str(root.get_path_to(item)) if root != null else str(item.name))
 
 static func _collect_draw_order(items: Array, result: Dictionary, namer: Callable, recursive: bool = false) -> void:
 	var canvas := []

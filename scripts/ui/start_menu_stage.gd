@@ -35,8 +35,19 @@ static func build(stage: Control) -> Dictionary:
 		art.offset_bottom = GbcStage.STAGE_SIZE.y
 		card.add_child(art)
 	else:
-		GbcWidgets.plate(PANEL_RECT, card) # the composed fallback panel
-	GbcWidgets.plate(PLATE_RECT, card)
+		var panel := GbcWidgets.plate(PANEL_RECT, card) # the composed fallback panel
+		panel.name = "PanelBounds"
+	var plate := GbcWidgets.plate(PLATE_RECT, card)
+	plate.name = "Plate"
+	# Art-anchor live compare needs a stage-sized PanelBounds even when menu1.png
+	# is present (MenuCard itself has no size — children use absolute offsets).
+	if card.get_node_or_null("PanelBounds") == null:
+		var bounds := Control.new()
+		bounds.name = "PanelBounds"
+		bounds.position = PANEL_RECT.position
+		bounds.size = PANEL_RECT.size
+		bounds.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card.add_child(bounds)
 	var rows = GbcWidgets.row_list(card, ROWS_ORIGIN) # black ink + black arrow cursor
 	return {"card": card, "rows": rows}
 

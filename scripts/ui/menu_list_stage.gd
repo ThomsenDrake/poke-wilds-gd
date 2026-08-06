@@ -31,17 +31,23 @@ static func build(stage: Control, opts: Dictionary) -> Dictionary:
 		title_label = plate_label(title_plate, Rect2(2, 3, title_rect.size.x - 4, 8), str(opts["title"]))
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var rows_rect: Rect2 = opts.get("rows_rect", Rect2(8, 24, 144, 64))
+	var rows_plate := GbcWidgets.plate(rows_rect, stage)
+	rows_plate.name = str(opts.get("rows_plate_name", "RowsPlate"))
 	var rows := Rows.new()
-	rows.setup(GbcWidgets.plate(rows_rect, stage), int(opts.get("max_visible", 0)))
+	rows.setup(rows_plate, int(opts.get("max_visible", 0)))
 	var detail_label: Label = null
 	var detail_rect: Rect2 = opts.get("detail_rect", Rect2())
 	if detail_rect.size.x > 0.0:
-		detail_label = wrapped_label(GbcWidgets.plate(detail_rect, stage),
+		var detail_plate := GbcWidgets.plate(detail_rect, stage)
+		detail_plate.name = str(opts.get("detail_plate_name", "DetailPlate"))
+		detail_label = wrapped_label(detail_plate,
 				Rect2(Vector2(3, 2), detail_rect.size - Vector2(6, 4)))
 	var hint_label: Label = null
 	var hint_rect: Rect2 = opts.get("hint_rect", Rect2())
 	if hint_rect.size.x > 0.0:
-		hint_label = wrapped_label(GbcWidgets.plate(hint_rect, stage),
+		var hint_plate := GbcWidgets.plate(hint_rect, stage)
+		hint_plate.name = str(opts.get("hint_plate_name", "HintPlate"))
+		hint_label = wrapped_label(hint_plate,
 				Rect2(Vector2(3, 1), hint_rect.size - Vector2(6, 2)))
 		hint_label.text = str(opts.get("hint", ""))
 	return {"rows": rows, "title_label": title_label, "detail_label": detail_label, "hint_label": hint_label}

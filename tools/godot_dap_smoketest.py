@@ -33,7 +33,7 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
                                  "visual_sweep_world_depth", "visual_sweep_world_depth_update",
-                                 "showcase_capture"}
+                                 "showcase_capture", "temporal_flow"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -41,7 +41,9 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 # captures need a real window and renderer). display_matrix is deliberately NOT
 # here: it self-skips its pixel work in-engine when headless
 # (display_matrix.gd:44-47) and still emits display_matrix_passed, so it stays
-# runnable under force-headless.
+# runnable under force-headless. temporal_flow is windowed-only: it needs real
+# pixels + frame_presented ordering (same reason as visual_sweep), and under
+# PLAYTEST_FORCE_HEADLESS both transports skip-with-reason (transport honesty).
 WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_camping", "visual_sweep_camping_update",
                            "visual_sweep_storage", "visual_sweep_storage_update",
@@ -49,7 +51,7 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_overworld", "visual_sweep_overworld_update",
                            "visual_sweep_fishing", "visual_sweep_fishing_update",
                            "visual_sweep_world_depth", "visual_sweep_world_depth_update",
-                           "showcase_capture"}
+                           "showcase_capture", "temporal_flow"}
 
 # R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label) runs for the
@@ -419,6 +421,15 @@ SCENARIO_REQUIREMENTS = {
     },
     "visual_sweep_fishing_update": {
         "all": ["visual_sweep_fishing_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Bounded temporal capture (battle/seam adapters) — windowed-only: needs real
+    # pixels + frame_presented ordering, same as visual_sweep. Symmetric
+    # temporal_flow_passed / temporal_flow_failed pair: the _passed marker is the
+    # required trace (all), the _failed marker rides failed_event_entry (miss-002
+    # loudness) so a red always carries its reasons.
+    "temporal_flow": {
+        "all": ["temporal_flow_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

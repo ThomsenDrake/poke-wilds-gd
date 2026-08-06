@@ -399,9 +399,226 @@ def _question_lines(questions: list[dict]) -> str:
     return "\n".join(f"- {q['id']}: {q['text']}" for q in questions) or "(no rubric questions parsed)"
 
 
-def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict]) -> str:
+def _bundle_prior_findings(public_ctx: dict, cfg=None) -> list[dict]:
+    """Prior vision-review.json findings for this shot, filtered by stem.
+
+    Prefers the bundle-enriched public_ctx/context.json (vision_review.assemble_bundle);
+    falls back to reading .godot-smoke/vision-review.json directly. Degrades to [] when
+    absent/unreadable — never raises. Keeps deterministic_findings path intact (separate)."""
+    try:
+        if isinstance(public_ctx.get("prior_findings"), list):
+            return [x for x in public_ctx["prior_findings"] if isinstance(x, dict)][:8]
+        # context.json enriched by vision_review.assemble_bundle
+        if cfg is not None:
+            paths = public_ctx.get("paths") or {}
+            ctx_path = paths.get("context")
+            if isinstance(ctx_path, str) and ctx_path:
+                try:
+                    doc = _read_json(_abs(cfg, ctx_path))
+                    if isinstance(doc, dict) and isinstance(doc.get("prior_findings"), list):
+                        return [x for x in doc["prior_findings"] if isinstance(x, dict)][:8]
+                except Exception:
+                    pass
+        # direct fallback: read vision-review.json filtered by shot stem
+        shot = str(public_ctx.get("shot") or "")
+        if not shot:
+            return []
+        stem = Path(shot).stem
+        candidates: list[Path] = []
+        if cfg is not None:
+            try:
+                candidates.append(cfg.base_dir / "vision-review.json")
+            except Exception:
+                pass
+        candidates.append(ROOT / ".godot-smoke" / "vision-review.json")
+        for cand in candidates:
+            try:
+                if cand.is_file():
+                    doc = _read_json(cand)
+                    if not isinstance(doc, dict):
+                        continue
+                    out: list[dict] = []
+                    for entry in doc.get("shots") or []:
+                        if not isinstance(entry, dict):
+                            continue
+                        sname = str(entry.get("shot") or "")
+                        if Path(sname).stem != stem:
+                            continue
+                        for f in entry.get("findings") or []:
+                            if not isinstance(f, dict):
+                                continue
+                            compact: dict = {}
+                            for k in ("finding_id", "class", "region_id", "severity", "confidence", "note"):
+                                v = f.get(k)
+                                if v is not None:
+                                    compact[k] = v
+                            if isinstance(f.get("explanation"), str) and f["explanation"]:
+                                compact["explanation"] = str(f["explanation"])[:160]
+                            out.append(compact)
+                            if len(out) >= 8:
+                                break
+                        if len(out) >= 8:
+                            break
+                    return out
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return []
+
+
+def _bundle_legibility_lines(public_ctx: dict, cfg=None) -> list[str]:
+    """Legibility-report.md CVD/contrast lines for this shot.
+
+    Prefers bundle-enriched public_ctx/context.json; falls back to parsing
+    .godot-smoke/legibility-report.md for canary/label contrast + CVD collapse
+    lines mentioning the shot stem/name. Degrades to [] when absent — never raises."""
+    try:
+        if isinstance(public_ctx.get("legibility_lines"), list):
+            return [str(x) for x in public_ctx["legibility_lines"] if isinstance(x, str)][:8]
+        if cfg is not None:
+            paths = public_ctx.get("paths") or {}
+            ctx_path = paths.get("context")
+            if isinstance(ctx_path, str) and ctx_path:
+                try:
+                    doc = _read_json(_abs(cfg, ctx_path))
+                    if isinstance(doc, dict) and isinstance(doc.get("legibility_lines"), list):
+                        return [str(x) for x in doc["legibility_lines"] if isinstance(x, str)][:8]
+                except Exception:
+                    pass
+        shot = str(public_ctx.get("shot") or "")
+        if not shot:
+            return []
+        stem = Path(shot).stem
+        candidates: list[Path] = []
+        if cfg is not None:
+            try:
+                candidates.append(cfg.base_dir / "legibility-report.md")
+            except Exception:
+                pass
+        candidates.append(ROOT / ".godot-smoke" / "legibility-report.md")
+        text = None
+        for cand in candidates:
+            try:
+                if cand.is_file():
+                    text = cand.read_text(encoding="utf-8")
+                    break
+            except Exception:
+                continue
+        if not text:
+            return []
+        out: list[str] = []
+        for raw in text.splitlines():
+            if stem not in raw and shot not in raw:
+                continue
+            low = raw.lower()
+            is_relevant = any(k in low for k in (
+                "ratio", "contrast", "cvd", "collapse", "deutan", "protan", "tritan",
+                "canary", "deltae", "wcag"))
+            stripped = raw.strip()
+            if stripped.startswith("- "):
+                stripped = stripped[2:]
+            elif stripped.startswith("* "):
+                stripped = stripped[2:]
+            stripped = stripped.strip()
+            if not stripped:
+                continue
+            if len(stripped) > 240:
+                stripped = stripped[:237] + "..."
+            if is_relevant or stem in raw:
+                out.append(stripped)
+            if len(out) >= 8:
+                break
+        return out[:8]
+    except Exception:
+        return []
+
+
+def _format_prior_block(prior: list[dict]) -> str:
+    if not prior:
+        return ""
+    rows: list[str] = []
+    for f in prior[:4]:
+        cls = str(f.get("class") or "?")
+        rid = str(f.get("region_id") or "?")
+        note = str(f.get("note") or "")[:80]
+        sev = str(f.get("severity") or "")
+        fid = str(f.get("finding_id") or "")[:12]
+        rows.append(f"- [{cls}/{sev}] {rid}: {note} (id {fid})")
+    body = "\n".join(rows)[:900]
+    return ("PRIOR FINDINGS FOR THIS SHOT (from .godot-smoke/vision-review.json, filtered by shot stem; "
+            "these are quarantined history — known false positives may be among them; do NOT repeat a prior "
+            "false positive without fresh visual evidence):\n" + body)
+
+
+def _format_legibility_block(lines: list[str]) -> str:
+    if not lines:
+        return ""
+    body = "\n".join(f"- {l}" for l in lines[:6])[:900]
+    return ("LEGIBILITY (from .godot-smoke/legibility-report.md, canary/label contrast + CVD collapse lines "
+            "mentioning this shot; use as accessibility context, not a verdict):\n" + body)
+
+
+# Per-group specialist focus (Track C.1): one cmd invocation still answers the
+# shot's own group questions, but the system prompt scopes judgment to the
+# group's specialty so menu/overworld/battle/temporal reviewers don't dilute.
+SPECIALIST_FOCUS = {
+    "menu": ("SPECIALIST LENS — MENU/TYPOGRAPHY: prioritize layout grid alignment, "
+             "plate margins, clipped/overlapping labels, cursor-to-row centering, "
+             "kerning, and GBC plate readability. Ignore overworld terrain."),
+    "overworld": ("SPECIALIST LENS — OVERWORLD: prioritize terrain/foliage continuity, "
+                  "y-sort of props vs player vs mons, floating sprites, nest ring "
+                  "legibility, and day/night tint honesty. Ignore battle HUD geometry."),
+    "battle": ("SPECIALIST LENS — BATTLE HUD: prioritize HP track seating, name/level "
+               "plate readability, cursor-to-row centering, message-box framing, and "
+               "sprite strip-bleed. Ignore overworld y-sort."),
+    "temporal": ("SPECIALIST LENS — TEMPORAL/MOTION: prioritize single clean frame "
+                 "sequences (no ghosting), phase-order coherence vs the semantic "
+                 "timeline, and animation settle honesty. Ignore static menu grid."),
+    "overworld_mons": ("SPECIALIST LENS — OVERWORLD MONS: prioritize roaming mon y-sort "
+                       "against props/player, nest-ring + egg + Alpha-badge legibility, "
+                       "and species-sprite integrity (no blank tiles)."),
+    "camping": ("SPECIALIST LENS — CAMPING: prioritize campfire/torch glow over night "
+                "tint and craft-menu recipe/ingredient legibility."),
+    "day_night": ("SPECIALIST LENS — DAY/NIGHT: prioritize uniform night tint and "
+                  "readable HUD under dimming."),
+    "display_matrix": ("SPECIALIST LENS — DISPLAY MATRIX: prioritize pixel-crisp text "
+                       "at every window size and centered surface margins."),
+    "satellite": ("SPECIALIST LENS — SATELLITE SWEEP: prioritize focal-content presence, "
+                  "clipping/stretch, and untextured ghost blobs."),
+}
+
+
+def _specialist_block(group: str | None) -> str:
+    focus = SPECIALIST_FOCUS.get(str(group or ""))
+    return focus or ""
+
+
+def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict], cfg=None,
+                        group: str | None = None) -> str:
     shot = public_ctx.get("shot", "?")
     grounding = public_ctx.get("grounding_rules") or {}
+    # Bundle-enriched context: prior findings (false-positive memory) + CVD/contrast legibility.
+    # Guard when files absent (degrade to no block, not crash); deterministic_findings path untouched.
+    prior = _bundle_prior_findings(public_ctx, cfg)
+    leg = _bundle_legibility_lines(public_ctx, cfg)
+    extra_blocks: list[str] = []
+    specialist = _specialist_block(group or public_ctx.get("shot_kind") or public_ctx.get("group"))
+    if not specialist:
+        # fall back via vision_review._shot_group when public_ctx lacks group
+        try:
+            specialist = _specialist_block(_load_vision_review()._shot_group(str(shot)))
+        except Exception:
+            specialist = ""
+    if specialist:
+        extra_blocks.append(specialist)
+    pb = _format_prior_block(prior)
+    if pb:
+        extra_blocks.append(pb)
+    lb = _format_legibility_block(leg)
+    if lb:
+        extra_blocks.append(lb)
+    extra = ("\n\n" + "\n\n".join(extra_blocks)) if extra_blocks else ""
     return (
         "You are a pixel-art visual-fidelity reviewer for a Game Boy Color-style Pokemon "
         "game (160x144 stage, integer-scaled to the capture window). You receive a BASE "
@@ -420,14 +637,14 @@ def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict]) -
         "GROUNDING (mandatory for a 'no'): cite ONLY a region_id from this catalog -- the only "
         "regions that exist for this shot. Numbers drawn on the Set-of-Mark overlays are the "
         "'mark N' labels below; you may cite the region_id or its mark number.\n%s\n\n"
-        "Grounding rules from the pipeline: %s\n\n"
+        "Grounding rules from the pipeline: %s%s\n\n"
         "DISCIPLINE: when unsure, answer 'yes' (findings are quarantine-tier, but false "
         "positives are costly noise). Answer every question exactly once.\n\n"
         "OUTPUT: return ONLY a JSON object matching this schema (no prose, no markdown fences):\n"
         "{\"answers\": [{\"question_id\": <one of the ids above>, \"verdict\": \"yes\"|\"no\", "
         "\"region_id\": <catalog region_id or mark number, only for a 'no'>, "
         "\"note\": <10-word summary>, \"explanation\": <one sentence citing the visible evidence>}]}\n"
-        % (shot, _question_lines(questions), catalog, json.dumps(grounding, sort_keys=True))
+        % (shot, _question_lines(questions), catalog, json.dumps(grounding, sort_keys=True), extra)
     )
 
 
@@ -802,7 +1019,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
         # cannot ground a finding. Proceed -- answers still mark questions covered.
         catalog = catalog or "(no groundable regions; 'no' answers cannot ground a finding)"
 
-    system = build_system_prompt(public_ctx, catalog, questions)
+    system = build_system_prompt(public_ctx, catalog, questions, cfg, group=group)
     temperature = 0.2 if cfg.independent_vote else 0.0
     passes: list[list[dict]] = []
     per_pass: list[dict] = []
@@ -831,6 +1048,15 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
 
     required_passes = 1 if backend == "command_code" else cfg.n
     unanimous, vote = _unanimous(passes, required=required_passes)
+    # Track C.3 — self-critique: a third adversarial pass that tries to REFUTE
+    # each unanimous 'no'. Any successfully refuted finding is demoted (kept in
+    # meta, dropped from emitted answers) so quarantine-forever stays safe.
+    critique_meta: dict = {"ran": False}
+    try:
+        unanimous, critique_meta = _self_critique(
+            public_ctx, cfg, backend, catalog, questions, unanimous, temperature)
+    except Exception as exc:
+        critique_meta = {"ran": False, "reason": f"{type(exc).__name__}: {exc}"}
     model_name = cfg.command_code_model if backend == "command_code" else (cfg.dashscope_model if backend == "dashscope" else cfg.model)
     vote_semantics = ("single bounded image review (Command Code fallback)" if backend == "command_code"
                       else ("independent two-sample vote" if cfg.independent_vote
@@ -838,8 +1064,69 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
     meta = {"ran": True, "backend": backend, "model": model_name, "group": group,
             "temperature": temperature, "configured_n": cfg.n, "n": required_passes,
             "passes_completed": len(passes), "questions_total": len(questions),
-            "per_pass": per_pass, "vote": vote, "vote_semantics": vote_semantics}
+            "per_pass": per_pass, "vote": vote, "vote_semantics": vote_semantics,
+            "specialist": bool(_specialist_block(group)), "self_critique": critique_meta}
     return unanimous, meta
+
+
+def _self_critique(public_ctx: dict, cfg: Config, backend: str, catalog: str,
+                   questions: list[dict], answers: list[dict],
+                   temperature: float) -> tuple[list[dict], dict]:
+    """Third-pass adversarial refute of unanimous 'no' answers (Track C.3).
+
+    Degrades silently when there are no 'no' answers or the model call fails —
+    never raises into the pipeline. Refuted answers are demoted to verdict 'yes'
+    with a critique note so coverage stays counted without emitting the finding.
+    """
+    nos = [a for a in answers if isinstance(a, dict) and a.get("verdict") == "no"]
+    if not nos:
+        return answers, {"ran": False, "reason": "no unanimous 'no' answers to critique"}
+    q_by_id = {q["id"]: q for q in questions if isinstance(q, dict) and q.get("id")}
+    rows = []
+    for a in nos[:6]:
+        qid = str(a.get("question_id", ""))
+        qtext = str((q_by_id.get(qid) or {}).get("text", qid))[:160]
+        rows.append(f"- {qid}: {qtext} | cited {a.get('region_id','?')} | note={str(a.get('note',''))[:80]}")
+    system = (
+        "You are an adversarial visual-fidelity CRITIC for a Game Boy Color Pokemon game. "
+        "A prior reviewer answered 'no' (defect) to the questions below. Your job is to "
+        "REFUTE each 'no' if the raw frames do NOT clearly show the claimed defect. "
+        "When unsure, refute (false positives are costly). Cite only catalog region_ids.\n\n"
+        f"Catalog:\n{catalog}\n\n"
+        "OUTPUT ONLY JSON: {\"refutations\": [{\"question_id\": <id>, \"refuted\": true|false, "
+        "\"note\": <10-word reason>}]}"
+    )
+    user_text = (
+        f"Shot {public_ctx.get('shot','?')}. Attempt to refute these unanimous 'no' answers "
+        f"by looking at the BASE/FRESH frames:\n" + "\n".join(rows)
+    )
+    order = ["before", "after"]
+    _ut, images, _labels = build_user_content(cfg, public_ctx, order)
+    content = _call_model(cfg, backend, system, user_text + "\n\n" + _ut, images,
+                          temperature, cfg.seed + 99, public_ctx)
+    doc, parse_note = _parse_with_repair(cfg, backend, system, user_text, images,
+                                         temperature, cfg.seed + 99, public_ctx, content)
+    if not isinstance(doc, dict):
+        return answers, {"ran": False, "reason": f"critique unparseable: {parse_note}"}
+    refuted_ids: set[str] = set()
+    for entry in doc.get("refutations") or []:
+        if isinstance(entry, dict) and entry.get("refuted") is True and entry.get("question_id"):
+            refuted_ids.add(str(entry["question_id"]))
+    if not refuted_ids:
+        return answers, {"ran": True, "refuted": 0, "parse": parse_note}
+    out: list[dict] = []
+    demoted: list[str] = []
+    for a in answers:
+        if isinstance(a, dict) and a.get("verdict") == "no" and str(a.get("question_id")) in refuted_ids:
+            demoted.append(str(a.get("question_id")))
+            fixed = dict(a)
+            fixed["verdict"] = "yes"
+            fixed["note"] = f"self-critique refuted: {a.get('note', '')}".strip()[:120]
+            fixed.pop("region_id", None)
+            out.append(fixed)
+        else:
+            out.append(a)
+    return out, {"ran": True, "refuted": len(demoted), "demoted_ids": demoted, "parse": parse_note}
 
 
 # --------------------------------------------------------------------------
