@@ -21,7 +21,7 @@ Every check class is classified by what its truth is ANCHORED to. A postmortem n
 | `HM` | hand-model-anchored | rects a human measured and transcribed | `ui_render_model`/`ui_render_art` geometry, visual_lint regions |
 | `SA` | source-art-anchored | derived from `res://pokewilds/**` bytes at check time | world tiles (Lane 1); **the art-anchor registry (this slice)** |
 | `XS` | external-standard-anchored | an independent published spec | WCAG contrast, Machado-2009 CVD |
-| `EA` | external-agent-anchored | a reviewer answering rubric questions | the Lane-4 `--reviewer-cmd` socket (populated this slice by Qwen3-VL) |
+| `EA` | external-agent-anchored | a reviewer answering rubric questions | the Lane-4 `--reviewer-cmd` socket (populated this slice by a vision-capable model) |
 
 An escaped defect means the class that COULD have seen it was either absent or anchored to the wrong thing. The 11px HP-bar miss was an `SA` gap: programmatic-on-baked elements had no source-art anchor (`G1`), and the rubric question that would have caught it had no answering agent (`G2`, an `EA` gap).
 

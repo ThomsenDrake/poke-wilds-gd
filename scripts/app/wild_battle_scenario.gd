@@ -65,6 +65,7 @@ func _run_smoke_battle(ctx: Dictionary, set_battle: Callable, wild_mon: Dictiona
 
 func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) -> String:
 	var session = runtime.session
+	session.campsite_pokemon.clear() # test-fixture reset: assert THIS capture lands in an EMPTY hold
 	runtime.start_wild_battle(target)
 	var caught: Dictionary = runtime.use_pokeball()
 	var target_id := str(target.get("species_id", ""))

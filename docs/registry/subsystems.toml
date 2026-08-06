@@ -78,6 +78,21 @@ quality_bucket = "bootstrap"
 # satellite family was rejected — it would have needed its own crafted seed +
 # SATELLITE_SWEEP_SCENARIOS/WINDOWED/SCENARIO_REQUIREMENTS registrations for zero
 # gate benefit).
+# GBC RESTYLE SLICE wave 2 co-modification (the pause/menu screens rebuilt on the
+# stage idiom; the menu_ui/crafting/storage/landmarks entries own the screens +
+# the per-screen extractions): the app-side surface is the app READERS RETARGETED
+# off the retired ItemList/Panel node reads to the restyle seams — input_gate_
+# scenario.gd reads camp_menu.selected_row_text(); input_gate_menu_checks.gd reads
+# start_menu.selected_row_text() + party_screen.action_row_text(i); layout_audit.gd
+# + ui_render_audit.gd take the menu/party/bag(/storage) bounds off stage_root()
+# and measure TEXT EXTENTS (the font's get_string_size / UiRenderModel.ink_rect —
+# the restyled stage labels carry oversized bounding rects under theme font
+# overrides while their ink fits), skipping the deliberate clip_text row labels
+# (a one-line GBC row clips at the plate interior by design; the .text contract
+# survives intact); storage_release_mouse_check.gd's retarget rides the storage
+# entry's note (stage-local row_rect through the ScreenDisplay integer scale).
+# Every injection witness, tap shape, and assertion is unchanged; the committed
+# menu baseline re-pins are PENDING (visual_sweep_update).
 # PRE-PHASE-7 SUITE EXPANSION (user-approved full deep-dive expansion; the four new
 # scenarios are miss-002-compliant: symmetric <name>_passed / <name>_failed{reasons}
 # markers). rng_joint_pin + save_stability live HERE (the SmokeScenarios home; the
@@ -346,6 +361,17 @@ code_paths = [
   "scripts/ui/menu_context.gd",
   "scripts/ui/options_screen.gd",
   "scripts/ui/seed_prompt.gd",
+  # GBC RESTYLE wave 2: the per-screen 220-wall extractions (the title_flow
+  # wave-0 stage precedent). menu_list_stage.gd is the SHARED single-list
+  # composition — the camp menu (crafting), the way-stone selector (landmarks)
+  # and the storage action plate consume it; it is owned HERE with its home
+  # screens (one owner per file, never double-listed).
+  "scripts/ui/start_menu_stage.gd",
+  "scripts/ui/menu_list_stage.gd",
+  "scripts/ui/party_screen_stage.gd",
+  "scripts/ui/party_action_dispatch.gd",
+  "scripts/ui/bag_screen_stage.gd",
+  "scripts/ui/bag_item_use.gd",
 ]
 scene_paths = [
   "scenes/ui/StartMenu.tscn",
@@ -361,6 +387,27 @@ validation_commands = [
 ]
 required_trace_events = ["menu_opened", "menu_closed", "save_written", "mon_retrieved"]
 quality_bucket = "ui"
+# GBC RESTYLE SLICE wave 2 (the menu screens rebuilt on the wave-0 battle
+# 160x144 stage idiom; the title_flow entry owns the shared gbc_stage/gbc_widgets
+# library): StartMenu, PartyScreen, BagScreen, OptionsScreen + the pause-menu
+# SeedPrompt render in native 160x144 stages — integer-scaled NEAREST display,
+# fonts.ttf@7 black ink on white plates, explicit integer offsets only (NEVER
+# set_anchors_preset on a parented node — the ce1571b anchor-collapse defect
+# class), every art load guarded (menu1.png / item_menu_gsc1.png / gsc
+# background1.png — plate/black-backing fallback, never a crash). The scenes
+# shrink to root + script (+ timers); the 220 ui wall is paid by the six
+# extractions in code_paths above (menu_list_stage.gd shared with the camp
+# menu / way-stone selector / storage action plate). FROZEN: every public API,
+# trace name/payload, latch signal, input semantic, and i18n string — row label
+# strings are NEVER rewritten (over-long rows clip at the plate interior via
+# clip_text, so the scenario .text contract survives intact). The
+# ItemList.item_clicked click convenience RETARGETS to a root _gui_input + the
+# gbc_stage.stage_point inverse map + row_rect hit tests (the _on_entry_clicked
+# handler name/signature preserved). NEW restyle seams for the app readers (the
+# app_bootstrap entry's note): stage_root() / row_texts() / selected_row_text()
+# / row_rect() on every restyled screen (+ the party screen's action_row_text()).
+# MessageBox rides the wave-1 textbox band (committed 36ffd71). Menu baseline
+# re-pins PENDING (visual_sweep_update).
 
 [[subsystems]]
 name = "title_flow"
@@ -533,7 +580,7 @@ quality_bucket = "building"
 name = "vision_fidelity"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/render_palette.gd", "scripts/app/text_oracle.gd", "tools/vision_metrics.py", "tools/vision_review.py", "tools/art_geometry.py", "tools/check_art_anchors.py", "tools/vlm_reviewer.py"]
+code_paths = ["scripts/app/snapshot_capture.gd", "scripts/app/render_introspection.gd", "scripts/app/render_palette.gd", "scripts/app/text_oracle.gd", "scripts/app/temporal_flow_capture.gd", "scripts/app/temporal_flow_checks.gd", "scripts/app/temporal_flow_scenario.gd", "scripts/app/temporal_battle_adapters.gd", "tools/vision_metrics.py", "tools/vision_review.py", "tools/art_geometry.py", "tools/check_art_anchors.py", "tools/vlm_reviewer.py"]
 scene_paths = []
 spec_doc = "docs/product-specs/vision-fidelity.md"
 validation_commands = [
@@ -547,9 +594,9 @@ validation_commands = [
   # the --live mode compares a fresh sidecar's draw_order rects to the docs/registry/art-anchors.toml stage_rects:
   "python3 tools/check_art_anchors.py",
   "python3 tools/check_art_anchors.py --live .godot-smoke/shots/09_battle.png.sidecar.json",
-  # OPTIONAL model-reviewer lane (G2; quarantine-forever; degrades to the deterministic pass when no model is
-  # pulled, exit 0; CI never sets --reviewer-cmd): the populated Qwen3-VL 8b answerer, tools/vlm_reviewer.py:
-  "python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd \"python3 tools/vlm_reviewer.py\"",
+  # REQUIRED model-reviewer lane (G2; Command Code gpt-5.6-luna first, then hosted/local fallbacks;
+  # model findings remain quarantine-forever; windowed acceptance fails closed on no model/coverage):
+  "VLM_RUNTIME=auto VLM_REQUIRED=1 python3 tools/vision_review.py --review-all --required --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd \"python3 tools/vlm_reviewer.py\"",
   # OPTIONAL corroboration step (quarantine-tier, never a gate; needs `uv sync --extra vision`, skips cleanly without it):
   "python3 tools/vision_metrics.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --out .godot-smoke/vision-metrics.json",
   "python3 tools/generate_legibility_report.py --output .godot-smoke/legibility-report.md",
@@ -683,6 +730,9 @@ code_paths = [
   "scripts/domain/material_drops.gd",
   "scripts/runtime/crafting_runtime.gd",
   "scripts/ui/camp_menu.gd",
+  # GBC RESTYLE wave 2: the camp menu's runtime-access block EXTRACTED at the
+  # 220 ui wall (the stage composition rides menu_ui's shared menu_list_stage.gd).
+  "scripts/ui/camp_menu_access.gd",
   "scripts/app/craft_flow_scenario.gd",
 ]
 scene_paths = ["scenes/ui/CampMenu.tscn"]
@@ -694,6 +744,20 @@ validation_commands = [
 ]
 required_trace_events = ["item_crafted", "craft_refused", "material_dropped", "craft_flow_passed"]
 quality_bucket = "crafting"
+# GBC RESTYLE SLICE wave 2 co-modification: the campfire menu rebuilt on the
+# battle 160x144 stage idiom (the title_flow wave-0 precedent) — the stage
+# composition rides the SHARED scripts/ui/menu_list_stage.gd single-list build
+# (menu_ui-owned, one owner per file) + the runtime-access block EXTRACTED to
+# scripts/ui/camp_menu_access.gd at the 220 ui wall (behavior-identical to the
+# pre-extraction private methods: the crafting runtime/session/catalog reads,
+# the REFLECTIVE recipe-ingredient read off the crafting runtime's pinned
+# Recipes domain const (ui may not import domain per check_architecture), the
+# lit placement read, and the MessageBox toast). The scene shrinks to root +
+# script. FROZEN: the five-recipe listing contract (missing counts greyed, no
+# discovery state), the Craft/Extinguish-or-Light/Demolish routing, every trace,
+# the closed-signal latch, and the click/input semantics (input_gate part B now
+# reads camp_menu.selected_row_text() instead of the retired ItemList node
+# path). The 16_craft_menu baseline re-pin is PENDING (visual_sweep_update).
 
 [[subsystems]]
 name = "storage"
@@ -704,6 +768,9 @@ code_paths = [
   "scripts/runtime/harvest_runtime.gd",
   "scripts/ui/storage_screen.gd",
   "scripts/ui/party_actions.gd",
+  # GBC RESTYLE wave 2: the storage screen's stage composition EXTRACTED at the
+  # 220 ui wall (the actions popup Rows ride menu_ui's shared menu_list_stage.gd).
+  "scripts/ui/storage_screen_stage.gd",
   "scripts/app/storage_flow_scenario.gd",
   "scripts/app/storage_flow_party_checks.gd",
   "scripts/app/storage_release_mouse_check.gd",
@@ -801,6 +868,27 @@ quality_bucket = "storage"
 # and self-wires via the /root/GameRuntime autoload convention; the ui scene
 # references ui only per check_architecture. See
 # docs/product-specs/camping-crafting-survival.md.
+# GBC RESTYLE SLICE wave 2 co-modification: the storage screen rebuilt on the
+# battle 160x144 stage idiom (the title_flow wave-0 precedent) — the stage
+# composition EXTRACTED to scripts/ui/storage_screen_stage.gd at the 220 ui wall
+# (two two-line Columns off the party_rows.gd row formats, title/detail/hint
+# plates, the actions popup plate riding menu_ui's shared menu_list_stage.gd
+# Rows — one owner per file — and the summary overlay); restyle seams
+# stage_root()/row_texts()/selected_row_text()/row_rect(). The release-confirm
+# MOUSE-bypass check RETARGETS: the synthesized click point derives from the
+# stage-local row_rect(row) mapped through the screen's ScreenDisplay integer
+# scale (item_clicked is gone with the restyle), and the direct
+# _on_entry_clicked call now rides ALONGSIDE the synthesized GUI event as the
+# guaranteed witness (the storage_mouse_fallback trace reason updated) — the
+# mid-confirm gate stays the assertion target, so release_mouse_ok proves the
+# same contract. ui_render_audit's storage state measures off stage_root()
+# (ink-rect text extents, deliberate clip_text rows skipped — the app_bootstrap
+# entry's note). FROZEN: the box loop, the confirm-gated RELEASE, every
+# storage_refused reason, the closed-signal latch + Z-route, and every trace.
+# The scene's full-rect Dim RETIRES with the rebuild — the wave-1 MessageBox
+# textbox band carries z_index over later $UI siblings, so the release confirm
+# draws at full contrast (the dimmed-confirm readability deviation RESOLVED).
+# Baselines 18/19 re-pins PENDING (visual_sweep_update).
 
 [[subsystems]]
 name = "field_moves"
@@ -1500,6 +1588,20 @@ quality_bucket = "landmarks"
 # a documented reach into the scene's _input_router — main.gd's bind array is frozen at its
 # 220 budget; the field_action_router._toggle_campfire reach precedent). ui-layer rules hold:
 # no domain/runtime-script imports (check_architecture), rows are plain label+tile dicts.
+# GBC RESTYLE SLICE wave 2 co-modification: the WayStoneSelector + the Options
+# submenu (both carried on THIS entry's code_paths) rebuilt on the battle
+# 160x144 stage idiom via the SHARED scripts/ui/menu_list_stage.gd single-list
+# composition (menu_ui-owned — one owner per file, never double-listed): opaque
+# black backing + 160x144 stage + integer-scaled NEAREST display, fonts.ttf@7
+# black ink on white plates (the gsc background load-guarded), explicit integer
+# offsets only. The scenes shrink to root + script; restyle seams
+# stage_root()/row_texts()/selected_row_text()/row_rect(). FROZEN: the
+# multi-stone listing (field_move_runtime.way_stone_tiles() registration order),
+# the opener-supplied rows + resolve Callable (the ui-may-not-import-domain
+# layer contract), the self-wired input latch, and every trace — the
+# waystone_selector scenario (the multi-stone choice + the avatar-input
+# ownership pin) drives the rebuild unchanged. Presentation-only: no
+# landmark/legendary/warp/save surface is touched.
 
 [[subsystems]]
 name = "world_gen_audit"

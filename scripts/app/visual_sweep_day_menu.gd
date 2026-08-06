@@ -150,8 +150,7 @@ func _select_bag_item(bag_screen: Node, item_id: String) -> bool:
 	var entries: Array = bag_screen._entries
 	for i in range(entries.size()):
 		if str((entries[i] as Dictionary).get("item_id", "")) == item_id:
-			bag_screen._selected = i
-			bag_screen._items.select(i)
+			bag_screen.select_item(i) # restyle seam: absolute-index selection scrolls the visible window
 			return true
 	return false
 

@@ -67,18 +67,21 @@ func run(ctx: Dictionary, runner, failures: Array, tile_c: Vector2i) -> void:
 	_ensure(not _screen().visible and _player().input_enabled, "mouse: X did not close the screen and re-enable the avatar")
 
 
-# Synthesizes a left-button press+release on the action list's `row`; witnesses
-# delivery through item_clicked and falls back to the direct handler call when
-# headless GUI hit-testing will not land (the degrade is traced, never silent).
+# Synthesizes a left-button press+release on the action list's `row` MID-CONFIRM
+# (the assertion target is the _on_entry_clicked mid-confirm gate, which must
+# block it). Delivers through the stage-mapped GUI event AND the direct handler
+# (the guaranteed witness when GUI hit-testing will not land; never silent).
 func _click_action_row(row: int) -> void:
-	var list: ItemList = _screen().get_node("Panel/Margin/HBox/SideColumn/ActionPanel/Margin/ActionList")
-	var rect: Rect2 = list.get_item_rect(row) # Godot 4 name (Godot 3's get_item_area_rect)
-	if rect.size == Vector2.ZERO:
+	var screen := _screen()
+	var stage_rect: Rect2 = screen.row_rect(row)
+	if stage_rect.size == Vector2.ZERO:
 		_failures.append("mouse: precondition: row %d has no rect (the action panel is not visible)" % row); return
-	var at: Vector2 = list.get_global_rect().position + rect.position + rect.size / 2.0
-	var landed := {"hit": false}
-	var witness := func(_index: int, _at: Vector2, _button: int) -> void: landed["hit"] = true
-	list.item_clicked.connect(witness)
+	# Map the stage-local row to a window point through the screen's GbcStage
+	# display (the 160x144 SubViewport texture drawn integer-scaled at an offset).
+	var display: TextureRect = screen.get_node("ScreenDisplay")
+	var dr := display.get_global_rect()
+	var factor := dr.size.x / 160.0
+	var at: Vector2 = dr.position + (stage_rect.position + stage_rect.size / 2.0) * factor
 	for pressed in [true, false]:
 		var event := InputEventMouseButton.new()
 		event.button_index = MOUSE_BUTTON_LEFT
@@ -87,10 +90,8 @@ func _click_action_row(row: int) -> void:
 		event.global_position = at
 		Input.parse_input_event(event)
 		await get_tree().process_frame
-	list.item_clicked.disconnect(witness)
-	if not bool(landed["hit"]):
-		_runtime().emit_trace("storage_mouse_fallback", "SmokeScenarios", {"reason": "item_clicked did not fire under this transport; direct handler call instead"})
-		_screen()._on_entry_clicked(row, Vector2.ZERO, 1)
+	_runtime().emit_trace("storage_mouse_fallback", "SmokeScenarios", {"reason": "direct _on_entry_clicked call alongside the synthesized GUI event; the mid-confirm gate is the assertion target (item_clicked is gone with the restyle)"})
+	_screen()._on_entry_clicked(row, Vector2.ZERO, 1)
 
 
 # One-frame press+release: drives _unhandled_input; can never fire a Main poll

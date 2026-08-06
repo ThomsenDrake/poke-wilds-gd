@@ -132,9 +132,7 @@ func _part_b_demolish_does_not_refire(fire_tile: Vector2i) -> void:
 		_inject_press("move_down")
 	_inject_release("move_down")
 	await get_tree().process_frame
-	var entries: ItemList = _camp_menu().get_node("MenuPanel/Margin/VBox/Entries")
-	var selected: PackedInt32Array = entries.get_selected_items()
-	var row_text := entries.get_item_text(int(selected[0])) if selected.size() > 0 else ""
+	var row_text: String = _camp_menu().selected_row_text()
 	if not _expect(row_text.contains("Demolish"), "B: precondition witness: selected row '%s' is not Demolish" % row_text):
 		return
 	var tile_before: Vector2i = player.tile_position

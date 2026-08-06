@@ -1,41 +1,61 @@
 extends Control
 
 # Options screen (title-screen submenu; spec: docs/product-specs/menu-and-save.md +
-# overworld-pokemon.md). Configures the random-encounter OPT-IN. The session is the single
-# source (get/set_encounter_settings); every change persists at once via save_game. Three
-# rows: WILD ENCOUNTERS (Z / ←/→ cycles OFF -> CLASSIC -> ANYWHERE), ENCOUNTER RATE (←/→
-# nudges the per-step chance along the pinned 0.02 ladder, greyed while encounters are OFF),
-# and BACK. The default OFF means wild battles come ONLY from a shared-tile sprite collision
-# (overworld-pokemon.md); the session stores OFF as {} so a never-touched save keeps its exact
-# byte shape. Self-wires through the /root/GameRuntime autoload (the camp_menu convention);
-# the mode/rate constants ride SessionState (ui -> runtime is layer-legal), single-sourced.
+# overworld-pokemon.md), restyled onto the GBC stage idiom (restyle slice wave 2):
+# an opaque 160x144 stage (gbc_stage.gd) with the gsc background art, a white
+# title plate, a three-row white plate (black ink; the greyed row is DIM ink),
+# and autowrap detail/hint plates (menu_list_stage.gd composition). Behavior is
+# unchanged: configures the random-encounter OPT-IN; the session is the single
+# source (get/set_encounter_settings); every change persists at once via
+# save_game. Three rows: WILD ENCOUNTERS (Z / ←/→ cycles OFF -> CLASSIC ->
+# ANYWHERE), ENCOUNTER RATE (←/→ nudges the per-step chance along the pinned
+# 0.02 ladder, greyed while encounters are OFF), and BACK. The default OFF means
+# wild battles come ONLY from a shared-tile sprite collision (overworld-pokemon.md);
+# the session stores OFF as {} so a never-touched save keeps its exact byte shape.
+# Self-wires through the /root/GameRuntime autoload (the camp_menu convention);
+# the mode/rate constants ride SessionState (ui -> runtime is layer-legal).
 
 const SessionState := preload("res://scripts/runtime/session_state.gd")
+const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
+const MenuList := preload("res://scripts/ui/menu_list_stage.gd")
 
 signal closed
 
 const ENTRY_MODE := "mode"
 const ENTRY_RATE := "rate"
 const ENTRY_BACK := "back"
-const COLOR_OK := Color(0.9, 0.92, 0.96, 1.0)
-const COLOR_DIM := Color(0.58, 0.58, 0.64, 1.0)
+const COLOR_OK := Color(0.9, 0.92, 0.96, 1.0) # legacy dark-theme fg, kept for API stability; enabled rows now use black ink
+const COLOR_DIM := Color(0.58, 0.58, 0.64, 1.0) # the greyed-row dim ink
 const MODE_LABELS := {"off": "OFF (contact only)", "classic": "CLASSIC (encounter tiles)", "anywhere": "ANYWHERE (any tile)"}
 const MODE_DETAIL := "OFF: battles only when you bump a wild Pokémon. CLASSIC: a per-step roll on tall-grass / encounter tiles. ANYWHERE: that roll on any tile you can stand on."
 const RATE_DETAIL := "The chance per step that a random wild battle starts (only while encounters are on)."
-
-@onready var _title: Label = $MenuPanel/Margin/VBox/Title
-@onready var _entries: ItemList = $MenuPanel/Margin/VBox/Entries
-@onready var _detail: Label = $MenuPanel/Margin/VBox/Detail
-@onready var _hint: Label = $MenuPanel/Margin/VBox/Hint
 
 var _runtime: Node = null
 var _rows: Array = []
 var _mode_index := 0 # index into SessionState.ENCOUNTER_MODES
 var _rate_index := 0 # index along the MIN..MAX ladder (STEP apart)
+var _stage: Control
+var _display: TextureRect
+var _list: MenuList.Rows
+var _title: Label
+var _detail: Label
+var _hint: Label
 
 func _ready() -> void:
 	visible = false
-	_entries.item_clicked.connect(_on_entry_clicked)
+	var parts := GbcStage.build(self) # opaque black backing + 160x144 stage + integer-scaled display
+	_stage = parts.stage
+	_display = parts.display
+	GbcStage.on_resized(self, _display)
+	var built := MenuList.build(_stage, {
+		"title": "OPTIONS", "title_rect": Rect2(48, 6, 64, 14),
+		"rows_rect": Rect2(8, 24, 144, 34),
+		"detail_rect": Rect2(8, 62, 144, 52),
+		"hint_rect": Rect2(8, 118, 144, 22), "hint": "Z: Change   Left/Right: Adjust   X: Back"})
+	_list = built.rows
+	_title = built.title_label
+	_detail = built.detail_label
+	_hint = built.hint_label
 	_wire_input_latch() # an Enter/X close must set the same-frame latch, or poll_menu_toggle re-fires and shuts the whole StartMenu
 
 # The same-frame latch reach (the WayStoneSelector precedent): this screen is a StartMenu child,
@@ -63,6 +83,14 @@ func close_screen() -> void:
 	visible = false
 	closed.emit()
 
+# --- Scenario/lead seams (the old ItemList reads): stage + row access ---
+func stage_root() -> Control: return _stage
+func row_texts() -> Array: return _list.row_texts()
+func selected_row_text() -> String: return _list.row_text(_list.selected())
+func select_row(index: int) -> void: _list.select(index)
+func row_count() -> int: return _list.row_count()
+func row_rect(index: int) -> Rect2: return _list.row_rect(index) # stage-local
+
 func _load_settings() -> void:
 	var settings: Dictionary = _session_settings()
 	_mode_index = maxi(0, SessionState.ENCOUNTER_MODES.find(str(settings.get("mode", "off"))))
@@ -87,22 +115,35 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 
+# Click convenience (the old item_clicked route) via the stage-inverse hit test.
+func _gui_input(event: InputEvent) -> void:
+	if not visible or not (event is InputEventMouseButton):
+		return
+	var button := event as InputEventMouseButton
+	if button.pressed and button.button_index == MOUSE_BUTTON_LEFT:
+		var hit := MenuList.hit_row(_display, button.position, _list)
+		if hit >= 0:
+			_on_entry_clicked(hit, button.position, MOUSE_BUTTON_LEFT)
+			accept_event()
+
 func _refresh() -> void:
-	var sel := _selected_index() # capture BEFORE clear(): ItemList.clear() drops the selection, and rebuilding would snap the cursor to row 0 (breaking repeated rate nudges)
+	var sel := _list.selected() if _list.row_count() > 0 else 0 # capture BEFORE set_rows(): the rebuild resets the cursor to row 0 (breaking repeated rate nudges)
 	_rows.clear()
-	_entries.clear()
+	var texts: Array = []
+	var inks: Array = []
 	var mode := _mode_str()
-	_add_row(ENTRY_MODE, "WILD ENCOUNTERS — %s" % str(MODE_LABELS.get(mode, mode)), true)
-	_add_row(ENTRY_RATE, "ENCOUNTER RATE — %d%%" % _rate_pct(), mode != "off")
-	_add_row(ENTRY_BACK, "BACK", true)
+	_add_row(texts, inks, ENTRY_MODE, "WILD ENCOUNTERS — %s" % str(MODE_LABELS.get(mode, mode)), true)
+	_add_row(texts, inks, ENTRY_RATE, "ENCOUNTER RATE — %d%%" % _rate_pct(), mode != "off")
+	_add_row(texts, inks, ENTRY_BACK, "BACK", true)
 	_hint.text = "Z: Change   Left/Right: Adjust   X: Back"
-	_entries.select(clampi(sel, 0, _entries.item_count - 1))
+	_list.set_rows(texts, inks)
+	_list.select(clampi(sel, 0, _list.row_count() - 1))
 	_update_detail()
 
-func _add_row(kind: String, label: String, enabled: bool) -> void:
+func _add_row(texts: Array, inks: Array, kind: String, label: String, enabled: bool) -> void:
 	_rows.append({"kind": kind})
-	_entries.add_item(label)
-	_entries.set_item_custom_fg_color(_entries.item_count - 1, COLOR_OK if enabled else COLOR_DIM)
+	texts.append(label)
+	inks.append(Color.BLACK if enabled else COLOR_DIM) # greyed row = dim ink (white-plate ink rule)
 
 func _nudge(direction: int) -> void:
 	var kind := _selected_kind()
@@ -134,10 +175,9 @@ func _apply() -> void:
 	_refresh()
 
 func _move_selection(direction: int) -> void:
-	if _entries.item_count == 0:
+	if _list.row_count() == 0:
 		return
-	_entries.select(wrapi(_selected_index() + direction, 0, _entries.item_count))
-	_entries.ensure_current_is_visible()
+	_list.move(direction)
 	_update_detail()
 
 func _update_detail() -> void:
@@ -147,7 +187,7 @@ func _update_detail() -> void:
 		_: _detail.text = "Return to the menu."
 
 func _on_entry_clicked(index: int, _at_position: Vector2, _mouse_button_index: int) -> void:
-	_entries.select(index)
+	_list.select(index)
 	_activate_selected()
 
 func _session_settings() -> Dictionary:
@@ -160,8 +200,7 @@ func _rate_pct() -> int: return int(round(_rate_value() * 100.0))
 func _rate_steps() -> int: return int(round((SessionState.ENCOUNTER_RATE_MAX - SessionState.ENCOUNTER_RATE_MIN) / SessionState.ENCOUNTER_RATE_STEP)) + 1
 
 func _selected_index() -> int:
-	var selected := _entries.get_selected_items()
-	return int(selected[0]) if not selected.is_empty() else 0
+	return _list.selected() if _list.row_count() > 0 else 0
 
 func _selected_kind() -> String:
 	var index := _selected_index()

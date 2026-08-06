@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lane-4 VLM reviewer plugin: Qwen3-VL behind the existing --reviewer-cmd socket.
+"""Lane-4 vision reviewer plugin: Command Code first, then hosted/local VLM fallbacks.
 
 This is the MODEL-REVIEWER LANE (the G2 answerer). It implements the
 `tools/vision_review.py --reviewer-cmd` contract EXACTLY: it reads the bundle the
@@ -15,7 +15,7 @@ and the witness is never the geometric oracle.
 TWO OUTPUT CHANNELS (matching the extended lane):
   * answers[] -- the model ANSWERS the shot-group's rubric questions (the G2
     seam). Each answer is {question_id, verdict: yes|no, region_id?, bbox?, note,
-    reviewer_kind: "model-qwen3-vl"}; question_id is the SAME stable `q1-` id the
+    reviewer_kind: "model-vision-llm"}; question_id is the SAME stable `q1-` id the
     pipeline computes (reused from vision_review.parse_rubric_questions, never
     re-implemented, so the ids join exactly). A verdict-"no" answer that cites a
     resolvable region + bbox is turned by the pipeline into a grounded
@@ -29,7 +29,7 @@ TWO OUTPUT CHANNELS (matching the extended lane):
 WITNESS vs ORACLE (the named terminal-hazard guardrail): the VLM answers the
 rubric JUDGMENT questions ("sprite a single clean frame?", "anything an
 untextured blob?", "world uniformly dimmed?", "text clipped?") that no coded
-class can express -- the 13/19 an art anchor is structurally blind to. It is NOT
+class can express -- the model-only questions an art anchor is structurally blind to. It is NOT
 asked to measure sub-pixel offsets: an 11px misalignment is the art-anchor
 layer's job (G1), because a VLM downscales to a pixel budget and may not resolve
 it. Model output is quarantine-FOREVER and must never be promoted to red/blocking;
@@ -65,12 +65,13 @@ independent vote -- reviewer_meta says exactly that; set VLM_INDEPENDENT_VOTE=1
 for temperature 0.2 + two distinct seeds (a real two-sample vote), off by
 default.
 
-RUNTIME (default `auto`): "Qwen 3.8" is served by the user's token plan as
-`qwen3.8-max-preview` (a REASONING model) via the OpenAI-compatible token-plan
-MaaS endpoint (DEFAULT_DASHSCOPE_BASE) -- PRIMARY when DASHSCOPE_API_KEY is set
-(env only, NEVER logged); else local qwen3-vl:8b (Instruct) via Ollama's HTTP
-API when pulled (verified on this box: ollama 0.31.2 live on :11434, 24GB);
-else a RECORDED degrade to the deterministic default. The wrapper is PURE
+RUNTIME (default `auto`): Command Code headless `gpt-5.6-luna` is tried
+FIRST for each image via `cmd -p --no-session --permission-mode plan`; it
+reads the local PNG paths from the prompt and returns strict JSON. If that
+CLI/model is unavailable, hosted `qwen3.8-max-preview` via the token-plan
+MaaS endpoint (DEFAULT_DASHSCOPE_BASE) is tried when DASHSCOPE_API_KEY is
+set (env only, NEVER logged); then local qwen3-vl:8b (Instruct) via Ollama's
+HTTP API when pulled; else required review fails closed. The wrapper is PURE
 STDLIB (urllib.request + json + base64; NO SDK, NO venv) and stays a CORE tool:
 OPTIONAL_TOOL_EXEMPTIONS remains pinned to exactly {vision_metrics.py}. An
 explicit model id is pinned, never `latest`. Hosted calls budget max_tokens=
@@ -99,6 +100,8 @@ import json
 import os
 from pathlib import Path
 import random
+import shutil
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -107,8 +110,9 @@ TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 
 SCHEMA = "vision-review/2"
-REVIEWER_KIND = "model-qwen3-vl"        # must equal vision_review.KIND_MODEL so coverage joins
-DEFAULT_MODEL = "qwen3-vl:8b"           # "Qwen 3.8" -> Qwen3-VL 8B Instruct (explicit tag, never latest)
+REVIEWER_KIND = "model-vision-llm"      # must equal vision_review.KIND_MODEL so coverage joins
+DEFAULT_MODEL = "qwen3-vl:8b"           # local fallback model (explicit tag, never latest)
+COMMAND_CODE_MODEL = "gpt-5.6-luna"
 FALLBACK_MODEL = "qwen3-vl:4b"          # faster / lower-fidelity lane or memory contention
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
@@ -161,6 +165,7 @@ class Config:
 
         self.runtime = str(pick("runtime", "VLM_RUNTIME", "auto")).lower()
         self.model = str(pick("model", "VLM_MODEL", DEFAULT_MODEL))
+        self.command_code_model = str(pick("command_code_model", "COMMAND_CODE_MODEL", COMMAND_CODE_MODEL))
         self.ollama_host = str(pick("ollama_host", "OLLAMA_HOST", DEFAULT_OLLAMA_HOST)).rstrip("/")
         self.dashscope_base = str(pick("dashscope_base", "DASHSCOPE_BASE_URL", DEFAULT_DASHSCOPE_BASE)).rstrip("/")
         self.dashscope_model = str(pick("dashscope_model", "DASHSCOPE_MODEL", DEFAULT_DASHSCOPE_MODEL))
@@ -173,6 +178,8 @@ class Config:
         self.shots_dir = Path(pick("shots_dir", "VLM_SHOTS_DIR", str(ROOT / ".godot-smoke" / "shots")))
         self.seed = int(pick("seed", "VLM_SEED", 1234))
         self.no_model = bool(getattr(args, "no_model", False)) or os.environ.get("VLM_NO_MODEL") == "1"
+        self.required = (bool(getattr(args, "required", False))
+                         or os.environ.get("VLM_REQUIRED") == "1")
         self.independent_vote = (bool(getattr(args, "independent_vote", False))
                                  or os.environ.get("VLM_INDEPENDENT_VOTE") == "1")
         self.send_raw_frames = os.environ.get("VLM_SEND_RAW_FRAMES") == "1"
@@ -181,7 +188,8 @@ class Config:
     def describe(self) -> dict:
         """reviewer_meta config block. NEVER includes secret values."""
         return {
-            "runtime": self.runtime, "model": self.model, "ollama_host": self.ollama_host,
+            "runtime": self.runtime, "model": self.model, "command_code_model": self.command_code_model,
+            "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
             "temperature": 0.2 if self.independent_vote else 0,
@@ -195,6 +203,7 @@ class Config:
                                  "option; native-res crops carry the small-diff signal; crops with a "
                                  "side < 11px are dropped (the hosted endpoint rejects <=10px images)",
             "reviewer_kind": REVIEWER_KIND,
+            "required": self.required,
         }
 
 
@@ -312,8 +321,22 @@ def _model_in_tags(host: str, model: str) -> tuple[bool, str]:
 
 
 def probe_availability(cfg: Config) -> tuple[str | None, str]:
-    """Resolve the active backend. Returns (backend, reason); backend is None
-    when no model is positively available (-> deterministic-only degrade)."""
+    """Resolve the active backend in priority order: Command Code, DashScope, Ollama."""
+    command_reason = "command code not probed"
+    if cfg.runtime in ("command_code", "auto"):
+        ok, reason = _command_code_available()
+        if ok:
+            return "command_code", reason
+        command_reason = reason
+        if cfg.runtime == "command_code":
+            return None, command_reason
+    dash_reason = "dashscope not probed"
+    if cfg.runtime in ("dashscope", "auto"):
+        if cfg.dashscope_key:
+            return "dashscope", "dashscope key present"
+        dash_reason = "no DASHSCOPE_API_KEY"
+        if cfg.runtime == "dashscope":
+            return None, dash_reason
     ollama_reason = "ollama not probed"
     if cfg.runtime in ("ollama", "auto"):
         ok, reason = _model_in_tags(cfg.ollama_host, cfg.model)
@@ -322,14 +345,7 @@ def probe_availability(cfg: Config) -> tuple[str | None, str]:
         ollama_reason = reason
         if cfg.runtime == "ollama":
             return None, ollama_reason
-    if cfg.runtime in ("dashscope", "auto"):
-        if cfg.dashscope_key:
-            return "dashscope", "dashscope key present"
-        dash_reason = "no DASHSCOPE_API_KEY (degrade-only)"
-        if cfg.runtime == "dashscope":
-            return None, dash_reason
-        return None, f"{ollama_reason}; {dash_reason}"
-    return None, f"unknown runtime {cfg.runtime!r}"
+    return None, f"{command_reason}; {dash_reason}; {ollama_reason}"
 
 
 # --------------------------------------------------------------------------
@@ -392,8 +408,9 @@ def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict]) -
         "(baseline/before) and a FRESH (current/after) capture of shot '%s' as numbered "
         "Set-of-Mark overlays plus native-resolution base|fresh crops of every changed region.\n\n"
         "WITNESS, NOT ORACLE: you answer JUDGMENT questions only -- is anything an untextured "
-        "blob, a garbled glyph, a sprite strip-bleed, an uneven dim, clipped text, a prop "
-        "floating off its tile? Do NOT try to measure pixel offsets or exact alignment; a "
+        "blob, a garbled glyph, a sprite strip-bleed, uneven kerning, clipped text, bad "
+        "spacing, misaligned rows, or a prop floating off its tile? Do NOT try to measure "
+        "pixel offsets or exact alignment; a "
         "deterministic art-anchor layer owns sub-pixel geometry and a vision model downscales "
         "to a pixel budget, so an N-px offset is not yours to call. Report only what you can "
         "actually SEE in the frames.\n\n"
@@ -480,6 +497,55 @@ def build_user_content(cfg: Config, public_ctx: dict, order: list[str]) -> tuple
 
 
 # --------------------------------------------------------------------------
+# Command Code headless dispatch
+# --------------------------------------------------------------------------
+def _command_code_available() -> tuple[bool, str]:
+    cmd = shutil.which("cmd")
+    if not cmd:
+        return False, "cmd CLI not found"
+    try:
+        proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
+                              timeout=PROBE_TIMEOUT, check=False)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"cmd probe failed: {type(exc).__name__}"
+    if proc.returncode != 0:
+        return False, f"cmd probe exit {proc.returncode}"
+    return True, "cmd CLI available"
+
+
+def _command_code_prompt(cfg: Config, public_ctx: dict, system: str, user_text: str) -> str:
+    paths = public_ctx.get("paths") or {}
+    images = [paths.get("before"), paths.get("after"), paths.get("som_before"), paths.get("som_after")]
+    image_paths = [str((cfg.base_dir / p).resolve()) for p in images if p]
+    return (
+        f"{system}\n\n{user_text}\n\n"
+        "Use the file/image tools to inspect these local PNGs directly:\n" +
+        "\n".join(f"- {p}" for p in image_paths) +
+        "\n\nReturn ONLY valid JSON in exactly this shape: {\"answers\":[{\"question_id\":\"...\",\"verdict\":\"yes\"|\"no\",\"note\":\"...\",\"explanation\":\"...\"}]}.\n"
+        "Answer every listed rubric question exactly once. Inspect the listed PNGs directly and keep reasoning concise. Do not edit files. Do not return markdown fences or prose outside the JSON object."
+    )
+
+
+def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dict) -> str:
+    cmd = shutil.which("cmd")
+    if not cmd:
+        raise RuntimeError("cmd CLI not found")
+    prompt = _command_code_prompt(cfg, public_ctx, system, user_text)
+    proc = subprocess.run(
+        [cmd, "-p", prompt, "--model", cfg.command_code_model, "--no-session",
+         "--skip-onboarding", "--auto-accept", "--max-turns", "8",
+         "--effort", "low", "--output-format", "text", "--add-dir", str(ROOT)],
+        capture_output=True, text=True, timeout=cfg.timeout, check=False,
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "no stderr"
+        raise RuntimeError(f"cmd reviewer exit {proc.returncode}: {detail[:240]}")
+    if not proc.stdout.strip():
+        raise RuntimeError("cmd reviewer returned empty output")
+    return proc.stdout.strip()
+
+
+# --------------------------------------------------------------------------
 # HTTP dispatch (stdlib urllib only)
 # --------------------------------------------------------------------------
 def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
@@ -556,7 +622,9 @@ def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,
-                images: list[str], temperature: float, seed: int) -> str:
+                 images: list[str], temperature: float, seed: int, public_ctx: dict) -> str:
+    if backend == "command_code":
+        return _call_command_code(cfg, system, user_text, public_ctx)
     if backend == "ollama":
         return _call_ollama(cfg, system, user_text, images, temperature, seed)
     return _call_dashscope(cfg, system, user_text, images, temperature, seed)
@@ -582,7 +650,7 @@ def _extract_json(text: str):
 
 def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
                        images: list[str], temperature: float, seed: int,
-                       content: str) -> tuple[dict | None, str]:
+                       public_ctx: dict, content: str) -> tuple[dict | None, str]:
     try:
         doc = _extract_json(content)
         if isinstance(doc, dict) and isinstance(doc.get("answers"), list):
@@ -595,7 +663,7 @@ def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
     repair_system = (system + "\n\nYour last reply was not valid JSON matching the schema. "
                      "Return ONLY the JSON object now. Error: %s" % first_err)
     try:
-        content2 = _call_model(cfg, backend, repair_system, user_text, images, temperature, seed + 7919)
+        content2 = _call_model(cfg, backend, repair_system, user_text, images, temperature, seed + 7919, public_ctx)
         doc = _extract_json(content2)
         if isinstance(doc, dict) and isinstance(doc.get("answers"), list):
             return doc, "repaired"
@@ -738,15 +806,16 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
     temperature = 0.2 if cfg.independent_vote else 0.0
     passes: list[list[dict]] = []
     per_pass: list[dict] = []
-    for i in range(cfg.n):
+    required_passes = 1 if backend == "command_code" else cfg.n
+    for i in range(required_passes):
         rng = random.Random(cfg.seed + i)  # per-pass order seed, recorded
         order = ["before", "after"]
         rng.shuffle(order)
         seed = (cfg.seed * 1000 + i * 17) if cfg.independent_vote else cfg.seed
         user_text, images, _labels = build_user_content(cfg, public_ctx, order)
-        content = _call_model(cfg, backend, system, user_text, images, temperature, seed)
+        content = _call_model(cfg, backend, system, user_text, images, temperature, seed, public_ctx)
         doc, parse_note = _parse_with_repair(cfg, backend, system, user_text, images,
-                                             temperature, seed, content)
+                                             temperature, seed, public_ctx, content)
         if doc is None:
             per_pass.append({"pass": i, "order": order, "parse": parse_note, "answers": 0})
             # an unparseable pass votes ABSENT: it is never added to `passes`, and
@@ -760,12 +829,16 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
         per_pass.append({"pass": i, "order": order, "parse": parse_note,
                          "answers": len(answers), **norm})
 
-    unanimous, vote = _unanimous(passes, required=cfg.n)
-    meta = {"ran": True, "backend": backend, "model": cfg.model, "group": group,
-            "temperature": temperature, "n": cfg.n, "passes_completed": len(passes),
-            "questions_total": len(questions), "per_pass": per_pass, "vote": vote,
-            "vote_semantics": ("independent two-sample vote" if cfg.independent_vote
-                               else "determinism/repro guard (identical greedy decodes at temperature 0)")}
+    required_passes = 1 if backend == "command_code" else cfg.n
+    unanimous, vote = _unanimous(passes, required=required_passes)
+    model_name = cfg.command_code_model if backend == "command_code" else (cfg.dashscope_model if backend == "dashscope" else cfg.model)
+    vote_semantics = ("single bounded image review (Command Code fallback)" if backend == "command_code"
+                      else ("independent two-sample vote" if cfg.independent_vote
+                            else "determinism/repro guard (identical greedy decodes at temperature 0)"))
+    meta = {"ran": True, "backend": backend, "model": model_name, "group": group,
+            "temperature": temperature, "configured_n": cfg.n, "n": required_passes,
+            "passes_completed": len(passes), "questions_total": len(questions),
+            "per_pass": per_pass, "vote": vote, "vote_semantics": vote_semantics}
     return unanimous, meta
 
 
@@ -795,18 +868,33 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
         backend, reason = probe_availability(cfg)
         if backend is None:
             meta["model"] = {"ran": False, "reason": reason}
+            if cfg.required:
+                raise RuntimeError(f"required vision model unavailable: {reason}")
             print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
                   file=sys.stderr)
         else:
             try:
                 answers, mmeta = run_model(public_ctx, cfg, backend)
                 meta["model"] = mmeta
-            except Exception as exc:  # the model NEVER takes the pipeline down
+                if cfg.required:
+                    required = int(mmeta.get("questions_total", 0))
+                    completed = int(mmeta.get("passes_completed", 0))
+                    answered = len(answers)
+                    expected_passes = 1 if mmeta.get("backend") == "command_code" else cfg.n
+                    if completed != expected_passes or answered != required:
+                        raise RuntimeError(
+                            f"required vision review incomplete: passes {completed}/{expected_passes}, "
+                            f"answers {answered}/{required}")
+            except Exception as exc:
                 answers = []
                 meta["model"] = {"ran": False,
                                  "reason": f"model pass error: {type(exc).__name__}: {exc}"}
+                if cfg.required:
+                    raise RuntimeError(f"required vision model failed: {type(exc).__name__}: {str(exc)[:240]}") from exc
                 print(f"vlm_reviewer: model pass error ({exc}); deterministic pass only",
                       file=sys.stderr)
+    if cfg.required and not meta.get("model", {}).get("ran"):
+        raise RuntimeError("required vision model did not run")
 
     meta["totals"] = {"deterministic_findings": len(det_findings),
                       "model_answers": len(answers),
@@ -819,7 +907,7 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     # self-tags a finding; deterministic-art-anchor is declared ONLY when the
     # stage-to-stage anchor comparison actually executed (anchor_kind_ran: the
     # region-table entries carried usable anchor meta — a comparison that never
-    # ran must not credit the ledger); model-qwen3-vl is declared only when it
+    # ran must not credit the ledger); model-vision-llm is declared only when it
     # actually RAN (a positive-unavailable model is NOT a ran kind — the degrade
     # reason stays recorded in meta["model"]). Malformed entries are ignored
     # pipeline-side, so this list is the honest ran/kind join, never faked coverage.
@@ -827,7 +915,7 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     if anchor_kind_ran:
         kinds_ran.append("deterministic-art-anchor")
     if meta.get("model", {}).get("ran"):
-        kinds_ran.append("model-qwen3-vl")
+        kinds_ran.append(REVIEWER_KIND)
     meta["kinds_ran"] = kinds_ran
     meta["deterministic"]["anchor_kind_ran"] = anchor_kind_ran
     return det_findings, answers, meta
@@ -839,8 +927,8 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runtime", choices=["ollama", "dashscope", "auto"], default=None,
-                        help="model backend (default: env VLM_RUNTIME or auto: local Ollama if the model is pulled, else hosted when DASHSCOPE_API_KEY is set)")
+    parser.add_argument("--runtime", choices=["command_code", "ollama", "dashscope", "auto"], default=None,
+                        help="model backend (default: env VLM_RUNTIME or auto: Command Code gpt-5.6-luna, then DashScope, then Ollama)")
     parser.add_argument("--model", default=None,
                         help=f"Ollama model tag, pinned explicit (default: env VLM_MODEL or {DEFAULT_MODEL})")
     parser.add_argument("--ollama-host", dest="ollama_host", default=None,
@@ -860,6 +948,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=None, help="base RNG seed (env VLM_SEED)")
     parser.add_argument("--no-model", dest="no_model", action="store_true",
                         help="force deterministic-only (CI); never touch the model")
+    parser.add_argument("--required", action="store_true",
+                        help="fail unless the vision model runs and answers every rubric question")
     parser.add_argument("--independent-vote", dest="independent_vote", action="store_true",
                         help="temperature 0.2 + two seeds for a real two-sample vote "
                              "(default off: n=2 at temperature 0 is a determinism guard)")

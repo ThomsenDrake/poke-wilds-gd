@@ -1,26 +1,35 @@
 extends Control
 
-# Party screen: d-pad list of party members; confirming opens an action menu (SWAP LEAD /
-# MOVE / SUMMARY / FIELD MOVE / DEPOSIT / RETRIEVE / CANCEL); SUMMARY shows a compact stats
-# panel. FIELD MOVE entries are capability display: only cut/dig/smash (and Build) act. MOVE
-# reorders arbitrarily (up/down live, Z commits, X restores). DEPOSIT moves the selected
-# member into the box beside the player — falling back to a breeding PEN (Phase 5) — offered
-# only while one exists (refusals flash the Hint). RETRIEVE pulls the oldest campsite-held
-# mon. EGGS ride the list with a pre-hatch status (no field moves, no FNT). Data: injected
-# context (see start_menu.gd).
+# Party screen on the GBC stage idiom (restyle slice wave 2): opaque black
+# backing + the native 160x144 SubViewport stage (gbc_stage.gd), integer-scaled
+# NEAREST, gsc/background1.png art under white plates (party_screen_stage.gd).
+# The LIST plate holds ≤6 two-line party rows (party_rows.gd keeps the
+# layout_audit HBoxContainer contract: child0 ">" marker, child1 name Label);
+# confirming pops the GSC-idiom action plate (bottom-anchored, dynamic height —
+# a literal left/right two-plate layout cannot hold fonts.ttf@7's worst rows:
+# name 116px + the 128px "RETRIEVE:" label exceed the 160px stage); SUMMARY is
+# a modal plate. Behavior unchanged: d-pad list; MOVE reorders live (Z commits,
+# X restores); DEPOSIT/RETRIEVE; FIELD MOVE display; eggs pre-hatch status.
+# Action open/dispatch: party_action_dispatch.gd (the 220-wall extraction).
+# Scenario seams: stage_root(), row_texts(), selected_row_text(), select_row(i),
+# row_count(), row_rect(i), action_row_text(i); rows at stage_root()/ListPlate/Rows.
 
 signal closed
 signal field_move_requested(move_id: String)
 
 const PartyRows := preload("res://scripts/ui/party_rows.gd")
 const PartyActions := preload("res://scripts/ui/party_actions.gd")
+const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
+const PartyStage := preload("res://scripts/ui/party_screen_stage.gd")
+const ActionDispatch := preload("res://scripts/ui/party_action_dispatch.gd")
 
-@onready var _rows: VBoxContainer = $Panel/Margin/HBox/ListColumn/Rows
-@onready var _hint: Label = $Panel/Margin/HBox/ListColumn/Hint
-@onready var _action_panel: PanelContainer = $Panel/Margin/HBox/SideColumn/ActionPanel
-@onready var _action_list: ItemList = $Panel/Margin/HBox/SideColumn/ActionPanel/Margin/ActionList
-@onready var _summary_panel: PanelContainer = $Panel/Margin/HBox/SideColumn/SummaryPanel
-@onready var _summary_text: Label = $Panel/Margin/HBox/SideColumn/SummaryPanel/Margin/SummaryText
+var _stage: Control
+var _rows: VBoxContainer
+var _hint: Label
+var _summary_plate: Control
+var _summary_text: Label
+var _action_plate: Control = null
+var _action_rows = null # the GbcWidgets.RowList while the action plate is up
 
 var _context: Dictionary = {}
 var _party: Array = []
@@ -32,6 +41,14 @@ var _move_order: Array = [] # during MOVE: original party index per current slot
 
 func _ready() -> void:
 	visible = false
+	var parts := GbcStage.build(self) # {viewport, stage, display, backing}
+	_stage = parts.stage
+	GbcStage.on_resized(self, parts.display)
+	var built := PartyStage.build(_stage)
+	_rows = built.rows
+	_hint = built.hint
+	_summary_plate = built.summary_plate
+	_summary_text = built.summary_text
 
 func setup(context: Dictionary) -> void:
 	_context = context
@@ -45,6 +62,35 @@ func open_screen() -> void:
 
 func close_screen() -> void:
 	visible = false
+
+# --- Scenario seams (restyle design §2; replaces the old Panel/Rows node reads) ---
+func stage_root() -> Control: return _stage
+func row_count() -> int: return _party.size()
+
+func row_texts() -> Array:
+	var texts: Array = []
+	for row in _rows.get_children():
+		if row is HBoxContainer and row.get_child_count() > 1:
+			texts.append((row.get_child(1) as Label).text)
+	return texts
+
+func selected_row_text() -> String:
+	var texts := row_texts()
+	return str(texts[_selected]) if _selected >= 0 and _selected < texts.size() else ""
+
+func select_row(index: int) -> void:
+	if _party.is_empty():
+		return
+	_selected = wrapi(index, 0, _party.size())
+	PartyRows.refresh_markers(_rows, _selected)
+
+func row_rect(index: int) -> Rect2: # stage-local (SubViewport canvas coords)
+	if index < 0 or index >= _rows.get_child_count():
+		return Rect2()
+	return (_rows.get_child(index) as Control).get_global_rect()
+
+func action_row_text(index: int) -> String:
+	return str((_actions[index] as Dictionary).get("label", "?")) if index >= 0 and index < _actions.size() else ""
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
@@ -65,8 +111,7 @@ func _move(direction: int) -> void:
 	if _state == "action":
 		if not _actions.is_empty():
 			_action_selected = wrapi(_action_selected + direction, 0, _actions.size())
-			_action_list.select(_action_selected)
-			_action_list.ensure_current_is_visible()
+			_action_rows.select(_action_selected)
 	elif _state == "move":
 		var target := PartyActions.move_target_index(_selected, direction, _party.size())
 		if target >= 0 and target != _selected:
@@ -78,10 +123,7 @@ func _move(direction: int) -> void:
 			_rebuild()
 	elif _state == "list" and not _party.is_empty():
 		_selected = wrapi(_selected + direction, 0, _party.size())
-		for i in range(_rows.get_child_count()):
-			var row := _rows.get_child(i) as HBoxContainer
-			if row != null:
-				PartyRows.set_selected(row, i == _selected)
+		PartyRows.refresh_markers(_rows, _selected)
 
 func _confirm() -> void:
 	match _state:
@@ -112,17 +154,37 @@ func _back() -> void:
 
 func _show_panel(mode: String) -> void:
 	_state = mode
-	_action_panel.visible = mode == "action"
-	_summary_panel.visible = mode == "summary"
+	if mode != "action":
+		_free_action_plate()
+	elif _action_plate == null:
+		_build_action_plate()
+	_summary_plate.visible = mode == "summary"
 	match mode:
 		"list":
 			_hint.text = "Z: Actions   X: Back"
 		"action":
 			_hint.text = "Z: Confirm   X: Back"
-		"move":
-			_hint.text = "Up/Down: Move   Z: Confirm   X: Cancel"
+		"move": # shortened: the old "Up/Down: Move..." string is 220px at fonts.ttf@7; the stage is 160px
+			_hint.text = "Z: Confirm   X: Cancel"
 		"summary":
 			_hint.text = "Z/X: Back"
+
+func _build_action_plate() -> void:
+	var labels: Array = []
+	for action in _actions:
+		labels.append(str(action.get("label", "?")))
+	var built := PartyStage.build_actions(_stage, labels)
+	_action_plate = built.plate
+	_action_rows = built.rows
+	_action_rows.select(_action_selected)
+
+func _free_action_plate() -> void:
+	if _action_plate != null:
+		_action_plate.queue_free()
+		_action_plate = null
+	if _action_rows != null:
+		_action_rows.root().queue_free()
+		_action_rows = null
 
 func _refresh_party() -> void:
 	var snapshot: Variant = _call_context("get_party_snapshot")
@@ -134,84 +196,13 @@ func _rebuild() -> void:
 	_rebuild_rows()
 
 func _rebuild_rows() -> void:
-	for child in _rows.get_children():
-		_rows.remove_child(child)
-		child.queue_free()
-	if _party.is_empty():
-		var empty_label := Label.new()
-		empty_label.text = "No Pokemon yet."
-		_rows.add_child(empty_label)
-		return
-	for i in range(_party.size()):
-		_rows.add_child(PartyRows.build_row(_party[i], i == _selected))
+	PartyRows.rebuild(_rows, _party, _selected)
 
 func _open_actions() -> void:
-	if _party.is_empty():
-		return
-	var held: Variant = _call_context("get_campsite_pokemon")
-	var player_tile: Variant = _call_context("get_player_tile")
-	var box: Variant = _call_context("box_tile_near", [player_tile]) if player_tile is Vector2i else {}
-	var pen: Variant = _call_context("pen_tile_near", [player_tile]) if player_tile is Vector2i else {} # Phase 5: DEPOSIT falls back to a pen
-	var has_box: bool = (box is Dictionary and bool((box as Dictionary).get("found", false))) or (pen is Dictionary and bool((pen as Dictionary).get("found", false)))
-	_actions = PartyActions.build_action_entries(_party[_selected], _eligible_field_moves(_party[_selected]),
-		_context.get("get_field_move_name", Callable()), held if held is Array else [],
-		_party.size(), has_box)
-	_action_list.clear()
-	for action in _actions:
-		_action_list.add_item(str(action.get("label", "?")))
-	_action_selected = 0
-	_action_list.select(0)
-	_show_panel("action")
+	ActionDispatch.open_actions(self)
 
 func _activate_action() -> void:
-	if _action_selected < 0 or _action_selected >= _actions.size():
-		return
-	var action: Dictionary = _actions[_action_selected]
-	match str(action.get("id", "")):
-		"swap":
-			_call_context("set_party_lead", [_selected])
-			_rebuild()
-			_show_panel("list")
-		"move":
-			_move_order = range(_party.size()) # party == display order at entry
-			_show_panel("move")
-		"summary":
-			_summary_text.text = PartyRows.summary_text(_party[_selected],
-				_context.get("get_species", Callable()), _context.get("experience_for_level", Callable()))
-			_show_panel("summary")
-		"field_move":
-			close_screen()
-			field_move_requested.emit(str(action.get("move_id", "")))
-		"deposit":
-			var result: Variant = _call_context("deposit_to_nearest", [_selected])
-			if result is Dictionary and bool((result as Dictionary).get("ok", false)):
-				_rebuild()
-				_show_panel("list")
-			else: # refusals (last member, witness guard, no box) flash the Hint
-				_hint.text = str((result as Dictionary).get("message", "That can't be done.")) if result is Dictionary else "That can't be done."
-		"retrieve":
-			_call_context("retrieve_campsite_mon", [0])
-			_rebuild()
-			_show_panel("list")
-		_:
-			_show_panel("list")
-
-func _eligible_field_moves(mon: Dictionary) -> Array:
-	var move_ids: Array = []
-	if bool(mon.get("is_egg", false)): # eggs perform no field moves
-		return move_ids
-	var get_species: Callable = _context.get("get_species", Callable())
-	if not get_species.is_valid():
-		return move_ids
-	var species: Variant = get_species.call(str(mon.get("species_id", "")))
-	var flags: Variant = (species as Dictionary).get("field_moves", {}) if species is Dictionary else {}
-	if flags is not Dictionary:
-		return move_ids
-	for id_variant in (flags as Dictionary).keys(): # flag==1: the mon is capable
-		if int((flags as Dictionary)[id_variant]) == 1:
-			move_ids.append(str(id_variant))
-	move_ids.sort()
-	return move_ids
+	ActionDispatch.activate(self)
 
 func _call_context(key: String, args: Array = []) -> Variant:
 	var accessor: Callable = _context.get(key, Callable())

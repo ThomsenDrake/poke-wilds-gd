@@ -78,13 +78,13 @@
     "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode \u2014 machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar \u2014 and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole \u2014 regenerated baselines were. REGEN-UNDER-BREAK (update mode \u2014 machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap \u2014 prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole). RE-STAMP 2026-08-02 (infinite-world slice 2 \u2014 the climate-field biome re-capture): the four battle sidecar.json files drifted in EXACTLY two run-position metadata keys (trace_cursor, ts_msec) \u2014 the visual_sweep_update re-capture under the new climate terrain re-emitted every sidecar; the four battle PNGs are byte-identical (verified: the battle shots are pixel-immune to terrain, the blank-bg DECIDUEYE craft). The deterministic-art-anchor gate held (no anchor_refusals \u2014 the R4 canary_rects + the glyph oracle regions are unchanged), the region-diff compare after the update is GREEN, and the sidecar seed gate confirmed every fresh sidecar's world_seed/shot_seq equals its predecessor's before the rewrite. The (C) honest-reporting mechanism is untouched (no tool edits this slice). Old pins: 09_battle.png d72d8ee50be5\u2026, 09_battle.png.sidecar.json 9d8c3c634ea3\u2026, 10_battle_moves.png e15936689279\u2026, 10_battle_moves.png.sidecar.json 30120ed10089\u2026, 11_battle_after_attack.png 169989acd846\u2026, 11_battle_after_attack.png.sidecar.json 918f834a1040\u2026, 12_battle_items.png ba1a0c59b602\u2026, 12_battle_items.png.sidecar.json da72cec352af\u2026. RE-STAMP 2026-08-03 (infinite-world slice 4 baseline re-pin): the beach spawn shifted the spawn-dependent visual baselines, so the battle sidecars' run-position metadata (trace_cursor/ts_msec) drifted; the battle PNGs stay PIXEL-IDENTICAL (the blank battle background is terrain-invariant \u2014 only the sidecar trace position moved). The HP-bar plant's revert CONTRACTS (the 11px HP bar + the battle-pixel revert proof) are unchanged; the revert_scope sidecar pins are re-stamped to the re-pinned baselines. Changed: 09_battle.png.sidecar.json a29d25a3f9b5\u21921e0ae6065e5b, 10_battle_moves.png.sidecar.json abb58661d408\u21926b6bc657a69e, 11_battle_after_attack.png.sidecar.json 3b68d5ed1a5d\u219217193c98a53a, 12_battle_items.png.sidecar.json 961f63b4d8c0\u2192a422bc863698.",
     "revert_scope": {
      "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
-     "docs/generated/visual-baselines/09_battle.png.sidecar.json": "9293332d09b81b6d95ec7c15fc07378c17e27991bc3106a8109559899b08f1f1",
+     "docs/generated/visual-baselines/09_battle.png.sidecar.json": "696123b92ddb467e5612fa787b2b2a147d3a03b61d4c3e2d6ac8195f3fa67c53",
      "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
-     "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "0e6c82a2b5f314c0b99069cd11261eb660679c0d07983949922a55ebcfcc83a1",
+     "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "1532847e1a11c0ced2bb6f87f4d8e00afbf5de22233bc08081ca630c81150442",
      "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
-     "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "5c545d09e1a43b140428eead5f724c38b874bbcb7a6573de6cc6782660f48edb",
+     "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "3fcddd82e484ecf8681647f0f9c3340ffcd96a824293c40af234383e5093a7e6",
      "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
-     "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "0ea4e00cc0a75590847e7d6641634bd4fb0cda877291c6251cf2a3a7dadafcdc"
+     "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "14d8d0f68ced05bdf5bc0016883e73c16eb2839c7ddb68d161af3a55addbf603"
     },
     "re_stamp_log": [
      {
@@ -142,6 +142,34 @@
       "old_pin": "a422bc863698",
       "new_pin": "0ea4e00cc0a7",
       "reason": "title-flow restyle baseline mint (shots 37-41) re-captured the main family; battle PNGs pixel-identical, sidecar trace_cursor/ts_msec drifted; HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/09_battle.png.sidecar.json",
+      "old_pin": "9293332d09b8",
+      "new_pin": "696123b92ddb",
+      "reason": "GBC restyle wave-2 menu baseline re-pin re-captured the main sweep (battle PNGs pixel-identical; sidecar trace_cursor/ts_msec drifted); HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json",
+      "old_pin": "0e6c82a2b5f3",
+      "new_pin": "1532847e1a11",
+      "reason": "GBC restyle wave-2 menu baseline re-pin re-captured the main sweep (battle PNGs pixel-identical; sidecar trace_cursor/ts_msec drifted); HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json",
+      "old_pin": "5c545d09e1a4",
+      "new_pin": "3fcddd82e484",
+      "reason": "GBC restyle wave-2 menu baseline re-pin re-captured the main sweep (battle PNGs pixel-identical; sidecar trace_cursor/ts_msec drifted); HP-bar plant revert contracts unchanged."
+     },
+     {
+      "date": "2026-08-04",
+      "file": "docs/generated/visual-baselines/12_battle_items.png.sidecar.json",
+      "old_pin": "0ea4e00cc0a7",
+      "new_pin": "14d8d0f68ced",
+      "reason": "GBC restyle wave-2 menu baseline re-pin re-captured the main sweep (battle PNGs pixel-identical; sidecar trace_cursor/ts_msec drifted); HP-bar plant revert contracts unchanged."
      }
     ]
    },
@@ -206,9 +234,9 @@
     "revert_scope": {
      "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
      "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-     "tools/run_playtests.py": "6059b06bda52b1b59298208b1e15e1c6f4d06cce7df576d121e7ca83b4e9ac4a",
+      "tools/run_playtests.py": "a0fba2f539feb1faa8eb402020ba4019810488d73efc53e4e5b8257ef46cf5f5",
      "tools/godot_dap_smoketest.py": "b69d00fbb7565779cf95a9b38e41cf8e9c4f20ea5eb1f964b6a14aa043a955ec",
-     "tools/verify_all.py": "6fe7d1bfb1105538d61754eadc071c4e271b544e032f0fb4148e8f9e9fbb4015"
+     "tools/verify_all.py": "1c9921922886b2ff3c95f0b7282e9085132e985983f5d8486b88af7777a36c5c"
     },
     "re_stamp_log": [
      {
@@ -533,13 +561,35 @@
       "new_pin": "b69d00fbb756",
       "reason": "legitimate edit (new-game flow slice): registered new_game_flow in SCENARIO_REQUIREMENTS. Registration-only additive change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
      },
-     {
-      "date": "2026-08-04",
-      "file": "tools/run_playtests.py",
-      "old_pin": "39184b21fdc7",
-      "new_pin": "6059b06bda52",
-      "reason": "legitimate edit (new-game flow slice, arithmetic fix): new_game_flow was registered in BOTH PLAYTEST_SCENARIOS and SMOKE_SCENARIOS, but --include-smoke concatenates the lists without dedup, so the suite ran it twice (58 runs). Removed from SMOKE_SCENARIOS; it stays in PLAYTEST_SCENARIOS (the seed_choice precedent), so the suite is 57 scenarios (44 playtest + 13 smoke). Membership-only change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
-     }
+      {
+       "date": "2026-08-04",
+       "file": "tools/run_playtests.py",
+       "old_pin": "39184b21fdc7",
+       "new_pin": "6059b06bda52",
+       "reason": "legitimate edit (new-game flow slice, arithmetic fix): new_game_flow was registered in BOTH PLAYTEST_SCENARIOS and SMOKE_SCENARIOS, but --include-smoke concatenates the lists without dedup, so the suite ran it twice (58 runs). Removed from SMOKE_SCENARIOS; it stays in PLAYTEST_SCENARIOS (the seed_choice precedent), so the suite is 57 scenarios (44 playtest + 13 smoke). Membership-only change; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing + failed_events collection + finalize ok contract) and the determinism seam are byte-for-byte untouched; the nav_audit scope pins and the other tool pins co-stamped here hold."
+      },
+      {
+       "date": "2026-08-05",
+       "file": "tools/run_playtests.py",
+       "old_pin": "6059b06bda52",
+       "new_pin": "589532f5fbc9",
+       "reason": "legitimate edit (mandatory vision-LLM review): every windowed visual-sweep family now dispatches the required VLM reviewer and fails closed on unavailable/incomplete model coverage; the proven miss-002 ERROR_MARKERS single-source, failed_events collection, finalize ok contract, and nav_audit scope remain unchanged."
+      },
+      {
+       "date": "2026-08-05",
+       "file": "tools/run_playtests.py",
+       "old_pin": "589532f5fbc9",
+       "new_pin": "19382a673601",
+       "reason": "legitimate edit (mandatory vision-LLM review completion): included fishing in the canonical satellite family tuple, corrected standalone all-shot review semantics, and finalized required review dispatch; miss-002 honest-reporting mechanism remains unchanged."
+      },
+      {
+       "date": "2026-08-05",
+       "file": "tools/verify_all.py",
+       "old_pin": "6fe7d1bfb110",
+       "new_pin": "1c9921922886",
+       "reason": "legitimate edit (mandatory vision-LLM review completion): canonical S9 now includes the fishing satellite family so verify_all covers every windowed sweep family; miss-002 double-run and reporting mechanisms remain unchanged."
+      }
+
     ]
    },
    "plants_recorded_but_excluded_from_stats": true

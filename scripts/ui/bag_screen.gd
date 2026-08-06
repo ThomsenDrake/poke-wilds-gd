@@ -1,12 +1,28 @@
 extends Control
 
-# Bag screen: item list + description. POTION heals and EVOLUTION STONES evolve a party-picked
-# member (stones confirm through GameRuntime's use_stone_on_mon; eggs refused); SLEEPING BAG rests.
+# Bag screen on the GBC stage idiom (restyle slice wave 2): opaque black
+# backing + the native 160x144 SubViewport stage (gbc_stage.gd), integer-scaled
+# NEAREST into the window. item_menu_gsc1.png full stage (guarded; plate
+# fallback — bag_screen_stage.gd): item rows + the black arrow cursor in the
+# art's list interior, description + hint in the baked bottom frame, and the
+# party pick as a modal white plate. The item list WINDOWS (VISIBLE_ROWS per
+# page) when the bag outgrows the frame. Behavior is unchanged: POTION heals
+# and EVOLUTION STONES evolve a party-picked member (stones confirm through
+# GameRuntime's use_stone_on_mon; eggs refused); SLEEPING BAG rests; the child
+# MessageBox instance (same scene, already restyled) surfaces the toasts.
+#
+# Scenario seams (the lead's app retargets): stage_root(), and
+# row_texts()/row_count()/select_row(i)/row_rect(i) over the VISIBLE window,
+# selected_row_text(); the picker rows container lives at
+# stage_root()/PickerPlate/Rows.
 
 signal closed
 
 const PartyRows := preload("res://scripts/ui/party_rows.gd")
 const StoneEvolutionRuntime := preload("res://scripts/runtime/stone_evolution_runtime.gd") # STONE_ITEM_IDS single-sourced off the runtime module: routing + validation can never disagree
+const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
+const BagStage := preload("res://scripts/ui/bag_screen_stage.gd")
+const ItemUse := preload("res://scripts/ui/bag_item_use.gd")
 
 const POTION_ITEM_ID := "potion"
 const POTION_HEAL_AMOUNT := 20
@@ -14,13 +30,16 @@ const POTION_HEAL_AMOUNT := 20
 const SLEEPING_BAG_ITEM_ID := "sleeping_bag"
 const STATE_ITEMS := "items"
 const STATE_PARTY_PICK := "party_pick"
+const VISIBLE_ROWS := BagStage.VISIBLE_ROWS
 
-@onready var _items: ItemList = $Panel/Margin/VBox/Body/Items
-@onready var _description: Label = $Panel/Margin/VBox/Body/SideColumn/Description
-@onready var _party_panel: PanelContainer = $Panel/Margin/VBox/Body/SideColumn/PartyPanel
-@onready var _party_rows: VBoxContainer = $Panel/Margin/VBox/Body/SideColumn/PartyPanel/Margin/VBox/PartyRows
-@onready var _hint: Label = $Panel/Margin/VBox/Hint
 @onready var _message_box = $MessageBox
+
+var _stage: Control
+var _rows # GbcWidgets.RowList over the visible item window
+var _description: Label
+var _hint: Label
+var _picker_plate: Control
+var _picker_rows: VBoxContainer
 
 var _context: Dictionary = {}
 var _entries: Array = []
@@ -29,16 +48,26 @@ var _selected := 0
 var _party_selected := 0
 var _pending_item := ""
 var _state := STATE_ITEMS
+var _window_top := 0
 
 func _ready() -> void:
 	visible = false
+	var parts := GbcStage.build(self) # {viewport, stage, display, backing}
+	_stage = parts.stage
+	GbcStage.on_resized(self, parts.display)
+	var built := BagStage.build(_stage)
+	_rows = built.rows
+	_description = built.description
+	_hint = built.hint
+	_picker_plate = built.picker_plate
+	_picker_rows = built.picker_rows
 
 func setup(context: Dictionary) -> void:
 	_context = context
 
 func open_screen() -> void:
 	_state = STATE_ITEMS
-	_party_panel.visible = false
+	_picker_plate.visible = false
 	visible = true
 	_refresh_items()
 	if _entries.is_empty():
@@ -47,6 +76,33 @@ func open_screen() -> void:
 
 func close_screen() -> void:
 	visible = false
+
+# --- Scenario seams (restyle design §2; the old Panel/Items node reads) ---
+func stage_root() -> Control: return _stage
+func row_count() -> int: return _rows.row_count()
+func row_texts() -> Array: return _rows.row_texts()
+
+func selected_row_text() -> String:
+	return _rows.row_text(_selected - _window_top) if not _entries.is_empty() else ""
+
+func select_row(index: int) -> void: # a VISIBLE-row index (wraps within the page)
+	if _entries.is_empty() or _rows.row_count() == 0:
+		return
+	_selected = _window_top + wrapi(index, 0, _rows.row_count())
+	_sync_item_rows()
+	_update_description()
+
+func select_item(index: int) -> void: # an ABSOLUTE entry index (scrolls the window to it)
+	if index < 0 or index >= _entries.size():
+		return
+	_selected = index
+	_sync_item_rows()
+	_update_description()
+
+func row_rect(index: int) -> Rect2: # stage-local rect of a VISIBLE row
+	if index < 0 or index >= _rows.row_count():
+		return Rect2()
+	return _rows.row_rect(index)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
@@ -67,11 +123,10 @@ func _move(direction: int) -> void:
 	if _state == STATE_PARTY_PICK:
 		if not _party.is_empty():
 			_party_selected = wrapi(_party_selected + direction, 0, _party.size())
-			_update_party_markers()
+			PartyRows.refresh_markers(_picker_rows, _party_selected)
 	elif not _entries.is_empty():
 		_selected = wrapi(_selected + direction, 0, _entries.size())
-		_items.select(_selected)
-		_items.ensure_current_is_visible()
+		_sync_item_rows()
 		_update_description()
 
 func _confirm() -> void:
@@ -90,16 +145,25 @@ func _back() -> void:
 func _refresh_items() -> void:
 	var snapshot: Variant = _call_context("get_bag_snapshot")
 	_entries = snapshot if snapshot is Array else []
-	_items.clear()
-	for entry_variant in _entries:
-		if entry_variant is Dictionary:
-			var entry: Dictionary = entry_variant
-			_items.add_item("%s x%d" % [_item_display_name(str(entry.get("item_id", ""))), int(entry.get("count", 0))])
 	_selected = clampi(_selected, 0, maxi(0, _entries.size() - 1))
-	if not _entries.is_empty():
-		_items.select(_selected)
-		_items.ensure_current_is_visible()
+	_sync_item_rows()
 	_update_description()
+
+# Rebuilds the visible page of item rows, following _selected with the window
+# (RowList.set_rows resets the cursor; select() restores the visible index).
+func _sync_item_rows() -> void:
+	_window_top = clampi(_window_top, 0, maxi(0, _entries.size() - VISIBLE_ROWS))
+	if _selected < _window_top:
+		_window_top = _selected
+	elif _selected >= _window_top + VISIBLE_ROWS:
+		_window_top = _selected - VISIBLE_ROWS + 1
+	var texts: Array = []
+	var get_item: Callable = _context.get("get_item", Callable())
+	for i in range(_window_top, mini(_window_top + VISIBLE_ROWS, _entries.size())):
+		texts.append(BagStage.row_text(_entries[i], get_item))
+	_rows.set_rows(texts)
+	if not _entries.is_empty():
+		_rows.select(_selected - _window_top)
 
 func _activate_item() -> void:
 	if _entries.is_empty() or _selected >= _entries.size():
@@ -121,94 +185,30 @@ func _open_party_pick() -> void:
 		return
 	_party_selected = 0
 	_state = STATE_PARTY_PICK
-	_party_panel.visible = true
-	_rebuild_party_rows()
+	_picker_plate.visible = true
+	PartyRows.rebuild(_picker_rows, _party, _party_selected)
 	_update_hint()
 
 func _close_party_pick() -> void:
 	_state = STATE_ITEMS
-	_party_panel.visible = false
+	_picker_plate.visible = false
 	_update_hint()
 
 func _apply_potion() -> void:
-	if _party.is_empty() or _party_selected >= _party.size():
-		return
-	var mon: Dictionary = (_party[_party_selected] as Dictionary).duplicate(true)
-	if bool(mon.get("is_egg", false)): # eggs_stay_with_you: a healed egg would be a battle-active empty-moveset lead
-		_message_box.show_message("You keep the Egg with you.", 1.4)
-		return
-	var max_hp := maxi(1, int(mon.get("max_hp", 1)))
-	var current_hp := int(mon.get("current_hp", 0))
-	if current_hp >= max_hp:
-		_message_box.show_message("It would have no effect.", 1.4)
-		return
-	mon["current_hp"] = mini(max_hp, current_hp + POTION_HEAL_AMOUNT)
-	_call_context("set_party_member", [_party_selected, mon])
-	_call_context("remove_item", [POTION_ITEM_ID, 1])
-	_message_box.show_message("Used Potion on %s." % str(mon.get("name", "Pokemon")), 1.6)
-	_close_party_pick()
-	_refresh_items()
+	ItemUse.apply_potion(self)
 
-func _apply_stone() -> void: # confirms through /root/GameRuntime (sleeping-bag convention); picker stays open on no-effect (like Potion), closes on success
-	if _party_selected >= _party.size():
-		return
-	var runtime := get_node_or_null("/root/GameRuntime")
-	var result: Variant = runtime.call("use_stone_on_mon", _pending_item, _party_selected) if runtime != null and runtime.has_method("use_stone_on_mon") else {}
-	var response: Dictionary = result if result is Dictionary else {}
-	_message_box.show_message(str(response.get("message", "Can't use that here.")), 1.6)
-	if bool(response.get("ok", false)):
-		_close_party_pick()
-		_refresh_items()
+func _apply_stone() -> void:
+	ItemUse.apply_stone(self)
 
-# Sleeping bag (Phase 2): a reusable key item (count never decrements). camping_runtime.rest("bag")
-# owns the heal/time/campsite; the screen surfaces the message, resyncs the tint, saves.
 func _use_sleeping_bag() -> void:
-	var runtime := get_node_or_null("/root/GameRuntime")
-	var camping: Variant = runtime.get("camping_runtime") if runtime != null else null
-	if camping == null or not camping.has_method("rest"):
-		_message_box.show_message("Can't use that here.", 1.4)
-		return
-	var result: Variant = camping.call("rest", "bag")
-	var response: Dictionary = result if result is Dictionary else {}
-	_message_box.show_message("You rested for a while." if str(response.get("message", "")).is_empty() else str(response.get("message", "")), 2.2)
-	if bool(response.get("ok", false)) and runtime != null:
-		var world := get_node_or_null("/root/Main/World")
-		if world != null and world.has_method("set_time_of_day"):
-			world.set_time_of_day(int(runtime.get_time_of_day_minutes()))
-		runtime.save_game()
-
-func _rebuild_party_rows() -> void:
-	for child in _party_rows.get_children():
-		_party_rows.remove_child(child)
-		child.queue_free()
-	for i in range(_party.size()):
-		_party_rows.add_child(PartyRows.build_row(_party[i], i == _party_selected))
-
-func _update_party_markers() -> void:
-	for i in range(_party_rows.get_child_count()):
-		var row := _party_rows.get_child(i) as HBoxContainer
-		if row != null:
-			PartyRows.set_selected(row, i == _party_selected)
-
-func _item_display_name(item_id: String) -> String:
-	var display_name := str(_catalog_item(item_id).get("display_name", ""))
-	if not display_name.is_empty():
-		return display_name.capitalize()
-	return item_id.capitalize()
-
-func _catalog_item(item_id: String) -> Dictionary:
-	var accessor: Callable = _context.get("get_item", Callable())
-	if not accessor.is_valid():
-		return {}
-	var item: Variant = accessor.call(item_id.strip_edges().to_lower())
-	return item if item is Dictionary else {}
+	ItemUse.use_sleeping_bag(self)
 
 func _update_description() -> void:
 	_description.text = ""
 	if _entries.is_empty() or _selected >= _entries.size():
 		return
 	var item_id := str((_entries[_selected] as Dictionary).get("item_id", ""))
-	_description.text = str(_catalog_item(item_id).get("description", ""))
+	_description.text = BagStage.item_description(item_id, _context.get("get_item", Callable()))
 
 func _update_hint() -> void:
 	_hint.text = "Z: Heal   X: Back" if _state == STATE_PARTY_PICK and _pending_item == POTION_ITEM_ID else "Z: Use   X: Back"

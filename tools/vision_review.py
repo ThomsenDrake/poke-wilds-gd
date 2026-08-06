@@ -68,7 +68,7 @@ EXIT_OK, EXIT_ERROR = 0, 2
 # Reviewer kinds (shared by _mk, the anchor bridge, and the coverage ledger).
 KIND_DETERMINISTIC = "deterministic-sidecar-consistency"  # this module's default reviewer
 KIND_ART_ANCHOR = "deterministic-art-anchor"              # art-anchor drift class (G1<->G2 bridge)
-KIND_MODEL = "model-qwen3-vl"                             # Qwen3-VL rubric reviewer (vlm slice)
+KIND_MODEL = "model-vision-llm"                           # model-backed rubric reviewer
 
 # SoM outline colour per region kind; numbering is kind-priority then region-id.
 # `anchor` rects are ART-TRUTH (art-anchors.toml), ranked above sidecar-derived kinds.
@@ -740,6 +740,7 @@ RUBRIC_GROUPS = [
     ("camping", "Camping states"),
     ("overworld_mons", "Overworld mon states"),
     ("display_matrix", "Display-matrix states"),
+    ("satellite", "Satellite sweep states"),
 ]
 
 # Answerer declarations: per shot-group, a list of (fingerprint, capable kinds).
@@ -764,6 +765,8 @@ QUESTION_ANSWERERS = {
         ("hp bars on their baked tracks", [KIND_ART_ANCHOR, KIND_MODEL]),
         ("single clean frame", [KIND_MODEL]),
         ("text inside its box", [KIND_MODEL]),
+        ("text kerning consistent", [KIND_MODEL]),
+        ("labels, bars, and cursors aligned", [KIND_MODEL]),
     ],
     "overworld": [
         ("biome read as its intended terrain", [KIND_MODEL]),
@@ -783,6 +786,8 @@ QUESTION_ANSWERERS = {
         ("every row align its name", [KIND_DETERMINISTIC, KIND_MODEL]),
         ("hp bars visible and color-graded", [KIND_DETERMINISTIC, KIND_MODEL]),
         ("clipped, overlapping, or escaping", [KIND_DETERMINISTIC, KIND_MODEL]),
+        ("spaced consistently", [KIND_MODEL]),
+        ("aligned to a consistent grid", [KIND_MODEL]),
     ],
     "display_matrix": [
         ("every window size", [KIND_MODEL]),
@@ -795,14 +800,20 @@ QUESTION_ANSWERERS = {
         ("roaming mons visibly y-sort", [KIND_MODEL]),
         ("ground nest ring", [KIND_MODEL]),
     ],
+    "satellite": [
+        ("focal content intact", [KIND_MODEL]),
+        ("text or sprites clipped", [KIND_MODEL]),
+        ("untextured solid-color or repeated-ghost", [KIND_MODEL]),
+        ("scene remain readable", [KIND_MODEL]),
+    ],
 }
 
 # Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
 # parsed inventory drifts from these counts the run records a loud warning
 # (advisory in this slice; a RED check_repo_contracts backstop is the documented
-# follow-up). Totals: 6 + 2 + 5 + 5 + 2 + 2 + 1 = 23 rubric questions.
+# follow-up). Totals: 6 + 2 + 7 + 7 + 2 + 2 + 1 + 4 = 31 rubric questions.
 EXPECTED_QUESTION_COUNTS = {
-    "overworld": 6, "day_night": 2, "menu": 5, "battle": 5, "camping": 2, "overworld_mons": 2, "display_matrix": 1,
+    "overworld": 6, "day_night": 2, "menu": 7, "battle": 7, "camping": 2, "overworld_mons": 2, "display_matrix": 1, "satellite": 4,
 }
 
 ANSWER_VERDICTS = ("yes", "no")
@@ -822,9 +833,8 @@ def _question_id(text: str) -> str:
 
 
 def _shot_group(name: str) -> str | None:
-    """Map a shot name to its rubric group key (shares _rubric_section's prefix
-    map). None for a name no group claims (satellite shots 18-21 + the fishing
-    26-27 carry no rubric group -- counted ungrouped, never faked)."""
+    """Map a shot name to its rubric group key. Unknown baselined shots use the
+    generic satellite group so every captured sweep frame receives model review."""
     stem = str(name).split(".")[0]
     if stem.startswith(("09", "10", "11", "12")):
         return "battle"
@@ -840,7 +850,7 @@ def _shot_group(name: str) -> str | None:
         return "display_matrix"
     if stem.startswith(("01", "02", "03")):
         return "overworld"
-    return None
+    return "satellite"
 
 
 def parse_rubric_questions(rubric_text: str) -> dict:
@@ -1180,7 +1190,7 @@ def _reviewer_params() -> dict:
                     "runs once -- votes are meaningless when deterministic"}
 
 
-def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list]:
+def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str], dict]:
     """Run the configured plugin reviewer. FAIL-CLOSED per the grounding
     contract: non-zero exit, timeout, invalid JSON, or findings-not-a-list is
     a TOOL ERROR (propagates to the top-level handler -> exit 2 -> runner red).
@@ -1196,7 +1206,8 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list]:
     `reviewer_meta.kinds_ran` -- how a COMPOSITE wrapper (which always runs the
     deterministic pass internally and adds the model pass) registers its internal
     deterministic coverage even on a 0-changed-shot run where nothing self-tags a
-    finding. Optional; malformed entries are ignored (never a tool error)."""
+    finding. Optional; malformed entries are ignored (never a tool error). The
+    complete reviewer_meta is returned for the required-review acceptance gate."""
     try:
         argv = shlex.split(cmd)
         proc = subprocess.run(argv, input=json.dumps(public_ctx), capture_output=True,
@@ -1221,7 +1232,7 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list]:
         declared = meta.get("kinds_ran")
         if isinstance(declared, list):
             meta_kinds = {k for k in declared if isinstance(k, str) and k}
-    return findings, answers, meta_kinds
+    return findings, answers, meta_kinds, (meta if isinstance(meta, dict) else {})
 
 
 # --------------------------------------------------------------------------
@@ -1273,7 +1284,7 @@ def review_is_fresh(review_doc: dict, shots_dir: Path, baseline_dir: Path | None
 
 def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                       changed: list[str] | None = None, reviewer_cmd: str | None = None,
-                      clusters_path: Path | None = None) -> dict:
+                      clusters_path: Path | None = None, review_all_shots: bool = False) -> dict:
     if not shots_dir.is_dir():
         raise RuntimeError(f"shots directory missing: {shots_dir}")
     if not baseline_dir.is_dir():
@@ -1309,6 +1320,7 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
     run_answers: list[dict] = []  # validated rubric answers returned by a plugin reviewer
     answers_dropped = 0
     run_meta_kinds: set[str] = set()  # kinds a composite wrapper declares via reviewer_meta
+    reviewer_meta_by_shot: dict[str, dict] = {}
 
     for name in shot_names:
         base_png = baseline_dir / name
@@ -1328,7 +1340,7 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                         "sidecar_baseline_sha256": _sha256_bytes(_sidecar_for(base_png).read_bytes())
                         if _sidecar_for(base_png).exists() else None,
                         "changed": is_changed})
-        if not is_changed:
+        if not is_changed and not review_all_shots:
             shots_out.append({"shot": name, "changed": False, "bundle": None,
                               "reviewer_raw_count": 0, "dropped_count": 0, "findings": []})
             continue
@@ -1376,8 +1388,10 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             "enforcement": "ungrounded findings are dropped and counted"}
 
         if reviewer_cmd:
-            raw, raw_answers, meta_kinds = _run_cmd_reviewer(reviewer_cmd, public_ctx)
+            raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)
             run_meta_kinds |= meta_kinds
+            if reviewer_meta:
+                reviewer_meta_by_shot[name] = reviewer_meta
             # Validate the additive answers[] seam; a verdict-"no" answer that cites
             # a resolvable region + bbox becomes a quarantine finding through the SAME
             # enforce_grounding path as every other finding (ungrounded ones drop and
@@ -1424,9 +1438,10 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
         except (vd.PngError, OSError) as exc:
             warnings.append(f"{name}: evidence crops skipped ({exc})")
 
-        shots_out.append({"shot": name, "changed": True, "bundle": f"vision-review/{Path(name).stem}",
+        shots_out.append({"shot": name, "changed": is_changed, "bundle": f"vision-review/{Path(name).stem}",
                           "reviewer_raw_count": len(raw), "dropped_count": stats["dropped"],
-                          "findings": emitted})
+                          "findings": emitted,
+                          "reviewer_meta": reviewer_meta_by_shot.get(name, {})})
         grounding_totals["emitted"] += stats["emitted"]
         grounding_totals["grounded"] += stats["grounded"]
         grounding_totals["dropped"] += stats["dropped"]
@@ -1480,6 +1495,10 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, default=ROOT / ".godot-smoke")
     parser.add_argument("--changed", default=None,
                         help="comma-separated shot names to force-treat as changed")
+    parser.add_argument("--review-all", action="store_true",
+                        help="review every baselined shot, including unchanged shots")
+    parser.add_argument("--required", action="store_true",
+                        help="require model-backed review and complete rubric coverage")
     parser.add_argument("--reviewer-cmd", default=None,
                         help="external reviewer (stdin JSON, stdout {\"findings\":[...]}); "
                              "non-zero exit / timeout / invalid JSON is a tool error "
@@ -1490,10 +1509,16 @@ def main() -> int:
 
     changed = [s for s in args.changed.split(",")] if args.changed else None
     clusters_path = args.clusters or (args.output_dir / "region-diff" / "clusters.json")
+    if args.required and not args.reviewer_cmd:
+        print("error: --required needs --reviewer-cmd", file=sys.stderr)
+        return EXIT_ERROR
+    prior_required = os.environ.get("VLM_REQUIRED")
+    if args.required:
+        os.environ["VLM_REQUIRED"] = "1"
     try:
         doc = run_vision_review(args.shots_dir, args.baseline_dir, args.output_dir,
                                 changed=changed, reviewer_cmd=args.reviewer_cmd,
-                                clusters_path=clusters_path)
+                                clusters_path=clusters_path, review_all_shots=args.review_all)
     except Exception as exc:  # tool error -> fail red (exit 2)
         print(f"error: vision review failed: {exc}", file=sys.stderr)
         return EXIT_ERROR

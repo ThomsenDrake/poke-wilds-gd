@@ -82,7 +82,7 @@ func _check_empty_cut() -> void:
 func _check_overflow(full_party: Array) -> void:
 	var runtime = _runtime()
 	_runner.resync_player_tile(_world(), _player(), runtime)
-	runtime.session.party = full_party.duplicate(true)
+	runtime.session.campsite_pokemon.clear(); runtime.session.party = full_party.duplicate(true) # fixture reset: assert THIS capture in an EMPTY hold
 	var target: Dictionary = _guaranteed_capture_mon(runtime)
 	if target.is_empty():
 		_failures.append("overflow: no catalog species meets the guaranteed-capture catch rate"); return

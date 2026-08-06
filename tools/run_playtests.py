@@ -35,6 +35,7 @@ import os
 from pathlib import Path
 import queue
 import re
+import shlex
 import signal
 import socket
 import subprocess
@@ -65,14 +66,22 @@ WINDOWED_ONLY_SCENARIOS = smoketest.WINDOWED_ONLY_SCENARIOS
 # refusal), so both its snapshot (prepare_anchor_gate) and its verdict
 # (apply_anchor_gate) cover both names.
 VISUAL_SWEEP_SCENARIOS = ("visual_sweep", "visual_sweep_update")
-# The five satellite sweep families. verify_all.py single-sources THIS tuple for its
+# Every windowed sweep family receives the required vision-capable model review.
+VISION_REVIEW_SCENARIOS = (
+    "visual_sweep", "visual_sweep_update",
+    "visual_sweep_fishing", "visual_sweep_fishing_update",
+    "visual_sweep_camping", "visual_sweep_camping_update",
+    "visual_sweep_storage", "visual_sweep_storage_update",
+    "visual_sweep_pokemon", "visual_sweep_pokemon_update",
+    "visual_sweep_overworld", "visual_sweep_overworld_update",
+    "visual_sweep_world_depth", "visual_sweep_world_depth_update",
+)
+# The six satellite sweep families. verify_all.py single-sources THIS tuple for its
 # S9 windowed loop (R3) so the orchestrator and the gates can never drift on which
-# families are satellites. visual_sweep_fishing is NOT a satellite family per
-# verify_all's frozen "shots 15-23" contract (it runs via the PLAYTEST_SCENARIOS
-# path), so it stays out of this set by construction.
-SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_camping", "visual_sweep_storage",
-                             "visual_sweep_pokemon", "visual_sweep_overworld",
-                             "visual_sweep_world_depth")
+# families receive pixel and mandatory model review.
+SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_fishing", "visual_sweep_camping",
+                              "visual_sweep_storage", "visual_sweep_pokemon",
+                              "visual_sweep_overworld", "visual_sweep_world_depth")
 # The full gate scope (R3): the RED-tier sidecar seed-equality gate + the source-art
 # anchor gate cover the main sweep AND every satellite family. Each sweep clears
 # .godot-smoke/shots at start (clear_shots), so the gate reads exactly THAT family's
@@ -882,31 +891,16 @@ def _record_vision_review(result: dict[str, Any], doc: dict[str, Any], review_pa
 
 
 def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
-    """Runner-recorded Lane-4 vision review for the visual_sweep scenario.
+    """Run the mandatory model-backed review for every windowed sweep family.
 
-    Mirrors apply_region_gate/apply_contrast_cvd's invocation-point decision:
-    verdicts are recorded onto the scenario entry of playtest-report.json -- NEVER
-    the JSONL trace -- as a quarantine-section kind vision_review (report-tier,
-    never flips result['ok']; Lane 4 is quarantine-tier). The post-step regenerates
-    .godot-smoke/vision-review.json on EVERY visual_sweep compare run (even 0 changed
-    shots -- full manifest, zero findings), so any sweep whose shots change has a
-    current file and the manifest is the complete freshness authority. The default
-    reviewer is deterministic (no model); the OPT-IN model lane rides the
-    VISION_REVIEWER_CMD env var (e.g. "python3 tools/vlm_reviewer.py"), passed
-    through to tools/vision_review.py's --reviewer-cmd plugin socket. Default
-    unset => the deterministic lane; CI NEVER sets it. The plugin owns its own
-    degrade (composite: always runs the deterministic pass, adds the model only
-    when POSITIVELY available), so an absent model records a degrade and exits 0
-    — never a silent fallback, never a red run. Only a tool ERROR (bad PNG
-    decode, unwritable output, broken plugin) fails red via the exception path
-    (fail-closed); dropped/ungrounded findings are counted, never errors. Skipped
-    on transport-skip and in update mode; a
-    transport-skipped run that leaves a stale review file on disk REFUSES it (warn,
-    not recorded, never red). It runs after apply_region_gate so region-diff's
-    clusters.json exists; if that step erred, vision_review degrades to
-    sidecar-delta-only findings with a recorded warning rather than crashing."""
-    if result.get("scenario") != "visual_sweep":
+    Deterministic sidecar/region/anchor checks remain quarantine evidence, but a
+    sweep is not accepted unless the Qwen reviewer runs on every covered shot and
+    answers every rubric question. Headless transport remains an honest skip and
+    update mode still reviews fresh frames while omitting baseline-only verdicts."""
+    scenario = result.get("scenario")
+    if scenario not in VISION_REVIEW_SCENARIOS:
         return
+
     shots_dir = project / ".godot-smoke" / "shots"
     baseline_dir = project / "docs" / "generated" / "visual-baselines"
     output_dir = project / ".godot-smoke"
@@ -929,41 +923,45 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
             if stale:
                 print("  visual_sweep: refusing stale vision-review.json (transport-skipped; not recorded)")
         return
-    payload = result.get("passed_payload")
-    if not isinstance(payload, dict):
-        payload = {}
-    if payload.get("mode") == "update" or payload.get("auto_update"):
-        result["vision_review_written"] = None  # baselines just rewritten; compare trivially green
-        return
     try:
         vision_review = _load_tool_module("vision_review")
-        # OPT-IN model lane: VISION_REVIEWER_CMD wires a --reviewer-cmd plugin
-        # (e.g. "python3 tools/vlm_reviewer.py") into this post-step. Default
-        # unset => the deterministic default reviewer; CI NEVER sets it. The
-        # plugin owns its degrade (composite: the deterministic pass always
-        # runs, the model only when positively available), so an absent model
-        # is a RECORDED degrade with exit 0, never a silent fallback and never
-        # a red run; a broken plugin stays fail-closed via the exception path.
-        reviewer_cmd = os.environ.get("VISION_REVIEWER_CMD") or None
-        doc = vision_review.run_vision_review(
-            shots_dir, baseline_dir, output_dir,
-            clusters_path=output_dir / "region-diff" / "clusters.json",
-            reviewer_cmd=reviewer_cmd)
-    except Exception as exc:  # a broken review tool must not silently pass
-        result.setdefault("exceptions", []).append(f"vision review failed: {exc}")
+        reviewer_cmd = os.environ.get("VISION_REVIEWER_CMD") or "python3 tools/vlm_reviewer.py"
+        prior_required = os.environ.get("VLM_REQUIRED")
+        os.environ["VLM_REQUIRED"] = "1"
+        try:
+            doc = vision_review.run_vision_review(
+                shots_dir, baseline_dir, output_dir,
+                clusters_path=output_dir / "region-diff" / "clusters.json",
+                reviewer_cmd=reviewer_cmd, review_all_shots=True)
+        finally:
+            if prior_required is None:
+                os.environ.pop("VLM_REQUIRED", None)
+            else:
+                os.environ["VLM_REQUIRED"] = prior_required
+    except Exception as exc:
+        result.setdefault("exceptions", []).append(f"required vision review failed: {exc}")
         result["ok"] = False
         return
-    # Defense in depth: the file was just regenerated, so it must be fresh; a
-    # mismatch here indicates a broken manifest. Refuse (warn, not recorded), never
-    # red -- staleness is quarantine-tier, the next sweep regenerates.
     if not isinstance(doc, dict) or not vision_review.review_is_fresh(doc, shots_dir, baseline_dir):
-        print("  visual_sweep: refusing vision-review.json (manifest does not match current shots; not recorded)")
+        result.setdefault("exceptions", []).append("required vision review produced a stale manifest")
+        result["ok"] = False
+        return
+    coverage = (doc.get("rubric_coverage") or {}).get("totals") or {}
+    reviewer_kinds = set((doc.get("rubric_coverage") or {}).get("reviewer_kinds_ran") or [])
+    shots = [entry for entry in doc.get("shots", []) if isinstance(entry, dict)]
+    missing_model = [entry.get("shot") for entry in shots
+                     if not (entry.get("reviewer_meta") or {}).get("model", {}).get("ran")]
+    if "model-vision-llm" not in reviewer_kinds or missing_model or coverage.get("unanswered", 0):
+        result.setdefault("exceptions", []).append(
+            "required vision review incomplete: a vision-capable model must review every shot and answer every rubric question"
+        )
+        result["ok"] = False
         return
     written = _record_vision_review(result, doc, review_path)
-    print(f"  visual_sweep: vision-review {written['findings']} finding(s) "
-          f"({written['grounded']} grounded, {written['dropped']} dropped), "
-          f"{written['shots_changed']} changed of {written['shots_reviewed']} covered shot(s), "
+    print(f"  {scenario}: required vision review {written['findings']} finding(s), "
+          f"{written['shots_changed']} changed / {written['shots_reviewed']} covered, "
           f"reviewer={written['reviewer']}")
+
 
 
 def _baseline_dir(project: Path) -> Path:

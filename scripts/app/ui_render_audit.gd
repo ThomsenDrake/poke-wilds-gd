@@ -103,9 +103,10 @@ func _check_labels(state: String, labels: Array, bounds: Rect2) -> void:
 	var rects := []
 	for label in labels:
 		_labels_checked += 1
-		if not bounds.grow(BOUNDS_TOLERANCE).encloses(label.get_global_rect()):
+		var ink := UiRenderModel.ink_rect(label) # text extent, not the oversized bounding rect (restyled stage labels carry ~2x bounding rects under theme font overrides)
+		if not label.clip_text and not bounds.grow(BOUNDS_TOLERANCE).encloses(ink):
 			_failures.append({"state": state, "kind": "off_stage", "label": str(label.name)})
-		rects.append(UiRenderModel.ink_rect(label))
+		rects.append(ink)
 	for i in range(rects.size()):
 		for j in range(i + 1, rects.size()):
 			if (rects[i] as Rect2).intersects(rects[j]):
@@ -136,22 +137,22 @@ func _audit_menus(catalog) -> void:
 	menu.setup(injected)
 	_ctx["toggle_menu"].call()
 	await _settle(2)
-	_check_menu_state("menu", menu, menu.get_node("MenuPanel").get_global_rect(), [])
+	_check_menu_state("menu", menu, menu.stage_root().get_global_rect(), [])
 	menu._activate_entry(0)
 	await _settle(2)
 	var party_screen: Control = menu.get_node("PartyScreen")
-	_check_menu_state("party", party_screen, party_screen.get_node("Panel").get_global_rect(), [str(species.get("display_name", "?"))])
+	_check_menu_state("party", party_screen, party_screen.stage_root().get_global_rect(), [str(species.get("display_name", "?"))])
 	party_screen.close_screen()
 	menu._activate_entry(1)
 	await _settle(2)
 	var bag_screen: Control = menu.get_node("BagScreen")
-	_check_menu_state("bag", bag_screen, bag_screen.get_node("Panel").get_global_rect(), UiRenderFixtures.bag_names(catalog))
+	_check_menu_state("bag", bag_screen, bag_screen.stage_root().get_global_rect(), UiRenderFixtures.bag_names(catalog))
 	bag_screen.close_screen()
 	var storage: Control = menu.get_node_or_null("../StorageScreen")
 	if storage != null and storage.has_method("open_screen"):
 		storage.open_screen(Vector2i.ZERO) # no box at the origin -> the empty two-column state
 		await _settle(2)
-		_check_menu_state("storage", storage, storage.get_node("Panel").get_global_rect(), ["STORAGE BOX"])
+		_check_menu_state("storage", storage, storage.stage_root().get_global_rect(), ["STORAGE BOX"])
 		storage.close_screen()
 	_ctx["toggle_menu"].call()
 	menu.setup(original)

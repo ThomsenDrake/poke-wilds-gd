@@ -40,6 +40,24 @@ static func build_action_entries(mon: Dictionary, eligible_moves: Array, move_na
 	return entries
 
 
+# The field moves a mon is capable of (species flag==1, sorted) — capability
+# DISPLAY entries; eggs perform no field moves. Extracted from party_screen.gd
+# for the 220 ui wall (restyle slice wave 2).
+static func eligible_field_moves(mon: Dictionary, get_species: Callable) -> Array:
+	var move_ids: Array = []
+	if bool(mon.get("is_egg", false)) or not get_species.is_valid():
+		return move_ids
+	var species: Variant = get_species.call(str(mon.get("species_id", "")))
+	var flags: Variant = (species as Dictionary).get("field_moves", {}) if species is Dictionary else {}
+	if flags is not Dictionary:
+		return move_ids
+	for id_variant in (flags as Dictionary).keys(): # flag==1: the mon is capable
+		if int((flags as Dictionary)[id_variant]) == 1:
+			move_ids.append(str(id_variant))
+	move_ids.sort()
+	return move_ids
+
+
 # The target slot for one live reorder step (wraps), or -1 when the party is
 # too small to reorder.
 static func move_target_index(from_index: int, direction: int, party_size: int) -> int:

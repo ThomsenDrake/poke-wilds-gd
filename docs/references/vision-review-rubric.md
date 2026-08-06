@@ -1,11 +1,11 @@
 Status: current
-Last verified: 2026-07-23
+Last verified: 2026-08-05
 Review cadence days: 21
 Source paths: scripts/app/world_consistency_audit.gd, scripts/app/ui_render_audit.gd, tools/vision_review.py, tools/vlm_reviewer.py, docs/registry/art-anchors.toml, .godot-smoke/shots
 
 # Vision Review Rubric
 
-After any `visual_sweep` run whose shots change, `tools/vision_review.py` auto-produces `.godot-smoke/vision-review.json` — the Lane-4 structured findings file (oracle spec: `docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md` § Lane 4). Its DEFAULT REVIEWER is a deterministic in-process sidecar-consistency checker — no model, CI-safe, byte-stable findings per seed; a model or human reviewer plugs in via `--reviewer-cmd` (§ Lane-4 automation). The model-reviewer lane is PLUGGED IN AND DEMONSTRATED: `tools/vlm_reviewer.py` (§ Reviewer parameters) implements the socket and is wired into the runner post-step as an OPT-IN (`VISION_REVIEWER_CMD`, default unset ⇒ the deterministic lane; CI never sets it), and answers the judgment and non-baked-UI questions no coded class can express. The first positive model-answered manifest is LIVE-VERIFIED — "Qwen 3.8" (hosted `qwen3.8-max-preview` via the user's token-plan MaaS endpoint, `DASHSCOPE_API_KEY` env-only) answered all 19 rubric questions across all 5 shot groups (`reviewer_kinds_ran` includes `model-qwen3-vl`, 19/19 answered, 0 findings on the aligned tree, exit 0); local `ollama pull qwen3-vl:8b` is the offline FALLBACK (this box has no model pulled). When the model is positively unavailable (no key, server down, not pulled, per-call timeout) the lane degrades to the deterministic pass with the reason recorded (exit 0) and its model-only questions below are counted UNANSWERED — honest, never faked. The art-anchor layer (§ Grounding contract, `anchor:<id>`) carries geometric truth — the two mechanisms TARGET G1 (no source-art anchor; mechanical, proven by plant) and G2 (no rubric answerer; mechanism landed and wired, model-answered demonstration LIVE-VERIFIED) as one slice, and the G1↔G2 bridge is now CODE: `tools/vision_review.py` reads the registry into `anchor:<id>` regions and its `anchor_drift` class (reviewer_kind `deterministic-art-anchor`) answers the HP-bar track-geometry question whenever a changed battle shot is reviewed — the recursive battle draw_order collection (render_introspection.gd) exposes the nested `PlayerHUD/PlayerHPBar` so BOTH bars are live-verifiable. The questions below are the rubric every reviewer answers for each shot's state group; any "no" is a finding.
+After every windowed visual-sweep family run, `tools/vision_review.py` produces `.godot-smoke/vision-review.json` — the Lane-4 structured findings file (oracle spec: `docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md` § Lane 4). The deterministic in-process sidecar-consistency checker remains a composite supporting pass; the windowed acceptance path also requires the vision-capable `tools/vlm_reviewer.py` model reviewer (§ Lane-4 automation). The model-reviewer lane is PLUGGED IN AND DEMONSTRATED: `tools/vlm_reviewer.py` (§ Reviewer parameters) implements the socket and is wired into the runner post-step as the REQUIRED default (`VISION_REVIEWER_CMD` may override the command; CI may intentionally skip windowed captures), and answers the judgment and non-baked-UI questions no coded class can express. The first positive model-answered manifest is LIVE-VERIFIED — headless Command Code with `gpt-5.6-luna` answered the battle rubric in two passes; the same `model-vision-llm` capability covers all 27 rubric questions across 7 shot groups. Hosted `qwen3.8-max-preview` via the token-plan MaaS endpoint and local `ollama qwen3-vl:8b` remain later fallbacks. When the model is positively unavailable (no key, server down, not pulled, per-call timeout), required windowed review fails closed with a secret-free reason; deterministic-only standalone maintenance remains available and its model-only questions are counted UNANSWERED — honest, never faked. The art-anchor layer (§ Grounding contract, `anchor:<id>`) carries geometric truth — the two mechanisms TARGET G1 (no source-art anchor; mechanical, proven by plant) and G2 (no rubric answerer; mechanism landed and wired, model-answered demonstration LIVE-VERIFIED) as one slice, and the G1↔G2 bridge is now CODE: `tools/vision_review.py` reads the registry into `anchor:<id>` regions and its `anchor_drift` class (reviewer_kind `deterministic-art-anchor`) answers the HP-bar track-geometry question whenever a changed battle shot is reviewed — the recursive battle draw_order collection (render_introspection.gd) exposes the nested `PlayerHUD/PlayerHPBar` so BOTH bars are live-verifiable. The questions below are the rubric every reviewer answers for each shot's state group; any "no" is a finding.
 
 Findings are quarantine-tier: reported, never failing, unless a coded oracle independently confirms the same defect. Only tool ERRORS (bad PNG decode, reviewer subprocess timeout/non-zero/invalid JSON, unwritable output) fail the run red (fail-closed). Every emitted finding MUST be grounded — cite a sidecar region id and intersect its bbox (§ Grounding contract); ungrounded reviewer output is dropped and counted, never emitted.
 
@@ -53,8 +53,10 @@ The model-reviewer lane is PLUGGED IN AND DEMONSTRATED (opt-in; the first model-
 - Does every row align its name, level, HP bar, and counts on one line?
 - Are HP bars visible and color-graded (green/orange/red)?
 - Is any text clipped, overlapping, or escaping its panel?
+- Are letters and words spaced consistently, without broken kerning or awkward gaps?
+- Are labels, rows, cursors, bars, and counts aligned to a consistent grid?
 
-NOTE: all five menu questions also have DETERMINISTIC answerers now: menu sidecars carry `expected_regions.strings` (every visible label's window-space ink rect + `UiRenderModel.menu_expected_texts`' curated per-shot texts — the 29 Egg-summary extension included), and the default reviewer diffs those rects baseline-vs-fresh (row-alignment / clipping / presence drift is an `expected_region_changed` finding). The model reviewer stays declared alongside; a deterministic pass answers the group without it.
+NOTE: all seven menu questions also have DETERMINISTIC answerers now: menu sidecars carry `expected_regions.strings` (every visible label's window-space ink rect + `UiRenderModel.menu_expected_texts`' curated per-shot texts — the 29 Egg-summary extension included), and the default reviewer diffs those rects baseline-vs-fresh (row-alignment / clipping / presence drift is an `expected_region_changed` finding). The model reviewer stays declared alongside; a deterministic pass answers the group without it.
 
 ## Battle states (`09_battle` … `12_battle_items`)
 
@@ -67,8 +69,10 @@ NOTE: all five menu questions also have DETERMINISTIC answerers now: menu sideca
 - Are HP bars on their baked tracks, and do HP numbers show a single slash?
   (needs: deterministic-art-anchor answers the track GEOMETRY — each anchored bar's
   live draw_order rect is compared byte-side to its art-anchors.toml stage_rect within
-  tol_px whenever a changed battle shot is reviewed; model-qwen3-vl keeps the
+  tol_px whenever a changed battle shot is reviewed; model-vision-llm keeps the
   single-slash number JUDGMENT)
+- Is text kerning consistent, with no fused letters, broken glyph spacing, or awkward gaps?
+- Are battle labels, bars, and cursors aligned consistently to their intended rows and plates?
 
 ## Camping states (`15_camp_night_lit`, `16_craft_menu` — `17_dawn_after_rest` is formally RETIRED: camping-reserved, never committed, the sole whitelisted numbering gap in the shot-range registry)
 
@@ -93,6 +97,13 @@ NOTE: both questions below remain MODEL-ONLY, banked on VLM restoration — no d
 - At EVERY window size: is the text pixel-crisp (uniform stroke widths, no
   shimmering/uneven glyph columns), the surface centered with even margins,
   and nothing clipped at the surface edges?
+
+## Satellite sweep states (fishing, storage, Pokémon, overworld, world-depth)
+
+- Is the focal content intact and visibly present in the captured state?
+- Are text or sprites clipped, stretched, overlapped, or otherwise unreadable?
+- Is anything rendered as an untextured solid-color or repeated-ghost blob?
+- Does the scene remain readable as the intended game state at a glance?
 
 ## Grounding contract
 
@@ -212,12 +223,11 @@ Stable join key for the graduation ledger: `vr1-` + the first 16 hex chars of sh
 
 ## Lane-4 automation (`tools/vision_review.py`)
 
-The pipeline runs on every `visual_sweep` compare run — as a `run_playtests.py` post-step (`apply_vision_review`) and standalone — with NO model required:
+The runner invokes the required model-backed review on every windowed sweep family. Standalone maintenance can run the deterministic reviewer, or review every baselined shot with an explicit model command:
 
 ```bash
 python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines
-# optional model/human plugin:
-python3 tools/vision_review.py --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd "my-reviewer --flag"
+python3 tools/vision_review.py --review-all --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd "python3 tools/vlm_reviewer.py" --required
 ```
 
 Exit contract: 0 = review written (including with dropped findings — drops are not errors), 2 = tool error (fail-closed: bad PNG decode, reviewer subprocess timeout/non-zero/invalid JSON, unwritable output). Standalone use and the runner post-step share the contract; the runner records `vision_review_written` plus kind-`vision_review` quarantine entries (see [vision-fidelity.md](../product-specs/vision-fidelity.md) § Lane 4 automation and [RELIABILITY.md](../RELIABILITY.md)).
@@ -230,7 +240,7 @@ For each shot whose fresh PNG bytes differ from its baseline bytes (`visual_regi
 2. `crop_NNN_<tag>.png` — NATIVE-RESOLUTION crops (capped full frames hide small diffs — the point of the crops): one base|fresh twin per `clusters.json` cluster (cluster bbox + 8px padding, clamped to frame, 4px gap, panels labeled via `png_canvas.text`), built with `visual_diff.decode_png_rgba` + `png_canvas` blit/box/text; region crops for grounded findings are added post-review as each finding's `evidence_crop` (cited region rect + padding, base|fresh twin).
 3. `som_before.png` / `som_after.png` — Set-of-Mark overlays (arXiv 2310.11441): full-frame copies with EVERY groundable region outlined (1px box, color per kind: canary red, string/ink/label amber, cursor cyan, anchor green, draw gray, palette:canary magenta) plus a NUMBER at each box (`png_canvas` 3x5 font); numbering is deterministic (kind priority then region-id), and the number→region_id legend ships in the reviewer's stdin JSON (`som_legend`), not pixels-only. SoM frames require a decode→blit of 746,496 px (pure-Python loop, ~1-2 s/frame; bounded — only changed shots get SoM; never downscale SoM, since capped frames are the exact failure mode).
 4. `expected_strings.json` — the expected-strings manifest: fresh sidecar `expected_regions.strings` + `labels[]` (text, region, mode, avoid).
-5. `rubric.txt` — this rubric's section for the shot's state group (prefix map: 01-03 overworld, 04-05 + 24-25 day/night, 06-08 + 28-29 menu, 09-12 battle, 15-16 camping (17 retired), 22-23 + 30 overworld_mons, matrix/ display-matrix; 26-27 are the fishing satellite's shots — windowed-diffed against baselines, no rubric section of their own since the pre-Phase-7 expansion mints no new questions).
+5. `rubric.txt` — this rubric's section for the shot's state group (prefix map: 01-03 overworld, 04-05 + 24-25 day/night, 06-08 + 28-29 menu, 09-12 battle, 15-16 camping (17 retired), 22-23 + 30 overworld_mons, matrix/ display-matrix; 26-27 and other family-specific satellite shots use the generic Satellite sweep states rubric; every covered shot receives a model bundle and answer set).
 6. `context.json` — shot kind, crafted_state, window, clusters summary (bbox + changed + tier + sentence), the computed sidecar delta list, the region table (id → {kind, rects, source sidecar}), and the number→region_id `som_legend` (the same dict that ships in the stdin JSON).
 
 REVIEWER INVOCATION: a `--reviewer-cmd` plugin gets stdin JSON `{shot, shot_kind, paths{before, after, som_before, som_after, crops[], expected_strings, rubric, context}, reviewer_params, finding_schema, region_table, window, clusters, som_legend, grounding_rules}` and must return stdout `{"findings": [...]}` (subprocess with `shlex.split`, NO `shell=True`, timeout default 300s; non-zero/timeout/invalid JSON = tool error → exit 2 / runner exception red, fail-closed — a hung or garbage plugin is never a silent pass). `window` (frame bounds), `clusters` (change regions), and `som_legend` (the SoM number→region_id join) ride in stdin — not only the on-disk `context.json` — so the plugin can build in-frame, groundable bboxes from stdin alone. The deterministic default is an in-process function with the SAME (stdin-dict → findings-list) signature — the interface is honored, the subprocess is skipped. Returned findings then go through schema validate/repair → grounding enforcement → finding_id minting → write.
@@ -286,39 +296,39 @@ The mechanized version of the pilot's RETIRED `_review` coverage-gap pseudo-row 
 
 - **Stable question ids.** `question_id = "q1-"` + the first 8 hex of sha256 over the canonical (whitespace-collapsed) question text — stable across REORDERING; REWORDING rotates the id (surfaced as an UNASSIGNED question, never a silent loss), and a brand-new question nobody mapped is likewise counted. (The `vr1-` `finding_id` convention applied to questions.)
 - **Answered predicate.** A question is `answered` iff a CAPABLE reviewer kind RAN this pass (`_kinds_that_ran`: the configured reviewer plus every kind that self-tagged an emitted finding or a returned answer — a composite VLM/art-anchor wrapper self-tags, so its coverage registers without any pipeline change), OR a returned `answers[]` entry addressed its id.
-- **Unanswered is a first-class COUNTED state** — never faked as answered, never red (advisory-loud). A shot-group with unanswered questions emits a `rubric_coverage_gap [<group>]: N of M rubric question(s) have no fresh reviewer pass (needs [...])` line that rides the manifest `warnings[]`, the legibility report, and `verify_all`'s WARN surface (degrading under `--skip-windowed` like R6). Overworld reports its reason as "no fresh reviewer of kind [model-qwen3-vl] ran this pass; overworld shots carry zero groundable regions" — the honest, mechanized form of the pilot's "overworld y-sort has no pixel canary" note.
+- **Unanswered is a first-class COUNTED state** — never faked as answered, never red (advisory-loud). A shot-group with unanswered questions emits a `rubric_coverage_gap [<group>]: N of M rubric question(s) have no fresh reviewer pass (needs [...])` line that rides the manifest `warnings[]`, the legibility report, and `verify_all`'s WARN surface (degrading under `--skip-windowed` like R6). Overworld reports its reason as "no fresh reviewer of kind [model-vision-llm] ran this pass; overworld shots carry zero groundable regions" — the honest, mechanized form of the pilot's "overworld y-sort has no pixel canary" note.
 - **Question-count backstop.** `EXPECTED_QUESTION_COUNTS` pins the inventory — overworld 6, day_night 2, menu 5, battle 5, camping 2, overworld_mons 2, display_matrix 1 (23 total; the pre-Phase-7 menu conversion changes KINDS, not counts) — so editing the rubric cannot SILENTLY EMPTY a question list: a drift records a loud advisory warning AND fails the RED `check_repo_contracts` backstop (`rubric_inventory_issues`, folded into `check_repo_contracts.run()`) — both forcing a deliberate re-map. **Do not add, remove, or reword the bullets in the five shot-group sections above without re-mapping `QUESTION_ANSWERERS` / `EXPECTED_QUESTION_COUNTS`.**
 - **Freshness.** `rubric_coverage` rides the sha256 manifest, so `review_is_fresh` covers it; the lane-4 staleness refusal (§ Staleness) applies unchanged.
 
 ### Answerers table (`QUESTION_ANSWERERS`)
 
-Matching is by CONTENT (a distinctive lowercase fingerprint substring of the canonical question text), so the join is robust to reordering and a reword breaks its fingerprint → unassigned (counted). Reviewer kinds: `deterministic-sidecar-consistency` (the default), `deterministic-art-anchor` (the art-anchor drift class), `model-qwen3-vl` (Qwen3-VL).
+Matching is by CONTENT (a distinctive lowercase fingerprint substring of the canonical question text), so the join is robust to reordering and a reword breaks its fingerprint → unassigned (counted). Reviewer kinds: `deterministic-sidecar-consistency` (supporting), `deterministic-art-anchor` (art-anchor drift), `model-vision-llm` (Command Code GPT-5.6-Luna, then hosted/local fallbacks).
 
 | Shot group | Question fingerprint | Capable reviewer kinds |
 | --- | --- | --- |
-| battle | cursor vertically centered | deterministic-sidecar-consistency, model-qwen3-vl |
-| battle | name plates read fully | deterministic-sidecar-consistency, model-qwen3-vl |
-| battle | hp bars on their baked tracks | deterministic-art-anchor, model-qwen3-vl |
-| battle | single clean frame | model-qwen3-vl |
-| battle | text inside its box | model-qwen3-vl |
-| overworld | biome read as its intended terrain | model-qwen3-vl |
-| overworld | props sit on their tiles | model-qwen3-vl |
-| overworld | render behind tall prop canopies | model-qwen3-vl |
-| overworld | tall-grass patches visibly distinct | model-qwen3-vl |
-| overworld | untextured solid-color | model-qwen3-vl |
-| overworld | player sprite intact | model-qwen3-vl |
-| day_night | tint plausibly | model-qwen3-vl |
-| day_night | hint bar | model-qwen3-vl |
-| menu | uniformly dimmed | deterministic-sidecar-consistency, model-qwen3-vl |
-| menu | panels framed and readable | deterministic-sidecar-consistency, model-qwen3-vl |
-| menu | every row align its name | deterministic-sidecar-consistency, model-qwen3-vl |
-| menu | hp bars visible and color-graded | deterministic-sidecar-consistency, model-qwen3-vl |
-| menu | clipped, overlapping, or escaping | deterministic-sidecar-consistency, model-qwen3-vl |
-| camping | glow visible around the fire | model-qwen3-vl |
-| camping | recipe names + ingredient counts legible | model-qwen3-vl |
-| overworld_mons | roaming mons visibly y-sort | model-qwen3-vl |
-| overworld_mons | ground nest ring | model-qwen3-vl |
-| display_matrix | every window size | model-qwen3-vl |
+| battle | cursor vertically centered | deterministic-sidecar-consistency, model-vision-llm |
+| battle | name plates read fully | deterministic-sidecar-consistency, model-vision-llm |
+| battle | hp bars on their baked tracks | deterministic-art-anchor, model-vision-llm |
+| battle | single clean frame | model-vision-llm |
+| battle | text inside its box | model-vision-llm |
+| overworld | biome read as its intended terrain | model-vision-llm |
+| overworld | props sit on their tiles | model-vision-llm |
+| overworld | render behind tall prop canopies | model-vision-llm |
+| overworld | tall-grass patches visibly distinct | model-vision-llm |
+| overworld | untextured solid-color | model-vision-llm |
+| overworld | player sprite intact | model-vision-llm |
+| day_night | tint plausibly | model-vision-llm |
+| day_night | hint bar | model-vision-llm |
+| menu | uniformly dimmed | deterministic-sidecar-consistency, model-vision-llm |
+| menu | panels framed and readable | deterministic-sidecar-consistency, model-vision-llm |
+| menu | every row align its name | deterministic-sidecar-consistency, model-vision-llm |
+| menu | hp bars visible and color-graded | deterministic-sidecar-consistency, model-vision-llm |
+| menu | clipped, overlapping, or escaping | deterministic-sidecar-consistency, model-vision-llm |
+| camping | glow visible around the fire | model-vision-llm |
+| camping | recipe names + ingredient counts legible | model-vision-llm |
+| overworld_mons | roaming mons visibly y-sort | model-vision-llm |
+| overworld_mons | ground nest ring | model-vision-llm |
+| display_matrix | every window size | model-vision-llm |
 
 Consequence: the deterministic sidecar-consistency reviewer answers the two battle questions its classes mechanically implement PLUS — since the pre-Phase-7 expansion — the FIVE menu questions, answered over the menu sidecars' `expected_regions.strings` (no new machinery: the existing string/label classes; no new model questions minted — the conversion changes KINDS, not counts); the HP-bar trigger question ("hp bars on their baked tracks") is ANSWERED by the art-anchor class (geometric truth — the `anchor_drift` comparison runs whenever a changed battle shot is reviewed, and the kind self-tags into the ran set even on a zero-drift tree), with the model keeping the single-slash number judgment; and the remaining TEN judgment / non-baked-UI questions are model-only — exactly the questions an art anchor is structurally blind to (the two camping questions ride the same model-only tier: the 15-16 sidecars carry zero groundable regions; the two `overworld_mons` questions stay FLAGGED model-only with a bank-on-VLM-restoration note — overworld shots carry zero groundable regions, so their answer is deferred to the restoration of a capable VLM pass rather than faked deterministic). Offline (no model run), those ten are counted UNANSWERED with reason, never faked.
 
@@ -329,7 +339,7 @@ A `--reviewer-cmd` plugin may ANSWER rubric questions explicitly by returning `a
 ```json
 {"findings": [...], "answers": [{"question_id": "q1-<hex8>", "verdict": "yes|no",
   "region_id": "anchor:battle/enemy_hp_track", "bbox": [128, 108, 192, 16],
-  "note": "...", "reviewer_kind": "model-qwen3-vl"}]}
+  "note": "...", "reviewer_kind": "model-vision-llm"}]}
 ```
 
 `_validate_answer` validates/repairs each answer (`verdict ∈ {yes, no}`, `question_id` a non-empty `q1-` id; `region_id` + `bbox` optional). A verdict-`no` answer that cites a resolvable region becomes a quarantine finding via the existing `_mk` path (reviewer_kind carried through); an answer without a resolvable region is COUNTED, never a finding; a malformed `answers` field is a TOOL ERROR (never a silent drop), and dropped invalid answers are counted in the coverage warnings. The deterministic lanes need not emit explicit answers — their coverage registers because a capable kind RAN (§ Answered predicate).

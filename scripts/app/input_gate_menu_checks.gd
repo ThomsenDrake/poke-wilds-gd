@@ -50,9 +50,7 @@ func _part_c_start_close_does_not_refire() -> void:
 		return
 	_flush_down(5) # POKEMON -> BAG -> SAVE -> OPTIONS -> NEW GAME -> CLOSE
 	await get_tree().process_frame
-	var entries: ItemList = _start_menu().get_node("MenuPanel/Margin/VBox/Entries")
-	var selected: PackedInt32Array = entries.get_selected_items()
-	var row_text := entries.get_item_text(int(selected[0])) if selected.size() > 0 else ""
+	var row_text: String = _start_menu().selected_row_text()
 	if not _expect(row_text == "CLOSE", "C: precondition witness: selected row '%s' is not CLOSE" % row_text):
 		return
 	var bag_before: Dictionary = runtime.session.bag.duplicate(true)
@@ -107,9 +105,7 @@ func _part_e_inert_field_move_leaves_the_tree() -> void:
 		return
 	_flush_down(field_row)
 	await get_tree().process_frame
-	var list: ItemList = party_screen.get_node("Panel/Margin/HBox/SideColumn/ActionPanel/Margin/ActionList")
-	var selected: PackedInt32Array = list.get_selected_items()
-	var row_text := list.get_item_text(int(selected[0])) if selected.size() > 0 else ""
+	var row_text: String = party_screen.action_row_text(int(party_screen.get("_action_selected")))
 	if not _expect(row_text.begins_with("FIELD"), "E: precondition witness: selected row '%s' is not a FIELD row" % row_text):
 		return
 	var tile_before: Vector2i = player.tile_position
@@ -132,9 +128,7 @@ func _part_d_new_game_confirm_resets_only() -> void:
 		return
 	_flush_down(4) # POKEMON -> BAG -> SAVE -> OPTIONS -> NEW GAME
 	await get_tree().process_frame
-	var entries: ItemList = _start_menu().get_node("MenuPanel/Margin/VBox/Entries")
-	var selected: PackedInt32Array = entries.get_selected_items()
-	var row_text := entries.get_item_text(int(selected[0])) if selected.size() > 0 else ""
+	var row_text: String = _start_menu().selected_row_text()
 	if not _expect(row_text.contains("NEW GAME"), "D: precondition witness: selected row '%s' is not NEW GAME" % row_text):
 		return
 	await _tap("action_a") # -> the MessageBox confirm
