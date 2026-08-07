@@ -110,6 +110,9 @@ const SCENARIOS := {
 	"visual_sweep_farfield_update": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", [{"mode": "update"}]],
 	# Bounded temporal capture (battle attack/capture adapters) — windowed-only.
 	"temporal_flow": [preload("res://scripts/app/temporal_flow_scenario.gd"), "run", []],
+	# Live-play drive for tools/commandcode_play_agent.py — windowed-only like
+	# temporal_flow; runs inside the dispatcher's save backup/restore guard.
+	"play_agent": [preload("res://scripts/app/play_agent_scenario.gd"), "run", []],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves
 	# evocative frames + crafted-state sidecars to docs/generated/showcase/. Deliberately outside the
 	# baseline gate machinery — no SHOT_REGISTRY entry, no reconcile()/region-diff gate. Windowed-only.

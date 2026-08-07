@@ -1,12 +1,25 @@
 #!/usr/bin/env python3
 """Command Code play agent: second cmd invocation that drives the live game.
 
-Takes a project root, reads the launch window + trace tail, and drives the
-running game through Godot DAP + input injection (Z/X/arrows/typed digits
-through player_avatar._unhandled_input / input_gate latch, the SAME latch
-the playtests use). Windowed-only like visual_sweep (needs real pixels),
-isolated in its own --user-dir temp so the user's save is never touched
-(see run_playtests suite save guard), bounded at 180s (< REVIEWER_TIMEOUT 300).
+Transport: the WINDOWED-SUBPROCESS pattern the repo's playtest harness proves
+(run_playtests.run_scenario_headless with windowed=True). The agent writes the
+smoke request (smoketest.write_smoke_request -> .godot-smoke/scenario.json =
+{"scenario": "play_agent"}), launches `godot --path <project>` WITHOUT
+--headless, drains stdout/stderr on threads, and parses trace lines via
+smoketest.parse_trace_lines through the run_playtests TraceCollector shape.
+ALL driving happens in-engine: scripts/app/play_agent_scenario.gd injects real
+input-phase events (SmokeTap.tap / Input.parse_input_event — the same
+input_gate/new_game_flow latch the playtests exercise) to run title -> NEW
+GAME -> creation (typed seed digits) -> GO -> world spawn, then one held-key
+overworld step and the bag snapshot. The scenario quits the app itself via
+get_tree().quit(); the wall-clock deadline here is only the backstop.
+
+Save honesty: isolation comes from the scenario running inside the
+dispatcher's save backup/restore guard (SmokeScenarioRunner.backup_save /
+restore_save in smoke_scenarios.gd) — there is NO --user-dir temp and NO DAP
+session, so the agent can never hijack a running editor or strand a temp
+profile. Windowed-only like visual_sweep/temporal_flow (real pixels + input
+phases), bounded at 180s (< REVIEWER_TIMEOUT 300).
 
 Invocation pattern (mirrors vlm_reviewer lane):
 
@@ -22,28 +35,26 @@ Stdin JSON bundle (what the harness ships to the agent):
 
 Stdout JSON (what the agent returns; also persisted as play_report.json):
   {
-    steps: [ {action, duration_s, events_seen[], ok} ],
-    reached_states: [ string ],       // trace states observed: title_shown, creation_confirmed, world_rebuilt, etc.
-    stuck_at?: string | null,
+    steps: [ {action, at_s, ok} ],
+    reached_states: [ string ],       // trace states observed: title_shown, creation_confirmed, world_rebuilt, overworld_step, inventory_checked, ...
+    stuck_at?: string | null,         // launch_failed | scenario_failed | timeout | runtime_error | missing_events | inventory_missing
     inventory_checks: [ {item_id, have, need, ok} ],
     creation_confirmed?: bool,
     player_step?: {tile: [x,y], steps: int} | null,
     snapshot_captured?: bool
   }
 
-Report file path: .godot-smoke/play_report.json (project-relative; also
-accepted as .godot-smoke/play-report.json for legacy readers).
+Report file path: .godot-smoke/play_report.json (project-relative; --report
+overrides it, and the legacy hyphen alias .godot-smoke/play-report.json is
+written ONLY for the default path).
 
 Transport honesty: under PLAYTEST_FORCE_HEADLESS the windowed-only lane is
-reported skipped-with-reason (ok=True), never failed — captures need a real
-window and renderer. The DAP path reuses godot_dap_smoketest primitives;
-input injection uses Input.parse_input_event via DAP evaluate (Z/X/arrows as
-InputEventKey physical_keycode, digits as unicode), the house accumulation
-pattern (press in one frame, release in a later frame) so
-player_avatar._read_step_direction / input_router polls see just_pressed.
+reported skipped-with-reason (ok=True), never failed — live play needs a real
+window and renderer. Trace parsing reuses godot_dap_smoketest primitives and
+the run_playtests TraceCollector/drain helpers via the sanctioned importlib
+pattern, never forked.
 
-Stdlib-only. Reuses godot_dap_smoketest via the sanctioned importlib pattern,
-never forked.
+Stdlib-only.
 """
 from __future__ import annotations
 
@@ -51,22 +62,19 @@ import argparse
 import importlib.util
 import json
 import os
+from pathlib import Path
+import queue
 import re
 import shutil
-import socket
 import subprocess
 import sys
-import tempfile
+import threading
 import time
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = Path(__file__).resolve().parent
 
 DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
-DEFAULT_SCENE = "res://scenes/app/Main.tscn"
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 6006
 CANONICAL_WINDOW = [1152, 648]
 PLAY_REPORT = ROOT / ".godot-smoke" / "play_report.json"
 PLAY_REPORT_LEGACY = ROOT / ".godot-smoke" / "play-report.json"
@@ -74,23 +82,17 @@ REVIEWER_TIMEOUT = 300
 PLAY_TIMEOUT = 180  # < REVIEWER_TIMEOUT by construction
 WINDOWED_ONLY = True
 TRACE_TAIL_LINES = 40
-CONNECT_TIMEOUT_S = 3.0
-SETTLE_S = 0.5
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 COMMAND_CODE_MODEL = "gpt-5.6-luna"
-
-# Input actions mirror scripts/app/input_router.gd + avatar bindings.
-ACTION_KEYS = {
-    "action_a": 90,   # Z
-    "action_b": 88,   # X
-    "start": 16777220,  # Enter (KEY_ENTER) — physical_keycode path covers it
-    "move_up": 16777232,    # KEY_UP
-    "move_down": 16777233,  # KEY_DOWN
-    "move_left": 16777234,  # KEY_LEFT
-    "move_right": 16777235, # KEY_RIGHT
-}
-# Fallback scan codes for letter keys when physical_keycode path used.
-DIGIT_UNICODE = {str(d): ord(str(d)) for d in range(10)}
+SCENARIO = "play_agent"
+# Granular witness events the play_agent scenario drives, in drive order
+# (boot + splash + title precede the scenario boundary; the rest are earned).
+TRACKED_EVENTS = (
+    "boot_started", "boot_ready", "splash_shown", "title_shown",
+    "title_new_game_chosen", "creation_confirmed", "world_rebuilt",
+    "overworld_step", "inventory_checked", "snapshot_captured",
+    "play_agent_passed", "play_agent_failed",
+)
 
 
 def force_headless() -> bool:
@@ -104,21 +106,19 @@ def windowed_skip_reason() -> str:
     )
 
 
-def _load_smoketest():
-    path = TOOLS / "godot_dap_smoketest.py"
-    spec = importlib.util.spec_from_file_location("godot_dap_smoketest", path)
+def _load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load godot_dap_smoketest from {path}")
+        raise RuntimeError(f"cannot load {name} from {path}")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
-smoketest = _load_smoketest()
+smoketest = _load_module("godot_dap_smoketest", TOOLS / "godot_dap_smoketest.py")
+playtests = _load_module("run_playtests", TOOLS / "run_playtests.py")
 
-# Reuse DAP primitives from the sibling harness (single-sourced).
-_send = smoketest.send
-_recv_messages = smoketest.recv_messages
+# Reuse the trace primitives from the sibling harnesses (single-sourced).
 _parse_trace_lines = smoketest.parse_trace_lines
 
 
@@ -236,16 +236,19 @@ def _command_code_available() -> tuple[bool, str]:
 
 def _invoke_command_code(bundle: dict, timeout: int = PLAY_TIMEOUT) -> dict | None:
     """Invoke `cmd -p --no-session --permission-mode plan --model gpt-5.6-luna --max-turns 12`
-    with the bundle on stdin. Returns parsed JSON or None when unavailable/error."""
+    with the bundle on stdin. Returns parsed JSON or None when unavailable/error.
+    ADVISORY ONLY: the plan is appended to the report as cmd_plan_steps; the
+    in-engine play_agent scenario always grounds the live run."""
     cmd = shutil.which("cmd")
     if not cmd:
         return None
     prompt = (
-        "You are the PokeWilds live-play driver. Read the JSON bundle on stdin "
+        "You are the PokeWilds live-play planner. Read the JSON bundle on stdin "
         "(window, trace_tail, available_scenarios, prior_findings) and return ONLY "
         "a JSON object {steps, reached_states, stuck_at, inventory_checks, "
-        "creation_confirmed, player_step, snapshot_captured} driving the game via "
-        "Z/X/arrows/typed digits through player_avatar._unhandled_input / input_gate latch. "
+        "creation_confirmed, player_step, snapshot_captured} planning the drive the "
+        "in-engine play_agent scenario performs: title -> NEW GAME -> creation "
+        "(typed seed digits) -> GO -> world spawn -> one overworld step -> bag check. "
         "Keep steps bounded; report stuck_at when blocked. No prose outside JSON."
     )
     # Mirror vlm_reviewer _call_command_code shape: prompt as -p arg, bundle on stdin.
@@ -290,241 +293,117 @@ def _invoke_command_code(bundle: dict, timeout: int = PLAY_TIMEOUT) -> dict | No
 
 
 # ---------------------------------------------------------------------------
-# Input injection (through DAP evaluate -> Input.parse_input_event)
-# The latch contract: every overlay owns Z/X/Enter via _unhandled_input during
-# the INPUT PHASE before Main._process polls; presses that close overlays set
-# the _ui_ate_press latch so same-frame polls do not re-fire. The play agent
-# drives the same physical keys so the latch is exercised.
+# Live play driver: write the smoke request, launch the WINDOWED subprocess
+# (no --headless; the play_agent scenario quits the app itself), drain stdout
+# on threads, and match traces against SCENARIO_REQUIREMENTS["play_agent"].
+# Save isolation is the in-engine backup/restore guard, not a --user-dir temp.
 # ---------------------------------------------------------------------------
 
-def _dap_evaluate(sock: socket.socket, seq: int, expression: str) -> dict | None:
-    """Evaluate a GDScript expression in the debuggee via DAP evaluate request."""
-    _send(sock, {"seq": seq, "type": "request", "command": "evaluate",
-                 "arguments": {"expression": expression, "context": "repl"}})
-    # Brief recv for the response; caller may ignore.
-    try:
-        msgs = _recv_messages(sock, timeout=0.6)
-        for m in msgs:
-            if m.get("type") == "response" and m.get("command") == "evaluate":
-                return m.get("body", {})
-    except OSError:
-        pass
+def _empty_drive(window: list[int] | None, stuck_at: str, action: str, error: str | None = None) -> dict:
+    step: dict = {"action": action, "ok": False}
+    if error:
+        step["error"] = error
+    return {"steps": [step], "reached_states": [], "stuck_at": stuck_at,
+            "inventory_checks": [], "creation_confirmed": False,
+            "player_step": None, "snapshot_captured": False,
+            "duration_s": 0.0, "window": window, "events_seen": []}
+
+
+def _last_payload(collector, event_name: str) -> dict | None:
+    """Newest payload for an event from the captured raw trace stream."""
+    for trace in reversed(collector.raw_traces or []):
+        if trace.get("event") == event_name:
+            payload = trace.get("payload", {})
+            return payload if isinstance(payload, dict) else {"value": payload}
     return None
 
 
-def _inject_key_via_dap(sock: socket.socket, seq: int, keycode: int, pressed: bool, unicode: int = 0) -> int:
-    expr = (
-        f"var e=InputEventKey.new(); e.physical_keycode={keycode}; "
-        f"e.pressed={'true' if pressed else 'false'}; "
-        + (f"e.unicode={unicode}; " if unicode else "")
-        + "Input.parse_input_event(e)"
-    )
-    _dap_evaluate(sock, seq, expr)
-    return seq + 1
-
-
-def _tap(sock: socket.socket, seq: int, action: str) -> int:
-    """Press in one input phase, release in a later frame — the house tap shape
-    that fires Input.is_action_just_pressed exactly once (smoke_tap.gd)."""
-    ka = ACTION_KEYS.get(action)
-    if ka is None:
-        # try digit unicode
-        if action.isdigit() and len(action) == 1:
-            # KEY_0..KEY_9 physical codes are 48..57; unicode is the digit.
-            return _inject_key_via_dap(sock, seq, 48 + int(action), True, DIGIT_UNICODE[action])
-        return seq
-    seq = _inject_key_via_dap(sock, seq, ka, True)
-    time.sleep(0.05)
-    seq = _inject_key_via_dap(sock, seq, ka, False)
-    time.sleep(0.05)
-    return seq
-
-
-def _type_digits(sock: socket.socket, seq: int, digits: str) -> int:
-    for ch in digits:
-        if ch.isdigit():
-            seq = _inject_key_via_dap(sock, seq, 48 + int(ch), True, DIGIT_UNICODE[ch])
-            time.sleep(0.02)
-            seq = _inject_key_via_dap(sock, seq, 48 + int(ch), False)
-            time.sleep(0.02)
-    return seq
-
-
-# ---------------------------------------------------------------------------
-# Live play driver: launch windowed Godot with --user-dir temp, drive via DAP.
-# ---------------------------------------------------------------------------
-
-def _launch_windowed(project: Path, godot_bin: str, user_dir: Path) -> subprocess.Popen:
-    cmd = [godot_bin, "--path", str(project), "--user-dir", str(user_dir)]
-    # No --headless: needs real window/pixels.
-    return subprocess.Popen(
-        cmd, cwd=str(project),
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, errors="replace", bufsize=1,
-    )
-
-
-def _drive_live(project: Path, godot_bin: str, timeout: float,
-                host: str, port: int, bundle: dict) -> dict:
-    """Drive the live game windowed; returns a play_report fragment."""
+def _drive_live(project: Path, godot_bin: str, timeout: float, bundle: dict) -> dict:
+    """Drive the live game via the windowed-subprocess play_agent scenario;
+    returns a play_report fragment grounded in observed trace events."""
     window = bundle.get("window") or CANONICAL_WINDOW
-    # Save isolation: own --user-dir temp (run_playtests suite save guard pattern).
-    user_dir = Path(tempfile.mkdtemp(prefix="poke-play-agent-"))
-    proc: subprocess.Popen | None = None
-    seq = 1
-    steps: list[dict] = []
-    reached: set[str] = set()
-    events_seen: set[str] = set()
-    creation_confirmed: bool | None = None
-    player_step: dict | None = None
-    snapshot_captured = False
-    inventory_checks: list[dict] = []
-    stuck_at: str | None = None
     t0 = time.monotonic()
-
-    def record(action: str, ok: bool, extra: dict | None = None) -> None:
-        steps.append({"action": action, "ok": ok, "at_s": round(time.monotonic() - t0, 2), **(extra or {})})
-
+    steps: list[dict] = []
+    # write_smoke_request truncates, so a leftover scenario.json from a crashed
+    # run is overwritten rather than merged.
+    request_path = smoketest.write_smoke_request(project, SCENARIO)
+    collector = playtests.TraceCollector(capture_raw=True)
+    exceptions: list[str] = []
+    proc: subprocess.Popen | None = None
+    timed_out = False
     try:
         try:
-            proc = _launch_windowed(project, godot_bin, user_dir)
+            # No --headless/--quit-after: the scenario quits the app itself; the
+            # wall-clock deadline below is the backstop.
+            proc = subprocess.Popen(
+                [godot_bin, "--path", str(project)], cwd=str(project),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True, errors="replace", bufsize=1,
+            )
         except OSError as exc:
-            return {"steps": [{"action": "launch", "ok": False, "error": str(exc)}],
-                    "reached_states": [], "stuck_at": "launch_failed",
-                    "inventory_checks": [], "creation_confirmed": False,
-                    "player_step": None, "snapshot_captured": False}
+            return _empty_drive(window, "launch_failed", "launch", str(exc))
+        steps.append({"action": "launch", "ok": True, "at_s": 0.0,
+                      "cmd": [godot_bin, "--path", str(project)]})
 
-        # Wait for DAP to come up (editor windowed run needs a moment).
-        deadline = time.monotonic() + 8.0
-        while time.monotonic() < deadline:
-            try:
-                sock_test = socket.create_connection((host, port), timeout=1.0)
-                sock_test.close()
+        stdout_lines: "queue.Queue[str]" = queue.Queue()
+        stderr_lines: list[str] = []
+        threads = [
+            threading.Thread(target=playtests._drain_stdout, args=(proc.stdout, stdout_lines), daemon=True),
+            threading.Thread(target=playtests._drain_stderr, args=(proc.stderr, stderr_lines), daemon=True),
+        ]
+        for thread in threads:
+            thread.start()
+
+        seen: set[str] = set()
+
+        def drain_stdout() -> None:
+            while True:
+                try:
+                    line = stdout_lines.get_nowait()
+                except queue.Empty:
+                    break
+                playtests.handle_output_line(line, collector, exceptions)
+                for event in sorted(collector.events - seen):
+                    if event in TRACKED_EVENTS:
+                        steps.append({"action": f"event:{event}", "ok": True,
+                                      "at_s": round(time.monotonic() - t0, 2)})
+                seen.update(collector.events)
+
+        settle_at: float | None = None
+        deadline = t0 + timeout
+        while True:
+            drain_stdout()
+            now = time.monotonic()
+            if playtests.requirements_met(SCENARIO, collector.events):
+                if settle_at is None:
+                    settle_at = now + playtests.SETTLE_S
+                elif now >= settle_at:
+                    _stop_process(proc, "terminate")
+                    break
+            if proc.poll() is not None:
                 break
-            except OSError:
-                time.sleep(0.3)
-        else:
-            proc.terminate()
-            return {"steps": [{"action": "dap_wait", "ok": False, "error": "DAP not listening"}],
-                    "reached_states": [], "stuck_at": "dap_unavailable",
-                    "inventory_checks": [], "creation_confirmed": False,
-                    "player_step": None, "snapshot_captured": False}
-
-        # DAP session: handshake then drive.
-        try:
-            sock = socket.create_connection((host, port), timeout=CONNECT_TIMEOUT_S)
-        except OSError as exc:
-            proc.terminate()
-            return {"steps": [{"action": "dap_connect", "ok": False, "error": str(exc)}],
-                    "reached_states": [], "stuck_at": "dap_connect_failed",
-                    "inventory_checks": [], "creation_confirmed": False,
-                    "player_step": None, "snapshot_captured": False}
-
-        with sock:
-            handshake = [
-                ("initialize", {"clientID": "play-agent", "clientName": "play-agent",
-                                "adapterID": "godot", "pathFormat": "path",
-                                "linesStartAt1": True, "columnsStartAt1": True,
-                                "supportsVariableType": True, "supportsVariablePaging": True,
-                                "supportsRunInTerminalRequest": False}),
-                ("launch", {"project": str(project), "scene": DEFAULT_SCENE}),
-                ("configurationDone", {}),
-            ]
-            for cmd_name, args in handshake:
-                _send(sock, {"seq": seq, "type": "request", "command": cmd_name, "arguments": args})
-                seq += 1
-
-            # Drive sequence: title -> creation -> spawn, then craft/build/breed probes.
-            # Each tap uses the house accumulation shape through the latch.
-            end = time.monotonic() + timeout
-            # Let boot settle and collect initial traces.
-            while time.monotonic() < end:
-                msgs = _recv_messages(sock, timeout=0.6)
-                for msg in msgs:
-                    if msg.get("type") != "event":
-                        continue
-                    body = msg.get("body", {})
-                    if msg.get("event") == "output":
-                        for tr in _parse_trace_lines(str(body.get("output", ""))):
-                            ev = str(tr.get("event", ""))
-                            if ev:
-                                events_seen.add(ev)
-                                reached.add(ev)
-                            if ev == "creation_confirmed":
-                                creation_confirmed = True
-                            if ev == "snapshot_captured":
-                                snapshot_captured = True
-                                reached.add("snapshot_captured")
-                            if ev in ("world_rebuilt", "boot_ready", "title_shown", "splash_shown"):
-                                reached.add(ev)
-                            payload = tr.get("payload", {}) if isinstance(tr.get("payload"), dict) else {}
-                            if ev == "world_rebuilt" and isinstance(payload, dict):
-                                ct = payload.get("center_tile")
-                                if isinstance(ct, (list, tuple)) and len(ct) == 2:
-                                    player_step = {"tile": [int(ct[0]), int(ct[1])], "steps": 0}
-                # Drive stepwise once boot is ready.
-                if "boot_ready" in events_seen and "title_shown" not in steps:
-                    # Title is up; drive NEW GAME -> creation.
-                    # Z = action_a (confirm), X = action_b (cancel), arrows = move_*.
-                    # Title entries: CONTINUE / NEW GAME; we drive NEW GAME.
-                    # Creation steps expect typed digits for seed: type "123" then Z commits.
-                    pass
-                # Periodic drive: nudge title/creation/overworld
-                if time.monotonic() - t0 > 2.0 and len(steps) < 4:
-                    # Press Z to advance splash/title.
-                    seq = _tap(sock, seq, "action_a")
-                    record("press_Z", True)
-                    if len(steps) == 2:
-                        # Creation seed step: type digits through digit row latch.
-                        seq = _type_digits(sock, seq, "20260806")
-                        record("type_seed_digits", True, {"digits": "20260806"})
-                    if len(steps) == 3:
-                        # Step arrows to walk creation NAME/AVATAR grid if present.
-                        seq = _tap(sock, seq, "move_right")
-                        record("move_right", True)
-                        seq = _tap(sock, seq, "move_down")
-                        record("move_down", True)
-                if "creation_confirmed" in events_seen and "world_rebuilt" in events_seen:
-                    # Reached spawn; probe overworld step + inventory.
-                    if player_step is None:
-                        player_step = {"tile": [0, 0], "steps": 1}
-                    # One overworld step to prove movement.
-                    seq = _tap(sock, seq, "move_up")
-                    record("overworld_step", True)
-                    # Inventory check: query bag via evaluate.
-                    body = _dap_evaluate(sock, seq, "str(get_node(\"/root/GameRuntime\").session.get_bag_snapshot())")
-                    seq += 1
-                    if body and body.get("result"):
-                        inventory_checks.append({"item_id": "bag_snapshot", "have": str(body["result"])[:200], "ok": True})
-                    break
-                if time.monotonic() >= end:
-                    stuck_at = "timeout"
-                    break
-                time.sleep(0.05)
-
-            # Graceful disconnect
-            try:
-                _send(sock, {"seq": seq, "type": "request", "command": "disconnect",
-                             "arguments": {"terminateDebuggee": True}})
-            except OSError:
-                pass
-
-        # Ensure process exits
+            if now >= deadline:
+                timed_out = True
+                _stop_process(proc, "kill")
+                break
+            time.sleep(0.05)
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            try:
-                proc.kill()
-                proc.wait(timeout=3)
-            except OSError:
-                pass
-
+            _stop_process(proc, "kill")
+            proc.wait()
+        for thread in threads:
+            thread.join(timeout=2)
+        drain_stdout()
+        for line in stderr_lines:
+            cleaned = playtests.clean_line(line)
+            if any(marker in cleaned for marker in smoketest.ERROR_MARKERS):
+                exceptions.append(cleaned)
+        if timed_out:
+            exceptions.append(f"Windowed run exceeded the {timeout:.0f}s wall-clock budget.")
     finally:
-        # Cleanup temp user-dir (save isolation).
-        try:
-            shutil.rmtree(user_dir, ignore_errors=True)
-        except OSError:
-            pass
+        if request_path.exists():
+            request_path.unlink()
         if proc is not None:
             try:
                 if proc.poll() is None:
@@ -532,35 +411,86 @@ def _drive_live(project: Path, godot_bin: str, timeout: float,
             except OSError:
                 pass
 
-    # Map reached trace events to human states
-    reached_states: list[str] = []
-    for ev in ("boot_started", "boot_ready", "splash_shown", "title_shown",
-               "title_new_game_chosen", "creation_confirmed", "world_rebuilt",
-               "snapshot_captured"):
-        if ev in reached:
-            reached_states.append(ev)
-    # Overworld/movement states
+    events = collector.events
+    requirements = smoketest.SCENARIO_REQUIREMENTS[SCENARIO]
+    missing_all = sorted(event for event in requirements["all"] if event not in events)
+    failed_events = collector.failed_events  # carries play_agent_failed reasons
+
+    # Honest stuck_at: a red ALWAYS names its cause (the run_playtests contract).
+    stuck_at: str | None = None
+    if failed_events:
+        stuck_at = "scenario_failed"
+        steps.append({"action": "scenario_failed", "ok": False,
+                      "at_s": round(time.monotonic() - t0, 2),
+                      "failed_events": failed_events})
+    elif timed_out and missing_all:
+        stuck_at = "timeout"
+    elif exceptions:
+        stuck_at = "runtime_error"
+    elif missing_all:
+        stuck_at = "missing_events"
+
+    creation_confirmed = "creation_confirmed" in events
+    snapshot_captured = "snapshot_captured" in events
+    player_step: dict | None = None
+    step_payload = _last_payload(collector, "overworld_step")
+    if step_payload is not None:
+        tile = step_payload.get("tile")
+        if isinstance(tile, (list, tuple)) and len(tile) == 2:
+            player_step = {"tile": [int(tile[0]), int(tile[1])],
+                           "steps": int(step_payload.get("steps", 1))}
+
+    # Inventory honesty: the scenario emits inventory_checked pass OR fail, so
+    # a run that reached the check always maps to real entries; a run that
+    # never produced the event can NOT silently pass the lane.
+    inventory_checks: list[dict] = []
+    inv_payload = _last_payload(collector, "inventory_checked")
+    if inv_payload is not None:
+        inv_ok = bool(inv_payload.get("ok", False))
+        items = inv_payload.get("items")
+        for item in items if isinstance(items, list) else []:
+            if isinstance(item, dict):
+                inventory_checks.append({"item_id": str(item.get("item_id", "")),
+                                         "have": int(item.get("count", 0)),
+                                         "need": 0, "ok": inv_ok})
+        if not inventory_checks:
+            inventory_checks.append({"item_id": "bag_snapshot", "have": 0, "need": 0,
+                                     "ok": inv_ok, "note": "bag snapshot empty"})
+    else:
+        inventory_checks.append({"item_id": "inventory_checked", "have": 0, "need": 0,
+                                 "ok": False,
+                                 "note": "scenario produced no inventory_checked event"})
+        if stuck_at is None:
+            stuck_at = "inventory_missing"
+
+    reached_states = [event for event in TRACKED_EVENTS if event in events]
     if player_step is not None:
         reached_states.append("overworld_spawn")
-    if inventory_checks:
-        reached_states.append("inventory_checked")
-    # Fallback inventory if nothing queried
-    if not inventory_checks:
-        inventory_checks = [{"item_id": "check_skipped", "have": 0, "need": 0, "ok": True, "note": "no bag query in this run"}]
-
-    duration = round(time.monotonic() - t0, 2)
     return {
         "steps": steps,
-        "reached_states": sorted(set(reached_states)),
+        "reached_states": reached_states,
         "stuck_at": stuck_at,
         "inventory_checks": inventory_checks,
-        "creation_confirmed": bool(creation_confirmed),
+        "creation_confirmed": creation_confirmed,
         "player_step": player_step,
         "snapshot_captured": snapshot_captured,
-        "duration_s": duration,
+        "duration_s": round(time.monotonic() - t0, 2),
         "window": window,
-        "events_seen": sorted(events_seen),
+        "events_seen": sorted(events),
+        "missing_all": missing_all,
+        "exceptions": exceptions,
+        "failed_events": failed_events,
     }
+
+
+def _stop_process(proc: subprocess.Popen, sig: str) -> None:
+    try:
+        if sig == "kill":
+            proc.kill()
+        else:
+            proc.terminate()
+    except OSError:
+        pass
 
 
 def assemble_bundle(project: Path) -> dict:
@@ -577,7 +507,7 @@ def assemble_bundle(project: Path) -> dict:
 
 def make_report(bundle: dict, drive: dict, project: Path) -> dict:
     """Merge bundle context into a structured play_report.json body."""
-    return {
+    report = {
         "schema": "play-report/1",
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "project": str(project),
@@ -595,41 +525,49 @@ def make_report(bundle: dict, drive: dict, project: Path) -> dict:
         "duration_s": drive.get("duration_s", 0),
         "events_seen": drive.get("events_seen") or [],
     }
+    for key in ("missing_all", "exceptions", "failed_events"):
+        if drive.get(key):
+            report[key] = drive[key]
+    return report
 
 
-def write_report(report: dict, project: Path) -> Path:
-    out = project / ".godot-smoke" / "play_report.json"
+def write_report(report: dict, project: Path, out_path: Path | None = None) -> Path:
+    """Write play_report.json. Honors the --report override (threaded through
+    as out_path / the PLAY_REPORT global); the legacy hyphen alias is written
+    ONLY for the default project-relative path."""
+    default_path = project / ".godot-smoke" / "play_report.json"
+    out = Path(out_path) if out_path is not None else default_path
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-    # Legacy alias for readers expecting hyphen.
-    try:
-        legacy = project / ".godot-smoke" / "play-report.json"
-        legacy.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
-    except OSError:
-        pass
+    text = json.dumps(report, indent=2, sort_keys=True)
+    out.write_text(text, encoding="utf-8")
+    if out == default_path:
+        # Legacy alias for readers expecting the hyphen (default path only).
+        try:
+            (project / ".godot-smoke" / "play-report.json").write_text(text, encoding="utf-8")
+        except OSError:
+            pass
     return out
 
 
 def run_play_agent(project: Path, godot_bin: str = DEFAULT_GODOT_BIN,
-                   host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
                    timeout: float = PLAY_TIMEOUT, bundle: dict | None = None,
-                   use_cmd: bool = True) -> tuple[dict, Path]:
-    """Entry: assemble bundle (or use provided), optionally invoke cmd agent,
-    then drive live game and write play_report.json. Returns (report, path)."""
+                   use_cmd: bool = True, report_path: Path | None = None) -> tuple[dict, Path]:
+    """Entry: assemble bundle (or use provided), optionally invoke the advisory
+    cmd agent, then run the windowed-subprocess drive and write play_report.json.
+    Returns (report, path)."""
     if bundle is None:
         bundle = assemble_bundle(project)
 
-    # Optional cmd agent pre-pass (the second cmd invocation). Its stdout JSON,
-    # when present, can seed the drive (e.g. a planned step list). The live
-    # drive still runs and grounds the report — the cmd output never bypasses
-    # the windowed run.
+    # Optional cmd agent pre-pass (the second cmd invocation). Its stdout JSON
+    # is appended to the report as cmd_plan_steps — advisory only; it NEVER
+    # bypasses the live windowed run that grounds the report.
     cmd_plan: dict | None = None
     if use_cmd:
         cmd_plan = _invoke_command_code(bundle, timeout=min(30, int(timeout)))
         if cmd_plan and isinstance(cmd_plan, dict):
             print(f"play_agent: cmd plan received ({len(cmd_plan.get('steps') or [])} steps)", file=sys.stderr)
 
-    drive = _drive_live(project, godot_bin, timeout, host, port, bundle) if not force_headless() else {
+    drive = _drive_live(project, godot_bin, timeout, bundle) if not force_headless() else {
         "steps": [{"action": "skipped", "ok": True, "reason": windowed_skip_reason()}],
         "reached_states": [],
         "stuck_at": None,
@@ -651,12 +589,12 @@ def run_play_agent(project: Path, godot_bin: str = DEFAULT_GODOT_BIN,
         report["skipped_reason"] = windowed_skip_reason()
         report["transport"] = "skipped-headless"
     else:
-        report["transport"] = "windowed"
+        report["transport"] = "windowed-subprocess"
         # Merge cmd plan advisory
         if "cmd_plan_steps" in drive:
             report["cmd_plan_steps"] = drive["cmd_plan_steps"]
 
-    path = write_report(report, project)
+    path = write_report(report, project, report_path)
     return report, path
 
 
@@ -665,8 +603,6 @@ def main(argv: list[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project", default=str(ROOT), help="project root (contains project.godot)")
     parser.add_argument("--godot-bin", default=os.environ.get("GODOT_BIN", DEFAULT_GODOT_BIN))
-    parser.add_argument("--host", default=DEFAULT_HOST)
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--timeout", type=float, default=PLAY_TIMEOUT,
                         help=f"wall-clock budget s (default {PLAY_TIMEOUT}, must be < {REVIEWER_TIMEOUT})")
     parser.add_argument("--bundle", type=Path, default=None,
@@ -711,12 +647,15 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError):
             bundle = None
 
-    # Report path override
+    # Report path override: thread it through (write_report honors out_path);
+    # keep the PLAY_REPORT global in sync for legacy readers.
     global PLAY_REPORT
+    report_path: Path | None = None
     if args.report is not None:
-        PLAY_REPORT = Path(args.report).expanduser()
-        if not PLAY_REPORT.is_absolute():
-            PLAY_REPORT = project / PLAY_REPORT
+        report_path = Path(args.report).expanduser()
+        if not report_path.is_absolute():
+            report_path = project / report_path
+        PLAY_REPORT = report_path
 
     # Transport honesty
     if force_headless():
@@ -736,7 +675,7 @@ def main(argv: list[str] | None = None) -> int:
             "player_step": None,
             "snapshot_captured": False,
         }
-        path = write_report(report, project)
+        path = write_report(report, project, report_path)
         print(json.dumps(report, indent=2, sort_keys=True))
         print(f"SKIP: {windowed_skip_reason()}", file=sys.stderr)
         print(f"report: {path}", file=sys.stderr)
@@ -747,9 +686,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: Godot binary missing: {args.godot_bin}", file=sys.stderr)
         return 2
 
-    report, path = run_play_agent(project, args.godot_bin, args.host, args.port,
+    report, path = run_play_agent(project, args.godot_bin,
                                   timeout=float(args.timeout), bundle=bundle,
-                                  use_cmd=not args.no_cmd)
+                                  use_cmd=not args.no_cmd, report_path=report_path)
     print(json.dumps(report, indent=2, sort_keys=True))
     print(f"report: {path}", file=sys.stderr)
     return 0 if not report.get("stuck_at") else 1

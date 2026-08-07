@@ -61,4 +61,19 @@ static func monotonic_frames_ok(manifest: Dictionary) -> Dictionary:
 		var entry: Dictionary = frames[i]
 		if int(entry.get("index", -1)) != i:
 			return {"ok": false, "reason": "frame index gap at %d" % i}
+	# Vacuous-capture guard: a temporal flow must OBSERVE at least one animating
+	# frame and actually settle. Contiguous indices alone prove nothing — a
+	# 1-frame capture of an idle view would otherwise pass. Settle is read from
+	# the manifest's top-level flag (capture_flow sets it when the adapter's
+	# settle() fires); the per-frame phase is sampled BEFORE on_frame updates it,
+	# so the final frame never carries a "settled" phase even on a real settle.
+	var saw_animating := false
+	for entry in frames:
+		var semantic: Dictionary = entry.get("semantic", {}) if entry.get("semantic") is Dictionary else {}
+		if bool(semantic.get("animating", false)) or bool(semantic.get("saw_animating", false)):
+			saw_animating = true
+	if not saw_animating:
+		return {"ok": false, "reason": "no animating frame observed (vacuous capture)"}
+	if not bool(manifest.get("settled", false)):
+		return {"ok": false, "reason": "flow never reached a settled phase"}
 	return {"ok": true, "reason": ""}

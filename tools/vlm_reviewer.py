@@ -867,12 +867,18 @@ def _extract_json(text: str):
 
 def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
                        images: list[str], temperature: float, seed: int,
-                       public_ctx: dict, content: str) -> tuple[dict | None, str]:
+                       public_ctx: dict, content: str,
+                       list_key: str = "answers") -> tuple[dict | None, str]:
+    # list_key: the required top-level list field. The review passes use
+    # "answers"; the self-critique pass returns "refutations" — accepting only
+    # "answers" there made every valid critique read as malformed (dead pass).
+    def _valid(doc: object) -> bool:
+        return isinstance(doc, dict) and isinstance(doc.get(list_key), list)
     try:
         doc = _extract_json(content)
-        if isinstance(doc, dict) and isinstance(doc.get("answers"), list):
+        if _valid(doc):
             return doc, "ok"
-        return None, "answers not a list"
+        return None, f"{list_key} not a list"
     except (ValueError, KeyError) as exc:
         first_err = exc
     # ONE repair retry (mandatory on the prompt-instructed DashScope path; a
@@ -882,7 +888,7 @@ def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
     try:
         content2 = _call_model(cfg, backend, repair_system, user_text, images, temperature, seed + 7919, public_ctx)
         doc = _extract_json(content2)
-        if isinstance(doc, dict) and isinstance(doc.get("answers"), list):
+        if _valid(doc):
             return doc, "repaired"
         return None, f"unparseable after repair: {first_err}"
     except (ValueError, KeyError, OSError, urllib.error.URLError) as exc2:
@@ -1105,7 +1111,8 @@ def _self_critique(public_ctx: dict, cfg: Config, backend: str, catalog: str,
     content = _call_model(cfg, backend, system, user_text + "\n\n" + _ut, images,
                           temperature, cfg.seed + 99, public_ctx)
     doc, parse_note = _parse_with_repair(cfg, backend, system, user_text, images,
-                                         temperature, cfg.seed + 99, public_ctx, content)
+                                         temperature, cfg.seed + 99, public_ctx, content,
+                                         list_key="refutations")
     if not isinstance(doc, dict):
         return answers, {"ran": False, "reason": f"critique unparseable: {parse_note}"}
     refuted_ids: set[str] = set()

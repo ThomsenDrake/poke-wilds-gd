@@ -83,11 +83,11 @@ static func prepare_capture_battle(ctx: Dictionary) -> String:
 		return "runtime did not expose catalog/pokemon_rules"
 	var get_move := Callable(catalog, "get_move")
 	var lead: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("MACHOP"), 20, get_move)
-	var wild_mon: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("CATERPIE"), 2, get_move)
+	# Full-HP low catch-rate target: a guaranteed catch has NO turns to animate;
+	# a FAILED catch plays the ball-shake turns + counterattack this lane records.
+	var wild_mon: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("GEODUDE"), 12, get_move)
 	if wild_mon.is_empty():
-		return "could not build wild CATERPIE"
-	wild_mon["current_hp"] = 1
-	wild_mon["max_hp"] = maxi(1, int(wild_mon.get("max_hp", 1)))
+		return "could not build wild GEODUDE"
 	var session = runtime.get("session")
 	var party_index: int = session.get_active_party_index() if session != null else -1
 	if party_index < 0:
@@ -109,10 +109,18 @@ static func prepare_capture_battle(ctx: Dictionary) -> String:
 	return ""
 
 
+# Drive capture through the battle VIEW (item menu -> poke_ball ->
+# _activate_selection -> _apply_response) so the turn player actually animates.
+# Calling runtime.use_pokeball() directly discards the response and leaves the
+# view idle — the adapter would then "capture" static frames.
 static func trigger_pokeball(ctx: Dictionary) -> void:
-	var runtime: Node = ctx.get("runtime")
-	if runtime != null and runtime.has_method("use_pokeball"):
-		runtime.use_pokeball()
+	var view: Node = ctx.get("battle_view")
+	if view == null:
+		return
+	view._set_menu_state("item")
+	view._selection = "poke_ball"
+	if view.has_method("_activate_selection"):
+		view._activate_selection()
 
 
 static func _move_index(mon: Dictionary, move_id: String) -> int:
@@ -125,18 +133,23 @@ static func _move_index(mon: Dictionary, move_id: String) -> int:
 
 class BattleAttackAdapter:
 	extends RefCounted
+	# Settle only after an OBSERVED animating frame followed by idle, and never
+	# before MIN_FRAMES — a 1-frame vacuous capture (trigger silently failed)
+	# must not read as a passed flow.
+	const MIN_FRAMES := 3
 	var _runtime: Node = null
 	var _viewport: Viewport = null
 	var _battle_view: Node = null
 	var _phase := "before"
 	var _saw_animating := false
 	var _settled := false
+	var _frames := 0
 	func setup(ctx: Dictionary) -> bool:
 		_runtime = ctx.get("runtime")
 		_viewport = ctx.get("viewport")
 		_battle_view = ctx.get("battle_view")
 		_phase = "animating"
-		_saw_animating = true
+		_saw_animating = false
 		return _runtime != null and _viewport != null and _battle_view != null
 	func phase() -> String:
 		return _phase
@@ -150,26 +163,34 @@ class BattleAttackAdapter:
 		if animating:
 			_saw_animating = true
 			_phase = "animating"
-		elif _saw_animating:
+		elif _saw_animating and _frames >= MIN_FRAMES:
 			_phase = "settled"
 			_settled = true
-		return {"enemy_hp": enemy_hp, "player_hp": player_hp, "animating": animating, "phase": _phase}
+		return {"enemy_hp": enemy_hp, "player_hp": player_hp, "animating": animating, "phase": _phase, "saw_animating": _saw_animating}
 	func settle() -> bool:
 		return _settled
 	func max_frames() -> int:
-		return 120
+		# A full exchange (move + counter) settles ~frame 124 on the FrameTicker
+		# pulse (one process frame each); 120 was too tight. 160 covers it with
+		# headroom while keeping per-frame PNG capture inside the wall-clock budget.
+		return 160
 	func on_frame(_frame) -> void:
+		_frames += 1
 		semantic() # refresh settle from live view each frame
 
 
 class BattleCaptureAdapter:
 	extends RefCounted
+	# Settle requires an OBSERVED animating frame (the ball throw) then idle, or
+	# the view closing on a finished capture — never a no-animation vacuous pass.
+	const MIN_FRAMES := 3
 	var _runtime: Node = null
 	var _viewport: Viewport = null
 	var _battle_view: Node = null
 	var _phase := "capturing"
 	var _settled := false
 	var _frames := 0
+	var _saw_animating := false
 	func setup(ctx: Dictionary) -> bool:
 		_runtime = ctx.get("runtime")
 		_viewport = ctx.get("viewport")
@@ -180,16 +201,20 @@ class BattleCaptureAdapter:
 	func semantic() -> Dictionary:
 		var visible := bool(_battle_view.visible) if _battle_view != null else false
 		var animating := bool(_battle_view.is_animating()) if _battle_view != null and _battle_view.has_method("is_animating") else false
-		_frames += 1
-		if not visible or (not animating and _frames >= 8):
+		if animating:
+			_saw_animating = true
+		# Settle only once the throw animated and the view went idle/closed.
+		if _frames >= MIN_FRAMES and _saw_animating and (not visible or not animating):
 			_phase = "settled"
 			_settled = true
 		else:
 			_phase = "capturing"
-		return {"animating": animating, "visible": visible, "phase": _phase}
+		return {"animating": animating, "visible": visible, "phase": _phase, "saw_animating": _saw_animating}
 	func settle() -> bool:
 		return _settled
 	func max_frames() -> int:
-		return 150
+		# Ball throw + catch resolve animate on the FrameTicker pulse like attack.
+		return 160
 	func on_frame(_frame) -> void:
+		_frames += 1
 		semantic()

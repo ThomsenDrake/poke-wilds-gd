@@ -17,6 +17,7 @@ static func build(main: Node) -> Dictionary:
 		"world": main.get_node("World"),
 		"player": main.get_node("Player"),
 		"runtime": runtime,
+		"viewport": main.get_viewport(),
 		"battle_view": main.get_node("UI/BattleView"),
 		"start_menu": main.get_node("UI/StartMenu"), "camp_menu": main.get_node("UI/CampMenu"),
 		"message_box": main.get_node("UI/MessageBox"),

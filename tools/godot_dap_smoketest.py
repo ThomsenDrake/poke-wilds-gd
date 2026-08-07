@@ -34,7 +34,7 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
                                  "visual_sweep_world_depth", "visual_sweep_world_depth_update",
                                  "visual_sweep_farfield", "visual_sweep_farfield_update",
-                                 "showcase_capture", "temporal_flow"}
+                                 "showcase_capture", "temporal_flow", "play_agent"}
 
 # The windowed-only subset: these have no in-engine headless fallback, so under
 # PLAYTEST_FORCE_HEADLESS both harnesses report them skipped-with-reason and
@@ -45,6 +45,9 @@ WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep
 # runnable under force-headless. temporal_flow is windowed-only: it needs real
 # pixels + frame_presented ordering (same reason as visual_sweep), and under
 # PLAYTEST_FORCE_HEADLESS both transports skip-with-reason (transport honesty).
+# play_agent is windowed-only too: it drives the real title/creation screens
+# through injected input phases and earns snapshot_captured off a real
+# readback, so a headless run is a skip-with-reason, never a red.
 WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_camping", "visual_sweep_camping_update",
                            "visual_sweep_storage", "visual_sweep_storage_update",
@@ -53,7 +56,7 @@ WINDOWED_ONLY_SCENARIOS = {"visual_sweep", "visual_sweep_update",
                            "visual_sweep_fishing", "visual_sweep_fishing_update",
                            "visual_sweep_world_depth", "visual_sweep_world_depth_update",
                            "visual_sweep_farfield", "visual_sweep_farfield_update",
-                           "showcase_capture", "temporal_flow"}
+                           "showcase_capture", "temporal_flow", "play_agent"}
 
 # R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label) runs for the
@@ -442,6 +445,18 @@ SCENARIO_REQUIREMENTS = {
     # loudness) so a red always carries its reasons.
     "temporal_flow": {
         "all": ["temporal_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Live-play drive (tools/commandcode_play_agent.py): the all-list pins the
+    # GRANULAR witness events, not just the pass marker — title_shown +
+    # creation_confirmed + world_rebuilt are the game's own traces the scenario
+    # asserts against, overworld_step + inventory_checked are the scenario's
+    # domain emissions. The symmetric play_agent_failed marker rides
+    # failed_event_entry (miss-002 loudness).
+    "play_agent": {
+        "all": ["boot_started", "boot_ready", "title_shown", "title_new_game_chosen",
+                "creation_confirmed", "world_rebuilt", "overworld_step",
+                "inventory_checked", "play_agent_passed"],
         "any": [["session_loaded", "session_created"]],
     },
 }

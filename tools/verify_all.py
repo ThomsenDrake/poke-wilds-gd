@@ -468,8 +468,10 @@ class Runner:
                 # --- S8.5: optional Command Code play agent (Track C.2) ---
                 # Default OFF locally; --with-play-agent opts in. Under
                 # --skip-windowed / missing binary it SKIP-with-reason (never PASS).
-                # The agent is windowed-only (real pixels + DAP input); headless
-                # force env is cleared so the agent can self-skip honestly.
+                # The agent is windowed-only (real pixels + the in-engine
+                # play_agent scenario's injected input phases, driven over the
+                # windowed-subprocess transport — no DAP); headless force env is
+                # cleared so the agent can self-skip honestly.
                 if not self.fail_fast_stop and getattr(args, "with_play_agent", False):
                     if args.skip_windowed:
                         self.record_skip("commandcode_play_agent", "windowed",
@@ -484,7 +486,7 @@ class Runner:
                                 "--project", str(ROOT),
                                 "--godot-bin", bin_,
                                 "--timeout", "180",
-                                "--no-cmd",  # deterministic DAP drive; cmd pre-pass opt-in later
+                                "--no-cmd",  # deterministic windowed-scenario drive; cmd pre-pass opt-in later
                             ],
                             pop_force_headless=True,
                             outer_timeout=300.0, retry_once=False,
