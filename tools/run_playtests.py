@@ -559,7 +559,9 @@ def sweep_stale_results(project: Path, run_start: float) -> int:
 
 
 def print_row(result: dict[str, Any]) -> None:
-    if result["transport"] == "skipped-headless":
+    if result.get("quarantined"):
+        status = "QUAR"
+    elif result["transport"] == "skipped-headless":
         status = "SKIP"
     else:
         status = "PASS" if result["ok"] else "FAIL"
@@ -568,6 +570,44 @@ def print_row(result: dict[str, Any]) -> None:
         f"{status:<6} {len(result['events_seen']):>6} "
         f"{len(result['warnings']):>5} {len(result['exceptions']):>4}"
     )
+
+
+def _print_failure_detail(result: dict[str, Any]) -> None:
+    """Per-scenario failure payload lines, shared by the failures section and the
+    quarantine section so a QUAR row stays as loud as a FAIL row."""
+    name = result["scenario"]
+    if result["missing_all"]:
+        print(f"  {name}: missing required events: {', '.join(result['missing_all'])}")
+    for group in result["missing_any"]:
+        print(f"  {name}: missing alternative group: {' | '.join(group)}")
+    for exception in result["exceptions"][:5]:
+        print(f"  {name}: exception: {exception}")
+    for failure in result.get("failed_events", [])[:5]:
+        print(f"  {name}: failed event {failure['event']}: {failure['payload']}")
+    for failure in result.get("region_failures", [])[:8]:
+        print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
+    for failure in result.get("sidecar_seed_violations", [])[:8]:
+        print(f"  {name}: sidecar-seed [{failure['kind']}] "
+              f"{failure.get('shot', '')}: {failure['detail']}")
+    for finding in result.get("region_quarantine", [])[:4]:
+        print(f"  {name}: quarantine [{finding['kind']}] {finding['shot']}: {finding['detail']}")
+    for finding in result.get("contrast_findings", [])[:4]:
+        print(f"  {name}: contrast_low {finding.get('shot', '')}: "
+              f"\"{finding.get('label_text', '')}\" ratio {finding.get('ratio')} < {finding.get('need')}")
+    for finding in result.get("cvd_findings", [])[:4]:
+        print(f"  {name}: cvd_collapse [{finding.get('deficiency')}] {finding.get('source')}: {finding.get('pair')}")
+    for finding in result.get("vision_review_quarantine", [])[:4]:
+        print(f"  {name}: vision_review [{finding.get('class', '')}] {finding.get('shot', '')} "
+              f"{finding.get('region_id', '')}: {finding.get('note', '')}")
+    for refusal in result.get("anchor_refusals", [])[:4]:
+        print(f"  {name}: anchor REFUSED {refusal.get('shot', '')} {refusal.get('node', '')}: "
+              f"live {refusal.get('live_rect')} off art anchor {refusal.get('stage_rect')}")
+    for finding in result.get("anchor_drift_quarantine", [])[:4]:
+        print(f"  {name}: anchor_drift [quarantine] {finding.get('shot', '')} "
+              f"{finding.get('node', '')}: {finding.get('detail', '')}")
+    if result.get("clusters_unexplained"):
+        print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
+              "(see region-diff/clusters.json — guards false closure)")
 
 
 _REGION_DIFF_PATH = Path(__file__).resolve().with_name("visual_region_diff.py")
@@ -931,10 +971,17 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
         prior_required = os.environ.get("VLM_REQUIRED")
         os.environ["VLM_REQUIRED"] = "1"
         try:
+            # VISION_REVIEW_WORKERS opts into the threaded per-shot pool (Track D);
+            # default 1 keeps the sequential pass. The merged vision-review.json is
+            # identical either way (ordered merge); VISION_REVIEW_REVIEWER_WORKERS
+            # caps concurrent VLM subprocesses (model-backend protection).
+            workers = int(os.environ.get("VISION_REVIEW_WORKERS", "1") or "1")
+            reviewer_workers = int(os.environ.get("VISION_REVIEW_REVIEWER_WORKERS", "2") or "2")
             doc = vision_review.run_vision_review(
                 shots_dir, baseline_dir, output_dir,
                 clusters_path=output_dir / "region-diff" / "clusters.json",
-                reviewer_cmd=reviewer_cmd, review_all_shots=True)
+                reviewer_cmd=reviewer_cmd, review_all_shots=True,
+                workers=workers, reviewer_workers=reviewer_workers)
         finally:
             if prior_required is None:
                 os.environ.pop("VLM_REQUIRED", None)
@@ -1364,7 +1411,8 @@ def main() -> int:
 
     results: list[dict[str, Any]] = []
     trace_dir = Path(args.trace_dir).expanduser() if args.trace_dir else None
-    for scenario in scenarios:
+
+    def run_one(scenario: str) -> dict[str, Any]:
         # Snapshot committed baselines BEFORE the sweep so apply_anchor_gate can
         # restore them if a regenerated baseline freezes an anchored misalignment
         # (the ONLY post-step that also runs in update mode). {} for other shots.
@@ -1379,58 +1427,49 @@ def main() -> int:
             result = run_scenario_dap(project, scenario, args.timeout, args.host, args.port)
         else:
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, trace_out=trace_out)
-        results.append(result)
         apply_region_gate(project, result)
         apply_contrast_cvd(project, result)
         apply_vision_review(project, result)
         apply_anchor_gate(project, result, anchor_snapshot)
         apply_soak_warning_tripwire(project, result)
+        return result
+
+    for scenario in scenarios:
+        result = run_one(scenario)
+        if not result["ok"] and scenario in smoketest.QUARANTINED_SCENARIOS:
+            # Quarantine protocol (smoketest.QUARANTINED_SCENARIOS): the entry is a
+            # FLAKE class, so one immediate re-run distinguishes the race from a
+            # real break. Still red => QUAR: the failure payload stays on the
+            # result, the suite exit stays green, and the count lands in
+            # summary.quarantined_flakes — tracked, never silently green.
+            retry = run_one(scenario)
+            retry["quarantine_attempts"] = 2
+            if not retry["ok"]:
+                retry["quarantined"] = True
+                retry["quarantine_reason"] = smoketest.QUARANTINED_SCENARIOS[scenario]
+            result = retry
+        results.append(result)
         print_row(result)
 
-    failed = [result for result in results if not result["ok"]]
+    quarantined = [result for result in results if result.get("quarantined")]
+    failed = [result for result in results if not result["ok"] and not result.get("quarantined")]
     if failed:
         print("\nfailures:")
         for result in failed:
-            name = result["scenario"]
-            if result["missing_all"]:
-                print(f"  {name}: missing required events: {', '.join(result['missing_all'])}")
-            for group in result["missing_any"]:
-                print(f"  {name}: missing alternative group: {' | '.join(group)}")
-            for exception in result["exceptions"][:5]:
-                print(f"  {name}: exception: {exception}")
-            for failure in result.get("failed_events", [])[:5]:
-                print(f"  {name}: failed event {failure['event']}: {failure['payload']}")
-            for failure in result.get("region_failures", [])[:8]:
-                print(f"  {name}: region [{failure['kind']}] {failure['shot']}: {failure['detail']}")
-            for failure in result.get("sidecar_seed_violations", [])[:8]:
-                print(f"  {name}: sidecar-seed [{failure['kind']}] "
-                      f"{failure.get('shot', '')}: {failure['detail']}")
-            for finding in result.get("region_quarantine", [])[:4]:
-                print(f"  {name}: quarantine [{finding['kind']}] {finding['shot']}: {finding['detail']}")
-            for finding in result.get("contrast_findings", [])[:4]:
-                print(f"  {name}: contrast_low {finding.get('shot', '')}: "
-                      f"\"{finding.get('label_text', '')}\" ratio {finding.get('ratio')} < {finding.get('need')}")
-            for finding in result.get("cvd_findings", [])[:4]:
-                print(f"  {name}: cvd_collapse [{finding.get('deficiency')}] {finding.get('source')}: {finding.get('pair')}")
-            for finding in result.get("vision_review_quarantine", [])[:4]:
-                print(f"  {name}: vision_review [{finding.get('class', '')}] {finding.get('shot', '')} "
-                      f"{finding.get('region_id', '')}: {finding.get('note', '')}")
-            for refusal in result.get("anchor_refusals", [])[:4]:
-                print(f"  {name}: anchor REFUSED {refusal.get('shot', '')} {refusal.get('node', '')}: "
-                      f"live {refusal.get('live_rect')} off art anchor {refusal.get('stage_rect')}")
-            for finding in result.get("anchor_drift_quarantine", [])[:4]:
-                print(f"  {name}: anchor_drift [quarantine] {finding.get('shot', '')} "
-                      f"{finding.get('node', '')}: {finding.get('detail', '')}")
-            if result.get("clusters_unexplained"):
-                print(f"  {name}: {result['clusters_unexplained']} unexplained cluster(s) "
-                      "(see region-diff/clusters.json — guards false closure)")
+            _print_failure_detail(result)
+    if quarantined:
+        print("\nquarantined (red but non-gating — tracked flake classes):")
+        for result in quarantined:
+            print(f"  {result['scenario']}: {result.get('quarantine_reason', '')}")
+            _print_failure_detail(result)
 
     skipped = sum(1 for result in results if result["transport"] == "skipped-headless")
     summary = {
         "ok": not failed,
         "total": len(results),
-        "passed": len(results) - len(failed),
+        "passed": len(results) - len(failed) - len(quarantined),
         "failed": len(failed),
+        "quarantined_flakes": len(quarantined),
         "skipped_headless": skipped,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1449,13 +1488,12 @@ def main() -> int:
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    line = f"\nsummary: {summary['passed']}/{summary['total']} passed, {summary['failed']} failed"
+    if summary["quarantined_flakes"]:
+        line += f", {summary['quarantined_flakes']} quarantined"
     if skipped:
-        line = f"\nsummary: {summary['passed']}/{summary['total']} ({skipped} skipped-headless)"
-        if summary["failed"]:
-            line += f", {summary['failed']} failed"
-        print(line)
-    else:
-        print(f"\nsummary: {summary['passed']}/{summary['total']} passed, {summary['failed']} failed")
+        line += f" ({skipped} skipped-headless)"
+    print(line)
     print(f"stamps:  head={report['head_sha'] or 'unknown'} godot={report['godot_version'] or 'unknown'} "
           f"window={report['window']} renderer={report['renderer'] or 'unknown'}")
     print(f"report:  {report_path}")

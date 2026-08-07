@@ -51,6 +51,8 @@ import datetime
 import hashlib
 import importlib.util
 import json
+import os
+import threading
 from pathlib import Path
 import shlex
 import subprocess
@@ -1416,7 +1418,8 @@ def review_is_fresh(review_doc: dict, shots_dir: Path, baseline_dir: Path | None
 
 def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                       changed: list[str] | None = None, reviewer_cmd: str | None = None,
-                      clusters_path: Path | None = None, review_all_shots: bool = False) -> dict:
+                      clusters_path: Path | None = None, review_all_shots: bool = False,
+                      workers: int = 1, reviewer_workers: int = 2) -> dict:
     if not shots_dir.is_dir():
         raise RuntimeError(f"shots directory missing: {shots_dir}")
     if not baseline_dir.is_dir():
@@ -1452,9 +1455,21 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
     run_answers: list[dict] = []  # validated rubric answers returned by a plugin reviewer
     answers_dropped = 0
     run_meta_kinds: set[str] = set()  # kinds a composite wrapper declares via reviewer_meta
-    reviewer_meta_by_shot: dict[str, dict] = {}
 
-    for name in shot_names:
+    # Per-shot worker: touches ONLY locals and returns a structured result; the
+    # main thread merges in shot_names order, so a threaded pass emits the same
+    # vision-review.json as a sequential one. Shared state is read-only after
+    # this point (clusters_by_shot, rubric_text, dirs, vd/canvas_mod, _EXPLAIN),
+    # and the lazy module caches are pre-warmed below before any pool starts.
+    # The reviewer subprocess (VLM) is the wall-time dominator and I/O-bound;
+    # reviewer_gate caps how many run concurrently (model-backend protection)
+    # independently of the shot-pool width.
+    reviewer_gate = threading.Semaphore(max(1, reviewer_workers)) if workers > 1 else None
+
+    def _work(name: str) -> dict:
+        res: dict = {"name": name, "warnings": [], "answers": [],
+                     "answers_dropped": 0, "meta_kinds": set(),
+                     "reviewer_meta": None}
         base_png = baseline_dir / name
         fresh_png = shots_dir / name
         fresh_bytes = fresh_png.read_bytes()
@@ -1462,25 +1477,26 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
         base_sidecar = _load_json(_sidecar_for(base_png))
         fresh_sidecar = _load_json(_sidecar_for(fresh_png))
         window = (base_sidecar or fresh_sidecar or {}).get("window") or [1152, 648]
-        windows.append(window)
+        res["window"] = window
         is_changed = (name in changed_set) if changed_set is not None else (fresh_bytes != base_bytes)
 
-        covered.append({"shot": name, "sha256": _sha256_bytes(fresh_bytes),
-                        "baseline_sha256": _sha256_bytes(base_bytes),
-                        "sidecar_fresh_sha256": _sha256_bytes(_sidecar_for(fresh_png).read_bytes())
-                        if _sidecar_for(fresh_png).exists() else None,
-                        "sidecar_baseline_sha256": _sha256_bytes(_sidecar_for(base_png).read_bytes())
-                        if _sidecar_for(base_png).exists() else None,
-                        "changed": is_changed})
+        res["covered"] = {"shot": name, "sha256": _sha256_bytes(fresh_bytes),
+                          "baseline_sha256": _sha256_bytes(base_bytes),
+                          "sidecar_fresh_sha256": _sha256_bytes(_sidecar_for(fresh_png).read_bytes())
+                          if _sidecar_for(fresh_png).exists() else None,
+                          "sidecar_baseline_sha256": _sha256_bytes(_sidecar_for(base_png).read_bytes())
+                          if _sidecar_for(base_png).exists() else None,
+                          "changed": is_changed}
         if not is_changed and not review_all_shots:
-            shots_out.append({"shot": name, "changed": False, "bundle": None,
-                              "reviewer_raw_count": 0, "dropped_count": 0, "findings": []})
-            continue
+            res["shot_out"] = {"shot": name, "changed": False, "bundle": None,
+                               "reviewer_raw_count": 0, "dropped_count": 0, "findings": []}
+            res["grounding"] = None
+            return res
 
         table = _build_region_table(base_sidecar, fresh_sidecar, window, _shot_group(name))
         warn = _selfcheck_draw_cursor(table)
         if warn:
-            warnings.append(f"{name}: {warn}")
+            res["warnings"].append(f"{name}: {warn}")
         clusters = (clusters_by_shot.get(name) or {}).get("clusters", [])
         bundle_dir = review_dir / Path(name).stem
         paths, som_legend, enrichment = assemble_bundle(name, base_png, fresh_png, base_sidecar,
@@ -1525,10 +1541,14 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
         public_ctx.update(enrichment)
 
         if reviewer_cmd:
-            raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)
-            run_meta_kinds |= meta_kinds
+            if reviewer_gate is not None:
+                with reviewer_gate:
+                    raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)
+            else:
+                raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)
+            res["meta_kinds"] |= meta_kinds
             if reviewer_meta:
-                reviewer_meta_by_shot[name] = reviewer_meta
+                res["reviewer_meta"] = reviewer_meta
             # Validate the additive answers[] seam; a verdict-"no" answer that cites
             # a resolvable region + bbox becomes a quarantine finding through the SAME
             # enforce_grounding path as every other finding (ungrounded ones drop and
@@ -1536,10 +1556,10 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             for ans in raw_answers:
                 clean, reason = _validate_answer(ans)
                 if clean is None:
-                    answers_dropped += 1
-                    warnings.append(f"{name}: dropped answer ({reason})")
+                    res["answers_dropped"] += 1
+                    res["warnings"].append(f"{name}: dropped answer ({reason})")
                     continue
-                run_answers.append(clean)
+                res["answers"].append(clean)
                 if clean["verdict"] == "no" and clean.get("region_id") and clean.get("bbox"):
                     raw.append({"shot": name, "class": "rubric_answer_no",
                                 "region_id": clean["region_id"], "bbox": clean["bbox"],
@@ -1558,10 +1578,10 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             # ZERO-finding pass (an aligned tree) -- the comparison itself ran -- and
             # reports anchored nodes absent from draw_order (counted, never findings).
             if ctx.get("anchor_kind_ran"):
-                run_meta_kinds.add(KIND_ART_ANCHOR)
+                res["meta_kinds"].add(KIND_ART_ANCHOR)
             if ctx.get("anchor_unverified"):
-                warnings.append(f"{name}: art-anchor live-unverified (counted, never a "
-                                f"finding): {'; '.join(ctx['anchor_unverified'])}")
+                res["warnings"].append(f"{name}: art-anchor live-unverified (counted, never a "
+                                       f"finding): {'; '.join(ctx['anchor_unverified'])}")
 
         emitted, stats = enforce_grounding(raw, table, window)
 
@@ -1573,21 +1593,51 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
                 finding["evidence_crop"] = _evidence_crop(
                     name, finding, base_buf, fresh_buf, window, bundle_dir, canvas_mod)
         except (vd.PngError, OSError) as exc:
-            warnings.append(f"{name}: evidence crops skipped ({exc})")
+            res["warnings"].append(f"{name}: evidence crops skipped ({exc})")
 
-        shots_out.append({"shot": name, "changed": is_changed, "bundle": f"vision-review/{Path(name).stem}",
-                          "reviewer_raw_count": len(raw), "dropped_count": stats["dropped"],
-                          "findings": emitted,
-                          "reviewer_meta": reviewer_meta_by_shot.get(name, {})})
+        res["shot_out"] = {"shot": name, "changed": is_changed,
+                           "bundle": f"vision-review/{Path(name).stem}",
+                           "reviewer_raw_count": len(raw), "dropped_count": stats["dropped"],
+                           "findings": emitted,
+                           "reviewer_meta": res["reviewer_meta"] or {}}
+        res["grounding"] = stats
+        res["ungroundable_deltas"] = ctx.get("ungroundable_deltas", 0)
+        res["ungroundable_clusters"] = ctx.get("ungroundable_clusters", 0)
+        res["ungroundable_shot"] = not table
+        return res
+
+    if workers > 1 and len(shot_names) > 1:
+        # Pre-warm the lazy module caches on the main thread so workers never
+        # race a first load (importlib exec_module is not import-lock guarded).
+        _review_context()
+        _art_geometry()
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            per_shot = list(pool.map(_work, shot_names))  # map preserves input order
+    else:
+        per_shot = [_work(name) for name in shot_names]
+
+    for res in per_shot:
+        name = res["name"]
+        windows.append(res["window"])
+        covered.append(res["covered"])
+        warnings.extend(res["warnings"])
+        run_answers.extend(res["answers"])
+        answers_dropped += res["answers_dropped"]
+        run_meta_kinds |= res["meta_kinds"]
+        shots_out.append(res["shot_out"])
+        stats = res["grounding"]
+        if stats is None:
+            continue
         grounding_totals["emitted"] += stats["emitted"]
         grounding_totals["grounded"] += stats["grounded"]
         grounding_totals["dropped"] += stats["dropped"]
         for k, v in stats["dropped_reasons"].items():
             grounding_totals["dropped_reasons"][k] = grounding_totals["dropped_reasons"].get(k, 0) + v
         grounding_totals["dropped_samples"].extend(stats["dropped_samples"])
-        grounding_totals["ungroundable_deltas"] += ctx.get("ungroundable_deltas", 0)
-        grounding_totals["ungroundable_clusters"] += ctx.get("ungroundable_clusters", 0)
-        if not table:
+        grounding_totals["ungroundable_deltas"] += res["ungroundable_deltas"]
+        grounding_totals["ungroundable_clusters"] += res["ungroundable_clusters"]
+        if res["ungroundable_shot"]:
             grounding_totals["ungroundable_shots"].append(name)
 
     grounding_totals["dropped_samples"] = grounding_totals["dropped_samples"][:8]
@@ -1642,6 +1692,12 @@ def main() -> int:
                              "(exit 2, fail-closed) -- never a silent fallback to the default")
     parser.add_argument("--clusters", type=Path, default=None,
                         help="clusters.json from visual_region_diff (default: output-dir/region-diff/clusters.json)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="per-shot worker threads (default 1 = sequential; the merged "
+                             "vision-review.json is identical either way)")
+    parser.add_argument("--reviewer-workers", type=int, default=2,
+                        help="cap on concurrent reviewer subprocesses when --workers > 1 "
+                             "(model-backend protection; default 2)")
     args = parser.parse_args()
 
     changed = [s for s in args.changed.split(",")] if args.changed else None
@@ -1655,7 +1711,8 @@ def main() -> int:
     try:
         doc = run_vision_review(args.shots_dir, args.baseline_dir, args.output_dir,
                                 changed=changed, reviewer_cmd=args.reviewer_cmd,
-                                clusters_path=clusters_path, review_all_shots=args.review_all)
+                                clusters_path=clusters_path, review_all_shots=args.review_all,
+                                workers=args.workers, reviewer_workers=args.reviewer_workers)
     except Exception as exc:  # tool error -> fail red (exit 2)
         print(f"error: vision review failed: {exc}", file=sys.stderr)
         return EXIT_ERROR

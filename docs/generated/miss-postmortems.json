@@ -234,9 +234,9 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-          "tools/run_playtests.py": "4dab8bd3fdfb9e938eb1c44d46a490a991e5cacfa3c7bb408c5a376c84926694",
-          "tools/godot_dap_smoketest.py": "cac5e2caed434da6536bcb988d57d95a71ed45661b32f83c0a5f5adc08578843",
-          "tools/verify_all.py": "a2560687ff8c01910c66c6ac89f3e823a7819fccf92ab150b11693ccd5f1a2a5"
+          "tools/run_playtests.py": "43efbd29bf1512590393dd2057de4e4a90071d6d770144ed31b7f201b30af787",
+          "tools/godot_dap_smoketest.py": "7f39c5844ab1dc989780c3f4b027765a2294ed3142f5869ec80d86afdc6be7d4",
+          "tools/verify_all.py": "0008271ce6a7f80d4c9fe03bcffd2d3b43cb708ade4d5273799daf040e4e165f"
         },
         "re_stamp_log": [
           {

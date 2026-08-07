@@ -121,19 +121,24 @@ DOUBLE_RUN_PER_SCENARIO_TIMEOUT_S = 45.0
 DOUBLE_RUN_RUN_OUTER_TIMEOUT_S = [240.0, 240.0]  # per GROUP, index-aligned with DOUBLE_RUN_GROUPS — never one run of all
 DOUBLE_RUN_CMP_OUTER_TIMEOUT_S = 10.0
 
+def _load_tool(module_name: str, path: Path):
+    """The single importlib loader for sibling tools: tools are read, never
+    forked (main entries are __main__-guarded)."""
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {module_name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_run_playtests_constant(name: str):
     """Single-source a constant from run_playtests.py (R3): the RED-tier sidecar
     seed-equality + anchor gates live there, so its SATELLITE_SWEEP_SCENARIOS is the
-    truth this orchestrator's S9 windowed loop mirrors. The importlib load mirrors
-    _load_vision_review below — run_playtests is read, never forked (its top-level
-    only loads the sibling smoke harness; the main entry is __main__-guarded)."""
-    path = ROOT / "tools" / "run_playtests.py"
-    spec = importlib.util.spec_from_file_location("run_playtests", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load run_playtests from {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return getattr(module, name)
+    truth this orchestrator's S9 windowed loop mirrors. run_playtests is read, never
+    forked (its top-level only loads the sibling smoke harness; the main entry is
+    __main__-guarded)."""
+    return getattr(_load_tool("run_playtests", ROOT / "tools" / "run_playtests.py"), name)
 
 
 # S9 windowed satellite sweep families (shots 15-23 + 26-27 + 30-34 minus retired,
@@ -165,16 +170,10 @@ def _git_head() -> str | None:
 
 
 def _load_vision_review():
-    """Sanctioned importlib load of the stdlib-only sibling vision_review
-    (same pattern run_playtests uses); reaches review_is_fresh without any
-    static import and without ever touching vision_metrics."""
-    path = ROOT / "tools" / "vision_review.py"
-    spec = importlib.util.spec_from_file_location("vision_review", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load vision_review from {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    """Sanctioned importlib load of the stdlib-only sibling vision_review;
+    reaches review_is_fresh without any static import and without ever
+    touching vision_metrics."""
+    return _load_tool("vision_review", ROOT / "tools" / "vision_review.py")
 
 
 def _read_json(path: Path):
@@ -457,6 +456,11 @@ class Runner:
                                                           "--timeout", str(args.windowed_timeout),
                                                           "--godot-bin", bin_],
                                 pop_force_headless=True,
+                                # Threaded per-shot review (Track D): 4 shot workers,
+                                # reviewer subprocesses capped by vision_review's
+                                # default. The merged manifest is byte-identical to a
+                                # sequential pass (ordered merge, proven 2026-08-07).
+                                env_override={"VISION_REVIEW_WORKERS": "4"},
                                 outer_timeout=args.windowed_timeout + 120, retry_once=True,
                                 exit_map=play_map,
                                 extra={"report": str(report.relative_to(ROOT))})
@@ -902,6 +906,17 @@ class Runner:
             print(f"result:  {json_path}")
         except OSError as exc:
             print(f"verify_all: could not write result file {json_path}: {exc}",
+                  file=sys.stderr)
+        # Trend history (Track D): one slim record per run appended to the
+        # machine-local JSONL + the HTML dashboard re-rendered. Advisory only —
+        # a failure here warns on stderr, NEVER reds the gate.
+        try:
+            trend = _load_tool("trend_report", ROOT / "tools" / "trend_report.py")
+            total = trend.append_history(trend.slim_record(result))
+            trend.render()
+            print(f"trend:   {trend.HTML_PATH.relative_to(ROOT)} ({total} runs)")
+        except Exception as exc:
+            print(f"verify_all: trend history append/render failed (non-gating): {exc}",
                   file=sys.stderr)
 
     def _print_summary(self, exit_code, duration, stamps) -> None:
