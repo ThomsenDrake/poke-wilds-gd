@@ -1,63 +1,26 @@
 extends RefCounted
 
 # Bounded temporal flow adapters (Track A.2). Each implements TemporalFlowCapture's
-# contract: phase() / semantic() / settle() / max_frames(). The scenario opens the
-# battle + triggers the move/ball BEFORE capture_flow; adapters only OBSERVE
-# post-input phase/HP/animation and mark settled when the view goes idle after
-# having seen an animating frame (or a hard frame budget).
+# contract: phase() / semantic() / settle() / max_frames() / on_frame(). The
+# scenario opens the battle + triggers the move/ball BEFORE capture_flow; adapters
+# only OBSERVE post-input state. on_frame() owns ALL state mutation (settle
+# detection); semantic() is a pure snapshot, so the capture loop's per-frame
+# sample can never advance the state machine.
 
 const BATTLE_ATTACK_ID := "battle_attack"
 const BATTLE_CAPTURE_ID := "battle_capture"
 
 
-static func make_attack_adapter(ctx: Dictionary) -> BattleAttackAdapter:
-	var adapter := BattleAttackAdapter.new()
-	adapter.setup(ctx)
-	return adapter
-
-
-static func make_capture_adapter(ctx: Dictionary) -> BattleCaptureAdapter:
-	var adapter := BattleCaptureAdapter.new()
-	adapter.setup(ctx)
-	return adapter
-
-
 # Drive Charmander@10 vs Geodude@12 into the moves menu with EMBER selected —
 # mirrors battle_anim_scenario so the temporal lane shares the same seed path.
 static func prepare_attack_battle(ctx: Dictionary) -> String:
-	var runtime: Node = ctx.get("runtime")
-	var view: Node = ctx.get("battle_view")
-	if runtime == null or view == null:
-		return "missing runtime/battle_view"
-	var catalog = runtime.get("catalog")
-	var pokemon_rules = runtime.get("pokemon_rules")
-	if catalog == null or pokemon_rules == null:
-		return "runtime did not expose catalog/pokemon_rules"
-	var get_move := Callable(catalog, "get_move")
-	var lead: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("CHARMANDER"), 10, get_move)
-	var ember_index := _move_index(lead, "EMBER")
+	var opened := _open_wild_battle(ctx, "CHARMANDER", 10, "GEODUDE", 12)
+	if not str(opened["error"]).is_empty():
+		return str(opened["error"])
+	var ember_index := _move_index(opened["lead"], "EMBER")
 	if ember_index < 0:
 		return "built Charmander does not know EMBER"
-	var wild_mon: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("GEODUDE"), 12, get_move)
-	if wild_mon.is_empty():
-		return "could not build wild Geodude"
-	var session = runtime.get("session")
-	var party_index: int = session.get_active_party_index() if session != null else -1
-	if party_index < 0:
-		return "no active party slot"
-	session.set_party_member(party_index, lead)
-	var set_battle: Callable = ctx.get("set_battle", Callable())
-	if set_battle.is_valid():
-		set_battle.call(true)
-	var message_box = ctx.get("message_box")
-	if message_box != null and message_box.has_method("hide_message"):
-		message_box.hide_message()
-	var music = ctx.get("music_router")
-	if music != null and music.has_method("play_battle_track"):
-		music.play_battle_track("wild")
-	view.start_wild_battle(wild_mon)
-	if not view.visible:
-		return "battle view did not open"
+	var view: Node = ctx.get("battle_view")
 	view._set_menu_state("moves")
 	view._selection = "move_%d" % ember_index
 	return ""
@@ -69,43 +32,15 @@ static func trigger_selected_move(ctx: Dictionary) -> void:
 		view._activate_selection()
 
 
-# Capture path: open a wild battle against a low-HP mon with balls in bag, then
-# the scenario activates the ball select. Adapter settles when the view closes
-# or stops animating after a capturing phase.
+# Capture path: full-HP low catch-rate target — a guaranteed catch has NO turns
+# to animate; a FAILED catch plays the ball-shake turns + counterattack this lane
+# records. Balls in bag so the item menu offers the throw.
 static func prepare_capture_battle(ctx: Dictionary) -> String:
-	var runtime: Node = ctx.get("runtime")
-	var view: Node = ctx.get("battle_view")
-	if runtime == null or view == null:
-		return "missing runtime/battle_view"
-	var catalog = runtime.get("catalog")
-	var pokemon_rules = runtime.get("pokemon_rules")
-	if catalog == null or pokemon_rules == null:
-		return "runtime did not expose catalog/pokemon_rules"
-	var get_move := Callable(catalog, "get_move")
-	var lead: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("MACHOP"), 20, get_move)
-	# Full-HP low catch-rate target: a guaranteed catch has NO turns to animate;
-	# a FAILED catch plays the ball-shake turns + counterattack this lane records.
-	var wild_mon: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species("GEODUDE"), 12, get_move)
-	if wild_mon.is_empty():
-		return "could not build wild GEODUDE"
-	var session = runtime.get("session")
-	var party_index: int = session.get_active_party_index() if session != null else -1
-	if party_index < 0:
-		return "no active party slot"
-	session.set_party_member(party_index, lead)
+	var opened := _open_wild_battle(ctx, "MACHOP", 20, "GEODUDE", 12)
+	if not str(opened["error"]).is_empty():
+		return str(opened["error"])
+	var session = ctx.get("runtime").get("session")
 	session.add_item("poke_ball", 5)
-	var set_battle: Callable = ctx.get("set_battle", Callable())
-	if set_battle.is_valid():
-		set_battle.call(true)
-	var message_box = ctx.get("message_box")
-	if message_box != null and message_box.has_method("hide_message"):
-		message_box.hide_message()
-	var music = ctx.get("music_router")
-	if music != null and music.has_method("play_battle_track"):
-		music.play_battle_track("wild")
-	view.start_wild_battle(wild_mon)
-	if not view.visible:
-		return "battle view did not open"
 	return ""
 
 
@@ -121,6 +56,43 @@ static func trigger_pokeball(ctx: Dictionary) -> void:
 	view._selection = "poke_ball"
 	if view.has_method("_activate_selection"):
 		view._activate_selection()
+
+
+# Shared wild-battle open: build lead + wild, seat the lead, flip battle state,
+# quiet the message box, start the view. Returns {"error", "lead"} — error empty
+# on success; lead is the built player mon (move validation reads it).
+static func _open_wild_battle(ctx: Dictionary, lead_species: String, lead_level: int, wild_species: String, wild_level: int) -> Dictionary:
+	var runtime: Node = ctx.get("runtime")
+	var view: Node = ctx.get("battle_view")
+	if runtime == null or view == null:
+		return {"error": "missing runtime/battle_view", "lead": {}}
+	var catalog = runtime.get("catalog")
+	var pokemon_rules = runtime.get("pokemon_rules")
+	if catalog == null or pokemon_rules == null:
+		return {"error": "runtime did not expose catalog/pokemon_rules", "lead": {}}
+	var get_move := Callable(catalog, "get_move")
+	var lead: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species(lead_species), lead_level, get_move)
+	var wild_mon: Dictionary = pokemon_rules.create_pokemon_instance(catalog.get_species(wild_species), wild_level, get_move)
+	if wild_mon.is_empty():
+		return {"error": "could not build wild %s" % wild_species, "lead": {}}
+	var session = runtime.get("session")
+	var party_index: int = session.get_active_party_index() if session != null else -1
+	if party_index < 0:
+		return {"error": "no active party slot", "lead": {}}
+	session.set_party_member(party_index, lead)
+	var set_battle: Callable = ctx.get("set_battle", Callable())
+	if set_battle.is_valid():
+		set_battle.call(true)
+	var message_box = ctx.get("message_box")
+	if message_box != null and message_box.has_method("hide_message"):
+		message_box.hide_message()
+	var music = ctx.get("music_router")
+	if music != null and music.has_method("play_battle_track"):
+		music.play_battle_track("wild")
+	view.start_wild_battle(wild_mon)
+	if not view.visible:
+		return {"error": "battle view did not open", "lead": {}}
+	return {"error": "", "lead": lead}
 
 
 static func _move_index(mon: Dictionary, move_id: String) -> int:
@@ -149,7 +121,6 @@ class BattleAttackAdapter:
 		_viewport = ctx.get("viewport")
 		_battle_view = ctx.get("battle_view")
 		_phase = "animating"
-		_saw_animating = false
 		return _runtime != null and _viewport != null and _battle_view != null
 	func phase() -> String:
 		return _phase
@@ -157,26 +128,26 @@ class BattleAttackAdapter:
 		var snap: Dictionary = {}
 		if _battle_view != null and "_snapshot" in _battle_view:
 			snap = _battle_view._snapshot if _battle_view._snapshot is Dictionary else {}
-		var enemy_hp := int((snap.get("enemy_mon", {}) as Dictionary).get("current_hp", -1))
-		var player_hp := int((snap.get("player_mon", {}) as Dictionary).get("current_hp", -1))
-		var animating := bool(_battle_view.is_animating()) if _battle_view != null and _battle_view.has_method("is_animating") else false
-		if animating:
+		return {"enemy_hp": int((snap.get("enemy_mon", {}) as Dictionary).get("current_hp", -1)),
+			"player_hp": int((snap.get("player_mon", {}) as Dictionary).get("current_hp", -1)),
+			"animating": _animating(), "phase": _phase, "saw_animating": _saw_animating}
+	func settle() -> bool:
+		return _settled
+	func max_frames() -> int:
+		# A full exchange (move + counter) settles ~frame 124 on the FrameTicker
+		# pulse (one process frame each); 160 covers it with headroom while keeping
+		# per-frame PNG capture inside the wall-clock budget.
+		return 160
+	func on_frame(_frame) -> void:
+		_frames += 1
+		if _animating():
 			_saw_animating = true
 			_phase = "animating"
 		elif _saw_animating and _frames >= MIN_FRAMES:
 			_phase = "settled"
 			_settled = true
-		return {"enemy_hp": enemy_hp, "player_hp": player_hp, "animating": animating, "phase": _phase, "saw_animating": _saw_animating}
-	func settle() -> bool:
-		return _settled
-	func max_frames() -> int:
-		# A full exchange (move + counter) settles ~frame 124 on the FrameTicker
-		# pulse (one process frame each); 120 was too tight. 160 covers it with
-		# headroom while keeping per-frame PNG capture inside the wall-clock budget.
-		return 160
-	func on_frame(_frame) -> void:
-		_frames += 1
-		semantic() # refresh settle from live view each frame
+	func _animating() -> bool:
+		return bool(_battle_view.is_animating()) if _battle_view != null and _battle_view.has_method("is_animating") else false
 
 
 class BattleCaptureAdapter:
@@ -199,17 +170,7 @@ class BattleCaptureAdapter:
 	func phase() -> String:
 		return _phase
 	func semantic() -> Dictionary:
-		var visible := bool(_battle_view.visible) if _battle_view != null else false
-		var animating := bool(_battle_view.is_animating()) if _battle_view != null and _battle_view.has_method("is_animating") else false
-		if animating:
-			_saw_animating = true
-		# Settle only once the throw animated and the view went idle/closed.
-		if _frames >= MIN_FRAMES and _saw_animating and (not visible or not animating):
-			_phase = "settled"
-			_settled = true
-		else:
-			_phase = "capturing"
-		return {"animating": animating, "visible": visible, "phase": _phase, "saw_animating": _saw_animating}
+		return {"animating": _animating(), "visible": _visible(), "phase": _phase, "saw_animating": _saw_animating}
 	func settle() -> bool:
 		return _settled
 	func max_frames() -> int:
@@ -217,4 +178,15 @@ class BattleCaptureAdapter:
 		return 160
 	func on_frame(_frame) -> void:
 		_frames += 1
-		semantic()
+		if _animating():
+			_saw_animating = true
+		# Settle only once the throw animated and the view went idle/closed.
+		if _frames >= MIN_FRAMES and _saw_animating and (not _visible() or not _animating()):
+			_phase = "settled"
+			_settled = true
+		else:
+			_phase = "capturing"
+	func _animating() -> bool:
+		return bool(_battle_view.is_animating()) if _battle_view != null and _battle_view.has_method("is_animating") else false
+	func _visible() -> bool:
+		return bool(_battle_view.visible) if _battle_view != null else false

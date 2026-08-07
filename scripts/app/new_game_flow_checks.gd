@@ -69,7 +69,7 @@ func _part_4_creation() -> void:
 	if not _expect(creation.seed_edit_active(), "4: injection witness: move_left did not open the seed digit row"):
 		return
 	for character in str(WORLD_SEED): # digits ride unicode key events (the digit row's typed-digit branch reads unicode 48-57)
-		await _tap_digit(int(character))
+		await SmokeTap.tap_digit(get_tree(), int(character))
 	await _tap("action_a") # the digit row's Z commit stores the typed seed
 	_expect(not creation.seed_edit_active(), "4: injection witness: Z did not commit the seed digit row")
 	if not _expect(value_label.text == str(WORLD_SEED), "4: the seed step shows '%s', not the typed %d" % [value_label.text, WORLD_SEED]):
@@ -184,27 +184,11 @@ func _part_6_persistence() -> void:
 func _tap(action: String) -> void:
 	await SmokeTap.tap(get_tree(), action)
 
-# N presses flush in ONE input phase -> N just_pressed dispatches (input_gate's
-# camp-menu flush shape), one release afterwards.
+# N presses flush in ONE input phase -> N just_pressed dispatches (SmokeTap.flush),
+# one release afterwards.
 func _flush(action: String, count: int) -> void:
-	for _i in range(count):
-		if not SmokeTap.inject_press(action):
-			_failures.append("injection: no key event is bound to %s" % action)
-			return
-	SmokeTap.inject_release(action)
-	await get_tree().process_frame
-
-# One typed digit for the seed digit row: unicode + matching keycode/physical_keycode
-# (gbc_digit_row's branch reads unicode 48-57), press -> frame -> release.
-func _tap_digit(digit: int) -> void:
-	var press := InputEventKey.new()
-	press.unicode = 48 + digit; press.keycode = 48 + digit; press.physical_keycode = 48 + digit; press.pressed = true
-	Input.parse_input_event(press)
-	await get_tree().process_frame
-	var release := InputEventKey.new()
-	release.unicode = 48 + digit; release.keycode = 48 + digit; release.physical_keycode = 48 + digit; release.pressed = false
-	Input.parse_input_event(release)
-	await get_tree().process_frame
+	if not await SmokeTap.flush(get_tree(), action, count):
+		_failures.append("injection: no key event is bound to %s" % action)
 
 func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; returns ok for witness early-returns
 	if not ok:

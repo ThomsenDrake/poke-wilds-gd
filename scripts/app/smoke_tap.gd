@@ -49,6 +49,31 @@ static func tap(tree: SceneTree, action: String) -> void:
 	await tree.process_frame
 
 
+# N presses flush in ONE input phase -> N just_pressed dispatches (the
+# input_gate camp-menu / name-grid walk shape), one release afterwards.
+# false: no key event is bound to the action (the caller records a failure).
+static func flush(tree: SceneTree, action: String, count: int) -> bool:
+	for _i in range(count):
+		if not inject_press(action):
+			return false
+	inject_release(action)
+	await tree.process_frame
+	return true
+
+
+# One typed digit for a digit row reading unicode 48-57 (gbc_digit_row's
+# branch): unicode + matching keycode/physical_keycode, press -> frame -> release.
+static func tap_digit(tree: SceneTree, digit: int) -> void:
+	var press := InputEventKey.new()
+	press.unicode = 48 + digit; press.keycode = 48 + digit; press.physical_keycode = 48 + digit; press.pressed = true
+	Input.parse_input_event(press)
+	await tree.process_frame
+	var release := InputEventKey.new()
+	release.unicode = 48 + digit; release.keycode = 48 + digit; release.physical_keycode = 48 + digit; release.pressed = false
+	Input.parse_input_event(release)
+	await tree.process_frame
+
+
 static func key_template(action: String) -> InputEventKey:
 	for event in InputMap.action_get_events(action):
 		if event is InputEventKey:

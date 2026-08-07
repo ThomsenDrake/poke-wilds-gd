@@ -399,199 +399,47 @@ def _question_lines(questions: list[dict]) -> str:
     return "\n".join(f"- {q['id']}: {q['text']}" for q in questions) or "(no rubric questions parsed)"
 
 
+_REVIEW_CONTEXT = None
+
+
+def _review_context():
+    """Sanctioned importlib load of tools/review_context.py (the single home for
+    prior-findings / legibility loaders + prompt formatters + the specialist
+    lens), cached — never forked."""
+    global _REVIEW_CONTEXT
+    if _REVIEW_CONTEXT is None:
+        spec = importlib.util.spec_from_file_location("review_context", TOOLS / "review_context.py")
+        if spec is None or spec.loader is None:
+            raise RuntimeError("cannot load review_context")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _REVIEW_CONTEXT = module
+    return _REVIEW_CONTEXT
+
+
 def _bundle_prior_findings(public_ctx: dict, cfg=None) -> list[dict]:
-    """Prior vision-review.json findings for this shot, filtered by stem.
-
-    Prefers the bundle-enriched public_ctx/context.json (vision_review.assemble_bundle);
-    falls back to reading .godot-smoke/vision-review.json directly. Degrades to [] when
-    absent/unreadable — never raises. Keeps deterministic_findings path intact (separate)."""
+    """Prior findings for this shot: the bundle-enriched public_ctx when present
+    (vision_review.assemble_bundle is the single writer), else the shared loader
+    over cfg.base_dir -> ROOT/.godot-smoke (standalone invocation). Never raises."""
+    if isinstance(public_ctx.get("prior_findings"), list):
+        return [x for x in public_ctx["prior_findings"] if isinstance(x, dict)][:8]
     try:
-        if isinstance(public_ctx.get("prior_findings"), list):
-            return [x for x in public_ctx["prior_findings"] if isinstance(x, dict)][:8]
-        # context.json enriched by vision_review.assemble_bundle
-        if cfg is not None:
-            paths = public_ctx.get("paths") or {}
-            ctx_path = paths.get("context")
-            if isinstance(ctx_path, str) and ctx_path:
-                try:
-                    doc = _read_json(_abs(cfg, ctx_path))
-                    if isinstance(doc, dict) and isinstance(doc.get("prior_findings"), list):
-                        return [x for x in doc["prior_findings"] if isinstance(x, dict)][:8]
-                except Exception:
-                    pass
-        # direct fallback: read vision-review.json filtered by shot stem
-        shot = str(public_ctx.get("shot") or "")
-        if not shot:
-            return []
-        stem = Path(shot).stem
-        candidates: list[Path] = []
-        if cfg is not None:
-            try:
-                candidates.append(cfg.base_dir / "vision-review.json")
-            except Exception:
-                pass
-        candidates.append(ROOT / ".godot-smoke" / "vision-review.json")
-        for cand in candidates:
-            try:
-                if cand.is_file():
-                    doc = _read_json(cand)
-                    if not isinstance(doc, dict):
-                        continue
-                    out: list[dict] = []
-                    for entry in doc.get("shots") or []:
-                        if not isinstance(entry, dict):
-                            continue
-                        sname = str(entry.get("shot") or "")
-                        if Path(sname).stem != stem:
-                            continue
-                        for f in entry.get("findings") or []:
-                            if not isinstance(f, dict):
-                                continue
-                            compact: dict = {}
-                            for k in ("finding_id", "class", "region_id", "severity", "confidence", "note"):
-                                v = f.get(k)
-                                if v is not None:
-                                    compact[k] = v
-                            if isinstance(f.get("explanation"), str) and f["explanation"]:
-                                compact["explanation"] = str(f["explanation"])[:160]
-                            out.append(compact)
-                            if len(out) >= 8:
-                                break
-                        if len(out) >= 8:
-                            break
-                    return out
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return []
-
-
-def _bundle_legibility_lines(public_ctx: dict, cfg=None) -> list[str]:
-    """Legibility-report.md CVD/contrast lines for this shot.
-
-    Prefers bundle-enriched public_ctx/context.json; falls back to parsing
-    .godot-smoke/legibility-report.md for canary/label contrast + CVD collapse
-    lines mentioning the shot stem/name. Degrades to [] when absent — never raises."""
-    try:
-        if isinstance(public_ctx.get("legibility_lines"), list):
-            return [str(x) for x in public_ctx["legibility_lines"] if isinstance(x, str)][:8]
-        if cfg is not None:
-            paths = public_ctx.get("paths") or {}
-            ctx_path = paths.get("context")
-            if isinstance(ctx_path, str) and ctx_path:
-                try:
-                    doc = _read_json(_abs(cfg, ctx_path))
-                    if isinstance(doc, dict) and isinstance(doc.get("legibility_lines"), list):
-                        return [str(x) for x in doc["legibility_lines"] if isinstance(x, str)][:8]
-                except Exception:
-                    pass
-        shot = str(public_ctx.get("shot") or "")
-        if not shot:
-            return []
-        stem = Path(shot).stem
-        candidates: list[Path] = []
-        if cfg is not None:
-            try:
-                candidates.append(cfg.base_dir / "legibility-report.md")
-            except Exception:
-                pass
-        candidates.append(ROOT / ".godot-smoke" / "legibility-report.md")
-        text = None
-        for cand in candidates:
-            try:
-                if cand.is_file():
-                    text = cand.read_text(encoding="utf-8")
-                    break
-            except Exception:
-                continue
-        if not text:
-            return []
-        out: list[str] = []
-        for raw in text.splitlines():
-            if stem not in raw and shot not in raw:
-                continue
-            low = raw.lower()
-            is_relevant = any(k in low for k in (
-                "ratio", "contrast", "cvd", "collapse", "deutan", "protan", "tritan",
-                "canary", "deltae", "wcag"))
-            stripped = raw.strip()
-            if stripped.startswith("- "):
-                stripped = stripped[2:]
-            elif stripped.startswith("* "):
-                stripped = stripped[2:]
-            stripped = stripped.strip()
-            if not stripped:
-                continue
-            if len(stripped) > 240:
-                stripped = stripped[:237] + "..."
-            if is_relevant or stem in raw:
-                out.append(stripped)
-            if len(out) >= 8:
-                break
-        return out[:8]
+        dirs = [cfg.base_dir] if cfg is not None else []
+        return _review_context().load_prior_findings(str(public_ctx.get("shot") or ""), *dirs)
     except Exception:
         return []
 
 
-def _format_prior_block(prior: list[dict]) -> str:
-    if not prior:
-        return ""
-    rows: list[str] = []
-    for f in prior[:4]:
-        cls = str(f.get("class") or "?")
-        rid = str(f.get("region_id") or "?")
-        note = str(f.get("note") or "")[:80]
-        sev = str(f.get("severity") or "")
-        fid = str(f.get("finding_id") or "")[:12]
-        rows.append(f"- [{cls}/{sev}] {rid}: {note} (id {fid})")
-    body = "\n".join(rows)[:900]
-    return ("PRIOR FINDINGS FOR THIS SHOT (from .godot-smoke/vision-review.json, filtered by shot stem; "
-            "these are quarantined history — known false positives may be among them; do NOT repeat a prior "
-            "false positive without fresh visual evidence):\n" + body)
-
-
-def _format_legibility_block(lines: list[str]) -> str:
-    if not lines:
-        return ""
-    body = "\n".join(f"- {l}" for l in lines[:6])[:900]
-    return ("LEGIBILITY (from .godot-smoke/legibility-report.md, canary/label contrast + CVD collapse lines "
-            "mentioning this shot; use as accessibility context, not a verdict):\n" + body)
-
-
-# Per-group specialist focus (Track C.1): one cmd invocation still answers the
-# shot's own group questions, but the system prompt scopes judgment to the
-# group's specialty so menu/overworld/battle/temporal reviewers don't dilute.
-SPECIALIST_FOCUS = {
-    "menu": ("SPECIALIST LENS — MENU/TYPOGRAPHY: prioritize layout grid alignment, "
-             "plate margins, clipped/overlapping labels, cursor-to-row centering, "
-             "kerning, and GBC plate readability. Ignore overworld terrain."),
-    "overworld": ("SPECIALIST LENS — OVERWORLD: prioritize terrain/foliage continuity, "
-                  "y-sort of props vs player vs mons, floating sprites, nest ring "
-                  "legibility, and day/night tint honesty. Ignore battle HUD geometry."),
-    "battle": ("SPECIALIST LENS — BATTLE HUD: prioritize HP track seating, name/level "
-               "plate readability, cursor-to-row centering, message-box framing, and "
-               "sprite strip-bleed. Ignore overworld y-sort."),
-    "temporal": ("SPECIALIST LENS — TEMPORAL/MOTION: prioritize single clean frame "
-                 "sequences (no ghosting), phase-order coherence vs the semantic "
-                 "timeline, and animation settle honesty. Ignore static menu grid."),
-    "overworld_mons": ("SPECIALIST LENS — OVERWORLD MONS: prioritize roaming mon y-sort "
-                       "against props/player, nest-ring + egg + Alpha-badge legibility, "
-                       "and species-sprite integrity (no blank tiles)."),
-    "camping": ("SPECIALIST LENS — CAMPING: prioritize campfire/torch glow over night "
-                "tint and craft-menu recipe/ingredient legibility."),
-    "day_night": ("SPECIALIST LENS — DAY/NIGHT: prioritize uniform night tint and "
-                  "readable HUD under dimming."),
-    "display_matrix": ("SPECIALIST LENS — DISPLAY MATRIX: prioritize pixel-crisp text "
-                       "at every window size and centered surface margins."),
-    "satellite": ("SPECIALIST LENS — SATELLITE SWEEP: prioritize focal-content presence, "
-                  "clipping/stretch, and untextured ghost blobs."),
-}
-
-
-def _specialist_block(group: str | None) -> str:
-    focus = SPECIALIST_FOCUS.get(str(group or ""))
-    return focus or ""
+def _bundle_legibility_lines(public_ctx: dict, cfg=None) -> list[str]:
+    """Legibility lines for this shot: enriched public_ctx first, else the shared
+    loader over cfg.base_dir -> ROOT/.godot-smoke. Never raises."""
+    if isinstance(public_ctx.get("legibility_lines"), list):
+        return [str(x) for x in public_ctx["legibility_lines"] if isinstance(x, str)][:8]
+    try:
+        dirs = [cfg.base_dir] if cfg is not None else []
+        return _review_context().load_legibility_lines(str(public_ctx.get("shot") or ""), *dirs)
+    except Exception:
+        return []
 
 
 def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict], cfg=None,
@@ -600,22 +448,23 @@ def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict], c
     grounding = public_ctx.get("grounding_rules") or {}
     # Bundle-enriched context: prior findings (false-positive memory) + CVD/contrast legibility.
     # Guard when files absent (degrade to no block, not crash); deterministic_findings path untouched.
+    rc = _review_context()
     prior = _bundle_prior_findings(public_ctx, cfg)
     leg = _bundle_legibility_lines(public_ctx, cfg)
     extra_blocks: list[str] = []
-    specialist = _specialist_block(group or public_ctx.get("shot_kind") or public_ctx.get("group"))
+    specialist = rc.specialist_block(group or public_ctx.get("shot_kind") or public_ctx.get("group"))
     if not specialist:
         # fall back via vision_review._shot_group when public_ctx lacks group
         try:
-            specialist = _specialist_block(_load_vision_review()._shot_group(str(shot)))
+            specialist = rc.specialist_block(_load_vision_review()._shot_group(str(shot)))
         except Exception:
             specialist = ""
     if specialist:
         extra_blocks.append(specialist)
-    pb = _format_prior_block(prior)
+    pb = rc.format_prior_block(prior)
     if pb:
         extra_blocks.append(pb)
-    lb = _format_legibility_block(leg)
+    lb = rc.format_legibility_block(leg)
     if lb:
         extra_blocks.append(lb)
     extra = ("\n\n" + "\n\n".join(extra_blocks)) if extra_blocks else ""
@@ -1071,7 +920,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
             "temperature": temperature, "configured_n": cfg.n, "n": required_passes,
             "passes_completed": len(passes), "questions_total": len(questions),
             "per_pass": per_pass, "vote": vote, "vote_semantics": vote_semantics,
-            "specialist": bool(_specialist_block(group)), "self_critique": critique_meta}
+            "specialist": bool(_review_context().specialist_block(group)), "self_critique": critique_meta}
     return unanimous, meta
 
 

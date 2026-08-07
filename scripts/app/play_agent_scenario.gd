@@ -78,7 +78,7 @@ func _drive_creation() -> void:
 	if not _expect(creation.seed_edit_active(), "injection witness: move_left did not open the seed digit row"):
 		return
 	for character in str(WORLD_SEED): # unicode digit events (the digit row reads unicode 48-57)
-		await _tap_digit(int(character))
+		await SmokeTap.tap_digit(get_tree(), int(character))
 	await _tap("action_a") # the digit row's Z commit stores the typed seed
 	if not _expect(value_label.text == str(WORLD_SEED), "the seed step shows '%s', not the typed %d" % [value_label.text, WORLD_SEED]):
 		return
@@ -87,7 +87,9 @@ func _drive_creation() -> void:
 	await _tap("action_a") # NAME opens the NameEntry grid
 	if not _expect(creation._name_entry.visible, "injection witness: Z did not open the NameEntry grid"):
 		return
-	await _flush("move_right", 27) # cell 0 (A) -> cell 27 (OK); the empty confirm keeps DEFAULT_PLAYER_NAME
+	if not await SmokeTap.flush(get_tree(), "move_right", 27): # cell 0 (A) -> cell 27 (OK); the empty confirm keeps DEFAULT_PLAYER_NAME
+		_failures.append("injection: no key event is bound to move_right")
+		return
 	await _tap("action_a") # OK confirms back to the step
 	if not _expect(not creation._name_entry.visible, "injection witness: OK did not close the NameEntry grid"):
 		return
@@ -161,28 +163,6 @@ func _restore() -> void: # EVERY exit path: accumulated input off, avatar drivab
 
 func _tap(action: String) -> void:
 	await SmokeTap.tap(get_tree(), action)
-
-# N presses flush in ONE input phase -> N just_pressed dispatches (the
-# new_game_flow_checks name-grid flush shape), one release afterwards.
-func _flush(action: String, count: int) -> void:
-	for _i in range(count):
-		if not SmokeTap.inject_press(action):
-			_failures.append("injection: no key event is bound to %s" % action)
-			return
-	SmokeTap.inject_release(action)
-	await get_tree().process_frame
-
-# One typed digit for the seed digit row: unicode + matching keycode/physical_keycode
-# (gbc_digit_row's branch reads unicode 48-57), press -> frame -> release.
-func _tap_digit(digit: int) -> void:
-	var press := InputEventKey.new()
-	press.unicode = 48 + digit; press.keycode = 48 + digit; press.physical_keycode = 48 + digit; press.pressed = true
-	Input.parse_input_event(press)
-	await get_tree().process_frame
-	var release := InputEventKey.new()
-	release.unicode = 48 + digit; release.keycode = 48 + digit; release.physical_keycode = 48 + digit; release.pressed = false
-	Input.parse_input_event(release)
-	await get_tree().process_frame
 
 static func _direction_action(direction: Vector2i) -> String:
 	match direction:

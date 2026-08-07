@@ -101,11 +101,6 @@ the fields (re-pin via `visual_sweep_overworld_update` after collector land).
   shimmering/uneven glyph columns), the surface centered with even margins,
   and nothing clipped at the surface edges?
 
-## Temporal states
-
-- Is the attack animation a single clean frame sequence without ghosting?
-- Does the frame order match the semantic phase progression?
-
 ## Satellite sweep states (fishing, storage, Pokémon, overworld, world-depth)
 
 - Is the focal content intact and visibly present in the captured state?

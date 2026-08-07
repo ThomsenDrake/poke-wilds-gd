@@ -236,7 +236,7 @@
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
           "tools/run_playtests.py": "4dab8bd3fdfb9e938eb1c44d46a490a991e5cacfa3c7bb408c5a376c84926694",
           "tools/godot_dap_smoketest.py": "cac5e2caed434da6536bcb988d57d95a71ed45661b32f83c0a5f5adc08578843",
-          "tools/verify_all.py": "f93f9bddb37217596ccbdf855a00106174733a6eee085f692004a987d8d3ba43"
+          "tools/verify_all.py": "a2560687ff8c01910c66c6ac89f3e823a7819fccf92ab150b11693ccd5f1a2a5"
         },
         "re_stamp_log": [
           {

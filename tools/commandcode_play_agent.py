@@ -117,6 +117,7 @@ def _load_module(name: str, path: Path):
 
 smoketest = _load_module("godot_dap_smoketest", TOOLS / "godot_dap_smoketest.py")
 playtests = _load_module("run_playtests", TOOLS / "run_playtests.py")
+review_context = _load_module("review_context", TOOLS / "review_context.py")
 
 # Reuse the trace primitives from the sibling harnesses (single-sourced).
 _parse_trace_lines = smoketest.parse_trace_lines
@@ -146,22 +147,16 @@ def _user_trace_path(project: Path) -> Path | None:
 
 
 def _read_window(project: Path, trace_tail: list[dict] | None = None) -> list[int] | None:
-    """Launch window: last snapshot_captured.window in trace tail, else sidecar, else canonical."""
+    """Report window stamp: last snapshot_captured.window in the trace tail, else
+    canonical. (Informational only — the windowed subprocess launches at the
+    game's own default window; all baselines share the canonical window, so a
+    sidecar fallback could never disagree.)"""
     if trace_tail:
         for rec in reversed(trace_tail):
             if rec.get("event") == "snapshot_captured":
                 w = rec.get("payload", {}).get("window")
                 if isinstance(w, (list, tuple)) and len(w) == 2:
                     return [int(w[0]), int(w[1])]
-    # sidecar fallback (committed baseline stamp)
-    sidecar = project / "docs/generated/visual-baselines/09_battle.png.sidecar.json"
-    try:
-        data = json.loads(sidecar.read_text(encoding="utf-8"))
-        w = data.get("window")
-        if isinstance(w, (list, tuple)) and len(w) == 2:
-            return [int(w[0]), int(w[1])]
-    except (OSError, ValueError):
-        pass
     return list(CANONICAL_WINDOW)
 
 
@@ -197,10 +192,11 @@ def _available_scenarios() -> list[str]:
 
 
 def _prior_findings(project: Path, window: list[int] | None = None) -> list[dict]:
-    """Filtered prior vision-review findings (best-effort, [] when absent)."""
+    """Project-wide prior vision-review findings for the planner bundle (the
+    bundle is not shot-scoped, so no stem filter). Shares the compact-key shape
+    with the review pipeline via review_context.PRIOR_FINDING_KEYS. Best-effort,
+    [] when absent."""
     review_path = project / ".godot-smoke" / "vision-review.json"
-    if not review_path.is_file():
-        return []
     try:
         doc = json.loads(review_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -213,11 +209,9 @@ def _prior_findings(project: Path, window: list[int] | None = None) -> list[dict
             continue
         for f in entry.get("findings") or []:
             if isinstance(f, dict):
-                out.append({k: f.get(k) for k in ("finding_id", "class", "region_id", "severity", "note") if f.get(k) is not None})
+                out.append({k: f[k] for k in review_context.PRIOR_FINDING_KEYS if f.get(k) is not None})
                 if len(out) >= 8:
-                    break
-        if len(out) >= 8:
-            break
+                    return out
     return out
 
 
@@ -549,6 +543,30 @@ def write_report(report: dict, project: Path, out_path: Path | None = None) -> P
     return out
 
 
+def _skipped_report(project: Path, window: list[int] | None) -> dict:
+    """The windowed-only lane under PLAYTEST_FORCE_HEADLESS: skipped-with-reason
+    (steps ok=True), never failed — live play needs a real window and renderer.
+    Single construction shared by run_play_agent and main so the two headless
+    exits can never drift on schema keys."""
+    reason = windowed_skip_reason()
+    return {
+        "schema": "play-report/1",
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "project": str(project),
+        "window": window,
+        "transport": "skipped-headless",
+        "skipped": True,
+        "skipped_reason": reason,
+        "steps": [{"action": "skipped", "ok": True, "reason": reason}],
+        "reached_states": [],
+        "stuck_at": None,
+        "inventory_checks": [],
+        "creation_confirmed": False,
+        "player_step": None,
+        "snapshot_captured": False,
+    }
+
+
 def run_play_agent(project: Path, godot_bin: str = DEFAULT_GODOT_BIN,
                    timeout: float = PLAY_TIMEOUT, bundle: dict | None = None,
                    use_cmd: bool = True, report_path: Path | None = None) -> tuple[dict, Path]:
@@ -557,6 +575,11 @@ def run_play_agent(project: Path, godot_bin: str = DEFAULT_GODOT_BIN,
     Returns (report, path)."""
     if bundle is None:
         bundle = assemble_bundle(project)
+
+    if force_headless():
+        report = _skipped_report(project, bundle.get("window"))
+        path = write_report(report, project, report_path)
+        return report, path
 
     # Optional cmd agent pre-pass (the second cmd invocation). Its stdout JSON
     # is appended to the report as cmd_plan_steps — advisory only; it NEVER
@@ -567,32 +590,16 @@ def run_play_agent(project: Path, godot_bin: str = DEFAULT_GODOT_BIN,
         if cmd_plan and isinstance(cmd_plan, dict):
             print(f"play_agent: cmd plan received ({len(cmd_plan.get('steps') or [])} steps)", file=sys.stderr)
 
-    drive = _drive_live(project, godot_bin, timeout, bundle) if not force_headless() else {
-        "steps": [{"action": "skipped", "ok": True, "reason": windowed_skip_reason()}],
-        "reached_states": [],
-        "stuck_at": None,
-        "inventory_checks": [],
-        "creation_confirmed": False,
-        "player_step": None,
-        "snapshot_captured": False,
-        "duration_s": 0,
-        "window": bundle.get("window"),
-        "events_seen": [],
-    }
+    drive = _drive_live(project, godot_bin, timeout, bundle)
     # If cmd plan carried extra steps, append them as advisory (never overwrite live).
     if isinstance(cmd_plan, dict) and isinstance(cmd_plan.get("steps"), list):
         drive.setdefault("cmd_plan_steps", cmd_plan["steps"])
 
     report = make_report(bundle, drive, project)
-    if force_headless():
-        report["skipped"] = True
-        report["skipped_reason"] = windowed_skip_reason()
-        report["transport"] = "skipped-headless"
-    else:
-        report["transport"] = "windowed-subprocess"
-        # Merge cmd plan advisory
-        if "cmd_plan_steps" in drive:
-            report["cmd_plan_steps"] = drive["cmd_plan_steps"]
+    report["transport"] = "windowed-subprocess"
+    # Merge cmd plan advisory
+    if "cmd_plan_steps" in drive:
+        report["cmd_plan_steps"] = drive["cmd_plan_steps"]
 
     path = write_report(report, project, report_path)
     return report, path
@@ -659,22 +666,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Transport honesty
     if force_headless():
-        report = {
-            "schema": "play-report/1",
-            "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "project": str(project),
-            "window": _read_window(project),
-            "transport": "skipped-headless",
-            "skipped": True,
-            "skipped_reason": windowed_skip_reason(),
-            "steps": [{"action": "skipped", "ok": True, "reason": windowed_skip_reason()}],
-            "reached_states": [],
-            "stuck_at": None,
-            "inventory_checks": [],
-            "creation_confirmed": False,
-            "player_step": None,
-            "snapshot_captured": False,
-        }
+        report = _skipped_report(project, _read_window(project))
         path = write_report(report, project, report_path)
         print(json.dumps(report, indent=2, sort_keys=True))
         print(f"SKIP: {windowed_skip_reason()}", file=sys.stderr)

@@ -27,7 +27,8 @@ static func collect_world(ctx: Dictionary, result: Dictionary) -> void:
 			"z": WorldDrawOrder.effective_z(item),
 			"y_sort": null if is_nan(sort_y) else sort_y,
 			"texture": "",
-			"rect": []
+			"rect": [],
+			"space": "display" # world collectors emit canvas px, never 160x144 stage px
 		})
 	collect_entities(ctx, result)
 
@@ -55,7 +56,7 @@ static func collect_entities(ctx: Dictionary, result: Dictionary) -> void:
 		var node_path := str(root.get_path_to(item)) if root != null else str(item.name)
 		var entry := {"node": node_path, "z": WorldDrawOrder.effective_z(item),
 			"y_sort": null if is_nan(sort_y) else sort_y, "texture": _texture_path(item),
-			"rect": rect}
+			"rect": rect, "space": "display"} # canvas px — see collect_world
 		result["draw_order"].append(entry)
 		var kind := _entity_kind(item)
 		if kind == "nest":

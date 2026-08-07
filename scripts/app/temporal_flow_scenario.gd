@@ -46,6 +46,18 @@ func _fail(ctx: Dictionary, why: String) -> void:
 		runtime.emit_trace("temporal_flow_failed", "SmokeScenarios", payload)
 
 
+# The registered flows: prep opens the battle, trigger fires the move/ball, make
+# is the adapter CONSTRUCTOR (setup is owned by _capture_one, exactly once).
+# A function, not a const: GDScript consts cannot hold Callable expressions.
+static func _flows() -> Array:
+	return [
+		{"id": TemporalAdapters.BATTLE_ATTACK_ID, "prep": TemporalAdapters.prepare_attack_battle,
+			"trigger": TemporalAdapters.trigger_selected_move, "make": TemporalAdapters.BattleAttackAdapter.new},
+		{"id": TemporalAdapters.BATTLE_CAPTURE_ID, "prep": TemporalAdapters.prepare_capture_battle,
+			"trigger": TemporalAdapters.trigger_pokeball, "make": TemporalAdapters.BattleCaptureAdapter.new},
+	]
+
+
 func _run_flows(ctx: Dictionary) -> String:
 	var runtime: Node = ctx.get("runtime")
 	var viewport: Viewport = ctx.get("viewport")
@@ -53,34 +65,26 @@ func _run_flows(ctx: Dictionary) -> String:
 	if runtime == null or viewport == null:
 		_failures.append("temporal_flow: missing runtime/viewport context")
 		return "missing context"
-	# --- battle_attack ---
-	var prep := TemporalAdapters.prepare_attack_battle(ctx)
-	if not prep.is_empty():
-		_failures.append("temporal_flow battle_attack prep: %s" % prep)
-		return prep
-	await get_tree().create_timer(0.15).timeout
-	TemporalAdapters.trigger_selected_move(ctx)
-	var attack := TemporalAdapters.make_attack_adapter(ctx)
-	var attack_fail := await _capture_one(ctx, attack, TemporalAdapters.BATTLE_ATTACK_ID, base_dir)
-	if not attack_fail.is_empty():
-		return attack_fail
-	# Close any leftover battle before the capture flow.
+	for flow in _flows():
+		await _close_battle(ctx) # no-op for the first flow; closes leftovers between flows
+		var flow_id := str(flow["id"])
+		var prep := str((flow["prep"] as Callable).call(ctx))
+		if not prep.is_empty():
+			_failures.append("temporal_flow %s prep: %s" % [flow_id, prep])
+			return prep
+		await get_tree().create_timer(0.15).timeout
+		(flow["trigger"] as Callable).call(ctx)
+		var fail := await _capture_one(ctx, (flow["make"] as Callable).call(), flow_id, base_dir)
+		if not fail.is_empty():
+			return fail
+	return ""
+
+
+func _close_battle(ctx: Dictionary) -> void:
 	var set_battle: Callable = ctx.get("set_battle", Callable())
 	if set_battle.is_valid():
 		set_battle.call(false)
 	await get_tree().create_timer(0.15).timeout
-	# --- battle_capture ---
-	prep = TemporalAdapters.prepare_capture_battle(ctx)
-	if not prep.is_empty():
-		_failures.append("temporal_flow battle_capture prep: %s" % prep)
-		return prep
-	await get_tree().create_timer(0.15).timeout
-	TemporalAdapters.trigger_pokeball(ctx)
-	var capture := TemporalAdapters.make_capture_adapter(ctx)
-	var capture_fail := await _capture_one(ctx, capture, TemporalAdapters.BATTLE_CAPTURE_ID, base_dir)
-	if not capture_fail.is_empty():
-		return capture_fail
-	return ""
 
 
 func _capture_one(ctx: Dictionary, adapter, flow_id: String, base_dir: String) -> String:

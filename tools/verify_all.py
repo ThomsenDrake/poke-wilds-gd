@@ -953,8 +953,8 @@ def main() -> int:
                         help="display-less environments: report the windowed pixel lanes "
                              "as SKIP (never PASS) and suppress the windowed refusals")
     parser.add_argument("--with-play-agent", action="store_true",
-                        help="opt-in S8.5 Command Code play agent (windowed DAP drive; "
-                             "default off locally; skipped under --skip-windowed)")
+                        help="opt-in S8.5 Command Code play agent (windowed-subprocess "
+                             "drive, no DAP; default off locally; skipped under --skip-windowed)")
     parser.add_argument("--timeout", type=float, default=120,
                         help="per-scenario wall-clock budget (s) for the headless suite "
                              "(default 120)")

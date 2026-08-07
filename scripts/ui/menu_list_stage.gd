@@ -21,6 +21,8 @@ const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
 # detail_rect Rect2 (zero size = no detail plate), hint String + hint_rect,
 # background bool (default true) + background_path.
 # Returns {rows: Rows, title_label, detail_label, hint_label}.
+# Plate names are CONSTANTS (never opts): the art-anchor registry + the menu
+# draw_order collector address them as stable node paths (e.g. camp RowsPlate).
 static func build(stage: Control, opts: Dictionary) -> Dictionary:
 	if bool(opts.get("background", true)):
 		art(stage, str(opts.get("background_path", BACKGROUND_PATH)))
@@ -32,21 +34,21 @@ static func build(stage: Control, opts: Dictionary) -> Dictionary:
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var rows_rect: Rect2 = opts.get("rows_rect", Rect2(8, 24, 144, 64))
 	var rows_plate := GbcWidgets.plate(rows_rect, stage)
-	rows_plate.name = str(opts.get("rows_plate_name", "RowsPlate"))
+	rows_plate.name = "RowsPlate"
 	var rows := Rows.new()
 	rows.setup(rows_plate, int(opts.get("max_visible", 0)))
 	var detail_label: Label = null
 	var detail_rect: Rect2 = opts.get("detail_rect", Rect2())
 	if detail_rect.size.x > 0.0:
 		var detail_plate := GbcWidgets.plate(detail_rect, stage)
-		detail_plate.name = str(opts.get("detail_plate_name", "DetailPlate"))
+		detail_plate.name = "DetailPlate"
 		detail_label = wrapped_label(detail_plate,
 				Rect2(Vector2(3, 2), detail_rect.size - Vector2(6, 4)))
 	var hint_label: Label = null
 	var hint_rect: Rect2 = opts.get("hint_rect", Rect2())
 	if hint_rect.size.x > 0.0:
 		var hint_plate := GbcWidgets.plate(hint_rect, stage)
-		hint_plate.name = str(opts.get("hint_plate_name", "HintPlate"))
+		hint_plate.name = "HintPlate"
 		hint_label = wrapped_label(hint_plate,
 				Rect2(Vector2(3, 1), hint_rect.size - Vector2(6, 2)))
 		hint_label.text = str(opts.get("hint", ""))

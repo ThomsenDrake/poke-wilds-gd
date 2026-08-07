@@ -96,8 +96,10 @@ ANCHOR_SCENE_BY_GROUP: dict[str, str | list[str]] = {
         "scenes/ui/PartyScreen.tscn",
         "scenes/ui/BagScreen.tscn",
         "scenes/ui/StorageScreen.tscn",
-        "scenes/ui/CampMenu.tscn",
     ],
+    # CampMenu shows in the CAMPING sweep (16_craft_menu opens it), never in the
+    # menu-group shots — the mapping must follow the group that displays it.
+    "camping": ["scenes/ui/CampMenu.tscn"],
 }
 
 
@@ -234,8 +236,14 @@ def _build_region_table(base: dict | None, fresh: dict | None, window: list[int]
             if not (isinstance(node, dict) and node.get("node")):
                 continue
             rect = node.get("rect")
-            if _valid_rect(rect) and any(rect):  # overworld nodes carry rect [] -> ungroundable
-                add(f"draw:{node['node']}", "draw", _stage_to_display(_ri(rect), window), source)
+            if _valid_rect(rect) and any(rect):  # overworld layer nodes carry rect [] -> ungroundable
+                # Rect space is a property of the COLLECTOR, not the shot group:
+                # battle/menu stage collectors emit 160x144 stage px (mapped via
+                # _stage_to_display); render_introspection_mons' world collectors
+                # stamp "space": "display" (canvas px) — mapping those through the
+                # stage formula would ground draw:EntityLayer/* at wrong coords.
+                mapped = _ri(rect) if node.get("space") == "display" else _stage_to_display(_ri(rect), window)
+                add(f"draw:{node['node']}", "draw", mapped, source)
         # Track A.1: overworld_mons deterministic regions (mons_y_sort / nest_rings).
         for i, entry in enumerate(sidecar.get("mons_y_sort") or []):
             if isinstance(entry, dict) and _valid_rect(entry.get("rect")) and any(entry.get("rect") or []):
@@ -833,7 +841,6 @@ RUBRIC_GROUPS = [
     ("camping", "Camping states"),
     ("overworld_mons", "Overworld mon states"),
     ("display_matrix", "Display-matrix states"),
-    ("temporal", "Temporal states"),
     ("satellite", "Satellite sweep states"),
 ]
 
@@ -899,10 +906,6 @@ QUESTION_ANSWERERS = {
         ("roaming mons visibly y-sort", [KIND_DETERMINISTIC, KIND_MODEL]),
         ("ground nest ring", [KIND_DETERMINISTIC, KIND_MODEL]),
     ],
-    "temporal": [
-        ("single clean frame sequence without ghosting", [KIND_MODEL]),
-        ("frame order match", [KIND_MODEL]),
-    ],
     "satellite": [
         ("focal content intact", [KIND_MODEL]),
         ("text or sprites clipped", [KIND_MODEL]),
@@ -914,9 +917,9 @@ QUESTION_ANSWERERS = {
 # Static pin so a rubric edit cannot SILENTLY EMPTY a question list: when the
 # parsed inventory drifts from these counts the run records a loud warning
 # (advisory in this slice; a RED check_repo_contracts backstop is the documented
-# follow-up). Totals: 6 + 2 + 7 + 7 + 2 + 2 + 1 + 2 + 4 = 33 rubric questions.
+# follow-up). Totals: 6 + 2 + 7 + 7 + 2 + 2 + 1 + 4 = 31 rubric questions.
 EXPECTED_QUESTION_COUNTS = {
-    "overworld": 6, "day_night": 2, "menu": 7, "battle": 7, "camping": 2, "overworld_mons": 2, "display_matrix": 1, "temporal": 2, "satellite": 4,
+    "overworld": 6, "day_night": 2, "menu": 7, "battle": 7, "camping": 2, "overworld_mons": 2, "display_matrix": 1, "satellite": 4,
 }
 
 ANSWER_VERDICTS = ("yes", "no")
@@ -1194,119 +1197,25 @@ def rubric_inventory_issues(rubric_text: str) -> list[str]:
     return issues
 
 
-def _prior_findings_for_shot(shot_name: str, bundle_dir: Path) -> list[dict]:
-    """Prior vision-review.json findings for this shot (filtered by stem).
-
-    Best-effort, degrade-on-absent: [] when the prior file is missing, unreadable,
-    or has no entry for this shot. Each entry is a compact summary so the bundle
-    stays small while the model sees known false positives. Never raises."""
-    try:
-        candidates: list[Path] = []
-        try:
-            # bundle_dir = output_dir / "vision-review" / stem  -> output_dir = parent.parent
-            candidates.append(bundle_dir.parent.parent / "vision-review.json")
-        except Exception:
-            pass
-        candidates.append(ROOT / ".godot-smoke" / "vision-review.json")
-        doc = None
-        for cand in candidates:
-            try:
-                if cand.is_file():
-                    loaded = _load_json(cand)
-                    if isinstance(loaded, dict) and loaded.get("shots") is not None:
-                        doc = loaded
-                        break
-            except Exception:
-                continue
-        if not isinstance(doc, dict):
-            return []
-        stem = Path(shot_name).stem
-        out: list[dict] = []
-        for entry in doc.get("shots") or []:
-            if not isinstance(entry, dict):
-                continue
-            sname = str(entry.get("shot") or "")
-            if Path(sname).stem != stem:
-                continue
-            for f in entry.get("findings") or []:
-                if not isinstance(f, dict):
-                    continue
-                compact = {}
-                for k in ("finding_id", "class", "region_id", "severity", "confidence", "note"):
-                    v = f.get(k)
-                    if v is not None:
-                        compact[k] = v
-                # keep explanation truncated so context.json stays bounded
-                if isinstance(f.get("explanation"), str) and f["explanation"]:
-                    compact["explanation"] = str(f["explanation"])[:160]
-                out.append(compact)
-                if len(out) >= 8:
-                    break
-            if len(out) >= 8:
-                break
-        return out
-    except Exception:
-        return []
+_REVIEW_CONTEXT = None
 
 
-def _legibility_lines_for_shot(shot_name: str, bundle_dir: Path) -> list[str]:
-    """Legibility-report CVD/contrast lines mentioning this shot.
-
-    Parses .godot-smoke/legibility-report.md for canary/label contrast + CVD
-    collapse lines for the shot (name or stem must appear). Best-effort: []
-    when the file is absent or unparseable. Never raises."""
-    try:
-        candidates: list[Path] = []
-        try:
-            candidates.append(bundle_dir.parent.parent / "legibility-report.md")
-        except Exception:
-            pass
-        candidates.append(ROOT / ".godot-smoke" / "legibility-report.md")
-        text = None
-        for cand in candidates:
-            try:
-                if cand.is_file():
-                    text = cand.read_text(encoding="utf-8")
-                    break
-            except Exception:
-                continue
-        if not text:
-            return []
-        stem = Path(shot_name).stem
-        lines: list[str] = []
-        for raw in text.splitlines():
-            if stem not in raw and shot_name not in raw:
-                continue
-            low = raw.lower()
-            # keep only contrast/CVD-relevant mentions; still keep any shot mention as fallback
-            is_relevant = any(k in low for k in (
-                "ratio", "contrast", "cvd", "collapse", "deutan", "protan", "tritan",
-                "canary", "deltae", "wcag"))
-            stripped = raw.strip()
-            if stripped.startswith("- "):
-                stripped = stripped[2:]
-            elif stripped.startswith("* "):
-                stripped = stripped[2:]
-            stripped = stripped.strip()
-            if not stripped:
-                continue
-            if len(stripped) > 240:
-                stripped = stripped[:237] + "..."
-            # prefer relevant lines, but keep any shot line (cap ensures no overflow)
-            if is_relevant or stem in raw:
-                lines.append(stripped)
-            if len(lines) >= 8:
-                break
-        return lines[:8]
-    except Exception:
-        return []
+def _review_context():
+    """Sanctioned importlib load of tools/review_context.py (the single home for
+    prior-findings / legibility loaders + prompt formatters), cached."""
+    global _REVIEW_CONTEXT
+    if _REVIEW_CONTEXT is None:
+        _REVIEW_CONTEXT = _load("review_context", TOOLS / "review_context.py")
+    return _REVIEW_CONTEXT
 
 
 def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clusters,
-                    table, bundle_dir, vd, canvas_mod, window, rubric_text) -> tuple[dict, dict]:
-    """Returns (bundle-relative paths, som_legend): the legend maps region_id to
-    the number drawn on the SoM overlays, so it rides in the reviewer stdin JSON
-    (not pixels-only) AND in the on-disk context.json."""
+                    table, bundle_dir, vd, canvas_mod, window, rubric_text) -> tuple[dict, dict, dict]:
+    """Returns (bundle-relative paths, som_legend, enrichment): the legend maps
+    region_id to the number drawn on the SoM overlays, so it rides in the
+    reviewer stdin JSON (not pixels-only) AND in the on-disk context.json. The
+    enrichment dict carries prior_findings/legibility_lines so the caller merges
+    it into public_ctx directly (no read-back of the just-written context.json)."""
     if bundle_dir.is_dir():  # clear stale crops/overlays from a prior run
         for stale in bundle_dir.iterdir():
             if stale.is_file():
@@ -1358,8 +1267,10 @@ def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clus
 
     # Enrichment (bundle assembly): prior findings (false-positive memory) + CVD/contrast
     # legibility lines so the model sees known issues. Degrade gracefully when files absent.
-    prior = _prior_findings_for_shot(name, bundle_dir)
-    legibility_lines = _legibility_lines_for_shot(name, bundle_dir)
+    # bundle_dir = output_dir / "vision-review" / stem -> output_dir = parent.parent.
+    rc = _review_context()
+    prior = rc.load_prior_findings(name, bundle_dir.parent.parent)
+    legibility_lines = rc.load_legibility_lines(name, bundle_dir.parent.parent)
     context = {
         "shot": name, "shot_kind": stem.split("_")[0], "window": window,
         "crafted_state": (fresh_sidecar or base_sidecar or {}).get("crafted_state"),
@@ -1376,12 +1287,14 @@ def assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar, clus
     }
     (bundle_dir / "context.json").write_text(json.dumps(context, indent=2, sort_keys=True), encoding="utf-8")
 
+    enrichment = {"prior_findings": prior, "prior_findings_count": len(prior),
+                  "legibility_lines": legibility_lines, "legibility_source": "legibility-report.md"}
     return ({"before": f"vision-review/{stem}/before.png", "after": f"vision-review/{stem}/after.png",
              "som_before": f"vision-review/{stem}/som_before.png",
              "som_after": f"vision-review/{stem}/som_after.png", "crops": crops,
              "expected_strings": f"vision-review/{stem}/expected_strings.json",
              "rubric": f"vision-review/{stem}/rubric.txt", "context": f"vision-review/{stem}/context.json"},
-            legend)
+            legend, enrichment)
 
 
 def _evidence_crop(name, finding, base_buf, fresh_buf, window, bundle_dir, canvas_mod) -> str | None:
@@ -1570,8 +1483,9 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             warnings.append(f"{name}: {warn}")
         clusters = (clusters_by_shot.get(name) or {}).get("clusters", [])
         bundle_dir = review_dir / Path(name).stem
-        paths, som_legend = assemble_bundle(name, base_png, fresh_png, base_sidecar, fresh_sidecar,
-                                            clusters, table, bundle_dir, vd, canvas_mod, window, rubric_text)
+        paths, som_legend, enrichment = assemble_bundle(name, base_png, fresh_png, base_sidecar,
+                                                        fresh_sidecar, clusters, table, bundle_dir,
+                                                        vd, canvas_mod, window, rubric_text)
 
         ctx = {"shot": name, "shot_kind": Path(name).stem.split("_")[0], "paths": paths,
                "region_table": table, "reviewer_params": _reviewer_params(),
@@ -1606,18 +1520,9 @@ def run_vision_review(shots_dir: Path, baseline_dir: Path, output_dir: Path,
             "intersect": "bbox must pass rects_overlap against >=1 registered rect",
             "enforcement": "ungrounded findings are dropped and counted"}
         # Bundle enrichment for model reviewers: prior findings (false-positive memory)
-        # + CVD/contrast legibility lines. Degrade gracefully when files absent; read
-        # from the just-written context.json (already enriched by assemble_bundle) so
-        # vision_review is the single writer and public_ctx stays in sync with context.json.
-        try:
-            _enrich_ctx = _load_json(bundle_dir / "context.json")
-            if isinstance(_enrich_ctx, dict):
-                # keys added: prior_findings, prior_findings_count, legibility_lines, legibility_source
-                for _k in ("prior_findings", "prior_findings_count", "legibility_lines", "legibility_source"):
-                    if _k in _enrich_ctx:
-                        public_ctx[_k] = _enrich_ctx[_k]
-        except Exception:
-            pass  # degrade, not crash -- model simply sees no prior/legibility context
+        # + CVD/contrast legibility lines, merged straight from assemble_bundle's
+        # return so public_ctx and context.json can never drift (no disk read-back).
+        public_ctx.update(enrichment)
 
         if reviewer_cmd:
             raw, raw_answers, meta_kinds, reviewer_meta = _run_cmd_reviewer(reviewer_cmd, public_ctx)
