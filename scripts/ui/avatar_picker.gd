@@ -26,7 +26,7 @@ const COLUMNS := 6
 const FRAME := Rect2(0, 0, 16, 16) # walking-sheet frame 0 = down-idle
 const CELL := 16 # stage px: native sheet frame, NEAREST
 const PITCH := 17 # 16px cell + 1px gap
-const PLATE_RECT := Rect2(24, 2, 112, 138) # fully on-stage (the geo witness)
+const PLATE_RECT := Rect2(24, 2, 112, 140) # fully on-stage (the geo witness); the extra 2px lift the grid's last row off the bottom border
 
 var plate: PanelContainer # the geo witness reads this member (new_game_flow_geo)
 var _name_label: Label

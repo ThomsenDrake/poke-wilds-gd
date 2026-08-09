@@ -147,6 +147,7 @@ func _is_any_action_pressed(event: InputEvent) -> bool:
 
 func _rebuild_entries() -> void:
 	_rows.set_rows(_entry_labels()) # resets the cursor to row 0 (the CONTINUE start)
+	TitleStage.center_rows(_rows)
 
 func _entry_labels() -> Array:
 	return [ENTRY_CONTINUE, ENTRY_NEW_GAME] if _has_save else [ENTRY_NEW_GAME]

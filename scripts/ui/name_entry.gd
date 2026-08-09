@@ -26,9 +26,10 @@ const COLUMNS := 7
 const CELL_DEL := 26
 const CELL_OK := 27
 const CELL_COUNT := 28
-const CELL_W := 18 # stage px: 7 columns fit the 134px plate
-const CELL_H := 12 # 8px row pitch + gap; 4 rows fit the plate
-const PLATE_RECT := Rect2(13, 6, 134, 90) # fully on-stage (the geo witness)
+const CELL_W := 16 # stage px: selection target around the 8px glyph
+const CELL_H := 13 # 8px glyph + row gap
+const PLATE_RECT := Rect2(13, 22, 134, 100) # stage-centered (the geo witness)
+const GRID_ORIGIN := Vector2i(11, 21) # the 7x16 grid centered in the plate
 
 var plate: PanelContainer # the geo witness reads this member (new_game_flow_geo)
 var _name_label: Label # "NAME — %s_" — the trailing _ is the insertion point
@@ -55,10 +56,10 @@ func _ready() -> void:
 	var content := Control.new() # PanelContainer sizes it to the plate rect
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plate.add_child(content)
-	_name_label = GbcStage.make_label("", Vector2i(5, 4), Color.BLACK, content)
-	_name_label.size = Vector2(124, 8)
+	_name_label = GbcStage.make_label("", Vector2i(GRID_ORIGIN.x, 7), Color.BLACK, content)
+	_name_label.size = Vector2(112, 8)
 	var grid := Control.new()
-	grid.position = Vector2(5, 16)
+	grid.position = Vector2(GRID_ORIGIN)
 	grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	content.add_child(grid)
 	_cursor_bg = ColorRect.new()
@@ -73,9 +74,9 @@ func _ready() -> void:
 		_cells.append(cell)
 	# Explicit two-line wrap: Label autowrap proved unreliable at fonts.ttf@7
 	# (the one-line render bled past the plate — off-stage ink); both lines fit
-	# the 124px content width.
-	var hint := GbcStage.make_label("(arrows: move\nZ: press   X: done)", Vector2i(5, 68), Color.BLACK, content)
-	hint.size = Vector2(124, 16)
+	# the 112px content width.
+	var hint := GbcStage.make_label("(arrows: move\nZ: press   X: done)", Vector2i(GRID_ORIGIN.x, 79), Color.BLACK, content)
+	hint.size = Vector2(112, 16)
 
 func open_entry() -> void:
 	_refresh()

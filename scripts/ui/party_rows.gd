@@ -5,8 +5,9 @@ extends RefCounted
 # (wave 2): rows render at native 160x144 stage scale — fonts.ttf@7 black ink
 # on the white plates, TWO 8px lines per row. Line 1 rides the HBoxContainer
 # (the layout_audit.gd:137-156 contract: child0 = ">" marker Label, child1 =
-# name Label); line 2 (HP bar + numbers + status, or egg steps + EGG tag) is
-# absolute-positioned children of the name Label so the contract shape holds.
+# name Label; child2 = the 16x16 overworld sprite / egg icon); line 2 (HP bar +
+# numbers + status, or egg steps + EGG tag) is absolute-positioned children of
+# the name Label so the contract shape holds.
 
 const ShinyPalette := preload("res://scripts/ui/shiny_palette.gd")
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
@@ -23,7 +24,12 @@ const HP_COLOR_MID := Color(0.92, 0.66, 0.22)
 const HP_COLOR_LOW := Color(0.88, 0.28, 0.24)
 const HP_BAR_BG_COLOR := Color(0.10, 0.11, 0.13, 0.95)
 const MARKER_WIDTH := 7.0
+const NAME_FIELD_WIDTH := 98.0 # 126 (picker rows) - marker 7 - seps 2x2 - sprite 16 - 1px slack
 const ROW_HEIGHT := 16.0 # two fonts.ttf@7 lines
+const SPRITE_SIZE := Vector2(16.0, 16.0)
+const SPRITE_FRAME := Rect2(0, 0, 16, 16) # frame 0 (down-idle) of the 96x16 walking strip
+const OVERWORLD_SHEET := "res://pokewilds/pokemon/pokemon/%s/overworld.png"
+const OVERWORLD_SHINY_SHEET := "res://pokewilds/pokemon/pokemon/%s/overworld-shiny.png"
 const LINE2_Y := 8.0
 const LINE2_H := 9.0
 const HP_LABEL_POS := Vector2(26, 8)
@@ -57,9 +63,12 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 		name_label.text = "Egg (%s)" % str(mon.get("egg", {}).get("display_name", "?"))
 	else:
 		name_label.text = "%s  Lv.%d" % [str(mon.get("name", "Pokemon")), int(mon.get("level", 1))]
-	# The text drives the width; a worst-case name clips at the stage edge by
-	# design (GBC row idiom; the layout audit skips clip_text labels).
-	name_label.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
+	# FIXED field width: an HBox hands a clip_text Label its minimum size, so the
+	# old text-driven minimum collapsed every row's ink to a 1px sliver (the
+	# wave-2 blank-name bug the 07 sidecar recorded as [14,5,1,7]). 98px leaves
+	# room for the 16px row sprite (126px picker rows are the tightest container);
+	# a worst-case name still clips by design (the layout audit skips clip_text).
+	name_label.custom_minimum_size = Vector2(NAME_FIELD_WIDTH, ROW_HEIGHT)
 	name_label.clip_text = true
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	GbcStage.apply_font(name_label, Color.BLACK)
@@ -67,8 +76,10 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 
 	if is_egg:
 		row.add_child(_icon(ShinyPalette.egg_frame(), ICON_SIZE, Color.WHITE))
-	elif bool(mon.get("is_shiny", false)): # the status-screen shiny symbol (top-right in the original)
-		row.add_child(_icon(ShinyPalette.shiny_icon(), BADGE_SIZE, SHINY_BADGE_COLOR))
+	else:
+		var sprite := _mon_sprite(mon)
+		if sprite != null:
+			row.add_child(sprite)
 
 	if is_egg:
 		name_label.add_child(_line2_label("Steps: %d" % int(mon.get("egg", {}).get("steps_to_hatch", 0)),
@@ -194,6 +205,39 @@ static func _type_text(types: Variant) -> String:
 		if not type_name.is_empty() and not unique.has(type_name):
 			unique.append(type_name)
 	return "/".join(unique) if not unique.is_empty() else "?"
+
+
+# The mon's overworld walking-sheet frame 0 as the row sprite (the GSC party
+# icon idiom). Shinies ride the recolored sheet when one exists and keep the
+# gold badge as an overlay, so the shiny signal survives the 400-odd species
+# without a shiny sheet; species with no overworld sheet at all skip the sprite.
+static func _mon_sprite(mon: Dictionary) -> TextureRect:
+	var slug := str(mon.get("species_id", "")).to_lower()
+	if slug.is_empty():
+		return null
+	var shiny := bool(mon.get("is_shiny", false))
+	var path := ""
+	if shiny and ResourceLoader.exists(OVERWORLD_SHINY_SHEET % slug):
+		path = OVERWORLD_SHINY_SHEET % slug
+	elif ResourceLoader.exists(OVERWORLD_SHEET % slug):
+		path = OVERWORLD_SHEET % slug
+	if path.is_empty():
+		return null
+	var atlas := AtlasTexture.new()
+	atlas.atlas = load(path)
+	atlas.region = SPRITE_FRAME
+	var sprite := TextureRect.new()
+	sprite.texture = atlas
+	sprite.custom_minimum_size = SPRITE_SIZE
+	sprite.stretch_mode = TextureRect.STRETCH_KEEP
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sprite.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if shiny: # the status-screen shiny symbol, overlaid on the sprite's top-right corner
+		var badge := _icon(ShinyPalette.shiny_icon(), BADGE_SIZE, SHINY_BADGE_COLOR)
+		badge.position = Vector2(SPRITE_SIZE.x - BADGE_SIZE.x, 0)
+		sprite.add_child(badge)
+	return sprite
 
 
 static func _icon(texture: Texture2D, icon_size: Vector2, tint: Color) -> TextureRect:

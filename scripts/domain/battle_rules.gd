@@ -276,8 +276,14 @@ func _catch_context(enemy_mon: Dictionary, ball_id: String, catch_rate: int) -> 
 	var current_hp = clampi(int(enemy_mon.get("current_hp", max_hp)), 0, max_hp)
 	var ball_bonus = _ball_bonus(ball_id)
 	var status_bonus = _status_catch_bonus(str(enemy_mon.get("status", "")))
-	var catch_value = floor(((3.0 * max_hp - 2.0 * current_hp) * rate * ball_bonus) / (3.0 * max_hp)) * status_bonus
-	return {"success": false, "roll": 0.0, "probability": clampf(catch_value / 255.0, 0.0, 1.0),
+	# Mainline modified catch rate "a" (the max(1) floor is Gen 2's: every wild mon
+	# keeps a sliver of catchability). a >= 255 is an automatic catch; else FOUR
+	# shake checks each pass at b/65536 with b = 65536/(255/a)^0.1875, so the overall
+	# probability is (a/255)^0.75 — NOT a/255 (the Gen 3/4 approximation this used
+	# before, which priced every ball ~40% below the modern games).
+	var catch_value = maxf(1.0, floor(((3.0 * max_hp - 2.0 * current_hp) * rate * ball_bonus) / (3.0 * max_hp)) * status_bonus)
+	var probability := 1.0 if catch_value >= 255.0 else pow(catch_value / 255.0, 0.75)
+	return {"success": false, "roll": 0.0, "probability": probability,
 		"catch_value": catch_value, "catch_rate": rate, "ball_bonus": ball_bonus, "status_bonus": status_bonus}
 
 func _ball_bonus(ball_id: String) -> float:

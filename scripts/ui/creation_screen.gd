@@ -173,6 +173,7 @@ func _activate() -> void:
 func _begin() -> void:
 	_generating = true # input locked for the beat; the timer releases it with the confirm
 	_value_label.text = GENERATING_TEXT
+	call_deferred("_center_block_deferred")
 	_gen_timer.start(0.6) # FLAGGED beat: world gen is instant; the duration is invented theater
 
 func _on_gen_timer_timeout() -> void:
@@ -218,3 +219,8 @@ func _seed_line() -> String:
 # they are the SAME pinned strings as the pre-restyle screen (design §2.2).
 func _render() -> void:
 	CreationRender.render(self)
+	call_deferred("_center_block_deferred") # get_line_count needs a layout pass first
+
+func _center_block_deferred() -> void:
+	if visible:
+		CreationRender.center_block(self)

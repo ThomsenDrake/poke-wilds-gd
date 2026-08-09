@@ -43,6 +43,7 @@ func _ready() -> void:
 	_stage.add_child(_art)
 	_label = Label.new()
 	_label.name = "TextLabel"
+	_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART # long confirms/toasts wrap inside the band — never bleed past its right edge
 	GbcStage.apply_font(_label, Color.BLACK)
 	_stage.add_child(_label)
 	_timer = Timer.new()

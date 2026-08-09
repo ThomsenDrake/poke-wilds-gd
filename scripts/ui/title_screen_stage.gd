@@ -20,6 +20,8 @@ const CREDIT_LINE := "a fan remake of PokeWilds — original game by SheerSt" # 
 const CREDIT_LINES := "a fan remake of PokeWilds\n— original game by SheerSt"
 const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
 const ENTRY_BAND_PATH := "res://pokewilds/textbox_bg2.png"
+const ENTRY_BAND := Rect2(0, 80, 160, 64) # textbox_bg2.png's opaque bottom band
+const ENTRY_ROWS_X := 57
 
 
 static func build(stage: Control) -> Dictionary:
@@ -80,8 +82,14 @@ static func _build_title_card(stage: Control) -> Dictionary:
 	mark.size = Vector2(70, 8)
 	mark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	art(card, ENTRY_BAND_PATH)
-	var rows = GbcWidgets.row_list(card, Vector2i(57, 96)) # rows centered on the white band
+	var rows = GbcWidgets.row_list(card, Vector2i(ENTRY_ROWS_X, 96)) # y re-centered per row count
 	return {"card": card, "rows": rows}
+
+
+# Vertically centers the entry rows within the baked band; the row count varies
+# (CONTINUE only with a save), so the centering runs on every rebuild.
+static func center_rows(rows) -> void:
+	rows.root().position.y = ENTRY_BAND.position.y + (ENTRY_BAND.size.y - rows.row_count() * GbcWidgets.RowList.PITCH) / 2.0
 
 
 # Full-stage NEAREST TextureRect; a missing asset degrades to the opaque black

@@ -21,6 +21,9 @@ const SCENARIOS := {
 	# Battle-END same-press leak: a press that ends a battle (RUN / capture) must not
 	# re-fire the overworld context action the same frame (the latch's battle arm).
 	"battle_end_input": [preload("res://scripts/app/battle_end_input_scenario.gd"), "run", []],
+	# QoL: Z on diggable ground with no Dig-capable mon stays silent (the refusal
+	# toast fired on every exploratory Z); cut + capable-dig presses still speak.
+	"dig_silence": [preload("res://scripts/app/dig_silence_scenario.gd"), "run", []],
 	# Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md);
 	# like every non-playtest entry, they run inside smoke_scenarios' save guard.
 	"camp_survival": [preload("res://scripts/app/camp_survival_scenario.gd"), "run", []],

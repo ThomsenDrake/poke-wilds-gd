@@ -18,6 +18,7 @@ const FieldMoveActions := preload("res://scripts/app/field_move_actions.gd")
 const OverworldEntityActions := preload("res://scripts/app/overworld_entity_actions.gd")
 
 const BUILD_MOVE := "build"
+const DIG_MOVE := "dig"
 const CAMPFIRE_ID := "campfire"
 const BED_ID := "bed"
 const BOX_ID := "storage_box"
@@ -67,8 +68,14 @@ func on_context_action() -> void:
 	if _try_fish(faced):
 		return
 	var result: Dictionary = _runtime.harvest_tile(faced)
-	if str(result.get("move_id", "")) != "":
-		_message(result)
+	var move_id := str(result.get("move_id", ""))
+	if move_id != "":
+		# QoL: Z on diggable ground with no Dig-capable mon stays silent — diggable
+		# tiles are walkable and everywhere (beach spawn), so the refusal toast fired
+		# on constantly-pressed Z (annoyance, not information). Success + cut/smash
+		# refusals still speak; the party-menu FIELD MOVE path keeps its feedback.
+		if bool(result.get("ok", false)) or move_id != DIG_MOVE:
+			_message(result)
 	elif _world.is_tile_walkable(faced) and _runtime.party_has_field_move_ability(BUILD_MOVE):
 		enter_build_mode({})
 	else:

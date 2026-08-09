@@ -8,9 +8,12 @@ extends RefCounted
 # never tofu (design §1.3).
 
 const SessionState := preload("res://scripts/runtime/session_state.gd")
+const CreationStage := preload("res://scripts/ui/creation_screen_stage.gd")
 
 const SEED_HINT := "(L/R: enter a custom seed   Z: next)"
 const SEED_EDIT_HINT := "Type digits; L/R pick a digit; U/D change it; Backspace deletes. (Z: commit   X: close)"
+const FRAME_INTERIOR := CreationStage.FRAME_RECT # single-sourced at the stage (it owns the frame art)
+const TITLE_VALUE_GAP := 2.0
 
 
 static func render(screen) -> void:
@@ -36,3 +39,18 @@ static func render(screen) -> void:
 		screen._value_label.text = "NAME — %s\nPLAYER — %s\nSHINY RATE — 1/%d\nWORLD SEED — %s" % [screen._committed_name(), screen._avatar, int(SessionState.SHINY_ODDS_CHOICES[screen._shiny_index]), screen._seed_line()]
 		screen._hint_label.text = "(Z: begin   X: back)"
 	screen._hint_label.visible = not screen._overlay_open()
+
+
+# Vertically centers the title+value block within the baked frame: single-line
+# steps used to top-anchor in the 80px-tall frame and leave it ~75% empty.
+# MUST run deferred (creation_screen._render): get_line_count reflects autowrap
+# only after a layout pass, and the SHINY value + GO summary do wrap.
+static func center_block(screen) -> void:
+	var value_label: Label = screen._value_label
+	var title_label: Label = screen._title_label
+	var value_lines: int = maxi(1, value_label.get_line_count())
+	var block_h: float = title_label.get_line_height() + TITLE_VALUE_GAP + value_lines * value_label.get_line_height()
+	var top: float = FRAME_INTERIOR.position.y + (FRAME_INTERIOR.size.y - block_h) / 2.0
+	title_label.position.y = top
+	value_label.position.y = top + title_label.get_line_height() + TITLE_VALUE_GAP
+	value_label.size.y = value_lines * value_label.get_line_height()

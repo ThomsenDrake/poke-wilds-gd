@@ -16,6 +16,7 @@ const GbcWidgets := preload("res://scripts/ui/gbc_widgets.gd")
 const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
 const FRAME_PATH := "res://pokewilds/menu/frame1.png"
 const HINT_BAND_PATH := "res://pokewilds/textbox_bg1.png"
+const FRAME_RECT := Rect2(48, 32, 72, 80) # frame1.png's verified bbox (48,32)-(119,111); the render slice centers inside it
 
 
 # Returns {title_label, value_label, hint_label} — the step surfaces. The value
@@ -26,7 +27,7 @@ static func build(stage: Control) -> Dictionary:
 	art(stage, BACKGROUND_PATH)
 	var frame := art(stage, FRAME_PATH)
 	if frame.texture == null:
-		GbcWidgets.plate(Rect2(48, 32, 72, 80), stage) # the frame's verified bbox
+		GbcWidgets.plate(FRAME_RECT, stage) # missing art degrades to the frame's plate
 	var title_label := GbcStage.make_label("", Vector2i(52, 35), Color.BLACK, stage)
 	title_label.size = Vector2(64, 8)
 	var value_label := GbcStage.make_label("", Vector2i(52, 44), Color.BLACK, stage)
