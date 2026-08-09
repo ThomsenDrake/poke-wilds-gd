@@ -18,8 +18,8 @@ const CREDIT_LINE := "a fan remake of PokeWilds — original game by SheerSt" # 
 # unreliable at fonts.ttf@7 (the one-line render bled past the stage edge —
 # off-stage ink), and each manual line fits the 160px stage width.
 const CREDIT_LINES := "a fan remake of PokeWilds\n— original game by SheerSt"
-const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
-const ENTRY_BAND_PATH := "res://pokewilds/textbox_bg2.png"
+const BACKGROUND_PATH := "res://assets/source/menu/gsc/background1.png"
+const ENTRY_BAND_PATH := "res://assets/source/textbox_bg2.png"
 const ENTRY_BAND := Rect2(0, 80, 160, 64) # textbox_bg2.png's opaque bottom band
 const ENTRY_ROWS_X := 57
 

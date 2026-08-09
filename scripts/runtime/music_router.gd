@@ -2,12 +2,12 @@ extends Node
 
 # Runtime audio service for background music. Maps overworld biomes (ids from
 # scripts/domain/biome_defs.gd) and battle kinds to tracks under
-# pokewilds/music/. Playback goes through a lazily created child
+# assets/source/music/. Playback goes through a lazily created child
 # AudioStreamPlayer, which only becomes audible once this router is added to
 # the scene tree by wave-2 wiring. Missing track files are a no-op with a
 # warning trace, never a crash.
 
-const MUSIC_DIR := "res://pokewilds/music/"
+const MUSIC_DIR := "res://assets/source/music/"
 const VOLUME_DB := -12.0
 
 const DEFAULT_OVERWORLD_TRACK := MUSIC_DIR + "route_1.ogg"

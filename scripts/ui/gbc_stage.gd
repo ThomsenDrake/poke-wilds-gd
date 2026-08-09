@@ -22,7 +22,7 @@ extends RefCounted
 
 const STAGE_SIZE := Vector2(160.0, 144.0)
 const STAGE_PADDING := 16.0 # battle_view.gd:195-203 pads the window by 16px
-const FONT_PATH := "res://pokewilds/fonts.ttf"
+const FONT_PATH := "res://assets/source/fonts.ttf"
 const FONT_SIZE := 7
 
 static var _font: Font

@@ -12,7 +12,7 @@ extends RefCounted
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const GbcWidgets := preload("res://scripts/ui/gbc_widgets.gd")
 
-const MENU_ART := "res://pokewilds/menu/menu1.png"
+const MENU_ART := "res://assets/source/menu/menu1.png"
 const PANEL_RECT := Rect2(81, 0, 79, 127) # the art's panel bbox (pixel-verified)
 const PLATE_RECT := Rect2(87, 6, 66, 116) # the panel interior, over the etched text
 const ROWS_ORIGIN := Vector2i(98, 40) # 6 rows x 8px pitch, centered in the plate

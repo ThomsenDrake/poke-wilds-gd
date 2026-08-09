@@ -232,7 +232,7 @@ required_trace_events = ["world_rebuilt", "biome_entered"]
 quality_bucket = "world"
 # TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
 # entry owns the screens): player_sprite_frames.gd's build gains the avatar_name
-# parameter (format-string sheet paths res://pokewilds/player/<name>-walking.png +
+# parameter (format-string sheet paths res://assets/source/player/<name>-walking.png +
 # -running.png replacing the two hardcoded consts; fallback chain requested walk -> ben
 # walk -> kris walk -> null mirrors the LEGACY fallback; a missing run sheet falls back
 # to the walk sheet as before — all eight walk/run animations rebuild sheet-agnostic) and
@@ -450,7 +450,7 @@ quality_bucket = "bootstrap"
 # stage_point inverse map, fonts.ttf@7 apply_font with an ink parameter, NEAREST on
 # every art TextureRect; opaque black Backing hides the unsynced boot world) + the
 # per-screen 220-wall extractions (title_screen_stage, creation_screen_stage,
-# creation_screen_render). The ce1571b pokewilds/title_bg1.png art is RETIRED (pixel
+# creation_screen_render). The ce1571b assets/source/title_bg1.png art is RETIRED (pixel
 # probe: 160x144, 19,200/23,040 px fully transparent — the ONLY content a 160x24
 # box-outline fragment strip across the top rows; unusable as full-screen art; the
 # submodule file stays untouched, the reference is GONE) — the title is COMPOSED art:

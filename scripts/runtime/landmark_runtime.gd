@@ -25,7 +25,7 @@ const OverworldMons := preload("res://scripts/domain/overworld_mons.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 const EncounterSelection := preload("res://scripts/domain/encounter_selection.gd")
 
-const TOWER_TRACK := "res://pokewilds/music/Wilds_HeartTower.ogg" # Calm variant + trigger DEFERRED (spec § Heart Tower; FLAGGED #7)
+const TOWER_TRACK := "res://assets/source/music/Wilds_HeartTower.ogg" # Calm variant + trigger DEFERRED (spec § Heart Tower; FLAGGED #7)
 const DUSCLOPS_ID := "landmark_dusclops_%d,%d" # per-cell guardian-shaped id (the sim's guardian id grammar)
 # Mansion interact locals — mirror landmarks.gd _M_SPECIAL (private there; runtime arms read world tiles off the footprint).
 const ROOM_DOOR_LOCAL := Vector2i(7, 5)

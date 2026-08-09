@@ -233,7 +233,7 @@ Every phase is delivered as one or more **slices**, and a slice is not done unti
 - **Localization wiring**: the dump ships ES/FR/DE/PT-BR properties (unused — `pokemon_catalog.gd:6-10` hardcodes English; no `TranslationServer` usage). Wire a translation layer over the parsed catalogs; locale selection in the start menu.
 - **Missing display names**: 104/990 species render as humanized slugs — source or generate proper names.
 - **Determinism pinning**: FastNoiseLite output is stable per engine version but not contractually pinned across upgrades. Add a golden-hash scenario (`worldgen_golden`) asserting fixed seeds produce fixed tile hashes; record the engine version (4.6.1) in RELIABILITY. An engine upgrade then fails loudly instead of silently regenerating worlds and stranding saves.
-- **Licensing decision**: ~55k ripped Gen 2 sprites + 1.5k audio ride in a submodule with no upstream LICENSE (`THIRD_PARTY.md` disclaims, not clears). Decide and document the distribution posture: private fan project only, or asset-replacement path for public distribution. This is a project-owner decision; the plan's job is to force it before any release.
+- **Licensing decision**: ~55k ripped Gen 2 sprites + 1.5k audio ride in the vendored `assets/source/` snapshot with no upstream LICENSE (`THIRD_PARTY.md` disclaims, not clears). Decide and document the distribution posture: private fan project only, or asset-replacement path for public distribution. This is a project-owner decision; the plan's job is to force it before any release.
 - **Quality pass**: every `QUALITY_SCORE.md` row to 3/3/3/3; close all tech-debt-tracker items; archive completed superpowers plans into `docs/exec-plans/completed/` (currently empty).
 - **README & docs refresh**: README "Current slice" matches reality; `docs/exec-plans/completed/` gets the finished phase plans.
 - Optional stretch: in-game Pokédex (exceeds the original; only if time allows).
@@ -299,7 +299,7 @@ The rewrite is **finished** when:
 |------|-----------|
 | **Line-budget pressure**: building, breeding, and move effects all want large files | Split first: `structures.gd`, `recipes.gd`, `move_effects.gd`, `structure_layer.gd` are pre-named in the phases; `battle_runtime.gd` (319 lines) must not grow |
 | **Save-schema churn**: Phases 3, 7 bump v3→v4→v5 | Each bump ships a migration fixture scenario (`save_migration` from 0.4 becomes a pattern); version check from 0.4 makes bad loads loud |
-| **Worldgen determinism across engine upgrades** | Phase 9 golden-hash scenario pins it; submodule is already pinned |
+| **Worldgen determinism across engine upgrades** | Phase 9 golden-hash scenario pins it; the asset snapshot is vendored in-tree (pinned by commit) |
 | **Overworld-Pokémon design risk** (Phase 6 inverts the current encounter model) | Spec + prototype the entity layer before implementation; keep grass encounters as the background source |
 | **Scope creep in world chaining** | Explicitly deferrable past Phase 9; landmarks/legendaries stand alone |
 | **Licensing** | Phase 9 forces a documented decision before any distribution |

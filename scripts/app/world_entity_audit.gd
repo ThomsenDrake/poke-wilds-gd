@@ -19,8 +19,8 @@ const DESPAWN_CELLS := 3 # mirrors OverworldMons.DESPAWN_CELLS (spawn band == de
 const MAX_ENTITY_SAMPLES := 8
 const ALL_BIOMES := ["WATER", "SAND", "PLAINS", "GRASSLAND", "FOREST", "SAVANNA", "DESERT", "SWAMP", "ROCK", "SNOW", "LAVA"]
 const DISPOSITIONS := ["TIMID", "FRIENDLY", "IRRITABLE", "AGGRESSIVE"]
-const NOT_FOUND_PATH := "res://pokewilds/pokemon/overworld_not_found.png" # tier-2 model truth
-const EGG_SHEET_PATH := "res://pokewilds/phione-egg.png"
+const NOT_FOUND_PATH := "res://assets/source/pokemon/overworld_not_found.png" # tier-2 model truth
+const EGG_SHEET_PATH := "res://assets/source/phione-egg.png"
 const NEST_CENTERS := [Vector2i(88, 88), Vector2i(120, 88), Vector2i(88, 120), Vector2i(152, 88),
 	Vector2i(88, 152), Vector2i(120, 120), Vector2i(184, 88), Vector2i(88, 184),
 	Vector2i(152, 120), Vector2i(120, 152), Vector2i(216, 88), Vector2i(88, 216)]

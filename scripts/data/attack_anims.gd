@@ -1,7 +1,7 @@
 extends RefCounted
 
 # Resolver and parser for the source attack-animation sets under
-# pokewilds/attacks/. Each set lives in a <move>_<side>_gsc directory with:
+# assets/source/attacks/. Each set lives in a <move>_<side>_gsc directory with:
 #   metadata.out   per-frame effect script ("31, player_healthbar_gone player_translate_x:2")
 #   output/        sequential 160x144 overlay frames (frame-001.png, ...; mostly
 #                  transparent, meant to sit over the live battle stage)
@@ -13,8 +13,8 @@ extends RefCounted
 # Parsing never crashes on missing pieces: an unusable key yields {} and the
 # caller falls back to fallback_anim(). Parsed dicts are cached per key.
 
-const ATTACKS_DIR := "res://pokewilds/attacks"
-const FALLBACK_SOUND_PATH := "res://pokewilds/sounds/hit.ogg"
+const ATTACKS_DIR := "res://assets/source/attacks"
+const FALLBACK_SOUND_PATH := "res://assets/source/sounds/hit.ogg"
 const FALLBACK_FRAMES := 14
 const FALLBACK_LUNGE_PX := 4.0
 

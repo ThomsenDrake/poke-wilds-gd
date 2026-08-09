@@ -11,7 +11,7 @@ extends RefCounted
 # save-migration work: the fixture rides the existing session.party shape.
 #
 # The six species are the verified MINIMUM cover (DP-optimal = 6) of all 13 ported
-# field moves, computed from the real catalog flags (pokewilds/pokemon/*/wilds_data.asm
+# field moves, computed from the real catalog flags (assets/source/pokemon/*/wilds_data.asm
 # db flags + base_stats.asm types) under FieldMoves.can_perform semantics (flag 1
 # able / 2 force-unable, else AUTO_TYPES by type; surf = final-stage WATER). The
 # user-named trio anchors it — Rhyperior = Smash/Dig/Ride/Surf, Charizard = Flash/

@@ -5,7 +5,7 @@ extends Control
 # CreationScreen 160x144 stage (creation_screen.gd parents it there), so it can
 # never collapse to 0x0 or drift off-window — explicit integer offsets only.
 # AVATARS is the SORTED list of the 24 shipped player sets (verified complete by
-# ls pokewilds/player/*-walking.png). The grid shows one cell per set: an
+# ls assets/source/player/*-walking.png). The grid shows one cell per set: an
 # AtlasTexture over the walking sheet, region (0,0,16,16) = frame 0 down-idle
 # (the canonical facing pose, player_sprite_frames convention), NEAREST
 # filtered — plus a x4 preview of the highlighted set and its name line. The
@@ -140,7 +140,7 @@ func _refresh() -> void:
 # Atlas over frame 0 of the walking sheet; null when the sheet is absent (the cell
 # degrades to a placeholder — load is guarded so the picker never crashes).
 func _sheet(avatar_name: String) -> Texture2D:
-	var path := "res://pokewilds/player/%s-walking.png" % avatar_name
+	var path := "res://assets/source/player/%s-walking.png" % avatar_name
 	if not ResourceLoader.exists(path):
 		return null
 	var atlas := AtlasTexture.new()

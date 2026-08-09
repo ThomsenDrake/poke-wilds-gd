@@ -1,14 +1,14 @@
 extends Node
 
 # Runtime audio service for Pokemon cries. Resolves a dex number to the
-# zero-padded source cry under pokewilds/pokemon/cries/ (000.ogg is the
+# zero-padded source cry under assets/source/pokemon/cries/ (000.ogg is the
 # fallback/unknown entry) and plays it through a lazily created child
 # AudioStreamPlayer, which only becomes audible once this node is added to
 # the scene tree by app wiring. One cry at a time: a new play_cry replaces
 # whatever is currently playing. Missing files are a no-op with a warning
 # trace, never a crash.
 
-const CRIES_DIR := "res://pokewilds/pokemon/cries/"
+const CRIES_DIR := "res://assets/source/pokemon/cries/"
 const VOLUME_DB := -12.0
 
 var _trace = null

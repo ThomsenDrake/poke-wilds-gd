@@ -2,11 +2,11 @@ extends Control
 
 const BattleSurfaceLayout := preload("res://scripts/ui/battle_surface_layout.gd")
 const ShinyPalette := preload("res://scripts/ui/shiny_palette.gd")
-const ACTION_BG_PATH := "res://pokewilds/battle/battle_screen2.png"
-const MOVE_BG_PATH := "res://pokewilds/menu/attack_screen1.png"
-const BLANK_BG_PATH := "res://pokewilds/battle/battle_bg1.png"
-const ARROW_PATH := "res://pokewilds/battle/arrow_right1.png"
-const BATTLE_FONT_PATH := "res://pokewilds/fonts.ttf"
+const ACTION_BG_PATH := "res://assets/source/battle/battle_screen2.png"
+const MOVE_BG_PATH := "res://assets/source/menu/attack_screen1.png"
+const BLANK_BG_PATH := "res://assets/source/battle/battle_bg1.png"
+const ARROW_PATH := "res://assets/source/battle/arrow_right1.png"
+const BATTLE_FONT_PATH := "res://assets/source/fonts.ttf"
 const BATTLE_FONT_SIZE := 7
 const ENEMY_HP_BAR_WIDTH := 48.0
 const PLAYER_HP_BAR_WIDTH := 48.0

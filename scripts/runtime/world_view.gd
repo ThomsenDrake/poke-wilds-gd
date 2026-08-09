@@ -3,7 +3,7 @@ extends Node2D
 const TILE_SIZE := 16
 const WorldGenerator := preload("res://scripts/domain/world_generator.gd")
 const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
-const EGG_SHEET_PATH := "res://pokewilds/phione-egg.png" # Phase 5 ground-egg sprite (16x16 cells)
+const EGG_SHEET_PATH := "res://assets/source/phione-egg.png" # Phase 5 ground-egg sprite (16x16 cells)
 const RuntimePath := "/root/GameRuntime"
 const TIME_OF_DAY_DEFAULT := 720
 # Piecewise-linear tint keyframes (minute, color): midnight blue, dawn warmth, neutral midday, dusk warmth.
@@ -246,7 +246,7 @@ func _sync_egg_node(map_pos: Vector2i) -> void:
 		egg_sprite.position = map_to_world(map_pos) + Vector2(0, TILE_SIZE); egg_sprite.offset = Vector2(0, -TILE_SIZE)
 		if bool(egg.get("is_shiny", false)):
 			var sparkle := Sprite2D.new()
-			sparkle.centered = false; sparkle.texture = load("res://pokewilds/shiny_inverse.png"); sparkle.modulate = Color(1.0, 0.85, 0.2)
+			sparkle.centered = false; sparkle.texture = load("res://assets/source/shiny_inverse.png"); sparkle.modulate = Color(1.0, 0.85, 0.2)
 			egg_sprite.add_child(sparkle)
 		_prop_layer.add_child(egg_sprite)
 		_egg_nodes[map_pos] = egg_sprite

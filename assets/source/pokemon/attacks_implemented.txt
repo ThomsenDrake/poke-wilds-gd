@@ -1,0 +1,241 @@
+absorb
+acid
+acid armor
+aeroblast
+amnesia
+ancientpower
+attract
+aurora beam
+barrage
+barrier
+bind
+bite
+blizzard
+body slam
+bone club
+bone rush
+bonemerang
+bubble
+bubblebeam
+charm
+clamp
+comet punch
+confuse ray
+constrict
+cotton spore
+crabhammer
+cross chop
+crunch
+curse
+cut
+defense curl
+dig
+disable
+dizzy punch
+double team
+double edge
+double kick
+doubleslap
+dragonbreath
+dragon rage
+drill peck
+dynamicpunch
+earthquake
+egg bomb
+ember
+explosion
+extremespeed
+faint attack
+false swipe
+fire blast
+fire punch
+fire spin
+flame wheel
+flamethrower
+flash
+fly
+fury attack
+fury swipes
+giga drain
+glare
+growl
+growth
+gust
+harden
+headbutt
+hi jump kick
+hidden power
+horn attack
+hydro pump
+hyper beam
+hyper fang
+hypnosis
+ice beam
+ice punch
+icy wind
+iron tail
+jump kick
+karate chop
+kinesis
+leech life
+leer
+lick
+light screen
+lovely kiss
+low kick
+mach punch
+mean look
+meditate
+mega drain
+megahorn
+mega kick
+mega punch
+metal claw
+metronome
+milk drink
+minimize
+moonlight
+morning sun
+mud slap
+night shade
+octazooka
+outrage
+pay day
+peck
+pin missile
+poison gas
+poison powder
+poison sting
+pound
+powder snow
+present
+psybeam
+psych up
+psychic
+psywave
+pursuit
+quick attack
+rapid spin
+razor leaf
+razor wind
+recover
+reflect
+return
+roar
+rock slide
+rock smash
+rock throw
+rolling kick
+rollout
+sacred fire
+safeguard
+sand attack
+scary face
+scratch
+screech
+seismic toss
+selfdestruct
+shadow ball
+sharpen
+sing
+sketch
+sky attack
+slam
+slash
+sleep powder
+sludge
+sludge bomb
+smog
+smokescreen
+softboiled
+solarbeam
+sonicboom
+spark
+spider web
+spike cannon
+spikes
+splash
+spore
+steel wing
+stomp
+strength
+string shot
+struggle
+stun spore
+submission
+super fang
+supersonic
+surf
+sweet kiss
+sweet scent
+swift
+swords dance
+synthesis
+tackle
+tail whip
+take down
+teleport
+thief
+thunder
+thunder punch
+thunderbolt
+thundershock
+thunderwave
+toxic
+tri attack
+twineedle
+twister
+vicegrip
+vine whip
+vital throw
+water gun
+waterfall
+whirlpool
+whirlwind
+wing attack
+withdraw
+wrap
+zap cannon
+dragon energy
+thunder cage
+crush grip
+dazzling gleam
+draining kiss
+struggle bug
+fairy wind
+air cutter
+double hit
+shock wave
+aqua jet
+aura sphere
+aerial ace
+bullet punch
+zen headbutt
+iron defense
+bug buzz
+feint attack
+dragon pulse
+drain punch
+hyper voice
+nasty plot
+energy ball
+astonish
+flash cannon
+will o wisp
+seed bomb
+night slash
+poison jab
+signal beam
+meteor mash
+dragon claw
+iron head
+power gem
+air slash
+dark pulse
+earth power
+psycho cut
+shadow claw
+play rough
+freeze dry
+sludge wave
+dual wingbeat

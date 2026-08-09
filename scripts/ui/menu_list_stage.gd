@@ -14,7 +14,7 @@ extends RefCounted
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const GbcWidgets := preload("res://scripts/ui/gbc_widgets.gd")
 
-const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
+const BACKGROUND_PATH := "res://assets/source/menu/gsc/background1.png"
 
 
 # opts: title String (+ title_rect), rows_rect Rect2, max_visible int (0=all),

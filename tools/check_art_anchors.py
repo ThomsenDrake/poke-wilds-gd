@@ -9,9 +9,9 @@ concerns, tiered per the house style:
     - registry schema violations (malformed rect, unknown derivation/element_kind,
       duplicate id, attested-without-attestation-block, missing
       source_art/art_sha256/nodes);
-    - art_sha256 != recorded pin (the art moved under the registry -- pokewilds/ is
-      a submodule whose contents are not individually tracked here, so the sha is
-      the art-change enforcement; mismatch forces a deliberate re-derivation);
+    - art_sha256 != recorded pin (the art moved under the registry -- the sha is
+      the art-change enforcement over the vendored assets/source/ tree; mismatch
+      forces a deliberate re-derivation);
     - recomputed derivation != stage_rect (declared-but-stale anchor / typo). The
       derivation is a deterministic integer function of the art bytes, so any
       delta is a stale entry, never art 'drifting quietly'.
@@ -177,9 +177,9 @@ def _schema_issues(anchors: list[dict]) -> list[str]:
             issues.append(f"art-anchor `{aid}`: duplicate id in the registry")
         seen_ids.add(aid)
         # art_sha256 is required, not optional: it is the anti-fossilization pin
-        # the freshness check asserts (pokewilds/ is a submodule whose contents
-        # are not individually tracked here). An entry added without a pin would
-        # silently lose the art-change enforcement the registry exists to give.
+        # the freshness check asserts over the vendored assets/source/ tree.
+        # An entry added without a pin would silently lose the art-change
+        # enforcement the registry exists to give.
         for key in ("scene", "source_art", "stage_rect", "derivation", "art_sha256"):
             if key not in anchor:
                 issues.append(f"art-anchor `{aid}`: missing required key `{key}`")

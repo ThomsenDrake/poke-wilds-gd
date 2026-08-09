@@ -12,7 +12,7 @@ const ContentScatter := LandmarkRuntime.ContentScatter
 const Structures := BuildRuntime.Structures
 
 const ORIGIN := Vector2i.ZERO
-const TOWER_TRACK := "res://pokewilds/music/Wilds_HeartTower.ogg" # landmark_runtime.TOWER_TRACK (private const): the asset the entry switch arms
+const TOWER_TRACK := "res://assets/source/music/Wilds_HeartTower.ogg" # landmark_runtime.TOWER_TRACK (private const): the asset the entry switch arms
 const RUINS_GUARD_LOCAL := Vector2i(10, 5) # landmark_runtime.UNDERGROUND_GUARD_LOCAL (private const)
 
 var _ctx: Dictionary = {}
