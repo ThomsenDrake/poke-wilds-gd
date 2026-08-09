@@ -6,6 +6,7 @@ mutates their behavior, or touches their exit-code contracts:
 
   S1-S4  static gates   check_repo_contracts / check_architecture /
                         check_quality_docs / check_change_contract
+  S4.5   freshness      import_pokeapi.py --check (committed catalog JSON vs pinned-cache regeneration)
   S5-S6  determinism    determinism_verify.py pins + canary
   S6.5   double-run     TEN rng-consumers x2 headless, cmp --mode trace (240s per-group
                         outer + 10s cmp; [5,5] groups — infinite-world slice 1 RETIRED the
@@ -360,12 +361,15 @@ class Runner:
             return [sys.executable, f"tools/{rel}"]
 
         # --- S1-S4: static gates (fast; failures surface at the top) ---
+        # S4.5 rides the same tuple: import_pokeapi.py --check fails non-zero when
+        # the committed catalog JSON is stale/missing vs the pinned-cache regen.
         for name, tool, extra_argv in (
             ("check_repo_contracts", "check_repo_contracts.py", []),
             ("check_architecture", "check_architecture.py", []),
             ("check_quality_docs", "check_quality_docs.py", []),
             ("check_change_contract", "check_change_contract.py",
              ["--base", args.base] if args.base else []),
+            ("import_pokeapi:check", "import_pokeapi.py", ["--check"]),
         ):
             self.run_tool(name, "static", py(tool) + extra_argv,
                           outer_timeout=300.0, exit_map=static_map, count_issues=True)

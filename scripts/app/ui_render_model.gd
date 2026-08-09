@@ -7,8 +7,12 @@ extends RefCounted
 # audit renders with and the pixel-half bridge to tools/visual_lint.py.
 
 const UiRenderArt := preload("res://scripts/app/ui_render_art.gd")
+# The moves-panel display transform (uppercase + 83px tail-ellipsize for 16-char
+# Gen-9 canon names) is shared with the panel so the oracle predicts exactly what
+# the renderer draws; extents still come from fonts.ttf at size 7.
+const MoveNameFit := preload("res://scripts/ui/move_name_fit.gd")
 
-const FONT_PATH := "res://pokewilds/fonts.ttf"
+const FONT_PATH := "res://assets/source/fonts.ttf"
 const FONT_SIZE := 7
 const STAGE := Rect2(0, 0, 160, 144)
 const LINT_DIR := "res://.godot-smoke/lint"
@@ -51,7 +55,7 @@ static func expected(state: String, snapshot: Dictionary) -> Dictionary:
 		"battle_moves":
 			var moves: Array = snapshot.get("player_mon", {}).get("moves", [])
 			for i in range(mini(moves.size(), UiRenderArt.MOVE_ROW_TOPS.size())):
-				var text := str(moves[i].get("name", "")).to_upper()
+				var text := MoveNameFit.display_name(str(moves[i].get("name", "")))
 				var region := Rect2(UiRenderArt.MOVE_ANCHOR + Vector2(0, i * 8), Vector2(measure(text).x, cap))
 				result["ink"].append(region)
 				result["strings"].append({"text": text, "region": region, "mode": "anchor", "avoid": []})

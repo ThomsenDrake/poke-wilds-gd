@@ -14,7 +14,7 @@ const BreedFlowHabitatChecks := preload("res://scripts/app/breed_flow_habitat_ch
 
 const SEED := 2026072601
 const PAIR_LEVEL := 30
-const EGG_MOVE_ID := "CHARM" # eevee/egg_moves.asm; the father passes it
+const EGG_MOVE_ID := "WISH" # EEVEE egg move in both the vendored egg_moves.asm and the generated catalog (CHARM aged out with the PokeAPI canon — catalog-parity `egg-move-churn`); the father passes it
 const PEN_SCAN_RADIUS := 160
 const LAY_STEP_CAP := 6000
 const LAY_BATCH := 60

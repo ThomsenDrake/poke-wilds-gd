@@ -25,8 +25,9 @@ extends RefCounted
 # drop EACH — Bulbasaur Grass/Poison -> Miracle Seed + Poison Barb; Dragon -> BOTH
 # Dragon Scale + Dragon Fang), once per in-game day (habitat_runtime cadence).
 # Species overrides replace or add (wiki-materials specials). Every id resolves in
-# pokewilds/i18n/item.properties — moo_moo_milk excepted, which the source game
-# hardcodes (pokemon_catalog.gd's RUNTIME_ITEM_SUPPLEMENTS covers it, the potion
+# assets/source/i18n/item.properties — moo_moo_milk excepted, which the source game
+# hardcodes (the importer's overrides cover it — RUNTIME_ITEM_SUPPLEMENTS retired
+# into tools/import_overrides.json with the PokeAPI catalog migration, the potion
 # precedent).
 #
 # WITNESS INVARIANT (load-bearing, shared with material_drops.gd): the drop economy
