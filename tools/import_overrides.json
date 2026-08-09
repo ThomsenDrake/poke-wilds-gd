@@ -1,0 +1,91 @@
+{
+  "species_map": {
+    "basculin": "basculin-red-striped",
+    "basculin_white": "basculin-white-striped",
+    "braviary_hisuian": "braviary-hisui",
+    "burmy_sand": "burmy-sandy",
+    "corsola_galarian": "corsola-galar",
+    "darmanitan": "darmanitan-standard",
+    "darmanitan_galarian": "darmanitan-galar-standard",
+    "darmanitan_galarian_zenmode": "darmanitan-galar-zen",
+    "darmanitan_zenmode": "darmanitan-zen",
+    "darumaka_galarian": "darumaka-galar",
+    "decidueye_hisuian": "decidueye-hisui",
+    "eiscue": "eiscue-ice",
+    "electrode_hisuian": "electrode-hisui",
+    "exeggutor_alolan": "exeggutor-alola",
+    "farfetch_d": "farfetchd",
+    "farfetch_d_galarian": "farfetchd-galar",
+    "frillish": "frillish-male",
+    "giratina": "giratina-altered",
+    "gmrmime": "mr-mime-galar",
+    "gourgeist": "gourgeist-average",
+    "grimer_alolan": "grimer-alola",
+    "growlithe_hisuian": "growlithe-hisui",
+    "jellicent": "jellicent-male",
+    "keldeo": "keldeo-ordinary",
+    "landorus": "landorus-incarnate",
+    "lycanroc": "lycanroc-midday",
+    "marowak_alolan": "marowak-alola",
+    "meloetta": "meloetta-aria",
+    "meowth_alolan": "meowth-alola",
+    "mimikyu": "mimikyu-disguised",
+    "minior": "minior-red-meteor",
+    "morpeko": "morpeko-full-belly",
+    "mrmime_galarian": "mr-mime-galar",
+    "mrrime": "mr-rime",
+    "muk_alolan": "muk-alola",
+    "oricorio": "oricorio-baile",
+    "ponyta_galarian": "ponyta-galar",
+    "pumpkaboo": "pumpkaboo-average",
+    "pyroar": "pyroar-male",
+    "raichu_alolan": "raichu-alola",
+    "rapidash_galarian": "rapidash-galar",
+    "samurott_hisuian": "samurott-hisui",
+    "shaymin": "shaymin-land",
+    "sirfetch_d": "sirfetchd",
+    "thundurus": "thundurus-incarnate",
+    "tornadus": "tornadus-incarnate",
+    "typhlosion_hisuian": "typhlosion-hisui",
+    "voltorb_hisuian": "voltorb-hisui",
+    "wishiwashi": "wishiwashi-solo",
+    "wormadam_sand": "wormadam-sandy",
+    "yamask_galarian": "yamask-galar",
+    "zygarde": "zygarde-50"
+  },
+  "move_map": {
+    "FAINT_ATTACK": "feint-attack",
+    "HI_JUMP_KICK": "high-jump-kick"
+  },
+  "move_aliases": {
+    "PSYCHIC_M": "PSYCHIC",
+    "ANCIENT_POWER": "ANCIENTPOWER",
+    "BUBBLE_BEAM": "BUBBLEBEAM",
+    "DOUBLE_SLAP": "DOUBLESLAP",
+    "DRAGON_BREATH": "DRAGONBREATH",
+    "DYNAMIC_PUNCH": "DYNAMICPUNCH",
+    "EXTREME_SPEED": "EXTREMESPEED",
+    "HIGH_JUMP_KICK": "HI_JUMP_KICK",
+    "POISON_POWDER": "POISONPOWDER",
+    "SELF_DESTRUCT": "SELFDESTRUCT",
+    "SOLAR_BEAM": "SOLARBEAM",
+    "THUNDER_PUNCH": "THUNDERPUNCH",
+    "THUNDER_SHOCK": "THUNDERSHOCK"
+  },
+  "item_map": {
+    "moo_moo_milk": "moomoo-milk"
+  },
+  "synthetic_species": {
+    "egg": "No PokeAPI entry: source-game egg placeholder whose base_stats.asm is a Zubat-stat copy. Entry reproduced verbatim from its own ASM files so parity holds."
+  },
+  "item_supplements": {
+    "potion": {
+      "display_name": "Potion",
+      "description": "Restores 20 HP."
+    },
+    "moo_moo_milk": {
+      "display_name": "Moo Moo Milk",
+      "description": "Fresh milk from a happy Miltank."
+    }
+  }
+}
