@@ -1,6 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+# Godot-regenerated import sidecars next to vendored source assets
+*.import
 .firecrawl/
 .godot-smoke/
 .DS_Store
