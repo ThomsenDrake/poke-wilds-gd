@@ -9,7 +9,7 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 - Start a wild battle, use moves (per-move source animation sets where they exist, a synthesized lunge/flash fallback otherwise), throw Poke Balls, use Potions, gain EXP, level up, and evolve. A full-party capture is non-losing: the overflow Pokemon is held at your campsite and retrieved from the party screen.
 - Open the start menu to inspect the party (swap lead, summary, field moves, campsite retrieve) and the bag (use items), save (atomic temp+rename writes), or start a new run (confirm-gated through a message box).
 - Validate the whole slice with one command: `python3 tools/verify_all.py` — the local gate that orchestrates the static checks, determinism pins, the transport-honest headless playtest/smoke suite, the windowed pixel lanes (`ui_render_audit` + `visual_sweep`), and the legibility report.
-- Load art/audio and source data from the vendored `assets/source/` snapshot (upstream PokeWilds v0.8.11; see [docs/references/source-assets.md](docs/references/source-assets.md)).
+- Load art/audio from the vendored `assets/source/` snapshot (upstream PokeWilds v0.8.11) and species/move/item data from the generated catalog at `assets/data/catalog/` — authored offline by `tools/import_pokeapi.py` from a pinned PokeAPI/api-data checkout (see [docs/references/source-assets.md](docs/references/source-assets.md)).
 
 ## Controls
 
@@ -47,7 +47,7 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 - `scripts/app/`: top-level scene wiring.
 - `scripts/runtime/`: Godot-facing orchestration and mutable runtime services.
 - `scripts/domain/`: gameplay rules and pure state transitions.
-- `scripts/data/`: parsers and data catalogs for the source asset tree.
+- `scripts/data/`: data catalogs over the generated catalog JSON and the source asset tree.
 - `scripts/ui/`: presentation controllers and UI scenes.
 - `scripts/core/`: small shared primitives.
 - `docs/`: system of record for design, specs, reliability, quality, and execution history.
