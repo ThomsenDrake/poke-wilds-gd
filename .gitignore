@@ -12,6 +12,9 @@
 # Python caches
 __pycache__/
 
+# PokeAPI api-data cache (270MB dump; re-fetch via tools/import_pokeapi.py --refresh)
+tools/.cache/
+
 # Claude Code session transcripts exported to the repo root (do NOT delete the user files; just untrack).
 *-local-command-caveat*.txt
 
