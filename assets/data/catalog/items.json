@@ -1,0 +1,922 @@
+{
+  "ANCIENTPOWDER": {
+    "category": "",
+    "cost": 0,
+    "description": "A mysterious and rare powder.",
+    "display_name": "ancient dust",
+    "item_id": "ANCIENTPOWDER",
+    "pocket": ""
+  },
+  "ASHEN_SOIL": {
+    "category": "",
+    "cost": 0,
+    "description": "Soil found near a volcano.",
+    "display_name": "ashen soil",
+    "item_id": "ASHEN_SOIL",
+    "pocket": ""
+  },
+  "ASPEAR_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of FREEZE.",
+    "display_name": "aspear berry",
+    "item_id": "ASPEAR_BERRY",
+    "pocket": "BERRIES"
+  },
+  "BERRY_JUICE": {
+    "category": "HEALING",
+    "cost": 0,
+    "description": "A healing drink that restores HP.",
+    "display_name": "berry juice",
+    "item_id": "BERRY_JUICE",
+    "pocket": "MEDICINE"
+  },
+  "BERRY_SEED": {
+    "category": "",
+    "cost": 0,
+    "description": "Can be planted to grow BERRIES.",
+    "display_name": "berry seed",
+    "item_id": "BERRY_SEED",
+    "pocket": ""
+  },
+  "BIG_PEARL": {
+    "category": "LOOT",
+    "cost": 0,
+    "description": "A big, beautiful pearl.",
+    "display_name": "big pearl",
+    "item_id": "BIG_PEARL",
+    "pocket": "MISC"
+  },
+  "BINDING_BAND": {
+    "category": "HELD_ITEMS",
+    "cost": 0,
+    "description": "A durable band.",
+    "display_name": "binding band",
+    "item_id": "BINDING_BAND",
+    "pocket": "MISC"
+  },
+  "BLACK_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A black APRICORN.",
+    "display_name": "black aprcrn",
+    "item_id": "BLACK_APRICORN",
+    "pocket": "KEY"
+  },
+  "BLANK_DISC": {
+    "category": "",
+    "cost": 0,
+    "description": "",
+    "display_name": "worn disc",
+    "item_id": "BLANK_DISC",
+    "pocket": ""
+  },
+  "BLUE_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A blue APRICORN.",
+    "display_name": "blue aprcrn",
+    "item_id": "BLUE_APRICORN",
+    "pocket": "KEY"
+  },
+  "CHARCOAL": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "Wood burned by a FIRE type.",
+    "display_name": "charcoal",
+    "item_id": "CHARCOAL",
+    "pocket": "MISC"
+  },
+  "CHERI_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of PARALYSIS.",
+    "display_name": "cheri berry",
+    "item_id": "CHERI_BERRY",
+    "pocket": "BERRIES"
+  },
+  "CHESTO_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of SLEEP.",
+    "display_name": "chesto berry",
+    "item_id": "CHESTO_BERRY",
+    "pocket": "BERRIES"
+  },
+  "CLAW_FOSSIL": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "claw fossil",
+    "item_id": "CLAW_FOSSIL",
+    "pocket": "MISC"
+  },
+  "CLEAR_GLASS": {
+    "category": "",
+    "cost": 0,
+    "description": "Clear, delicate glass.",
+    "display_name": "clear glass",
+    "item_id": "CLEAR_GLASS",
+    "pocket": ""
+  },
+  "CONCRETE": {
+    "category": "",
+    "cost": 0,
+    "description": "",
+    "display_name": "concrete",
+    "item_id": "CONCRETE",
+    "pocket": ""
+  },
+  "CURSED_SOIL": {
+    "category": "",
+    "cost": 0,
+    "description": "Soil taken from a graveyard.",
+    "display_name": "cursed soil",
+    "item_id": "CURSED_SOIL",
+    "pocket": ""
+  },
+  "DAMP_SOIL": {
+    "category": "",
+    "cost": 0,
+    "description": "Soil from the Lake.",
+    "display_name": "damp soil",
+    "item_id": "DAMP_SOIL",
+    "pocket": ""
+  },
+  "DARK_ENERGY": {
+    "category": "",
+    "cost": 0,
+    "description": "An energy exuded by DARK types.",
+    "display_name": "dark energy",
+    "item_id": "DARK_ENERGY",
+    "pocket": ""
+  },
+  "DAWN_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "dawn stone",
+    "item_id": "DAWN_STONE",
+    "pocket": "MISC"
+  },
+  "DIVE_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Catch POKéMON underwater.",
+    "display_name": "dive ball",
+    "item_id": "DIVE_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "DOME_FOSSIL": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "dome fossil",
+    "item_id": "DOME_FOSSIL",
+    "pocket": "MISC"
+  },
+  "DRAGON_FANG": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A fang from a DRAGON type.",
+    "display_name": "dragon fang",
+    "item_id": "DRAGON_FANG",
+    "pocket": "MISC"
+  },
+  "DRAGON_SCALE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "A scale from a DRAGON type.",
+    "display_name": "dragon scale",
+    "item_id": "DRAGON_SCALE",
+    "pocket": "MISC"
+  },
+  "DREAM_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 0,
+    "description": "Catch sleeping POKéMON.",
+    "display_name": "dream ball",
+    "item_id": "DREAM_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "DRY_SAND": {
+    "category": "",
+    "cost": 0,
+    "description": "Hot, dry sand from the desert.",
+    "display_name": "dry sand",
+    "item_id": "DRY_SAND",
+    "pocket": ""
+  },
+  "DRY_SOIL": {
+    "category": "",
+    "cost": 0,
+    "description": "Dry soil from the savannah.",
+    "display_name": "dry soil",
+    "item_id": "DRY_SOIL",
+    "pocket": ""
+  },
+  "DUBIOUS_DISC": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "",
+    "display_name": "dubious disc",
+    "item_id": "DUBIOUS_DISC",
+    "pocket": "MISC"
+  },
+  "DUSK_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Most effective in dark areas.",
+    "display_name": "dusk ball",
+    "item_id": "DUSK_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "DUSK_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "dusk stone",
+    "item_id": "DUSK_STONE",
+    "pocket": "MISC"
+  },
+  "ESCAPE_ROPE": {
+    "category": "SPELUNKING",
+    "cost": 0,
+    "description": "Takes you to a nearby shore.",
+    "display_name": "escape rope",
+    "item_id": "ESCAPE_ROPE",
+    "pocket": "MISC"
+  },
+  "FAST_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "Most effective on fast POKéMON.",
+    "display_name": "fast ball",
+    "item_id": "FAST_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "FIRE_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "fire stone",
+    "item_id": "FIRE_STONE",
+    "pocket": "MISC"
+  },
+  "FLOWERS": {
+    "category": "",
+    "cost": 0,
+    "description": "Small, beautiful flowers.",
+    "display_name": "flowers",
+    "item_id": "FLOWERS",
+    "pocket": ""
+  },
+  "FRIEND_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "A ball that raises FRIENDSHIP.",
+    "display_name": "friend ball",
+    "item_id": "FRIEND_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "GOOD_ROD": {
+    "category": "GAMEPLAY",
+    "cost": 0,
+    "description": "Use by water to fish for POKéMON.",
+    "display_name": "good rod",
+    "item_id": "GOOD_ROD",
+    "pocket": "KEY"
+  },
+  "GRASS": {
+    "category": "",
+    "cost": 0,
+    "description": "Freshly cut GRASS.",
+    "display_name": "grass",
+    "item_id": "GRASS",
+    "pocket": ""
+  },
+  "GREAT_BALL": {
+    "category": "STANDARD_BALLS",
+    "cost": 600,
+    "description": "A good tool for catching POKéMON.",
+    "display_name": "great ball",
+    "item_id": "GREAT_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "GREEN_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A green APRICORN.",
+    "display_name": "green aprcrn",
+    "item_id": "GREEN_APRICORN",
+    "pocket": "KEY"
+  },
+  "HARD_SHELL": {
+    "category": "",
+    "cost": 0,
+    "description": "Fragments of a WATER type« shell.",
+    "display_name": "hard shell",
+    "item_id": "HARD_SHELL",
+    "pocket": ""
+  },
+  "HARD_STONE": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A durable rock.",
+    "display_name": "hard stone",
+    "item_id": "HARD_STONE",
+    "pocket": "MISC"
+  },
+  "HEAL_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 300,
+    "description": "Heals POKéMON it contains.",
+    "display_name": "heal ball",
+    "item_id": "HEAL_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "HEAVY_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 120,
+    "description": "Most effective on heavy POKéMON.",
+    "display_name": "heavy ball",
+    "item_id": "HEAVY_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "HELIX_FOSSIL": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "helix fossil",
+    "item_id": "HELIX_FOSSIL",
+    "pocket": "MISC"
+  },
+  "HONEY": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A sweet and sticky treat.",
+    "display_name": "honey",
+    "item_id": "HONEY",
+    "pocket": "MISC"
+  },
+  "ICE_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "ice stone",
+    "item_id": "ICE_STONE",
+    "pocket": "MISC"
+  },
+  "LEAF_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "leaf stone",
+    "item_id": "LEAF_STONE",
+    "pocket": "MISC"
+  },
+  "LEVEL_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "Most effective on low-level POKéMON.",
+    "display_name": "level ball",
+    "item_id": "LEVEL_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "LIFE_FORCE": {
+    "category": "",
+    "cost": 0,
+    "description": "An energy exuded by GHOST types.",
+    "display_name": "life force",
+    "item_id": "LIFE_FORCE",
+    "pocket": ""
+  },
+  "LIGHT_CLAY": {
+    "category": "HELD_ITEMS",
+    "cost": 0,
+    "description": "Soft clay from the mountains.",
+    "display_name": "light clay",
+    "item_id": "LIGHT_CLAY",
+    "pocket": "MISC"
+  },
+  "LOG": {
+    "category": "",
+    "cost": 0,
+    "description": "A sturdy LOG.",
+    "display_name": "log",
+    "item_id": "LOG",
+    "pocket": ""
+  },
+  "LOVE_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "Catch <> of the opposite gender.",
+    "display_name": "love ball",
+    "item_id": "LOVE_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "LUM_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of STATUS EFFECTS.",
+    "display_name": "lum berry",
+    "item_id": "LUM_BERRY",
+    "pocket": "BERRIES"
+  },
+  "LURE_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "Most effective while fishing.",
+    "display_name": "lure ball",
+    "item_id": "LURE_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "MAGNET": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A small but powerful magnet.",
+    "display_name": "magnet",
+    "item_id": "MAGNET",
+    "pocket": "MISC"
+  },
+  "MANURE": {
+    "category": "",
+    "cost": 0,
+    "description": "A smelly fertilizer.",
+    "display_name": "manure",
+    "item_id": "MANURE",
+    "pocket": ""
+  },
+  "MASTER_BALL": {
+    "category": "STANDARD_BALLS",
+    "cost": 0,
+    "description": "The best BALL. It never misses.",
+    "display_name": "master ball",
+    "item_id": "MASTER_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "MAX_REPEL": {
+    "category": "SPELUNKING",
+    "cost": 0,
+    "description": "A spray that repels weak POKéMON.",
+    "display_name": "max repel",
+    "item_id": "MAX_REPEL",
+    "pocket": "MISC"
+  },
+  "MAX_REVIVE": {
+    "category": "REVIVAL",
+    "cost": 0,
+    "description": "Fully restores a fainted <>.",
+    "display_name": "max revive",
+    "item_id": "MAX_REVIVE",
+    "pocket": "MEDICINE"
+  },
+  "METAL_COAT": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A coat shed by STEEL types.",
+    "display_name": "metal coat",
+    "item_id": "METAL_COAT",
+    "pocket": "MISC"
+  },
+  "MIRACLE_SEED": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "Can be planted to grow GRASS.",
+    "display_name": "miracle seed",
+    "item_id": "MIRACLE_SEED",
+    "pocket": "MISC"
+  },
+  "MOOMOO_MILK": {
+    "category": "HEALING",
+    "cost": 0,
+    "description": "A nutritious drink that restores HP.",
+    "display_name": "moomoo milk",
+    "item_id": "MOOMOO_MILK",
+    "pocket": "MEDICINE"
+  },
+  "MOON_BALL": {
+    "category": "APRICORN_BALLS",
+    "cost": 0,
+    "description": "For <> that evolve by Moon Stone.",
+    "display_name": "moon ball",
+    "item_id": "MOON_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "MOON_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "moon stone",
+    "item_id": "MOON_STONE",
+    "pocket": "MISC"
+  },
+  "MOO_MOO_MILK": {
+    "category": "HEALING",
+    "cost": 0,
+    "description": "Fresh milk from a happy Miltank.",
+    "display_name": "Moo Moo Milk",
+    "item_id": "MOO_MOO_MILK",
+    "pocket": "MEDICINE"
+  },
+  "MYSTIC_SOIL": {
+    "category": "",
+    "cost": 0,
+    "description": "Soil from the Forest.",
+    "display_name": "mystic soil",
+    "item_id": "MYSTIC_SOIL",
+    "pocket": ""
+  },
+  "MYSTIC_WATER": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "",
+    "display_name": "mystic water",
+    "item_id": "MYSTIC_WATER",
+    "pocket": "MISC"
+  },
+  "NEST_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Most effective on weaker POKéMON.",
+    "display_name": "nest ball",
+    "item_id": "NEST_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "NET_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Best for BUG and WATER type <>.",
+    "display_name": "net ball",
+    "item_id": "NET_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "NEVERMELTICE": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A special ice that doesn» melt.",
+    "display_name": "nevermeltice",
+    "item_id": "NEVERMELTICE",
+    "pocket": "MISC"
+  },
+  "OLD_AMBER": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "Amber containing DNA of ancient <>.",
+    "display_name": "old amber",
+    "item_id": "OLD_AMBER",
+    "pocket": "MISC"
+  },
+  "OLD_ROD": {
+    "category": "GAMEPLAY",
+    "cost": 0,
+    "description": "Use by water to fish for POKéMON.",
+    "display_name": "old rod",
+    "item_id": "OLD_ROD",
+    "pocket": "KEY"
+  },
+  "PARK_BALL": {
+    "category": "STANDARD_BALLS",
+    "cost": 0,
+    "description": "",
+    "display_name": "park ball",
+    "item_id": "PARK_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "PECHA_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of POISON.",
+    "display_name": "pecha berry",
+    "item_id": "PECHA_BERRY",
+    "pocket": "BERRIES"
+  },
+  "PERSIM_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of CONFUSION.",
+    "display_name": "persim berry",
+    "item_id": "PERSIM_BERRY",
+    "pocket": "BERRIES"
+  },
+  "PINK_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A pink APRICORN.",
+    "display_name": "pink aprcrn",
+    "item_id": "PINK_APRICORN",
+    "pocket": "KEY"
+  },
+  "POISON_BARB": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A small, poisonous barb.",
+    "display_name": "poison barb",
+    "item_id": "POISON_BARB",
+    "pocket": "MISC"
+  },
+  "POKE_BALL": {
+    "category": "STANDARD_BALLS",
+    "cost": 0,
+    "description": "A tool for catching POKéMON.",
+    "display_name": "poké ball",
+    "item_id": "POKE_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "POKE_DOLL": {
+    "category": "SPELUNKING",
+    "cost": 0,
+    "description": "A cute plushie.",
+    "display_name": "poké doll",
+    "item_id": "POKE_DOLL",
+    "pocket": "MISC"
+  },
+  "POTION": {
+    "category": "HEALING",
+    "cost": 0,
+    "description": "Restores 20 HP.",
+    "display_name": "Potion",
+    "item_id": "POTION",
+    "pocket": "MEDICINE"
+  },
+  "PSI_ENERGY": {
+    "category": "",
+    "cost": 0,
+    "description": "An energy exuded by PSYCHIC types.",
+    "display_name": "psi energy",
+    "item_id": "PSI_ENERGY",
+    "pocket": ""
+  },
+  "QUICK_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Best when used at start of encounter",
+    "display_name": "quick ball",
+    "item_id": "QUICK_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "RAGECANDYBAR": {
+    "category": "GAMEPLAY",
+    "cost": 0,
+    "description": "A candy bar that can restore HP.",
+    "display_name": "ragecandybar",
+    "item_id": "RAGECANDYBAR",
+    "pocket": "KEY"
+  },
+  "RARE_CANDY": {
+    "category": "VITAMINS",
+    "cost": 0,
+    "description": "Raises a POKéMON« level by 1.",
+    "display_name": "rare candy",
+    "item_id": "RARE_CANDY",
+    "pocket": "MEDICINE"
+  },
+  "RAWST_BERRY": {
+    "category": "MEDICINE",
+    "cost": 0,
+    "description": "Cures <> of BURN.",
+    "display_name": "rawst berry",
+    "item_id": "RAWST_BERRY",
+    "pocket": "BERRIES"
+  },
+  "RED_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A red APRICORN.",
+    "display_name": "red aprcrn",
+    "item_id": "RED_APRICORN",
+    "pocket": "KEY"
+  },
+  "REPEL": {
+    "category": "SPELUNKING",
+    "cost": 0,
+    "description": "A spray that repels weak POKéMON.",
+    "display_name": "repel",
+    "item_id": "REPEL",
+    "pocket": "MISC"
+  },
+  "REVIVE": {
+    "category": "REVIVAL",
+    "cost": 0,
+    "description": "Restores a fainted <> to half hp.",
+    "display_name": "revive",
+    "item_id": "REVIVE",
+    "pocket": "MEDICINE"
+  },
+  "ROOT_FOSSIL": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "root fossil",
+    "item_id": "ROOT_FOSSIL",
+    "pocket": "MISC"
+  },
+  "SCRAP_METAL": {
+    "category": "",
+    "cost": 0,
+    "description": "",
+    "display_name": "scrap metal",
+    "item_id": "SCRAP_METAL",
+    "pocket": ""
+  },
+  "SECRET_KEY": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "A mysterious key.",
+    "display_name": "secret key",
+    "item_id": "SECRET_KEY",
+    "pocket": "KEY"
+  },
+  "SHIELD_FOSSIL": {
+    "category": "",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "shield fossil",
+    "item_id": "SHIELD_FOSSIL",
+    "pocket": ""
+  },
+  "SHINY_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "shiny stone",
+    "item_id": "SHINY_STONE",
+    "pocket": "MISC"
+  },
+  "SILKY_THREAD": {
+    "category": "",
+    "cost": 0,
+    "description": "Delicate thread from a BUG type.",
+    "display_name": "silky thread",
+    "item_id": "SILKY_THREAD",
+    "pocket": ""
+  },
+  "SILPH_SCOPE": {
+    "category": "PLOT_ADVANCEMENT",
+    "cost": 0,
+    "description": "An item that identifies ghosts.",
+    "display_name": "silph scope",
+    "item_id": "SILPH_SCOPE",
+    "pocket": "KEY"
+  },
+  "SKULL_FOSSIL": {
+    "category": "DEX_COMPLETION",
+    "cost": 0,
+    "description": "A fossil of an ancient POKéMON.",
+    "display_name": "skull fossil",
+    "item_id": "SKULL_FOSSIL",
+    "pocket": "MISC"
+  },
+  "SLEEPING_BAG": {
+    "category": "",
+    "cost": 0,
+    "description": "Slowly restores party HP.",
+    "display_name": "sleeping bag",
+    "item_id": "SLEEPING_BAG",
+    "pocket": ""
+  },
+  "SOFT_BEDDING": {
+    "category": "",
+    "cost": 0,
+    "description": "For a comfy bed and faster healing",
+    "display_name": "soft bedding",
+    "item_id": "SOFT_BEDDING",
+    "pocket": ""
+  },
+  "SOFT_FEATHER": {
+    "category": "",
+    "cost": 0,
+    "description": "A stray feather from a FLYING type",
+    "display_name": "soft feather",
+    "item_id": "SOFT_FEATHER",
+    "pocket": ""
+  },
+  "SOFT_SAND": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "Soft, light sand from the beach.",
+    "display_name": "soft sand",
+    "item_id": "SOFT_SAND",
+    "pocket": "MISC"
+  },
+  "SOFT_WOOL": {
+    "category": "",
+    "cost": 0,
+    "description": "Thick, fluffy wool.",
+    "display_name": "soft wool",
+    "item_id": "SOFT_WOOL",
+    "pocket": ""
+  },
+  "SPELL_TAG": {
+    "category": "TYPE_ENHANCEMENT",
+    "cost": 0,
+    "description": "A sinister, eerie tag.",
+    "display_name": "spell tag",
+    "item_id": "SPELL_TAG",
+    "pocket": "MISC"
+  },
+  "STARDUST": {
+    "category": "LOOT",
+    "cost": 0,
+    "description": "A sparkling  powder.",
+    "display_name": "stardust",
+    "item_id": "STARDUST",
+    "pocket": "MISC"
+  },
+  "STAR_PIECE": {
+    "category": "LOOT",
+    "cost": 0,
+    "description": "A sparkling gem.",
+    "display_name": "star piece",
+    "item_id": "STAR_PIECE",
+    "pocket": "MISC"
+  },
+  "SUN_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "sun stone",
+    "item_id": "SUN_STONE",
+    "pocket": "MISC"
+  },
+  "SUPER_ROD": {
+    "category": "GAMEPLAY",
+    "cost": 0,
+    "description": "Use by water to fish for POKéMON.",
+    "display_name": "super rod",
+    "item_id": "SUPER_ROD",
+    "pocket": "KEY"
+  },
+  "SWEET_APPLE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "sweet apple",
+    "item_id": "SWEET_APPLE",
+    "pocket": "MISC"
+  },
+  "THIN_PAPER": {
+    "category": "",
+    "cost": 0,
+    "description": "A soft paper good for making posters",
+    "display_name": "thin paper",
+    "item_id": "THIN_PAPER",
+    "pocket": ""
+  },
+  "THUNDERSTONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "thunderstone",
+    "item_id": "THUNDERSTONE",
+    "pocket": "MISC"
+  },
+  "TIMER_BALL": {
+    "category": "SPECIAL_BALLS",
+    "cost": 1000,
+    "description": "Most effective in a longer battle.",
+    "display_name": "timer ball",
+    "item_id": "TIMER_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "ULTRA_BALL": {
+    "category": "STANDARD_BALLS",
+    "cost": 800,
+    "description": "An excellent tool for catching <>.",
+    "display_name": "ultra ball",
+    "item_id": "ULTRA_BALL",
+    "pocket": "POKEBALLS"
+  },
+  "UPGRADE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "",
+    "display_name": "upgrade",
+    "item_id": "UPGRADE",
+    "pocket": "MISC"
+  },
+  "WATER_STONE": {
+    "category": "EVOLUTION",
+    "cost": 0,
+    "description": "Can evolve certain POKéMON.",
+    "display_name": "water stone",
+    "item_id": "WATER_STONE",
+    "pocket": "MISC"
+  },
+  "WHITE_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A white APRICORN.",
+    "display_name": "white aprcrn",
+    "item_id": "WHITE_APRICORN",
+    "pocket": "KEY"
+  },
+  "YELLOW_APRICORN": {
+    "category": "APRICORN_BOX",
+    "cost": 0,
+    "description": "A yellow APRICORN.",
+    "display_name": "yellow aprcrn",
+    "item_id": "YELLOW_APRICORN",
+    "pocket": "KEY"
+  }
+}
