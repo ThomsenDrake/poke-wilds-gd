@@ -19,7 +19,7 @@ Every check class is classified by what its truth is ANCHORED to. A postmortem n
 | --- | --- | --- | --- |
 | `CO` | code-output-anchored | the code's own earlier output / render | pixel baselines, sidecar-diff, determinism pins, display-matrix round-trip, the deterministic sidecar-consistency reviewer |
 | `HM` | hand-model-anchored | rects a human measured and transcribed | `ui_render_model`/`ui_render_art` geometry, visual_lint regions |
-| `SA` | source-art-anchored | derived from `res://pokewilds/**` bytes at check time | world tiles (Lane 1); **the art-anchor registry (this slice)** |
+| `SA` | source-art-anchored | derived from `res://assets/source/**` bytes at check time | world tiles (Lane 1); **the art-anchor registry (this slice)** |
 | `XS` | external-standard-anchored | an independent published spec | WCAG contrast, Machado-2009 CVD |
 | `EA` | external-agent-anchored | a reviewer answering rubric questions | the Lane-4 `--reviewer-cmd` socket (populated this slice by a vision-capable model) |
 

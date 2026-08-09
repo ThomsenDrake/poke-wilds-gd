@@ -31,7 +31,7 @@ extends RefCounted
 # therefore WITHHELD from the habitat table too (Rock-type mons contribute their
 # other type's material, or nothing). Keep every table clean.
 
-# Uppercase type -> lowercase bag id (every id is in pokewilds/i18n/item.properties).
+# Uppercase type -> lowercase bag id (every id is in assets/source/i18n/item.properties).
 const TYPE_MATERIALS := {
 	"ELECTRIC": "magnet",
 	"WATER": "hard_shell",

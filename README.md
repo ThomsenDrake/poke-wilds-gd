@@ -9,7 +9,7 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 - Start a wild battle, use moves (per-move source animation sets where they exist, a synthesized lunge/flash fallback otherwise), throw Poke Balls, use Potions, gain EXP, level up, and evolve. A full-party capture is non-losing: the overflow Pokemon is held at your campsite and retrieved from the party screen.
 - Open the start menu to inspect the party (swap lead, summary, field moves, campsite retrieve) and the bag (use items), save (atomic temp+rename writes), or start a new run (confirm-gated through a message box).
 - Validate the whole slice with one command: `python3 tools/verify_all.py` — the local gate that orchestrates the static checks, determinism pins, the transport-honest headless playtest/smoke suite, the windowed pixel lanes (`ui_render_audit` + `visual_sweep`), and the legibility report.
-- Load source data from the checked-in `pokewilds/` asset and data subtree.
+- Load art/audio and source data from the vendored `assets/source/` snapshot (upstream PokeWilds v0.8.11; see [docs/references/source-assets.md](docs/references/source-assets.md)).
 
 ## Controls
 
@@ -54,4 +54,4 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 
 ## Source Assets
 
-The checked-in `pokewilds/` subtree is treated as external source data and art content for the port. See [docs/references/source-assets.md](docs/references/source-assets.md) for the files the runtime parses directly.
+The checked-in `assets/source/` tree is a vendored snapshot of the upstream PokeWilds project (SheerSt/pokewilds, v0.8.11), treated as external source data and art content for the port. See [docs/references/source-assets.md](docs/references/source-assets.md) for the files the runtime parses directly.

@@ -6,16 +6,16 @@ extends RefCounted
 # not enforced yet but are carried on every blocked tile so the field-moves
 # slice can unlock traversal without rewriting world generation.
 
-const BASE_WATER := "res://pokewilds/tiles/water1.png"
-const BASE_SAND := "res://pokewilds/tiles/ground3.png"
-const BASE_PLAINS := "res://pokewilds/ground1.png"
-const BASE_GRASS := "res://pokewilds/grass1.png"
-const BASE_SAVANNA := "res://pokewilds/tiles/green_savanna1.png"
-const BASE_DESERT := "res://pokewilds/tiles/desert1.png"
-const BASE_SWAMP := "res://pokewilds/tiles/swamp/swamp1.png"
-const BASE_ROCK := "res://pokewilds/tiles/rock4.png"
-const BASE_SNOW := "res://pokewilds/tiles/ice2.png"
-const BASE_LAVA := "res://pokewilds/tiles/desert4_cracked.png"
+const BASE_WATER := "res://assets/source/tiles/water1.png"
+const BASE_SAND := "res://assets/source/tiles/ground3.png"
+const BASE_PLAINS := "res://assets/source/ground1.png"
+const BASE_GRASS := "res://assets/source/grass1.png"
+const BASE_SAVANNA := "res://assets/source/tiles/green_savanna1.png"
+const BASE_DESERT := "res://assets/source/tiles/desert1.png"
+const BASE_SWAMP := "res://assets/source/tiles/swamp/swamp1.png"
+const BASE_ROCK := "res://assets/source/tiles/rock4.png"
+const BASE_SNOW := "res://assets/source/tiles/ice2.png"
+const BASE_LAVA := "res://assets/source/tiles/desert4_cracked.png"
 
 # Solid ground colors composited under base textures that are really overlays
 # (white-background detail sheets like grass1/ground1/water1, or alpha sheets
@@ -29,19 +29,19 @@ const GROUND_GRASS := Color8(106, 186, 90)
 const GROUND_FOREST := Color8(74, 148, 74)
 const GROUND_LAVA := Color8(198, 52, 36)
 
-const PROP_FLOWER := "res://pokewilds/tiles/flower1.png"
+const PROP_FLOWER := "res://assets/source/tiles/flower1.png"
 # tree1.png is a proper green tree; the old tree_small1 was a white-bodied
 # stump that read as a ghost pawn even after background keying. Its grass
 # background is baked in (opaque source greens), so it uses the "border"
 # corner-color keying hint in tile_texture_cache.gd.
-const PROP_TREE := "res://pokewilds/tiles/tree1.png"
-const PROP_CACTUS := "res://pokewilds/tiles/cactus1.png"
-const PROP_BUSH := "res://pokewilds/tiles/bush_savanna1.png"
-const PROP_SWAMP_TREE := "res://pokewilds/tiles/swamp/tree13.png"
-const PROP_LILLY := "res://pokewilds/tiles/swamp/lillypad1.png"
-const PROP_ROCK := "res://pokewilds/rock_small1.png"
-const PROP_SNOW_TREE := "res://pokewilds/tiles/spooky/tree1.png"
-const PROP_LAVA := "res://pokewilds/tiles/lava_sheet1.png"
+const PROP_TREE := "res://assets/source/tiles/tree1.png"
+const PROP_CACTUS := "res://assets/source/tiles/cactus1.png"
+const PROP_BUSH := "res://assets/source/tiles/bush_savanna1.png"
+const PROP_SWAMP_TREE := "res://assets/source/tiles/swamp/tree13.png"
+const PROP_LILLY := "res://assets/source/tiles/swamp/lillypad1.png"
+const PROP_ROCK := "res://assets/source/rock_small1.png"
+const PROP_SNOW_TREE := "res://assets/source/tiles/spooky/tree1.png"
+const PROP_LAVA := "res://assets/source/tiles/lava_sheet1.png"
 
 # Tall-grass encounter overlays for the grass biomes. These are white-
 # background tuft sheets (verified: grass2_over/grass3_over/grass_savanna2 are
@@ -50,9 +50,9 @@ const PROP_LAVA := "res://pokewilds/tiles/lava_sheet1.png"
 # tile_texture_cache.gd. grass2_over is a bright 4-tuft patch for the open
 # grassland, grass3_over a deeper green for the forest floor, grass_savanna2 a
 # single yellowed tuft matching the savanna palette.
-const TALL_GRASS_FIELD := "res://pokewilds/tiles/grass2_over.png"
-const TALL_GRASS_FOREST := "res://pokewilds/tiles/grass3_over.png"
-const TALL_GRASS_SAVANNA := "res://pokewilds/tiles/grass_savanna2.png"
+const TALL_GRASS_FIELD := "res://assets/source/tiles/grass2_over.png"
+const TALL_GRASS_FOREST := "res://assets/source/tiles/grass3_over.png"
+const TALL_GRASS_SAVANNA := "res://assets/source/tiles/grass_savanna2.png"
 
 const TILE_PIXELS := 16
 

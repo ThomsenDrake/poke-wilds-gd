@@ -4,7 +4,7 @@ extends RefCounted
 # docs/product-specs/camping-crafting-survival.md). Pure data + rules: the
 # faithful PokeWilds campfire recipes plus the one kiln recipe, keyed by the
 # lowercase bag ids the rest of the port already uses (session.add_item and
-# pokewilds/i18n/item.properties). No Godot node imports and no runtime/data
+# assets/source/i18n/item.properties). No Godot node imports and no runtime/data
 # dependency, so the domain layer stays intact (check_architecture
 # SCRIPT_ALLOWED[domain] = {domain, core}).
 #
@@ -33,7 +33,7 @@ extends RefCounted
 const STATION_CAMPFIRE := "campfire"
 const STATION_KILN := "kiln"
 
-# Lowercase bag ids, all present in pokewilds/i18n/item.properties (verified).
+# Lowercase bag ids, all present in assets/source/i18n/item.properties (verified).
 const RECIPES := {
 	"poke_ball": {"station": STATION_CAMPFIRE, "ingredients": {"magnet": 1, "hard_shell": 1}},
 	"soft_bedding": {"station": STATION_CAMPFIRE, "ingredients": {"soft_feather": 3, "silky_thread": 3}},

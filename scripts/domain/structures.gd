@@ -97,35 +97,35 @@ const _BLOCK_REASONS := {
 # are logged as art tech debt (per-biome completeness is Phase 1-incomplete).
 const _SHELL := {
 	"default": {
-		"wall": "res://pokewilds/tiles/buildings/house1_middle1.png",
-		"door": "res://pokewilds/tiles/buildings/house1_door1.png",
-		"roof": "res://pokewilds/tiles/buildings/house1_roof_middle1.png",
+		"wall": "res://assets/source/tiles/buildings/house1_middle1.png",
+		"door": "res://assets/source/tiles/buildings/house1_door1.png",
+		"roof": "res://assets/source/tiles/buildings/house1_roof_middle1.png",
 	},
 	"stone": {
-		"wall": "res://pokewilds/tiles/ruins2_wall1.png",
-		"door": "res://pokewilds/tiles/ruins2_door.png",
-		"roof": "res://pokewilds/tiles/buildings/house6_roof_middle1.png",
+		"wall": "res://assets/source/tiles/ruins2_wall1.png",
+		"door": "res://assets/source/tiles/ruins2_door.png",
+		"roof": "res://assets/source/tiles/buildings/house6_roof_middle1.png",
 	},
 	"savanna": {
-		"wall": "res://pokewilds/tiles/buildings/house5_wall1.png",
-		"door": "res://pokewilds/tiles/buildings/house5_door1.png",
-		"roof": "res://pokewilds/tiles/buildings/house5_roof_middle1.png",
+		"wall": "res://assets/source/tiles/buildings/house5_wall1.png",
+		"door": "res://assets/source/tiles/buildings/house5_door1.png",
+		"roof": "res://assets/source/tiles/buildings/house5_roof_middle1.png",
 	},
 }
-const _PARTITION_PATH := "res://pokewilds/tiles/buildings/building1_wall1.png"
-const _CAMPFIRE_PATH := "res://pokewilds/tiles/campfire1.png"
-const _FENCE_PATH := "res://pokewilds/tiles/fence1.png"
+const _PARTITION_PATH := "res://assets/source/tiles/buildings/building1_wall1.png"
+const _CAMPFIRE_PATH := "res://assets/source/tiles/campfire1.png"
+const _FENCE_PATH := "res://assets/source/tiles/fence1.png"
 # Faithful: a door placed between two fence tiles becomes a gate. The gate art
 # is a fixed sheet (not biome-skinned); runtime stamps it when door_is_gate().
-const GATE_PATH := "res://pokewilds/tiles/fence1gate1.png"
-const _BED_PATH := "res://pokewilds/tiles/buildings/house_bed1.png"
-const _BOX_PATH := "res://pokewilds/tiles/chest1.png"
-const _TORCH_PATH := "res://pokewilds/tiles/torch_sheet1.png"
+const GATE_PATH := "res://assets/source/tiles/fence1gate1.png"
+const _BED_PATH := "res://assets/source/tiles/buildings/house_bed1.png"
+const _BOX_PATH := "res://assets/source/tiles/chest1.png"
+const _TORCH_PATH := "res://assets/source/tiles/torch_sheet1.png"
 # Phase 4 props: odd_keystone2.png is a 16x16 standing stone (the way-stone
 # beacon); tiles/rock1.png is a 16x16 boulder, a DISTINCT path from the smashable
 # rock_small1.png so harvest never mistakes a pushed boulder for a smashable rock.
-const _WAYSTONE_PATH := "res://pokewilds/tiles/odd_keystone2.png"
-const _BOULDER_PATH := "res://pokewilds/tiles/rock1.png"
+const _WAYSTONE_PATH := "res://assets/source/tiles/odd_keystone2.png"
+const _BOULDER_PATH := "res://assets/source/tiles/rock1.png"
 # campfire1/chest1 are 2-frame sheets; one 16-wide frame is the static prop.
 # campfire1 is a 32x20 sheet (two 16x20 frames): frame 0 is the unlit base the
 # build loop stamps, frame 1 is the lit fire — pin both so the light layer can swap.

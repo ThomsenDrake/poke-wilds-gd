@@ -14,7 +14,7 @@ extends RefCounted
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const GbcWidgets := preload("res://scripts/ui/gbc_widgets.gd")
 
-const ART_PATH := "res://pokewilds/menu/item_menu_gsc1.png"
+const ART_PATH := "res://assets/source/menu/item_menu_gsc1.png"
 const VISIBLE_ROWS := 10
 const LIST_ORIGIN := Vector2i(52, 10) # the black arrow cursor lands at x42, inside the list interior
 const DESC_POS := Vector2i(6, 104)

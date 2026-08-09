@@ -398,7 +398,7 @@ def _mechanism_targets(text: str) -> tuple[list[str], list[str]]:
     """Resolution targets named by a mechanism_added string: repo-relative file
     paths (contain '/', final segment has an extension) and art-anchor ids
     (bare lowercase `scene/name` slugs, no extension). res:// URLs name
-    submodule ART bytes (policed by the art_sha256 pin), not repo artifacts."""
+    vendored source ART bytes (policed by the art_sha256 pin), not repo artifacts."""
     paths: list[str] = []
     anchor_ids: list[str] = []
     for token in re.findall(r"[A-Za-z0-9_./-]+", text):

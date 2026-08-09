@@ -24,7 +24,7 @@ extends Node2D
 # render HERE as transient entities (re-used phione-egg art); pen eggs render on world_view's prop
 # layer (persisted, sparkle) — distinct node tree + lifecycle, never conflated. ASSET COVERAGE
 # (flagged, miss-002): tier 1 = the species' 96x16 six-frame sheet (catalog "overworld_path";
-# 709/990); tier 2 = the source placeholder pokewilds/pokemon/overworld_not_found.png (96x16) for
+# 709/990); tier 2 = the source placeholder assets/source/pokemon/overworld_not_found.png (96x16) for
 # the 281 without, with a LOUD warn() once per species; tier 3 (scaled front sprite) REJECTED. The
 # Alpha badge + nest ring are generated textures (no submodule art — DIVERGENCE #1).
 #
@@ -42,8 +42,8 @@ const HALF_WIDTH_TILES := 30 # mirror world_view's synced window (world_view.gd:
 const HALF_HEIGHT_TILES := 20
 const RuntimePath := "/root/GameRuntime"
 const FRAME_SIZE := 16 # the 96x16 sheets are six 16x16 directional frames
-const NOT_FOUND_PATH := "res://pokewilds/pokemon/overworld_not_found.png" # tier-2 faithful placeholder
-const EGG_SHEET_PATH := "res://pokewilds/phione-egg.png" # re-used egg art (NO sparkle — faithful :230)
+const NOT_FOUND_PATH := "res://assets/source/pokemon/overworld_not_found.png" # tier-2 faithful placeholder
+const EGG_SHEET_PATH := "res://assets/source/phione-egg.png" # re-used egg art (NO sparkle — faithful :230)
 const LERP_SPEED := 192.0 # px/s: ~1 tile in 0.08s, so a settle() snaps mons onto logic tiles
 const SNAP_EPSILON := 0.5 # px: resting sprites land EXACTLY on the feet target (byte-stable)
 const KIND_MON := "mon"

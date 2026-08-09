@@ -13,9 +13,9 @@ extends RefCounted
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const GbcWidgets := preload("res://scripts/ui/gbc_widgets.gd")
 
-const BACKGROUND_PATH := "res://pokewilds/menu/gsc/background1.png"
-const FRAME_PATH := "res://pokewilds/menu/frame1.png"
-const HINT_BAND_PATH := "res://pokewilds/textbox_bg1.png"
+const BACKGROUND_PATH := "res://assets/source/menu/gsc/background1.png"
+const FRAME_PATH := "res://assets/source/menu/frame1.png"
+const HINT_BAND_PATH := "res://assets/source/textbox_bg1.png"
 const FRAME_RECT := Rect2(48, 32, 72, 80) # frame1.png's verified bbox (48,32)-(119,111); the render slice centers inside it
 
 

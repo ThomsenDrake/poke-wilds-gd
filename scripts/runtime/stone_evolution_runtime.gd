@@ -23,7 +23,7 @@ extends RefCounted
 const NO_EFFECT_MESSAGE := "It would have no effect."
 const DEFAULT_CATCH_RATE := 45 # the battle_runtime fallback; catalog entries carry their own
 
-# Bag ids exactly as pokewilds/i18n/item.properties:80-89 keys them. thunderstone
+# Bag ids exactly as assets/source/i18n/item.properties:80-89 keys them. thunderstone
 # has NO underscore (item.properties:83 + the THUNDERSTONE evo param) — the brief
 # spelling "thunder_stone" would be a silent no-effect on every Electric-stone evo.
 # SINGLE SOURCE: bag_screen reads this const off the preloaded module, so routing

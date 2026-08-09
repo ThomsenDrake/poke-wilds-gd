@@ -14,8 +14,8 @@ signal confirmed
 signal cancelled
 
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
-const TOAST_ART := "res://pokewilds/textbox_bg1.png"
-const CONFIRM_ART := "res://pokewilds/textbox_bg2.png"
+const TOAST_ART := "res://assets/source/textbox_bg1.png"
+const CONFIRM_ART := "res://assets/source/textbox_bg2.png"
 
 var _label: Label
 var _timer: Timer

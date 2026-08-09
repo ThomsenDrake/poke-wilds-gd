@@ -4,7 +4,7 @@ extends RefCounted
 # budget): builds the walk/run SpriteFrames from the one-row-of-eight 16x16 sheets — idle
 # down/up/left/right (0-3) then stride (4-7), so walk and run share one frame map under a
 # "run_" animation-name prefix. Pure presentation: no game state, no rng, no input.
-# Sheets resolve by AVATAR NAME (creation-flow slice): res://pokewilds/player/
+# Sheets resolve by AVATAR NAME (creation-flow slice): res://assets/source/player/
 # <name>-walking.png + <name>-running.png. The default "ben" is exactly the pre-slice
 # hardcoded sheet pair, so every existing render keeps its pixels. The -back/-sitting/
 # -sleepingbag/-fishing variants have NO consumers in the port yet; they follow the
@@ -14,7 +14,7 @@ extends RefCounted
 const TILE_SIZE := 16
 const WALK_ANIMATION_FPS := 12.5
 const DEFAULT_AVATAR_NAME := "ben"
-const LEGACY_WALK_SHEET_PATH := "res://pokewilds/player/kris-walking.png" # pre-avatar-knob fallback, kept
+const LEGACY_WALK_SHEET_PATH := "res://assets/source/player/kris-walking.png" # pre-avatar-knob fallback, kept
 
 # Null when no walk sheet loads (the avatar keeps its scene-default frames) — mirrors the
 # pre-extraction early-return exactly. Fallback chain: requested walk sheet -> ben walk ->
@@ -37,7 +37,7 @@ static func build(avatar_name: String = DEFAULT_AVATAR_NAME) -> SpriteFrames:
 
 
 static func _sheet_path(avatar_name: String, sheet_kind: String) -> String:
-	return "res://pokewilds/player/%s-%s.png" % [avatar_name, sheet_kind]
+	return "res://assets/source/player/%s-%s.png" % [avatar_name, sheet_kind]
 
 
 static func _add_sheet_animations(frames: SpriteFrames, sheet: Texture2D, prefix: String) -> void:

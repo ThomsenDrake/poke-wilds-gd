@@ -17,12 +17,12 @@ const TILE := 16
 # Model truth independent of the data under test: these props are solid
 # structures, so a walkable tile rendering one is a world-data regression.
 const SOLID_PROP_PATHS := [
-	"res://pokewilds/tiles/tree1.png",
-	"res://pokewilds/tiles/swamp/tree13.png",
-	"res://pokewilds/tiles/spooky/tree1.png",
-	"res://pokewilds/tiles/cactus1.png",
-	"res://pokewilds/rock_small1.png",
-	"res://pokewilds/tiles/lava_sheet1.png",
+	"res://assets/source/tiles/tree1.png",
+	"res://assets/source/tiles/swamp/tree13.png",
+	"res://assets/source/tiles/spooky/tree1.png",
+	"res://assets/source/tiles/cactus1.png",
+	"res://assets/source/rock_small1.png",
+	"res://assets/source/tiles/lava_sheet1.png",
 ]
 
 

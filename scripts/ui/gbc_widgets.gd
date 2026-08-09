@@ -8,8 +8,8 @@ extends RefCounted
 # fonts.ttf@7 on an 8px row pitch (the text_oracle raster contract).
 
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
-const BLACK_CURSOR_PATH := "res://pokewilds/battle/arrow_right1.png" # 8x8
-const WHITE_CURSOR_PATH := "res://pokewilds/arrow_right_white2.png" # 7x9
+const BLACK_CURSOR_PATH := "res://assets/source/battle/arrow_right1.png" # 8x8
+const WHITE_CURSOR_PATH := "res://assets/source/arrow_right_white2.png" # 7x9
 const HINT_POS := Vector2i(8, 104) # 8px into the 48px bottom textbox band
 
 

@@ -22,7 +22,7 @@ const EGG_GROUND_CAP := 7 # faithful 7-egg cap before the producer self-traps
 const BREED_HAPPY_THRESHOLD := 220 # HAPPINESS_EVOLUTION_THRESHOLD doubles as "happy"
 const LAY_CHECK_STEPS := 120 # the invisible-countdown cadence (rate-limited scan)
 const LAY_CHANCE := 0.5 # seeded roll per cadence (Eevee-farm anchor: ~6 eggs / <15 min)
-const HATCH_SFX_PATH := "res://pokewilds/sounds/egg_noise1.ogg"
+const HATCH_SFX_PATH := "res://assets/source/sounds/egg_noise1.ogg"
 
 var _session = null
 var _catalog = null

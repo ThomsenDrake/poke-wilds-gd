@@ -5,7 +5,7 @@ extends RefCounted
 # colors" — the asset dump ships front.pal + shiny.pal siblings in 636/990 species
 # folders, each two `RGB r, g, b` lines = the sprite's two custom colors on the GBC
 # 0-31 scale; front.png is exactly black outline + white highlight + those two
-# colors) plus a sparkle icon (pokewilds/shiny.png / shiny_inverse.png, committed as
+# colors) plus a sparkle icon (assets/source/shiny.png / shiny_inverse.png, committed as
 # "+shiny icon for status screen"). Species WITHOUT a shiny.pal keep normal art +
 # the sparkle badge only (documented fallback — the flag stays real for odds/breeding).
 # OVERWORLD: the original draws shinies identically until battle or the status screen
@@ -15,8 +15,8 @@ extends RefCounted
 # EGGS sparkle in the pen. The recolor is exact-match per palette color: unmatched
 # pixels (outline/highlight/alpha) pass through, so anti-aliased art never smears.
 
-const SHINY_ICON_PATH := "res://pokewilds/shiny_inverse.png"
-const EGG_SHEET_PATH := "res://pokewilds/phione-egg.png" # 16x16 in-pen egg frames
+const SHINY_ICON_PATH := "res://assets/source/shiny_inverse.png"
+const EGG_SHEET_PATH := "res://assets/source/phione-egg.png" # 16x16 in-pen egg frames
 const EGG_FRAME_SIZE := 16
 
 var _frame_cache := {}

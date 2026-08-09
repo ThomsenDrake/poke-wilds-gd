@@ -3,13 +3,13 @@ extends RefCounted
 # Baked-art measurements for the Lane 2 render model (ui_render_model.gd).
 # Every constant is measured pixel-wise from the source PNGs (dark-ink runs
 # over decoded RGBA data), not copied from layout code:
-# - pokewilds/battle/battle_screen2.png (action/message overlay): message box
+# - assets/source/battle/battle_screen2.png (action/message overlay): message box
 #   x 1..70 y 96..143, action box x 65..159 y 96..143; FIGHT/PKMN/ITEM/RUN
 #   glyphs baked 7px tall (PKMN ligature 8px) at the row tops below.
-# - pokewilds/menu/attack_screen1.png (moves overlay): side box x 1..87
+# - assets/source/menu/attack_screen1.png (moves overlay): side box x 1..87
 #   y 64..103, move list box x 33..159 y 96..143; "TYPE/" baked at
 #   (8,72,31,8); the PP "/" baked diagonally at (56,89,7,7).
-# - pokewilds/battle/battle_bg1.png (blank background): full-width bottom box
+# - assets/source/battle/battle_bg1.png (blank background): full-width bottom box
 #   x 1..159 y 96..143.
 
 const STAGE := Rect2(0, 0, 160, 144)
