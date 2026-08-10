@@ -1,4 +1,10 @@
 {
+  "legibility_soak": {
+    "count": 1,
+    "messages": [
+      "Species catalog load complete."
+    ]
+  },
   "playtest_breed_soak": {
     "count": 1,
     "messages": [
