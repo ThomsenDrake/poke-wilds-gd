@@ -15,6 +15,12 @@ const SCENARIOS := {
 	# analog — per-screen visible-Control-tree JSON dumps to .godot-smoke/ui_tree/
 	# (title/menu/party/bag/battle) + the ui_tree_dump_passed/failed pair. Self-pinned.
 	"ui_tree_dump": [preload("res://scripts/app/ui_tree_dump_scenario.gd"), "run", []],
+	# The Phase-2 agreement gate (agent-surface completion sprint, Workstream F):
+	# drives the SAME five screens through the SAME seams and asserts the ui_tree
+	# dumps, the game/* Performance monitors, and the trace lifecycle AGREE —
+	# closing the "MANUALLY kept in sync" gap on performance_monitors.gd. Checks
+	# split into legibility_soak_checks.gd for the app budget. Self-pinned.
+	"legibility_soak": [preload("res://scripts/app/legibility_soak_scenario.gd"), "run", []],
 	"battle_anim": [preload("res://scripts/app/battle_anim_scenario.gd"), "run", []],
 	"display_matrix": [preload("res://scripts/app/display_matrix.gd"), "run", []],
 	"harvest_flow": [preload("res://scripts/app/harvest_flow_scenario.gd"), "run", []],

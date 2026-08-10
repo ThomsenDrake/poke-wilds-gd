@@ -283,8 +283,8 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-          "tools/run_playtests.py": "5e658499bf1f0cf44acb8e38c4a432ccd9187d944d0c0e46513bbe6855ca7476",
-          "tools/godot_dap_smoketest.py": "1d82cb78e2690a8ff29406774fa30be6d14b19f177410cd230e139b33b3ea168",
+          "tools/run_playtests.py": "54269083c90534d129d33df85fe6ea4cef476f870aa3b8bfed5c4c3aa56ce00f",
+          "tools/godot_dap_smoketest.py": "5618890b2ae7f6c6d3121813daff53ab2bfda6064f421dfc43b768cd74497699",
           "tools/verify_all.py": "714572208f2edbd1d536c1f66a9b7083ac53752fa712eb9f41344c814b9a4773"
         },
         "re_stamp_log": [
@@ -777,6 +777,20 @@
             "old_pin": "5618890b2ae7",
             "new_pin": "1d82cb78e269",
             "reason": "legitimate edit (PR-split landing, stack/08-harness-error-envelopes): this branch carries only the sprint's error-as-directive envelope changes for this file; the scenario registrations (dig_silence / legibility_soak rows) land in the stacked stack/09 branch, which re-stamps to the sprint-final bytes. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged. Old pin: 5618890b2ae7..."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "5e658499bf1f",
+            "new_pin": "54269083c905",
+            "reason": "legitimate edit (PR-split landing, stack/09-scenario-legibility-surfaces): the dig_silence / legibility_soak harness registrations (SCENARIO_REQUIREMENTS rows / PLAYTEST_SCENARIOS entries) land on top of stack/08's envelope slice, restoring this file to the sprint-final bytes the prior re-stamps recorded. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged. Old pin: 5e658499bf1f..."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "1d82cb78e269",
+            "new_pin": "5618890b2ae7",
+            "reason": "legitimate edit (PR-split landing, stack/09-scenario-legibility-surfaces): the dig_silence / legibility_soak harness registrations (SCENARIO_REQUIREMENTS rows / PLAYTEST_SCENARIOS entries) land on top of stack/08's envelope slice, restoring this file to the sprint-final bytes the prior re-stamps recorded. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged. Old pin: 1d82cb78e269..."
           }
         ]
       },

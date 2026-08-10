@@ -222,6 +222,16 @@ SCENARIO_REQUIREMENTS = {
         "all": ["ui_tree_dump_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Agent-surface completion sprint (Workstream F): the legibility_soak
+    # agreement gate — drives the same five screens as ui_tree_dump and asserts
+    # the ui_tree dumps, the game/* Performance monitors, and the trace
+    # lifecycle AGREE. The symmetric legibility_soak_failed marker rides
+    # failed_event_entry (miss-002 loudness; single-sourced mirror in
+    # run_playtests' PLAYTEST_SCENARIOS).
+    "legibility_soak": {
+        "all": ["legibility_soak_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "battle_anim": {
         "all": ["battle_anim_passed"],
         "any": [["session_loaded", "session_created"]],
@@ -250,6 +260,15 @@ SCENARIO_REQUIREMENTS = {
     "battle_end_input": {
         "all": ["boot_started", "boot_ready", "encounter_started", "battle_finished",
                 "field_move_used", "battle_end_input_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
+    # Dig-silence QoL guard (the Phase-0 orphan, harness-registered by the
+    # agent-surface completion sprint): Z on diggable ground with no Dig-capable
+    # party member stays silent; the cut + capable-dig presses stay loud as the
+    # delivery witnesses. The symmetric dig_silence_failed marker rides
+    # failed_event_entry (miss-002 loudness).
+    "dig_silence": {
+        "all": ["dig_silence_passed"],
         "any": [["session_loaded", "session_created"]],
     },
     # Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md).
