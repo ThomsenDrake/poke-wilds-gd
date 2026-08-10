@@ -42,6 +42,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 - `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal).
 - `time_evolution` (Phase 2) proves the time-of-day evolution gate in both directions under `seed_for_smoke`: EEVEE at happiness 255, exp poked to one seeded victory from level — a DAY battle (time 600) leaves it EEVEE with `evolution_time_gate{time_of_day:"DAY", evolved:""}`, and the same setup at NIGHT (time 1380) evolves it to UMBREON with `evolution_time_gate{evolved:"UMBREON"}` (SNOM→FROSMOTH rides the identical `TR_NITE` gate). The shadow-retreat block is proven by `night_cycle` (run refused once with `retreat_blocked`, then victory), not here.
 
+
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
@@ -55,3 +56,7 @@ Phase 6 (`overworld-pokemon.md`) consumes the provoked-mon buff in `battle_runti
 ## Phase 0 static-gate cleanup (extraction-only co-modification note)
 
 `scripts/domain/battle_rules.gd` co-mods by EXTRACTION only (the house extract-before-edit pattern; the file had blown the 320 domain budget at 326): the pure-data move-effect tables (`HIT_STATUS_EFFECTS`, `PURE_STATUS_EFFECTS`, `MULTI_HIT_EFFECTS`, `SELF_TARGET_EFFECTS` — plus the `OHKO_EFFECT` id constant, the same pure-data family, needed to land at exactly 320/320) move to the NEW `scripts/domain/battle_effect_tables.gd`, which `battle_rules.gd` preloads as `EffectTables`. Every roll, accuracy/protect gate, and branch is untouched; the `BattleRules` public API (`apply_attack`/`execute_attack`/`calculate_damage`/`attempt_capture`/`move_priority`) and all trace payloads are unchanged, so the seeded battle scenarios stay byte-identical. The new module is registered on the `battle_loop` subsystem in [../registry/subsystems.toml](../registry/subsystems.toml).
+
+## Strict-review remedy F2 (battle-scenario fixture extraction co-modification note)
+
+`wild_battle_scenario.gd` co-mods by EXTRACTION only (no behavior change): its verbatim `_guaranteed_capture_mon` copy moves to the NEW shared `scripts/app/battle_scenario_fixtures.gd` (`BattleScenarioFixtures.guaranteed_capture_mon(runtime)`), the single canonical home for the 1 HP + SLP + catch_rate >= 192 capture-certainty pin. The campsite-capture and defeat-clean-heal assertions, the smoke-battle driver, and the `wild_battle_passed` payload are unchanged.

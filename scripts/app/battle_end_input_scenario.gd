@@ -31,6 +31,7 @@ extends Node
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
+const BattleScenarioFixtures := preload("res://scripts/app/battle_scenario_fixtures.gd")
 
 const SEED := 2026072402
 
@@ -44,6 +45,11 @@ func run(ctx: Dictionary) -> void:
 	Input.use_accumulated_input = true
 	var runtime = _runtime()
 	runtime.seed_for_smoke(SEED)
+	# Self-contained pinned world (the breed_flow precedent): the boot-save chain's
+	# leftover tile flaked the site scans (2026-08-09 S7 red); game_reset is menu-only.
+	runtime.new_game()
+	_world().rebuild(runtime.get_world_seed())
+	_runner.resync_player_tile(_world(), _player(), runtime)
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var party_before: Array = _runner.swap_party(runtime, ["BULBASAUR"]) # cut-capable, so a re-fire fells the tree LOUDLY
@@ -120,7 +126,7 @@ func _part_c_capture_does_not_refire(cut_tile: Vector2i) -> void:
 	var runtime = _runtime()
 	var player = _player()
 	runtime.session.add_item("poke_ball", 3)
-	var target: Dictionary = _guaranteed_capture_mon(runtime)
+	var target: Dictionary = BattleScenarioFixtures.guaranteed_capture_mon(runtime)
 	if not _expect(not target.is_empty(), "C: precondition: no catalog species meets the guaranteed-capture catch rate"):
 		return
 	_start_battle(target)
@@ -164,20 +170,6 @@ func _select(option: String) -> void:
 func _wild_mon(runtime) -> Dictionary:
 	var species_id := str(runtime.catalog.species.keys()[0])
 	return runtime.pokemon_rules.create_pokemon_instance(runtime.catalog.get_species(species_id), 5, Callable(runtime.catalog, "get_move"))
-
-
-# 1 HP + asleep + catch_rate >= 192 pins capture probability at 1.0 (deterministic; the wild_battle_scenario pattern).
-func _guaranteed_capture_mon(runtime) -> Dictionary:
-	for entry in runtime.catalog.species.values():
-		if entry is Dictionary and int((entry as Dictionary).get("catch_rate", 0)) >= 192:
-			var mon: Dictionary = runtime.pokemon_rules.create_pokemon_instance(entry, 3, Callable(runtime.catalog, "get_move"))
-			if mon.is_empty():
-				continue
-			mon["max_hp"] = 2
-			mon["current_hp"] = 1
-			mon["status"] = "SLP"
-			return mon
-	return {}
 
 
 func _tap(action: String) -> void:

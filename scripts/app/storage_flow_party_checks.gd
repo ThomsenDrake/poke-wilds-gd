@@ -15,6 +15,7 @@ extends Node
 
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const StorageReleaseMouseCheck := preload("res://scripts/app/storage_release_mouse_check.gd")
+const BattleScenarioFixtures := preload("res://scripts/app/battle_scenario_fixtures.gd")
 
 var _ctx: Dictionary = {}
 var _runner = null # the scenario's SmokeScenarioRunner, injected by run()
@@ -83,7 +84,7 @@ func _check_overflow(full_party: Array) -> void:
 	var runtime = _runtime()
 	_runner.resync_player_tile(_world(), _player(), runtime)
 	runtime.session.campsite_pokemon.clear(); runtime.session.party = full_party.duplicate(true) # fixture reset: assert THIS capture in an EMPTY hold
-	var target: Dictionary = _guaranteed_capture_mon(runtime)
+	var target: Dictionary = BattleScenarioFixtures.guaranteed_capture_mon(runtime)
 	if target.is_empty():
 		_failures.append("overflow: no catalog species meets the guaranteed-capture catch rate"); return
 	var placements_before: Dictionary = runtime.placed_structures().duplicate(true)
@@ -143,18 +144,6 @@ func _check_reorder(stand: Vector2i) -> void:
 	_ensure(_order() == committed, "reorder: the committed order did not survive the save round-trip")
 	await _press("action_b") # close the party screen back to the menu panel
 	_call("toggle_menu")
-
-
-# 1 HP + asleep + catch_rate >= 192 pins capture probability at 1.0 (phase0 precedent).
-func _guaranteed_capture_mon(runtime) -> Dictionary:
-	for entry in runtime.catalog.species.values():
-		if entry is Dictionary and int((entry as Dictionary).get("catch_rate", 0)) >= 192:
-			var mon: Dictionary = runtime.pokemon_rules.create_pokemon_instance(entry, 3, Callable(runtime.catalog, "get_move"))
-			if mon.is_empty():
-				continue
-			mon["max_hp"] = 2; mon["current_hp"] = 1; mon["status"] = "SLP"
-			return mon
-	return {}
 
 
 # The S2 release-confirm mouse-bypass group (the deposits + the real seam + the synthesized click live in the extraction for this file's line budget).

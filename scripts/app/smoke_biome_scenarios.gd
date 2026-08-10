@@ -9,12 +9,15 @@ extends Node
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
+const PIN := 2026080902 # seed_for_smoke pin (the new_game_flow precedent; NOT a double-run consumer): the traverse encounter + smoke battle ride the pinned stream — the probe draws nothing
+
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
 
 
 func run(scenario: String, ctx: Dictionary) -> void:
 	_ctx = ctx
+	_runtime().seed_for_smoke(PIN) # BEFORE the traverse draws: self-pinned, never the wall-clock randomize()
 	match scenario:
 		"biome_probe": await _scenario_biome_probe()
 		"biome_traverse": await _scenario_biome_traverse()
