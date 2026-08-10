@@ -436,7 +436,12 @@ quality_bucket = "ui"
 # app_bootstrap entry's note): stage_root() / row_texts() / selected_row_text()
 # / row_rect() on every restyled screen (+ the party screen's action_row_text()).
 # MessageBox rides the wave-1 textbox band (committed 36ffd71). Menu baseline
-# re-pins PENDING (visual_sweep_update).
+# re-pins PENDING (visual_sweep_update). REVIEW-FIX (strict-review remedies):
+# menu_list_stage.gd's Rows (the greyed-row screens' widget) gains the
+# accessibility contract — per-row accessibility_name pinned at build (row
+# strings are never rewritten), ", unavailable" on non-black-ink rows, the
+# cursor's "Row N of M: <text>" description; metadata only, zero visual change
+# (the gbc_widgets RowList approach, contract: docs/references/accessibility.md).
 
 [[subsystems]]
 name = "title_flow"
@@ -468,6 +473,26 @@ validation_commands = [
 ]
 required_trace_events = ["splash_shown", "splash_closed", "title_shown", "title_continued", "title_new_game_chosen", "creation_confirmed"]
 quality_bucket = "bootstrap"
+# AGENT-NEUTRAL INTEGRATION Phase 4 (AccessKit semantic annotations):
+# gbc_widgets.gd + gbc_stage.gd now annotate every widget the shared library
+# builds with Godot 4.5+ accessibility PROPERTIES (accessibility_name /
+# accessibility_description / accessibility_live — PROPERTY-ONLY, never the
+# low-level DisplayServer RID API: the engine's own per-class update handlers
+# rewrite the element, so handwritten role/state overrides race the engine).
+# METADATA ONLY — no geometry, no visuals, no input handling, so the committed
+# visual baselines are unaffected by construction; headless runs store + read
+# back the properties fine (the agent-legibility consumer), and the
+# announcement half is best-effort while upstream screen-reader support is
+# partial (flagged experimental). ONE contract serves BOTH consumers: the
+# player-facing AccessKit tree AND the app_bootstrap entry's ui_tree_dump
+# scenario, which reads the same properties off the built Controls (the two
+# legibility surfaces agree by construction). REVIEW-FIX (strict-review
+# remedies): RowList.set_rows' never-passed `disabled` array is DELETED — the
+# greyed-row screens ride menu_ui's menu_list_stage.gd Rows (greyed = non-black
+# ink), which now carries the same contract (per-row name + ", unavailable" +
+# cursor position); the dump emits the annotations as a11y_name/
+# a11y_description/a11y_live. Full annotation contract + the
+# rule for new widgets: docs/references/accessibility.md.
 # TITLE-FLOW SLICE (new-game flow + startup splash): splash + title are PHASES of ONE
 # scene (TitleScreen.tscn — a black card phase, then the composed title art + the entry
 # list); creation is its OWN scene (CreationScreen.tscn, five steps SEED -> SHINY RATE

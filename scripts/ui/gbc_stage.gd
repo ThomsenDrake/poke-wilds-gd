@@ -135,9 +135,14 @@ static func apply_font(label: Label, ink: Color) -> void:
 
 
 # Stage Label factory: absolute integer position, fonts.ttf@7, input-ignoring.
+# Non-empty text pins the accessible name (docs/references/accessibility.md);
+# empty-at-build labels (mutating hints) stay unnamed so the engine tracks
+# their .text as the accessible value instead of a stale pinned name.
 static func make_label(text: String, pos: Vector2i, ink: Color, parent: Control) -> Label:
 	var label := Label.new()
 	label.text = text
+	if not text.is_empty():
+		label.accessibility_name = text
 	label.position = Vector2(pos)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	apply_font(label, ink)
