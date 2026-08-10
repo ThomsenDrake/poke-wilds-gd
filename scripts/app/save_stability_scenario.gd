@@ -39,6 +39,13 @@ func run(ctx: Dictionary, extra: Dictionary = {}) -> void:
 	var update := str(extra.get("mode", "")) == "update"
 	runtime.seed_for_smoke(SEED) # before new_game: pins the world-seed draw too
 	runtime.new_game()
+	# Pin the golden's creation identity: new_game deliberately INHERITS the boot session's
+	# player_name/player_avatar/shiny_odds_choice (session_state.gd's "creation identity
+	# persists across new games"), so an un-pinned craft drifts with whatever save the boot
+	# loaded (2026-08-09 gate: a leftover GOLD-named save turned the golden diff red).
+	runtime.session.player_name = "AAA" # the golden's pinned name
+	runtime.session.player_avatar = SessionState.DEFAULT_PLAYER_AVATAR
+	runtime.session.shiny_odds_choice = SessionState.SHINY_ODDS_DEFAULT
 	_mutate_v4_surface(runtime)
 	runtime.save_game()
 	var canon_a := _canon_str(_payload(runtime))

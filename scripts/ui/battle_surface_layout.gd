@@ -1,5 +1,7 @@
 extends RefCounted
 
+const MoveNameFit := preload("res://scripts/ui/move_name_fit.gd")
+
 # Baked-art measurements (battle_screen2.png, attack_screen1.png, battle_bg1.png):
 # baked GSC glyphs are 7px tall; fonts.ttf at size 7 puts cap ink at label.y + 1 .. + 7.
 const MOVE_ROW_TOPS := [104.0, 112.0, 120.0, 128.0]
@@ -189,13 +191,13 @@ func _move_model(moves: Array) -> Array:
 		var row_top: float = MOVE_ROW_TOPS[i]
 		var entry = _entry(
 			"move_%d" % i,
-			str(move.get("name", move.get("move_id", "MOVE"))).to_upper(),
-			Vector2(45, row_top - 1.0),
+			MoveNameFit.display_name(str(move.get("name", move.get("move_id", "MOVE")))),
+			Vector2(MoveNameFit.ROW_ANCHOR_X, row_top - 1.0),
 			Vector2(37, row_top),
 			Rect2(37, row_top, 116, 8),
 			Vector2i(0, i),
 			int(move.get("pp", 0)) > 0,
-			Vector2(108, 8)
+			Vector2(MoveNameFit.MAX_WIDTH, 8)
 		)
 		entry["move"] = move
 		result.append(entry)

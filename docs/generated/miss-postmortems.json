@@ -75,16 +75,16 @@
         "executed": true,
         "mechanism_caught": true,
         "classes_silent_confirmed": true,
-        "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode \u2014 machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar \u2014 and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole \u2014 regenerated baselines were. REGEN-UNDER-BREAK (update mode \u2014 machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap \u2014 prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole). RE-STAMP 2026-08-02 (infinite-world slice 2 \u2014 the climate-field biome re-capture): the four battle sidecar.json files drifted in EXACTLY two run-position metadata keys (trace_cursor, ts_msec) \u2014 the visual_sweep_update re-capture under the new climate terrain re-emitted every sidecar; the four battle PNGs are byte-identical (verified: the battle shots are pixel-immune to terrain, the blank-bg DECIDUEYE craft). The deterministic-art-anchor gate held (no anchor_refusals \u2014 the R4 canary_rects + the glyph oracle regions are unchanged), the region-diff compare after the update is GREEN, and the sidecar seed gate confirmed every fresh sidecar's world_seed/shot_seq equals its predecessor's before the rewrite. The (C) honest-reporting mechanism is untouched (no tool edits this slice). Old pins: 09_battle.png d72d8ee50be5\u2026, 09_battle.png.sidecar.json 9d8c3c634ea3\u2026, 10_battle_moves.png e15936689279\u2026, 10_battle_moves.png.sidecar.json 30120ed10089\u2026, 11_battle_after_attack.png 169989acd846\u2026, 11_battle_after_attack.png.sidecar.json 918f834a1040\u2026, 12_battle_items.png ba1a0c59b602\u2026, 12_battle_items.png.sidecar.json da72cec352af\u2026. RE-STAMP 2026-08-03 (infinite-world slice 4 baseline re-pin): the beach spawn shifted the spawn-dependent visual baselines, so the battle sidecars' run-position metadata (trace_cursor/ts_msec) drifted; the battle PNGs stay PIXEL-IDENTICAL (the blank battle background is terrain-invariant \u2014 only the sidecar trace position moved). The HP-bar plant's revert CONTRACTS (the 11px HP bar + the battle-pixel revert proof) are unchanged; the revert_scope sidecar pins are re-stamped to the re-pinned baselines. Changed: 09_battle.png.sidecar.json a29d25a3f9b5\u21921e0ae6065e5b, 10_battle_moves.png.sidecar.json abb58661d408\u21926b6bc657a69e, 11_battle_after_attack.png.sidecar.json 3b68d5ed1a5d\u219217193c98a53a, 12_battle_items.png.sidecar.json 961f63b4d8c0\u2192a422bc863698.",
+        "revert_proof": "git diff empty over the plant scope (byte-identical revert; the eight battle baseline files are sha256-pinned by revert_scope and mechanically held by the check_repo_contracts miss_postmortem_issues backstop). EXECUTED 2026-07-22 (windowed, Godot 4.6.1-stable official, 1152x648, forward_plus, HEAD cf44597). FIRST BREAK (EnemyHPBar 32->43 + PlayerHPBar 96->107, no baseline regen, compare mode \u2014 machine-local .godot-smoke/proof-class1-compare.json): every coded RED tier stayed silent (region_failures=0; global backstop 0.28% < 0.5%; canary/ink/string/label/glyph/contrast/CVD/display-matrix all zero) while anchor_drift fired [quarantine] on the moved enemy bar \u2014 and two enumerated classes independently CORROBORATED at the QUARANTINE tier, grounded on the moved bar (visual_region_diff region_drift: 10 'unexplained' clusters; Lane-4 deterministic sidecar-consistency cluster_unexplained: 10 findings). The silence enumeration is therefore scoped to the BASELINE-FROZEN escape (RED tiers); first-break detection was never the hole \u2014 regenerated baselines were. REGEN-UNDER-BREAK (update mode \u2014 machine-local .godot-smoke/proof-class1-update-refusal.json): apply_anchor_gate REFUSED the regeneration on all four battle shots (anchor_refusals: battle/enemy_hp_track live [43,18,37,4] vs art [32,18,48,4], tol 1px), RESTORED all 48 prior baseline files byte-identical, and failed RED (summary.ok=false); battle/player_hp_track recorded UNVERIFIABLE (nested node not in draw_order). REVERT: all scope files sha-verified equal to their pre-plant bytes and the post-revert compare run is GREEN (machine-local .godot-smoke/proof-class1-revert-compare.json). NOTE: the plant's first pass exposed and fixed a guard gap \u2014 prepare_anchor_gate/apply_anchor_gate keyed on 'visual_sweep' alone made the refusal branch unreachable under 'visual_sweep_update' (VISUAL_SWEEP_SCENARIOS now covers both names; the first unguarded update pass is the proof of that hole). RE-STAMP 2026-08-02 (infinite-world slice 2 \u2014 the climate-field biome re-capture): the four battle sidecar.json files drifted in EXACTLY two run-position metadata keys (trace_cursor, ts_msec) \u2014 the visual_sweep_update re-capture under the new climate terrain re-emitted every sidecar; the four battle PNGs are byte-identical (verified: the battle shots are pixel-immune to terrain, the blank-bg DECIDUEYE craft). The deterministic-art-anchor gate held (no anchor_refusals \u2014 the R4 canary_rects + the glyph oracle regions are unchanged), the region-diff compare after the update is GREEN, and the sidecar seed gate confirmed every fresh sidecar's world_seed/shot_seq equals its predecessor's before the rewrite. The (C) honest-reporting mechanism is untouched (no tool edits this slice). Old pins: 09_battle.png d72d8ee50be5\u2026, 09_battle.png.sidecar.json 9d8c3c634ea3\u2026, 10_battle_moves.png e15936689279\u2026, 10_battle_moves.png.sidecar.json 30120ed10089\u2026, 11_battle_after_attack.png 169989acd846\u2026, 11_battle_after_attack.png.sidecar.json 918f834a1040\u2026, 12_battle_items.png ba1a0c59b602\u2026, 12_battle_items.png.sidecar.json da72cec352af\u2026. RE-STAMP 2026-08-03 (infinite-world slice 4 baseline re-pin): the beach spawn shifted the spawn-dependent visual baselines, so the battle sidecars' run-position metadata (trace_cursor/ts_msec) drifted; the battle PNGs stay PIXEL-IDENTICAL (the blank battle background is terrain-invariant \u2014 only the sidecar trace position moved). The HP-bar plant's revert CONTRACTS (the 11px HP bar + the battle-pixel revert proof) are unchanged; the revert_scope sidecar pins are re-stamped to the re-pinned baselines. Changed: 09_battle.png.sidecar.json a29d25a3f9b5\u21921e0ae6065e5b, 10_battle_moves.png.sidecar.json abb58661d408\u21926b6bc657a69e, 11_battle_after_attack.png.sidecar.json 3b68d5ed1a5d\u219217193c98a53a, 12_battle_items.png.sidecar.json 961f63b4d8c0\u2192a422bc863698. RE-STAMP 2026-08-09 (PokeAPI catalog migration gate): the sanctioned visual_sweep_update accept for the learnset-churn parity class rewrote the three battle PNGs 10/11/12 (player DECIDUEYE's crafted moveset now comes from the generated catalog learnsets; 10 = moves-panel rows, 11 = post-attack HP/text 38->45/61, 12 = under-threshold ride-along). The HP-bar plant revert CONTRACT (the 11px offsets + the anchor gate) is untouched \u2014 no scene, script, or art-anchor change \u2014 so the three PNG revert_scope pins re-stamp to the new captures. The four battle SIDECAR pins are deliberately NOT re-stamped here: their drift is unrelated uncommitted in-flight battle-UI work (owner re-stamps on landing). RE-STAMP 2026-08-09 (source-asset vendoring, commit db99e4c4): the four battle sidecar.json pins re-stamp to the current tree bytes. The drift had two landed causes \u2014 the vendoring path rewrite (res://pokewilds/ \u2192 res://assets/source/ in the draw_order texture strings; the referenced art bytes are unchanged) and f98a7cab's run-position metadata (trace_cursor/ts_msec). The HP-bar plant revert CONTRACT is untouched \u2014 no scene, script, or art-anchor change; both bar rects verified intact in the current sidecars (EnemyHPBar [32,18,48,4], PlayerHUD/PlayerHPBar [96,74,48,4]) and the windowed visual_sweep lane is GREEN with zero anchor refusals under the rewritten paths.",
         "revert_scope": {
           "docs/generated/visual-baselines/09_battle.png": "d72d8ee50be57435159ae42fafdf3f5eba1bf31d675a70bed0feda29649c611d",
-          "docs/generated/visual-baselines/09_battle.png.sidecar.json": "29f3ec4f76a070a5b01d415df3a5927ce4a86482d59b0dab3b338bf24e8a1ddc",
-          "docs/generated/visual-baselines/10_battle_moves.png": "e159366892793a41b9b803c68f8c97ad6009b7a89d3521c8754cc341aa0949b4",
-          "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "a93e49e048b90d5252782ace26a3dde3c53cdaabe38eb691dc719dd374b1aa66",
-          "docs/generated/visual-baselines/11_battle_after_attack.png": "169989acd846f2ad643804719fc1d23603e865c7725b22fdbcab96edf9901f0d",
-          "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "da256c32b0756c8d084c165958ec1716b264bbeab3c31f5a69a30809343386e1",
-          "docs/generated/visual-baselines/12_battle_items.png": "ba1a0c59b60200f33d2502f7b7e102540780ff97b4ecbcc92bc945bd4d27b9e7",
-          "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "df9077d1441dc663597de7cf615dff4f8fc5fa2848efcadc2885d2cb63b4f7f8"
+          "docs/generated/visual-baselines/09_battle.png.sidecar.json": "6e966dc06a21e6ff56ed5e17179b95ff2236c8593af48db7037a1562066fd965",
+          "docs/generated/visual-baselines/10_battle_moves.png": "9ac590edc557a8dbc360ae1a12d2648cc3b81b0e182e612484f40d95d6722ca0",
+          "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json": "cc51f1e5be94990df17362b5878086ffe7c53451267a6145f2f4b99d1a7171d1",
+          "docs/generated/visual-baselines/11_battle_after_attack.png": "9b29b886b1e4cb830e2eb684aa612e661ae5385b4ff33a0eacd10b75904d671b",
+          "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json": "eea6a148d7eb5cb4a3b91087d3d7f53f83fc8de3181634f69f0830b2f81e7f19",
+          "docs/generated/visual-baselines/12_battle_items.png": "7290b97c3c44788e7295643808ddf73e80f18eb763cf34ebabea091bec1bcdb0",
+          "docs/generated/visual-baselines/12_battle_items.png.sidecar.json": "3313f62daa5e4d577cb6a340705d3ef15b451a5d52f8cc06303688dc38e38bf2"
         },
         "re_stamp_log": [
           {
@@ -170,6 +170,55 @@
             "old_pin": "0ea4e00cc0a7",
             "new_pin": "14d8d0f68ced",
             "reason": "GBC restyle wave-2 menu baseline re-pin re-captured the main sweep (battle PNGs pixel-identical; sidecar trace_cursor/ts_msec drifted); HP-bar plant revert contracts unchanged."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/10_battle_moves.png",
+            "old_pin": "e15936689279",
+            "new_pin": "9ac590edc557",
+            "reason": "PokeAPI catalog migration gate: sanctioned visual_sweep_update accept (learnset-churn parity class) rewrote the battle PNG; HP-bar plant revert contracts unchanged; sidecar pins intentionally left to the in-flight battle-UI owner."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/11_battle_after_attack.png",
+            "old_pin": "169989acd846",
+            "new_pin": "9b29b886b1e4",
+            "reason": "PokeAPI catalog migration gate: sanctioned visual_sweep_update accept (learnset-churn parity class) rewrote the battle PNG; HP-bar plant revert contracts unchanged; sidecar pins intentionally left to the in-flight battle-UI owner."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/12_battle_items.png",
+            "old_pin": "ba1a0c59b602",
+            "new_pin": "7290b97c3c44",
+            "reason": "PokeAPI catalog migration gate: sanctioned visual_sweep_update accept (learnset-churn parity class) rewrote the battle PNG; HP-bar plant revert contracts unchanged; sidecar pins intentionally left to the in-flight battle-UI owner."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/09_battle.png.sidecar.json",
+            "old_pin": "29f3ec4f76a0",
+            "new_pin": "6e966dc06a21",
+            "reason": "source-asset vendoring (db99e4c4): res://pokewilds/ -> res://assets/source/ path rewrite in draw_order texture strings (art bytes unchanged), plus f98a7cab run-position metadata drift (trace_cursor/ts_msec); battle PNG untouched; HP-bar plant revert contracts unchanged (bar rects verified intact; visual_sweep lane green, zero anchor refusals)."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/10_battle_moves.png.sidecar.json",
+            "old_pin": "a93e49e048b9",
+            "new_pin": "cc51f1e5be94",
+            "reason": "source-asset vendoring (db99e4c4): res://pokewilds/ -> res://assets/source/ path rewrite in draw_order texture strings (art bytes unchanged), plus f98a7cab run-position metadata drift (trace_cursor/ts_msec); battle PNG untouched; HP-bar plant revert contracts unchanged (bar rects verified intact; visual_sweep lane green, zero anchor refusals)."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/11_battle_after_attack.png.sidecar.json",
+            "old_pin": "da256c32b075",
+            "new_pin": "eea6a148d7eb",
+            "reason": "source-asset vendoring (db99e4c4): res://pokewilds/ -> res://assets/source/ path rewrite in draw_order texture strings (art bytes unchanged), plus f98a7cab run-position metadata drift (trace_cursor/ts_msec); battle PNG untouched; HP-bar plant revert contracts unchanged (bar rects verified intact; visual_sweep lane green, zero anchor refusals)."
+          },
+          {
+            "date": "2026-08-09",
+            "file": "docs/generated/visual-baselines/12_battle_items.png.sidecar.json",
+            "old_pin": "df9077d1441d",
+            "new_pin": "3313f62daa5e",
+            "reason": "source-asset vendoring (db99e4c4): res://pokewilds/ -> res://assets/source/ path rewrite in draw_order texture strings (art bytes unchanged), plus f98a7cab run-position metadata drift (trace_cursor/ts_msec); battle PNG untouched; HP-bar plant revert contracts unchanged (bar rects verified intact; visual_sweep lane green, zero anchor refusals)."
           }
         ]
       },
@@ -236,7 +285,7 @@
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
           "tools/run_playtests.py": "43efbd29bf1512590393dd2057de4e4a90071d6d770144ed31b7f201b30af787",
           "tools/godot_dap_smoketest.py": "7f39c5844ab1dc989780c3f4b027765a2294ed3142f5869ec80d86afdc6be7d4",
-          "tools/verify_all.py": "0008271ce6a7f80d4c9fe03bcffd2d3b43cb708ade4d5273799daf040e4e165f"
+          "tools/verify_all.py": "5cd123f0c17a66e198c849937646616c70928bf4d3683c31cb8d308c9303677a"
         },
         "re_stamp_log": [
           {
@@ -623,6 +672,20 @@
             "old_pin": "1c9921922886",
             "new_pin": "7eca61516924",
             "reason": "legitimate edit (vision-suite expansion Track C.2): optional --with-play-agent S8.5 lane wires tools/commandcode_play_agent.py (windowed DAP play agent; default off; SKIP under --skip-windowed). Additive orchestrator flag; double-run lane + honest-reporting mechanism untouched; nav_audit pins hold"
+          },
+          {
+            "date": "2026-08-09",
+            "file": "tools/verify_all.py",
+            "old_pin": "0008271ce6a7",
+            "new_pin": "f55e6242f3f9",
+            "reason": "legitimate edit (PokeAPI catalog migration): wired S4.5 \u2014 the import_pokeapi.py --check committed-catalog freshness gate (committed assets/data/catalog/*.json vs regeneration from the pinned api-data cache; ANY non-zero = stale/missing -> fail, the importer prints the remedy) \u2014 into the static section between S1-S4 and S5-S6, plus the docstring step line. Additive orchestrator step only; the double-run x2 + determinism_verify cmp --mode trace mechanism and the honest-reporting single-sourcing this entry proves are byte-for-byte untouched; the two nav_audit scope pins + the run_playtests.py / godot_dap_smoketest.py pins verified unchanged and still hold"
+          },
+          {
+            "date": "2026-08-09",
+            "file": "tools/verify_all.py",
+            "old_pin": "f55e6242f3f9",
+            "new_pin": "5cd123f0c17a",
+            "reason": "legitimate edit (catalog-migration review remedy): the bespoke S4.5 block folded into the static-gate tuple loop as ONE entry (import_pokeapi:check, import_pokeapi.py, [--check]) riding the shared static_map/run_tool path, and the docstring S4.5 mention trimmed to one line — the review found the 12-line hand-rolled block (custom exit_map/timeout) rebuilt the exact tuple-loop pattern. Step count UNCHANGED (5 static steps before and after: 4 gates + the freshness check, same name/argv/position between S1-S4 and S5-S6); structural references unchanged (the docstring still names S4.5; exit semantics identical — the importer exits 0/1 only, so the dropped 2->fail mapping is unreachable; the importer's non-'- '-prefixed failure lines keep count_issues cosmetically 0, accepted). The double-run x2 + determinism_verify cmp mechanism and the honest-reporting single-sourcing this entry proves are byte-for-byte untouched; the two nav_audit scope pins + the run_playtests.py / godot_dap_smoketest.py pins unchanged and still hold"
           }
         ]
       },
