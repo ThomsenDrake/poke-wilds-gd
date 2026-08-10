@@ -109,6 +109,8 @@ static func wrapped_label(parent: Control, rect: Rect2) -> Label:
 # than texts defaults to black. select()/move() wrap (wrapi). row_rect() is
 # STAGE-local (root _gui_input hit tests + audits). max_visible > 0 scrolls a
 # window so the selected row stays visible (the old ItemList scroll contract).
+# Accessibility contract (docs/references/accessibility.md — the gbc_widgets
+# RowList approach): greyed (non-black-ink) rows read ", unavailable".
 class Rows extends RefCounted:
 	const PITCH := 8
 	const CURSOR_GAP := 2
@@ -116,6 +118,7 @@ class Rows extends RefCounted:
 	var _root: Control
 	var _cursor: TextureRect
 	var _labels: Array = []
+	var _inks: Array = []
 	var _selected := 0
 	var _window := 0
 	var _max_visible := 0
@@ -138,6 +141,7 @@ class Rows extends RefCounted:
 		for label in _labels:
 			(label as Label).queue_free()
 		_labels.clear()
+		_inks = inks
 		for i in texts.size():
 			var ink: Color = inks[i] if i < inks.size() and inks[i] is Color else Color.BLACK
 			var label := Label.new()
@@ -146,6 +150,7 @@ class Rows extends RefCounted:
 			label.size = Vector2(_width, PITCH)
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			GbcStage.apply_font(label, ink)
+			label.accessibility_name = label.text # pinned at build: row strings are never rewritten
 			_root.add_child(label)
 			_labels.append(label)
 		_selected = 0
@@ -198,3 +203,17 @@ class Rows extends RefCounted:
 			label.position = Vector2(0, slot * PITCH)
 		_cursor.visible = not _labels.is_empty()
 		_cursor.position = Vector2(-(_cursor.size.x + CURSOR_GAP), (_selected - _window) * PITCH)
+		_refresh_a11y()
+
+	# Selection/availability state refresh (the gbc_widgets RowList contract; every
+	# selection change funnels through _layout).
+	func _refresh_a11y() -> void:
+		for i in _labels.size():
+			var state := "Item %d of %d" % [i + 1, _labels.size()]
+			if i < _inks.size() and _inks[i] is Color and _inks[i] != Color.BLACK:
+				state += ", unavailable"
+			if i == _selected:
+				state += ", selected"
+			(_labels[i] as Label).accessibility_description = state
+		_cursor.accessibility_description = "" if _labels.is_empty() else \
+				"Row %d of %d: %s" % [_selected + 1, _labels.size(), row_text(_selected)]

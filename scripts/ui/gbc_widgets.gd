@@ -6,6 +6,9 @@ extends RefCounted
 # black ink on white plates (cursor: black battle/arrow_right1.png); the white
 # cursor is for dark backings only (arrow_right_white2.png). Labels use
 # fonts.ttf@7 on an 8px row pitch (the text_oracle raster contract).
+# Every widget built here is also accessibility-annotated (accessible name/
+# description/live region — METADATA ONLY, zero geometry/visual change); the
+# contract lives in docs/references/accessibility.md.
 
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const BLACK_CURSOR_PATH := "res://assets/source/battle/arrow_right1.png" # 8x8
@@ -29,6 +32,10 @@ static func _cursor(texture: Texture2D) -> TextureRect:
 	cursor.stretch_mode = TextureRect.STRETCH_KEEP
 	cursor.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Named + LIVE_POLITE centrally so every list cursor is a polite live
+	# region; the owning list writes the pointed-at row into its description.
+	cursor.accessibility_name = "Selection cursor"
+	cursor.accessibility_live = DisplayServer.AccessibilityLiveMode.LIVE_POLITE
 	if texture != null:
 		cursor.size = texture.get_size()
 	return cursor
@@ -67,9 +74,14 @@ static func plate(rect: Rect2, parent: Control) -> Control:
 	return root
 
 
-# Bottom-band hint Label (fonts.ttf@7, black ink, at HINT_POS).
+# Bottom-band hint Label (fonts.ttf@7, black ink, at HINT_POS). Hint text
+# mutates per context (creation_screen_render.gd), so the hint is a LIVE_POLITE
+# region with NO pinned name — the engine keeps the accessible value in sync
+# with .text on every set_text.
 static func hint_label(text: String, parent: Control) -> Label:
-	return GbcStage.make_label(text, HINT_POS, Color.BLACK, parent)
+	var label := GbcStage.make_label(text, HINT_POS, Color.BLACK, parent)
+	label.accessibility_live = DisplayServer.AccessibilityLiveMode.LIVE_POLITE
+	return label
 
 
 static func _bar(parent: Control, rect: Rect2i, color: Color) -> ColorRect:
@@ -85,7 +97,9 @@ static func _bar(parent: Control, rect: Rect2i, color: Color) -> ColorRect:
 # Stateful row-list widget. Lives under its own Rows Control so screens can
 # show/hide the whole widget via root().visible. row_rect()/cursor_rect() are
 # STAGE-local (mouse hit tests + audits). set_rows() resets the selection to
-# row 0. move(dir) wraps (wrapi): dir 1 = down, -1 = up.
+# row 0. move(dir) wraps (wrapi): dir 1 = down, -1 = up. Accessibility
+# contract: docs/references/accessibility.md (unavailable-row marking lives on
+# menu_list_stage.gd's Rows, the widget the greyed-row screens actually use).
 class RowList extends RefCounted:
 	const PITCH := 8
 	const CURSOR_GAP := 2
@@ -118,6 +132,9 @@ class RowList extends RefCounted:
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_apply_font.call(label)
 			label.size = label.get_combined_minimum_size()
+			# Row text is final at build, so the accessible name pins it
+			# (a name pinned over LATER-mutated text would go stale).
+			label.accessibility_name = label.text
 			_root.add_child(label)
 			_rows.append(label)
 		_selected = 0
@@ -163,3 +180,16 @@ class RowList extends RefCounted:
 	func _place_cursor() -> void:
 		_cursor.visible = not _rows.is_empty()
 		_cursor.position = Vector2(-(_cursor.size.x + CURSOR_GAP), _selected * PITCH)
+		_refresh_a11y()
+
+	# Selection/disabled state refresh (the a11y half of _place_cursor; every
+	# selection change funnels through there). Row states ride the description
+	# — the 4.6 GDScript surface has no per-Control role/state override.
+	func _refresh_a11y() -> void:
+		for i in _rows.size():
+			var state := "Item %d of %d" % [i + 1, _rows.size()]
+			if i == _selected:
+				state += ", selected"
+			(_rows[i] as Label).accessibility_description = state
+		_cursor.accessibility_description = "" if _rows.is_empty() else \
+				"Row %d of %d: %s" % [_selected + 1, _rows.size(), row_text(_selected)]
