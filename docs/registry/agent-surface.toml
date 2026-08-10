@@ -46,6 +46,16 @@ smoke_list_flag = "--include-smoke"
 headless_env = "PLAYTEST_FORCE_HEADLESS=1"
 report_path = ".godot-smoke/playtest-report.json"
 
+[play_agent]
+# OPTIONAL reference driver only: a scripted windowed play agent driving the
+# app through the same scenario/transport seams as the suite. ANY scripted
+# play agent can fulfill this role — the repo artifacts the contract, never
+# the client (agent-vendor-neutral house rule). Windowed-only by design.
+driver_path = "tools/commandcode_play_agent.py"
+scenario = "play_agent"
+windowed_only = true
+optional = true
+
 [traces]
 # One JSON object per line, record shape {event, ts_msec, source, payload}.
 # Appended by the emitter below and mirrored on stdout (both harness transports
@@ -55,6 +65,25 @@ record_shape = "{event, ts_msec, source, payload}"
 emitter_path = "scripts/core/trace_logger.gd"
 schema_doc = "docs/references/trace-events.md"
 
+[ui_tree]
+# Structured UI-tree dumps (the text-first accessibility surface): the
+# scenario drives the agent-facing screens while the writer (producer_path)
+# owns the bytes — one JSON per screen under dump_dir at runtime (gitignored,
+# so the path gate skips it by design). Node shape and the widget a11y
+# annotation contract live in contract_doc.
+dump_dir = ".godot-smoke/ui_tree"
+scenario = "ui_tree_dump"
+producer_path = "scripts/app/ui_tree_dump_writer.gd"
+contract_doc = "docs/references/accessibility.md"
+
+[monitors]
+# Live-probe Performance monitors (names are exact): queryable via
+# Performance.get_custom_monitor even in RELEASE builds — the JSONL trace is
+# the file artifact, these are the in-process surface.
+producer_path = "scripts/runtime/performance_monitors.gd"
+names = ["game/party_size", "game/world_seed", "game/current_screen"]
+query_api = "Performance.get_custom_monitor"
+
 [visual_baselines]
 # Committed golden screenshots plus metadata sidecars (<shot>.png.sidecar.json).
 # visual_sweep_update (and the satellite *_update scenarios) regenerate them;
@@ -63,6 +92,19 @@ schema_doc = "docs/references/trace-events.md"
 baseline_dir = "docs/generated/visual-baselines"
 sidecar_suffix = ".png.sidecar.json"
 update_scenario = "visual_sweep_update"
+
+[vision_review]
+# Lane-4 model review of windowed sweep shots: the reviewer answers the rubric
+# judgment questions and writes report_path (gitignored run output, skipped by
+# the path gate by design). QUARANTINE-FOREVER semantics: model findings are
+# advisory quarantine-tier and must NEVER be promoted to red/blocking.
+# override_env swaps the reviewer command; required_env=1 fails closed on a
+# missing or incomplete model review.
+report_path = ".godot-smoke/vision-review.json"
+reviewer_path = "tools/vlm_reviewer.py"
+reviewer_command = "python3 tools/vlm_reviewer.py"
+override_env = "VISION_REVIEWER_CMD"
+required_env = "VLM_REQUIRED"
 
 [determinism]
 # Scenario-authoring convention: pin the runtime rngs with seed_for_smoke BEFORE

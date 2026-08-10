@@ -20,7 +20,7 @@ goes missing reds the static gate).
 | --- | --- | --- |
 | Files | Read/edit the tree, run CLIs, parse committed artifacts | **Yes — the primary channel.** [AGENTS.md](../../AGENTS.md) is the table of contents; `tools/*.py` are stdlib-only and runnable as-is. |
 | LSP | Language Server Protocol for GDScript (diagnostics, symbols, completion) | **Yes, via the running editor.** The Godot editor's GDScript language server listens on `127.0.0.1:6005`, TCP-only, and only while the editor has this project open. An agent host that needs stdio must run a per-developer stdio↔TCP bridge (never vendored). |
-| DAP | Debug Adapter Protocol: launch the game, collect exceptions, drive scenarios | **Yes.** `127.0.0.1:6006` with [tools/godot_dap_smoketest.py](../../tools/godot_dap_smoketest.py) as the repo's reference client (launch contract and scenario mechanism: [godot-dap.md](godot-dap.md)). |
+| DAP | Debug Adapter Protocol: launch the game, collect exceptions, drive scenarios | **Yes.** `127.0.0.1:6006` with [tools/godot_dap_smoketest.py](../../tools/godot_dap_smoketest.py) as the repo's reference client (launch contract and scenario mechanism: [godot-dap.md](godot-dap.md)). The transport is **launch/trace-only** — the windowed-subprocess transport is the sole pixel/VLM authority ([godot-dap.md](godot-dap.md) § Transport authority). |
 | Editor bridge | An in-editor plugin surface (debugger tabs, docks) | **Yes, opt-in.** [addons/agent_trace](../../addons/agent_trace/README.md) is an editor plugin (ships **disabled by default** — Project Settings > Plugins) that renders the live trace stream in-editor: a per-session debugger tab plus a bottom-panel activity log. The game side is an additive `EngineDebugger.send_message("agent_trace:event", [line])` hook in `scripts/core/trace_logger.gd` (a strict no-op when no debugger is attached, so headless/scenario runs are byte-identical); the editor side declares the `agent_trace` capture. It visualizes the repo's own JSONL contract — no vendor coupling — and no plugin is required to drive the repo (the DAP/LSP endpoints remain sufficient). |
 | Runtime bridge | File-in/file-out control of a running game | **Yes.** The harness writes `.godot-smoke/scenario.json`, which `scripts/runtime/smoke_scenario_runner.gd` consumes at boot; the game answers on the JSONL trace stream (`user://logs/agent_trace.jsonl`, also mirrored on stdout) and the playtest report. No socket required on the headless transport. |
 
@@ -62,18 +62,71 @@ Agents answer "what is the game doing?" from **structured text**, in this order:
 3. Capture sidecars (`docs/generated/visual-baselines/*.png.sidecar.json`) —
    machine-readable geometry/labels per golden shot.
 4. The UI-tree dumps (`.godot-smoke/ui_tree/<screen>.json`, produced by the
-   `ui_tree_dump` scenario) — per-screen JSON of every visible Control (path,
-   type, text, rect, disabled) plus the AccessKit annotations the GBC widget
+   `ui_tree_dump` scenario; manifest `[ui_tree]`) — per-screen JSON of every
+   visible Control (path, type, text, rect, disabled) plus the AccessKit
+   annotations the GBC widget
    library sets (`a11y_name`/`a11y_description`/`a11y_live`, emitted only when
    non-default — e.g. the selection cursor's `"Row N of M"` description) plus
    the cursor/selection. The annotation contract (what is set where, and the
    rule for new widgets) lives in
-   [accessibility.md](accessibility.md).
+   [accessibility.md](accessibility.md). The `legibility_soak` scenario
+   continuously gates the three-way agreement between these dumps, the
+   `game/*` Performance monitors (manifest `[monitors]`), and the trace
+   stream's screen-transition lifecycle events, emitting
+   `legibility_soak_passed` / `legibility_soak_failed{failures}`.
+5. The Lane-4 vision review (`.godot-smoke/vision-review.json`, written by
+   `tools/vlm_reviewer.py` through the runner's mandatory review post-step;
+   manifest `[vision_review]`) — a vision model's rubric answers over the
+   windowed sweep shots, merged onto the scenario entry as
+   `vision_review_quarantine` findings. Advisory only: quarantine-FOREVER,
+   never promoted to red (see Recipes below).
 
 Screenshots are golden-baseline **verification artifacts**, not a primary
 perception channel: capture paths go in transcripts, never binary image data in
 context. A windowed lane that cannot run reports SKIP, never PASS — a skipped
 lane certifies nothing, and no agent should treat it as a pass.
+
+## Recipes
+
+Short vendor-neutral loops over the artifacts above. Each names the manifest
+section that is its machine-readable source instead of restating paths.
+
+- **Read a screen without pixels** (manifest `[ui_tree]`). Run `python3
+  tools/run_playtests.py --scenario ui_tree_dump` (headless-runnable,
+  self-pinned), then read `.godot-smoke/ui_tree/<screen>.json` — one file per
+  agent-facing screen (`title`, `menu`, `party`, `bag`, `battle`), each
+  `{screen, cursor, node_count, nodes}` with per-node path/type/text/rect and
+  the non-default a11y annotations. Node contract:
+  [accessibility.md](accessibility.md).
+- **Probe live state** (manifest `[monitors]`). In any running build —
+  including release — `Performance.get_custom_monitor` answers
+  `game/current_screen`, `game/party_size`, and `game/world_seed`; the JSONL
+  trace is the file artifact, these are the in-process surface.
+- **Explain a capture** (manifest `[visual_baselines]`). Join four artifacts
+  by name and cursor: the PNG path ↔ its `<shot>.png.sidecar.json` sibling ↔
+  the `snapshot_captured` record at 1-based line `trace_cursor + 1` of the
+  JSONL trace ↔ the `visual_sweep` entry of the playtest report
+  (`region_failures`, `region_quarantine`, `vision_review_written`). Full
+  protocol: [snapshot-sidecar.md](snapshot-sidecar.md) § Correlation protocol.
+- **Read the quarantine tiers** (manifest `[vision_review]`). Red-tier
+  findings flip `ok` and gate. Quarantine-tier findings ride the scenario
+  entry — `region_quarantine`, `contrast_findings` / `cvd_findings`,
+  `anchor_drift_quarantine`, `vision_review_quarantine` — reported, never
+  gating. A `QUARANTINED_SCENARIOS` entry still runs every pass, but its red
+  counts under `summary.quarantined_flakes`, not failure. Lane 4 is
+  quarantine-FOREVER: `vision-review.json` is advisory model output and must
+  never be promoted to red; under `VLM_REQUIRED=1` a missing, stale, or
+  incomplete review fails closed (`vision_review_failed` /
+  `vision_review_stale` / `vision_review_incomplete`).
+- **Treat SKIP as nothing certified.** A windowed-only scenario under
+  `PLAYTEST_FORCE_HEADLESS=1` — or the gate's `--skip-windowed` — reports
+  SKIP-with-reason (`transport: "skipped-headless"`,
+  `vision_review_written: null`) and exits 0: transport honesty, not a pass.
+  Only a `transport: "windowed"` entry certifies the pixel lanes.
+- **Drive the game like a player — optional** (manifest `[play_agent]`). Any
+  scripted play agent can drive the windowed transport through the same
+  scenario seams; `tools/commandcode_play_agent.py` is the repo's optional
+  reference driver (windowed-only), never part of the contract.
 
 ## Error-as-directive
 
