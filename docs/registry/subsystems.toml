@@ -267,17 +267,25 @@ status = "active"
 layer = "data"
 code_paths = [
   "scripts/data/pokemon_catalog.gd",
-  "scripts/data/species_file_parser.gd",
-  "scripts/data/move_file_parser.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
+  "python3 tools/import_pokeapi.py --check",
 ]
 required_trace_events = ["warning"]
 quality_bucket = "data"
+# POKEAPI CATALOG MIGRATION (2026-08-09, docs/exec-plans/active/pokeapi-catalog-migration.md):
+# the runtime catalog is GENERATED — tools/import_pokeapi.py turns a pinned
+# PokeAPI/api-data checkout (tools/api_data_pin.json; gitignored tools/.cache) plus
+# the vendored assets/source tree's wilds_data.asm custom fields + sprite presence
+# into assets/data/catalog/{species,moves,items}.json, and pokemon_catalog.gd loads
+# them with the identical schema/ids (the species/move ASM parsers are retired; git
+# history preserves them). `--check` is the committed-JSON freshness gate, wired
+# into verify_all.py's static section. Field-move display names stay runtime-parsed
+# from assets/source/i18n/fieldmove.properties (not part of the migration).
 
 [[subsystems]]
 name = "pokemon_progression"
@@ -332,6 +340,10 @@ code_paths = [
   "scripts/ui/battle_surface.gd",
   "scripts/ui/battle_turn_player.gd",
   "scripts/ui/battle_view.gd",
+  # Moves-panel name fitting (83px baked-art budget; Gen-9 16-char ellipsization),
+  # split off battle_surface_layout.gd at the 220 ui wall; shared with the Lane-2
+  # oracle (scripts/app/ui_render_model.gd) so the model predicts the panel.
+  "scripts/ui/move_name_fit.gd",
 ]
 scene_paths = ["scenes/ui/BattleView.tscn"]
 spec_doc = "docs/product-specs/battle-and-capture.md"
@@ -1045,12 +1057,15 @@ quality_bucket = "breeding"
 # (absent -> {}; validation lives in breeding_runtime.apply_save_state — a
 # pen lost to demolition relocates its mons to the campsite hold, never loses
 # them; NO SAVE_VERSION bump, v5 stays reserved for Phase 7); scripts/data/
-# species_file_parser.gd (pokemon_data-owned) gains the static parse_egg_moves
+# species_file_parser.gd (pokemon_data-owned) gained the static parse_egg_moves
 # (SpeciesEggMoves: label + `db MOVE` lines; absent -> []; malformed skipped
-# per the partial-result convention) and scripts/data/pokemon_catalog.gd
-# (pokemon_data-owned) gains egg_moves + the shiny asset paths (front.pal /
+# per the partial-result convention — the parser is RETIRED by the 2026-08-09
+# PokeAPI catalog migration and egg_moves now arrives generated on the catalog
+# entry) and scripts/data/pokemon_catalog.gd
+# (pokemon_data-owned) gained egg_moves + the shiny asset paths (front.pal /
 # shiny.pal colors, overworld-shiny path) on the species entry plus the
-# moo_moo_milk RUNTIME_ITEM_SUPPLEMENTS entry (the potion precedent, :19-24);
+# moo_moo_milk item supplement (the potion precedent — RUNTIME_ITEM_SUPPLEMENTS
+# retired into the importer's tools/import_overrides.json with the migration);
 # scripts/ui/battle_surface.gd + battle_surface_layout.gd (battle_loop-owned)
 # gain the shiny frame selection (front.pal -> shiny.pal exact-match remap over
 # the full strip BEFORE the AtlasTexture crop, cached in the existing

@@ -1,41 +1,27 @@
 extends RefCounted
 
-const SPECIES_ROOT := "res://pokewilds/pokemon/pokemon"
-const MOVES_FILE := "res://pokewilds/pokemon/moves.asm"
-const MOVE_CATEGORY_FILE := "res://pokewilds/pokemon/spec_phys_lookup.txt"
-const MOVE_NAMES_FILE := "res://pokewilds/i18n/attack.properties"
-const SPECIES_NAMES_FILE := "res://pokewilds/i18n/pokemondisplayname.properties"
-const ITEM_NAMES_FILE := "res://pokewilds/i18n/item.properties"
-const ITEM_DESCRIPTIONS_FILE := "res://pokewilds/i18n/itemdescription.properties"
-const FIELD_MOVE_NAMES_FILE := "res://pokewilds/i18n/fieldmove.properties"
+# Runtime source-data catalog. Since the PokeAPI catalog migration the
+# species/move/item data is AUTHORING-TIME generated: tools/import_pokeapi.py
+# turns a pinned PokeAPI/api-data checkout (plus the vendored assets/source
+# tree's wilds_data.asm custom fields and sprite presence) into the three
+# committed JSON documents below, and this loader reads them verbatim. The
+# dictionary schema, species ids, and every public API are identical to the
+# former ASM-walk loader, so domain/runtime/ui consumers are untouched; boot
+# is three JSON reads instead of a 990-folder parse walk. Regenerate with
+# `python3 tools/import_pokeapi.py` (freshness gate: `--check`).
 
-const SpeciesFileParser := preload("res://scripts/data/species_file_parser.gd")
-const MoveFileParser := preload("res://scripts/data/move_file_parser.gd")
-
-# Runtime-defined supplements for bag-referenced item ids the source i18n
-# files never list (the source game hardcodes them, so item.properties and
-# itemdescription.properties have no entry). Anything the bag/battle systems
-# can hand out must resolve here; keyed by the lowercase bag id.
-const RUNTIME_ITEM_SUPPLEMENTS := {
-	"potion": {
-		"display_name": "Potion",
-		"description": "Restores 20 HP."
-	},
-	# Phase 5 habitat drops: Miltank's faithful Moo Moo Milk (wiki-materials species
-	# special) — the source game hardcodes it, so item.properties has no entry.
-	"moo_moo_milk": {
-		"display_name": "Moo Moo Milk",
-		"description": "Fresh milk from a happy Miltank."
-	}
-}
+const SPECIES_FILE := "res://assets/data/catalog/species.json"
+const MOVES_FILE := "res://assets/data/catalog/moves.json"
+const ITEMS_FILE := "res://assets/data/catalog/items.json"
+# Field-move display names are NOT part of the JSON migration: they still come
+# from the vendored i18n properties at runtime.
+const FIELD_MOVE_NAMES_FILE := "res://assets/source/i18n/fieldmove.properties"
 
 var moves: Dictionary = {}
 var species: Dictionary = {}
 var items: Dictionary = {}
 var encounter_species: Array = []
 
-var _species_names: Dictionary = {}
-var _move_names: Dictionary = {}
 var _field_move_names: Dictionary = {}
 var _loaded = false
 var _trace = null
@@ -49,17 +35,11 @@ func load_all() -> void:
 	if _loaded:
 		return
 
-	_species_names = _parse_properties_file(SPECIES_NAMES_FILE)
-	_move_names = _parse_properties_file(MOVE_NAMES_FILE)
 	_field_move_names = _parse_properties_file(FIELD_MOVE_NAMES_FILE)
-	moves = MoveFileParser.parse_moves(
-		_read_text_file(MOVES_FILE),
-		_move_names,
-		MoveFileParser.parse_move_categories(_read_text_file(MOVE_CATEGORY_FILE))
-	)
-	items = _build_items()
-	_apply_runtime_item_supplements()
-	_parse_species_directory()
+	moves = _normalize_moves(_read_json_object(MOVES_FILE))
+	items = _normalize_items(_read_json_object(ITEMS_FILE))
+	# Species ids are re-sorted inside _load_species for encounter determinism; moves/items are NOT re-sorted — runtime lookup is exact-key and sidecar/meta keys make re-sorting lossy.
+	_load_species(_read_json_object(SPECIES_FILE))
 	_loaded = true
 
 
@@ -98,32 +78,37 @@ func get_random_encounter_species(rng: RandomNumberGenerator) -> String:
 	return str(encounter_species[index])
 
 
-func _parse_species_directory() -> void:
-	var dir := DirAccess.open(SPECIES_ROOT)
-	if dir == null:
-		_warn("PokemonCatalog", "Could not open species root.", {"path": SPECIES_ROOT})
-		return
-
-	var folder_names: Array = []
-	dir.list_dir_begin()
-	while true:
-		var entry := dir.get_next()
-		if entry.is_empty():
-			break
-		if entry.begins_with("."):
-			continue
-		if dir.current_is_dir():
-			folder_names.append(entry)
-	dir.list_dir_end()
-	folder_names.sort()
-
+# Builds the species dictionary from the generated catalog, iterating keys in
+# sorted order so encounter_species is byte-identical across runs (encounter
+# RNG depends on it). The sort rides the LOWERCASE form of each id: the ASM
+# walk sorted lowercase folder names before uppercasing them into ids, and
+# ASCII case ordering differs around "_" (0x5F sorts below lowercase letters
+# but above uppercase ones — "nidoran_f" vs "nidorina" flips), so sorting the
+# uppercase ids directly would NOT reproduce today's encounter order.
+func _load_species(catalog: Dictionary) -> void:
 	var parsed := 0
 	var skipped := 0
-	for folder_name_variant in folder_names:
-		if _load_species_folder(str(folder_name_variant)):
-			parsed += 1
-		else:
+	var ids: Array = catalog.keys()
+	ids.sort_custom(func(a, b): return str(a).to_lower() < str(b).to_lower())
+	for id_variant in ids:
+		var species_id := str(id_variant)
+		var raw = catalog[id_variant]
+		if raw is not Dictionary:
+			_warn("PokemonCatalog", "Skipping malformed species catalog entry.", {"path": SPECIES_FILE, "species_id": species_id})
 			skipped += 1
+			continue
+		var entry := _normalize_species_entry(species_id, raw)
+		species[species_id] = entry
+		parsed += 1
+		# Wild encounters require battle-viable species: battle sprites, real
+		# base stats, a catch rate, and a learnset. Everything else stays
+		# lookup-only.
+		if not str(entry["front_path"]).is_empty() and not str(entry["back_path"]).is_empty() \
+				and int(entry["catch_rate"]) > 0 \
+				and not (entry["base_stats"] as Dictionary).is_empty() \
+				and not (entry["learnset"] as Array).is_empty() \
+				and species_id != "EGG":
+			encounter_species.append(species_id)
 
 	_warn("PokemonCatalog", "Species catalog load complete.", {
 		"parsed": parsed,
@@ -133,150 +118,163 @@ func _parse_species_directory() -> void:
 	})
 
 
-func _load_species_folder(folder_name: String) -> bool:
-	var base_path := "%s/%s" % [SPECIES_ROOT, folder_name]
-	var front_path := "%s/front.png" % base_path
-	var back_path := "%s/back.png" % base_path
-	var overworld_path := "%s/overworld.png" % base_path
-	# Phase 5 shiny/breeding data: the recolor overworld sheet (579/990 folders)
-	# and the father-inheritance egg moves (359/990 folders; absent -> empty).
-	var shiny_overworld_path := "%s/overworld-shiny.png" % base_path
-	var egg_moves_path := "%s/egg_moves.asm" % base_path
-	var base_stats_path := "%s/base_stats.asm" % base_path
-	var evos_attacks_path := "%s/evos_attacks.asm" % base_path
-	var wilds_data_path := "%s/wilds_data.asm" % base_path
+# JSON.parse_string types are not guaranteed, so entries start as a deep
+# duplicate of the raw object — the same duplicate-then-re-pin pattern as
+# moves/items, so future additive generator fields ride along instead of being
+# silently dropped — with the known fields re-pinned in place to the exact
+# types the ASM parsers produced (int stats/levels, float weight/height,
+# PackedStringArray word lists). The additive fields the ASM path never had
+# (held_items, abilities) pass through untouched, as do the precomputed sprite
+# path strings (no per-species FileAccess checks — that is the boot-speed win).
+func _normalize_species_entry(species_id: String, raw: Dictionary) -> Dictionary:
+	var entry: Dictionary = raw.duplicate(true)
+	var slug := str(entry.get("slug", species_id.to_lower()))
+	entry["species_id"] = species_id
+	entry["slug"] = slug
+	entry["display_name"] = str(entry.get("display_name", _humanize_slug(slug)))
+	entry["dex_number"] = int(entry.get("dex_number", 0))
+	entry["types"] = _to_packed_string_array(entry.get("types"), PackedStringArray(["NORMAL", "NORMAL"]))
+	entry["base_stats"] = _normalize_base_stats(entry.get("base_stats", {}))
+	entry["learnset"] = _normalize_learnset(entry.get("learnset", []))
+	entry["evolutions"] = _normalize_evolutions(entry.get("evolutions", []))
+	entry["catch_rate"] = int(entry.get("catch_rate", 0))
+	entry["base_exp"] = int(entry.get("base_exp", 0))
+	entry["growth_rate"] = str(entry.get("growth_rate", ""))
+	entry["gender_ratio"] = str(entry.get("gender_ratio", ""))
+	entry["egg_groups"] = _to_packed_string_array(entry.get("egg_groups"), PackedStringArray())
+	entry["egg_moves"] = _to_packed_string_array(entry.get("egg_moves"), PackedStringArray())
+	entry["tmhm"] = _to_packed_string_array(entry.get("tmhm"), PackedStringArray())
+	entry["spawn_biomes"] = _to_packed_string_array(entry.get("spawn_biomes"), PackedStringArray())
+	entry["field_moves"] = entry.get("field_moves", {})
+	entry["overworld_behavior"] = entry.get("overworld_behavior", {})
+	entry["dex_entry"] = str(entry.get("dex_entry", ""))
+	entry["weight_kg"] = float(entry.get("weight_kg", 0.0))
+	entry["height_m"] = float(entry.get("height_m", 0.0))
+	entry["front_path"] = str(entry.get("front_path", ""))
+	entry["back_path"] = str(entry.get("back_path", ""))
+	entry["overworld_path"] = str(entry.get("overworld_path", ""))
+	entry["shiny_overworld_path"] = str(entry.get("shiny_overworld_path", ""))
+	entry["held_items"] = entry.get("held_items", [])
+	entry["abilities"] = entry.get("abilities", [])
+	return entry
 
-	var base_data := {}
-	if FileAccess.file_exists(base_stats_path):
-		base_data = SpeciesFileParser.parse_base_stats(_read_text_file(base_stats_path))
 
-	var wilds_data := {}
-	if FileAccess.file_exists(wilds_data_path):
-		wilds_data = SpeciesFileParser.parse_wilds_data(SpeciesFileParser.read_latin1_text(wilds_data_path))
+func _normalize_base_stats(raw) -> Dictionary:
+	var stats: Dictionary = {}
+	if raw is Dictionary:
+		for key_variant in (raw as Dictionary).keys():
+			stats[str(key_variant)] = int(raw[key_variant])
+	return stats
 
-	if base_data.is_empty() and wilds_data.is_empty():
-		if FileAccess.file_exists(base_stats_path) or FileAccess.file_exists(wilds_data_path):
-			_warn("PokemonCatalog", "Failed to parse species data files.", {"path": base_path})
-		return false
 
-	var slug := folder_name.to_lower()
-	# The dict key is always the folder-derived id: a few source files declare
-	# a wrong or ambiguous constant (kleavor declares KLEFKI, ursaluna declares
-	# URSARING, nidoran_f/m both declare NIDORAN), which would otherwise drop
-	# species through key collisions. Folder names are unique by construction.
-	var species_id := folder_name.to_upper()
+# Writer sorts by level and guarantees level >= 1 (import_pokeapi.py), so
+# malformed rows are NOT dropped here — they survive to surface generator
+# regressions instead of being silently swallowed by the loader.
+func _normalize_learnset(raw) -> Array:
+	var learnset: Array = []
+	if raw is not Array:
+		return learnset
+	for entry_variant in (raw as Array):
+		if entry_variant is not Dictionary:
+			continue
+		var entry: Dictionary = entry_variant
+		learnset.append({"level": int(entry.get("level", 0)), "move_id": str(entry.get("move_id", ""))})
+	return learnset
 
-	var learnset := _parse_learnset_file(evos_attacks_path)
+
+func _normalize_evolutions(raw) -> Array:
 	var evolutions: Array = []
-	if FileAccess.file_exists(evos_attacks_path):
-		evolutions = SpeciesFileParser.parse_evolutions(_read_text_file(evos_attacks_path))
-	var egg_moves := PackedStringArray()
-	if FileAccess.file_exists(egg_moves_path):
-		egg_moves = SpeciesFileParser.parse_egg_moves(_read_text_file(egg_moves_path))
-
-	var dex_number := int(wilds_data.get("dex_number", 0))
-	if dex_number <= 0:
-		dex_number = int(base_data.get("dex_number", 0))
-
-	var has_front := FileAccess.file_exists(front_path)
-	var has_back := FileAccess.file_exists(back_path)
-	species[species_id] = {
-		"species_id": species_id,
-		"slug": slug,
-		"display_name": str(_species_names.get(slug, _humanize_slug(slug))),
-		"dex_number": dex_number,
-		"types": base_data.get("types", PackedStringArray(["NORMAL", "NORMAL"])),
-		"base_stats": base_data.get("base_stats", {}),
-		"learnset": learnset,
-		"evolutions": evolutions,
-		"catch_rate": int(base_data.get("catch_rate", 0)),
-		"base_exp": int(base_data.get("base_exp", 0)),
-		"growth_rate": str(base_data.get("growth_rate", "")),
-		"gender_ratio": str(base_data.get("gender_ratio", "")),
-		"egg_groups": base_data.get("egg_groups", PackedStringArray()),
-		"egg_moves": egg_moves,
-		"tmhm": base_data.get("tmhm", PackedStringArray()),
-		"spawn_biomes": wilds_data.get("spawn_biomes", PackedStringArray()),
-		"field_moves": wilds_data.get("field_moves", {}),
-		"overworld_behavior": wilds_data.get("overworld_behavior", {}),
-		"dex_entry": str(wilds_data.get("dex_entry", "")),
-		"weight_kg": float(wilds_data.get("weight_kg", 0.0)),
-		"height_m": float(wilds_data.get("height_m", 0.0)),
-		"front_path": front_path if has_front else "",
-		"back_path": back_path if has_back else "",
-		"overworld_path": overworld_path if FileAccess.file_exists(overworld_path) else "",
-		"shiny_overworld_path": shiny_overworld_path if FileAccess.file_exists(shiny_overworld_path) else ""
-	}
-
-	# Wild encounters require battle-viable species: battle sprites, real base
-	# stats, a catch rate, and a learnset. Everything else stays lookup-only.
-	if has_front and has_back and int(base_data.get("catch_rate", 0)) > 0 \
-			and not (base_data.get("base_stats", {}) as Dictionary).is_empty() \
-			and not learnset.is_empty() \
-			and species_id != "EGG":
-		encounter_species.append(species_id)
-	return true
+	if raw is not Array:
+		return evolutions
+	for evo_variant in (raw as Array):
+		if evo_variant is not Dictionary:
+			continue
+		var evo: Dictionary = evo_variant
+		evolutions.append({
+			"method": str(evo.get("method", "")),
+			"param": _normalize_evolution_param(evo.get("param")),
+			"target": str(evo.get("target", ""))
+		})
+	return evolutions
 
 
-func _build_items() -> Dictionary:
-	var catalog := {}
-	var names := _parse_properties_file(ITEM_NAMES_FILE)
-	var descriptions := _parse_properties_file(ITEM_DESCRIPTIONS_FILE)
-	var ids := {}
-	for key in names.keys():
-		ids[key] = true
-	for key in descriptions.keys():
-		ids[key] = true
-	for key_variant in ids.keys():
-		var key := str(key_variant)
-		var item_id := key.to_upper()
-		catalog[item_id] = {
-			"item_id": item_id,
-			"display_name": str(names.get(key, _humanize_slug(key))),
-			"description": str(descriptions.get(key, ""))
-		}
+# param stays a Variant exactly as the ASM parser produced it: an int level for
+# EVOLVE_LEVEL, a string for TR_/item params (pokemon_rules reads both). JSON
+# numbers arrive as float and are coerced back to int; the writer emits bare
+# strings only for flavor words, so everything else passes through untouched.
+func _normalize_evolution_param(value):
+	if value is float:
+		return int(value)
+	return value
+
+
+# Move entries pass through (power/accuracy/pp/effect_chance arrive as JSON
+# ints); only the id/display fields are re-pinned. priority/target/ailment are
+# additive and ride along untouched.
+func _normalize_moves(raw_moves: Dictionary) -> Dictionary:
+	var catalog: Dictionary = {}
+	for key_variant in raw_moves.keys():
+		var move_id := str(key_variant).to_upper()
+		var raw = raw_moves[key_variant]
+		if raw is not Dictionary:
+			continue
+		var entry: Dictionary = (raw as Dictionary).duplicate()
+		entry["move_id"] = move_id
+		entry["display_name"] = str(entry.get("display_name", _humanize_slug(move_id.to_lower())))
+		catalog[move_id] = entry
 	return catalog
 
 
-# Merges RUNTIME_ITEM_SUPPLEMENTS into the parsed item catalog without
-# overwriting any id the source i18n does define.
-func _apply_runtime_item_supplements() -> void:
-	for key_variant in RUNTIME_ITEM_SUPPLEMENTS.keys():
-		var key := str(key_variant)
-		var item_id := key.to_upper()
-		if items.has(item_id):
+# Item entries pass through with only the id/display fields re-pinned and cost
+# coerced to int; pocket/category ride along untouched.
+func _normalize_items(raw_items: Dictionary) -> Dictionary:
+	var catalog: Dictionary = {}
+	for key_variant in raw_items.keys():
+		var item_id := str(key_variant).to_upper()
+		var raw = raw_items[key_variant]
+		if raw is not Dictionary:
 			continue
-		var supplement: Dictionary = RUNTIME_ITEM_SUPPLEMENTS[key]
-		items[item_id] = {
-			"item_id": item_id,
-			"display_name": str(supplement.get("display_name", _humanize_slug(key))),
-			"description": str(supplement.get("description", ""))
-		}
+		var entry: Dictionary = (raw as Dictionary).duplicate()
+		entry["item_id"] = item_id
+		entry["display_name"] = str(entry.get("display_name", _humanize_slug(item_id.to_lower())))
+		entry["description"] = str(entry.get("description", ""))
+		if entry.has("cost"):
+			entry["cost"] = int(entry["cost"])
+		catalog[item_id] = entry
+	return catalog
 
 
-func _parse_learnset_file(path: String) -> Array:
-	if not FileAccess.file_exists(path):
-		return []
+# Reads one generated catalog document. Fail-soft exactly like the ASM walk: a
+# missing/unparseable file warns with the path payload and yields an empty
+# dict, never an error. Quiet parse (the save_store.gd precedent) so a bad
+# read emits no spurious engine "ERROR: Parse JSON failed" stderr line — the
+# refusal is traced here, never swallowed, never doubled by engine noise.
+func _read_json_object(path: String) -> Dictionary:
+	var path_used := path
+	var file: FileAccess = null
+	if FileAccess.file_exists(path_used):
+		file = FileAccess.open(path_used, FileAccess.READ)
+	if file == null:
+		_warn("PokemonCatalog", "Could not open catalog file.", {"path": path_used})
+		return {}
+	var text = file.get_as_text()
+	file.close()
+	var json = JSON.new()
+	if json.parse(text) != OK or not (json.data is Dictionary):
+		_warn("PokemonCatalog", "Failed to parse catalog file.", {"path": path_used})
+		return {}
+	return json.data
 
-	var text = _read_text_file(path)
-	var move_re = RegEx.new()
-	move_re.compile("^\\s*db\\s+([0-9]+)\\s*,\\s*([A-Z0-9_]+)")
 
-	var learnset: Array = []
-	for raw_line_variant in text.split("\n"):
-		var raw_line = str(raw_line_variant)
-		var stripped = raw_line.strip_edges()
-		if stripped.contains("no more level-up moves"):
-			break
-
-		var move_match = move_re.search(raw_line)
-		if move_match == null:
-			continue
-		var level = int(move_match.get_string(1))
-		if level <= 0:
-			continue
-		learnset.append({"level": level, "move_id": move_match.get_string(2)})
-	return learnset
+# JSON arrays arrive as plain Array; the ASM parsers produced PackedStringArray
+# and consumers (biome filters, egg-group pairing, tmhm checks) rely on it.
+func _to_packed_string_array(value, fallback: PackedStringArray) -> PackedStringArray:
+	if value is not Array:
+		return fallback
+	var result := PackedStringArray()
+	for item_variant in (value as Array):
+		result.append(str(item_variant))
+	return result
 
 
 func _parse_properties_file(path: String) -> Dictionary:
