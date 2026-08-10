@@ -109,7 +109,6 @@ Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code o
 - `scripts/app/smoke_scenarios.gd` gains the `playtest_field_soak` match arm; `scripts/app/playtest_scenarios.gd` grows `run_field_soak` (a thin wrapper delegating to the new `playtest_field_soak_scenario.gd`); `scripts/app/qa_scenarios.gd` registers `field_moves_flow` + `build_house_flow`; `scripts/runtime/playtest_bot.gd` gains `try_random_field_move` (the seeded field-move soak band). The fresh-game starter-party `playtest_soak` is untouched (the field soak is its own `playtest_` scenario).
 - `scripts/runtime/player_avatar.gd` gains the Ride mount speed mode (`set_mounted`/`is_mounted`, `mount_step_seconds` faster than the run gait; the run sheet is the documented mount-sprite fallback — no dedicated mount art ships in the submodule). Ledge-climbing is out of scope (traversal speed only).
 
-
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
@@ -182,3 +181,7 @@ The wave-2 GBC restyle rebuilt the pause/menu screens — start menu, party, bag
 - `storage_release_mouse_check.gd` (storage-owned code path — [storage-and-party.md](storage-and-party.md) § GBC stage restyle): the synthesized click point derives from the screen's stage-local `row_rect(row)` mapped through the `ScreenDisplay` integer scale; the direct `_on_entry_clicked` call rides alongside the synthesized GUI event as the guaranteed witness (`item_clicked` is gone with the restyle) — the mid-confirm gate stays the assertion target.
 
 The committed menu baseline PNGs (06/07/08/28/29 + the camping/storage satellites) are still the PRE-restyle captures; the re-pins land with the wave-3 `visual_sweep_update` pass ([../RELIABILITY.md](../RELIABILITY.md) § Visual verification).
+
+## Phase 0 static-gate cleanup (extraction-only co-modification note)
+
+`scripts/ui/creation_screen.gd` co-mods by EXTRACTION only (it had blown the 220 ui budget at 226): the step-label accessor cluster — the `step_title_label()` / `step_value_label()` / `seed_edit_active()` scenario seams plus the `_committed_name()` / `_seed_line()` value accessors the GO summary and the confirm payload read — move into the EXISTING `scripts/ui/creation_screen_render.gd` sibling (the wave-0 220-wall extraction home, already in `title_flow`'s `code_paths`) as `CreationRender.*(screen)` statics, so the app readers consume the same module that renders the labels. Step strings, the five-step order, the digit-row edit semantics, the confirm payload, and the `creation_confirmed` trace are all unchanged. The app readers retarget with zero assertion changes: `new_game_flow_checks.gd`, `visual_sweep_title.gd`, and `play_agent_scenario.gd` preload `CreationRender` and pass the screen instance (app→ui is an allowed dependency).

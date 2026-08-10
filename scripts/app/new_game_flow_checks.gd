@@ -19,6 +19,7 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const Geo := preload("res://scripts/app/new_game_flow_geo.gd")
+const CreationRender := preload("res://scripts/ui/creation_screen_render.gd") # the step-label seams live here (creation_screen.gd's 220-wall extraction)
 
 # The scenario's pins, mirrored here (single pin set per file, the menu_checks precedent).
 const WORLD_SEED := 2026080602 # probed beach spawn (the scenario's WORLD_SEED)
@@ -60,18 +61,18 @@ func _part_4_creation() -> void:
 	_expect(_runner.trace_log_has_since("title_new_game_chosen", cursor), "4: no title_new_game_chosen trace after the confirmed NEW GAME")
 	if not _expect(creation.visible and not title.visible, "4: injection witness: the confirm did not swap title -> creation"):
 		return
-	var title_label: Label = creation.step_title_label() # restyle seam (design §3.1; the old Panel/Margin/VBox reads)
-	var value_label: Label = creation.step_value_label()
+	var title_label: Label = CreationRender.step_title_label(creation) # restyle seam (design §3.1; the old Panel/Margin/VBox reads)
+	var value_label: Label = CreationRender.step_value_label(creation)
 	# SEED step: RANDOM is the one-press default; move_left is the custom-seed gesture.
 	if not _expect(title_label.text == "WORLD SEED" and value_label.text == "RANDOM", "4: the seed step opened on '%s'/'%s', not WORLD SEED/RANDOM" % [title_label.text, value_label.text]):
 		return
 	await _tap("move_left")
-	if not _expect(creation.seed_edit_active(), "4: injection witness: move_left did not open the seed digit row"):
+	if not _expect(CreationRender.seed_edit_active(creation), "4: injection witness: move_left did not open the seed digit row"):
 		return
 	for character in str(WORLD_SEED): # digits ride unicode key events (the digit row's typed-digit branch reads unicode 48-57)
 		await SmokeTap.tap_digit(get_tree(), int(character))
 	await _tap("action_a") # the digit row's Z commit stores the typed seed
-	_expect(not creation.seed_edit_active(), "4: injection witness: Z did not commit the seed digit row")
+	_expect(not CreationRender.seed_edit_active(creation), "4: injection witness: Z did not commit the seed digit row")
 	if not _expect(value_label.text == str(WORLD_SEED), "4: the seed step shows '%s', not the typed %d" % [value_label.text, WORLD_SEED]):
 		return
 	await _tap("action_a") # advance

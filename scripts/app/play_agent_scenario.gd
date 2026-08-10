@@ -20,6 +20,7 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
+const CreationRender := preload("res://scripts/ui/creation_screen_render.gd") # the step-label seams live here (creation_screen.gd's 220-wall extraction)
 
 const PIN := 2026080701 # seed_for_smoke pin: the starter shiny draw rides this stream
 const WORLD_SEED := 2026080702 # typed into the creation seed digit row (no RANDOM ambiguity)
@@ -73,9 +74,9 @@ func _drive_creation() -> void:
 	_expect(_runner.trace_log_has_since("title_new_game_chosen", cursor), "no title_new_game_chosen trace after the confirmed NEW GAME")
 	if not _expect(creation.visible and not title.visible, "injection witness: the confirm did not swap title -> creation"):
 		return
-	var value_label: Label = creation.step_value_label()
+	var value_label: Label = CreationRender.step_value_label(creation)
 	await _tap("move_left") # RANDOM -> the in-stage seed digit row
-	if not _expect(creation.seed_edit_active(), "injection witness: move_left did not open the seed digit row"):
+	if not _expect(CreationRender.seed_edit_active(creation), "injection witness: move_left did not open the seed digit row"):
 		return
 	for character in str(WORLD_SEED): # unicode digit events (the digit row reads unicode 48-57)
 		await SmokeTap.tap_digit(get_tree(), int(character))
@@ -99,7 +100,7 @@ func _drive_creation() -> void:
 		return
 	await _tap("action_a") # confirm the default avatar (cursor cell 0)
 	await _tap("action_a") # AVATAR -> GO
-	if not _expect(creation.step_title_label().text == "Go!", "the flow landed on '%s', not the GO step" % creation.step_title_label().text):
+	if not _expect(CreationRender.step_title_label(creation).text == "Go!", "the flow landed on '%s', not the GO step" % CreationRender.step_title_label(creation).text):
 		return
 	var go_cursor := _runner.trace_log_line_count()
 	await _tap("action_a") # GO -> the generating beat -> creation_confirmed

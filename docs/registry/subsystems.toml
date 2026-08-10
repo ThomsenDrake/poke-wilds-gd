@@ -331,6 +331,11 @@ layer = "runtime"
 code_paths = [
   "scripts/runtime/battle_runtime.gd",
   "scripts/domain/battle_rules.gd",
+  # Pure-data move-effect tables (hit/pure status maps, multi-hit counts,
+  # self-target ids, the OHKO effect id, the handled-damage-effect set) split
+  # off battle_rules.gd at the 320 domain wall; battle_rules.gd preloads it,
+  # all rolls/branches stay behind.
+  "scripts/domain/battle_effect_tables.gd",
   "scripts/domain/battle_status.gd",
   "scripts/domain/battle_text.gd",
   "scripts/domain/type_chart.gd",
@@ -368,6 +373,9 @@ code_paths = [
   "scripts/ui/start_menu.gd",
   "scripts/ui/message_box.gd",
   "scripts/ui/party_rows.gd",
+  # Row style constants + the threshold-colored HP-bar builder split off
+  # party_rows.gd at the 220 ui wall (the party_actions.gd precedent).
+  "scripts/ui/party_row_style.gd",
   "scripts/ui/party_screen.gd",
   "scripts/ui/bag_screen.gd",
   "scripts/ui/menu_context.gd",
@@ -555,9 +563,20 @@ code_paths = [
   "scripts/runtime/build_runtime.gd",
   "scripts/runtime/structure_layer.gd",
   "scripts/app/field_action_router.gd",
+  # Camp/storage placed-object Z routes (campfire menu, bed rest, storage box,
+  # fence pen delegation) split off the router at the 220 app wall — same
+  # one-delegation-per-tier idiom as field_move_actions/overworld_entity_actions.
+  "scripts/app/field_object_routes.gd",
   "scripts/app/placement_flow_scenario.gd",
   "scripts/app/placement_flow_demolition.gd",
   "scripts/app/visual_sweep_build.gd",
+  # dig_silence gates the dig-silence QoL guard: Z on DIGGABLE ground with no
+  # Dig-capable party member must stay SILENT (diggable tiles are walkable and
+  # everywhere — beach spawn — so the capability-refusal toast fired on every
+  # exploratory Z); the cut press + the dig-capable press stay loud as the
+  # delivery witnesses proving the silence is the router's decision, never a
+  # swallowed press (f98a7cab's scenario, registered late — the Phase-0 fix).
+  "scripts/app/dig_silence_scenario.gd",
 ]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/building-and-placement.md"

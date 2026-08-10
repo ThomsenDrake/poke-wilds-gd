@@ -3,6 +3,7 @@ extends RefCounted
 const TypeChart := preload("res://scripts/domain/type_chart.gd")
 const BattleStatus := preload("res://scripts/domain/battle_status.gd")
 const BattleText := preload("res://scripts/domain/battle_text.gd")
+const EffectTables := preload("res://scripts/domain/battle_effect_tables.gd")
 
 const CRIT_RATE := 1.0 / 24.0
 const CRIT_MULTIPLIER := 1.5
@@ -12,13 +13,6 @@ const BURN_ATTACK_FACTOR := 0.5
 const DEFAULT_CATCH_RATE := 45
 const RECOIL_DIVISOR := 4
 const LEECH_DIVISOR := 2
-const OHKO_EFFECT := "EFFECT_OHKO"
-# Effects that target the user; the defender's protect never blocks them.
-const SELF_TARGET_EFFECTS: PackedStringArray = ["EFFECT_HEAL", "EFFECT_PROTECT"]
-const HIT_STATUS_EFFECTS := {"EFFECT_POISON_HIT": "PSN", "EFFECT_BURN_HIT": "BRN", "EFFECT_PARALYZE_HIT": "PAR", "EFFECT_SLEEP_HIT": "SLP", "EFFECT_FREEZE_HIT": "FRZ", "EFFECT_POISON_MULTI_HIT": "PSN", "EFFECT_FLAME_WHEEL": "BRN", "EFFECT_SACRED_FIRE": "BRN"}
-const PURE_STATUS_EFFECTS := {"EFFECT_POISON": "PSN", "EFFECT_BURN": "BRN", "EFFECT_PARALYZE": "PAR", "EFFECT_SLEEP": "SLP"}
-# Value 0 means "roll 2-5"; a positive value is a fixed hit count.
-const MULTI_HIT_EFFECTS := {"EFFECT_MULTI_HIT": 0, "EFFECT_POISON_MULTI_HIT": 0, "EFFECT_DOUBLE_HIT": 2}
 
 var _status = BattleStatus.new()
 
@@ -63,7 +57,7 @@ func _resolve_move(attacker: Dictionary, defender: Dictionary, move: Dictionary,
 	if effect != "EFFECT_ALWAYS_HIT" and not _accuracy_check(attacker, defender, move, rng):
 		return true
 	result["hit"] = true
-	if effect == OHKO_EFFECT:
+	if effect == EffectTables.OHKO_EFFECT:
 		var ohko_damage = _status.apply_ohko(attacker, defender)
 		result["ohko"] = ohko_damage >= 0
 		result["failed"] = ohko_damage < 0
@@ -160,14 +154,14 @@ func _forced_move(attacker: Dictionary, move: Dictionary, result: Dictionary) ->
 	return move
 
 func _targets_self(effect: String) -> bool:
-	if SELF_TARGET_EFFECTS.has(effect):
+	if EffectTables.SELF_TARGET_EFFECTS.has(effect):
 		return true
 	var stage_effect = BattleStatus.parse_stage_effect(effect)
 	return not stage_effect.is_empty() and int(stage_effect.get("stages", 0)) > 0
 
 func _apply_status_move(attacker: Dictionary, defender: Dictionary, effect: String, rng: RandomNumberGenerator, result: Dictionary) -> void:
-	if PURE_STATUS_EFFECTS.has(effect):
-		var status = str(PURE_STATUS_EFFECTS[effect])
+	if EffectTables.PURE_STATUS_EFFECTS.has(effect):
+		var status = str(EffectTables.PURE_STATUS_EFFECTS[effect])
 		result["failed"] = not _status.inflict_status(defender, status, rng)
 		result["status_applied"] = "" if result["failed"] else status
 		return
@@ -241,8 +235,8 @@ func _apply_damage_move(attacker: Dictionary, defender: Dictionary, move: Dictio
 func _roll_secondary_effects(attacker: Dictionary, defender: Dictionary, effect: String, effect_chance: int, stage_effect: Dictionary, rng: RandomNumberGenerator, result: Dictionary) -> void:
 	if effect_chance <= 0 or rng.randi_range(1, 100) > effect_chance:
 		return
-	if HIT_STATUS_EFFECTS.has(effect) and str(result.get("status_applied", "")).is_empty():
-		var status = str(HIT_STATUS_EFFECTS[effect])
+	if EffectTables.HIT_STATUS_EFFECTS.has(effect) and str(result.get("status_applied", "")).is_empty():
+		var status = str(EffectTables.HIT_STATUS_EFFECTS[effect])
 		if _status.inflict_status(defender, status, rng):
 			result["status_applied"] = status
 	elif effect == "EFFECT_CONFUSE_HIT":
@@ -253,16 +247,13 @@ func _roll_secondary_effects(attacker: Dictionary, defender: Dictionary, effect:
 		result["stat_changes"].append_array(_status.apply_stage_change(attacker, defender, stage_effect))
 
 func _is_handled_damage_effect(effect: String) -> bool:
-	if effect.is_empty() or HIT_STATUS_EFFECTS.has(effect) or MULTI_HIT_EFFECTS.has(effect):
-		return true
-	if ["EFFECT_NORMAL_HIT", "EFFECT_ALWAYS_HIT", "EFFECT_PRIORITY_HIT", "EFFECT_FLINCH_HIT", "EFFECT_RECOIL_HIT", "EFFECT_LEECH_HIT", "EFFECT_CONFUSE_HIT", "EFFECT_TRAP_TARGET", "EFFECT_RAMPAGE", "EFFECT_FURY_CUTTER"].has(effect):
-		return true
-	return not BattleStatus.parse_stage_effect(effect).is_empty()
+	return effect.is_empty() or EffectTables.HIT_STATUS_EFFECTS.has(effect) or EffectTables.MULTI_HIT_EFFECTS.has(effect) \
+		or EffectTables.HANDLED_DAMAGE_EFFECTS.has(effect) or not BattleStatus.parse_stage_effect(effect).is_empty()
 
 func _hits_for_effect(effect: String, rng: RandomNumberGenerator) -> int:
-	if not MULTI_HIT_EFFECTS.has(effect):
+	if not EffectTables.MULTI_HIT_EFFECTS.has(effect):
 		return 1
-	var fixed = int(MULTI_HIT_EFFECTS[effect])
+	var fixed = int(EffectTables.MULTI_HIT_EFFECTS[effect])
 	if fixed > 0:
 		return fixed
 	var roll = rng.randi_range(1, 8)

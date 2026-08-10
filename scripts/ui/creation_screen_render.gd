@@ -16,10 +16,21 @@ const FRAME_INTERIOR := CreationStage.FRAME_RECT # single-sourced at the stage (
 const TITLE_VALUE_GAP := 2.0
 
 
+# Scenario seams (restyle design §2.2; the old Panel/Margin/VBox node reads) —
+# moved here with the step strings at creation_screen.gd's second 220 wall, so
+# the app readers (new_game_flow_checks / visual_sweep_title / play_agent) read
+# the same module that renders the labels.
+static func step_title_label(screen) -> Label: return screen._title_label
+static func step_value_label(screen) -> Label: return screen._value_label
+static func seed_edit_active(screen) -> bool: return screen._step == screen.STEP_SEED and screen._digit_row.editing_active() # the old SeedPrompt-visible witness
+static func committed_name(screen) -> String: return SessionState.DEFAULT_PLAYER_NAME if screen._name.is_empty() else screen._name
+static func seed_line(screen) -> String: return "RANDOM" if screen._seed < 0 else str(screen._seed)
+
+
 static func render(screen) -> void:
 	if screen._step == screen.STEP_SEED:
 		screen._title_label.text = "WORLD SEED"
-		screen._value_label.text = screen._digit_row.display_text() if screen._digit_row.editing_active() else screen._seed_line()
+		screen._value_label.text = screen._digit_row.display_text() if screen._digit_row.editing_active() else seed_line(screen)
 		screen._hint_label.text = SEED_EDIT_HINT if screen._digit_row.editing_active() else SEED_HINT
 	elif screen._step == screen.STEP_SHINY:
 		var odds := int(SessionState.SHINY_ODDS_CHOICES[screen._shiny_index])
@@ -36,7 +47,7 @@ static func render(screen) -> void:
 		screen._hint_label.text = "(Z: choose avatar   X: back)"
 	elif screen._step == screen.STEP_GO:
 		screen._title_label.text = "Go!" # i18n go, verbatim (FLAGGED: hardcoded)
-		screen._value_label.text = "NAME — %s\nPLAYER — %s\nSHINY RATE — 1/%d\nWORLD SEED — %s" % [screen._committed_name(), screen._avatar, int(SessionState.SHINY_ODDS_CHOICES[screen._shiny_index]), screen._seed_line()]
+		screen._value_label.text = "NAME — %s\nPLAYER — %s\nSHINY RATE — 1/%d\nWORLD SEED — %s" % [committed_name(screen), screen._avatar, int(SessionState.SHINY_ODDS_CHOICES[screen._shiny_index]), seed_line(screen)]
 		screen._hint_label.text = "(Z: begin   X: back)"
 	screen._hint_label.visible = not screen._overlay_open()
 
