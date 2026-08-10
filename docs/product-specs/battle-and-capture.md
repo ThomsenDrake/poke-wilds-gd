@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-07-23
 Review cadence days: 21
-Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/app/time_evolution_scenario.gd
+Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/app/time_evolution_scenario.gd
 
 # Battle And Capture
 
@@ -42,7 +42,6 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 - `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal).
 - `time_evolution` (Phase 2) proves the time-of-day evolution gate in both directions under `seed_for_smoke`: EEVEE at happiness 255, exp poked to one seeded victory from level — a DAY battle (time 600) leaves it EEVEE with `evolution_time_gate{time_of_day:"DAY", evolved:""}`, and the same setup at NIGHT (time 1380) evolves it to UMBREON with `evolution_time_gate{evolved:"UMBREON"}` (SNOM→FROSMOTH rides the identical `TR_NITE` gate). The shadow-retreat block is proven by `night_cycle` (run refused once with `retreat_blocked`, then victory), not here.
 
-
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
@@ -52,3 +51,7 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 ## Phase 6 integration note (overworld Pokémon)
 
 Phase 6 (`overworld-pokemon.md`) consumes the provoked-mon buff in `battle_runtime.start_wild_battle`: an entry-stamped `attack_stages` (set by `overworld_mons_runtime._force_battle` — chase-catch/provoked +3 per :284; player-initiated Attack 0 per :280) becomes `stages.atk` AFTER `reset_stages`, so ordinary encounters are unchanged. The forced battle itself rides the pending-encounter seam through `game_runtime.generate_wild_encounter` (the fishing precedent) and the normal presentation path.
+
+## Phase 0 static-gate cleanup (extraction-only co-modification note)
+
+`scripts/domain/battle_rules.gd` co-mods by EXTRACTION only (the house extract-before-edit pattern; the file had blown the 320 domain budget at 326): the pure-data move-effect tables (`HIT_STATUS_EFFECTS`, `PURE_STATUS_EFFECTS`, `MULTI_HIT_EFFECTS`, `SELF_TARGET_EFFECTS` — plus the `OHKO_EFFECT` id constant, the same pure-data family, needed to land at exactly 320/320) move to the NEW `scripts/domain/battle_effect_tables.gd`, which `battle_rules.gd` preloads as `EffectTables`. Every roll, accuracy/protect gate, and branch is untouched; the `BattleRules` public API (`apply_attack`/`execute_attack`/`calculate_damage`/`attempt_capture`/`move_priority`) and all trace payloads are unchanged, so the seeded battle scenarios stay byte-identical. The new module is registered on the `battle_loop` subsystem in [../registry/subsystems.toml](../registry/subsystems.toml).

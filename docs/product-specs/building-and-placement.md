@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-04
 Review cadence days: 21
-Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
+Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/field_object_routes.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/app/dig_silence_scenario.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
 # Building And Placement
 
@@ -120,3 +120,7 @@ The showcase-capture + BeaconSelector slice ([bootstrap-and-overworld.md](bootst
 ## Infinite-world slice (co-modification note)
 
 `field_move_actions.gd`'s warp routing (`_route_warp`) is reworked to way-stones: the world-edge beacon concept is retired with world chaining (the seamless infinite plane has no edge band), so the multi-way-stone SELECTOR now lists ALL registered way-stones (renamed WayStoneSelector) and there is no `edge_suppressed` precheck. Placing way-stones is unchanged (still a placed `way_stone` structure); only the beacon/edge semantics are gone. Placements themselves are unaffected by the infinite plane (the sparse per-tile maps are already unbounded `"x,y"` keys).
+
+## Phase 0 static-gate cleanup (extraction-only co-modification note)
+
+`scripts/app/field_action_router.gd` co-mods by EXTRACTION only (it had blown the 220 app budget at 227): the camp/storage placed-object Z routes — `_route_camp_object`, `_open_camp_menu`, `_open_storage_screen`, plus their exclusive private helpers `_rest_at_bed` and the campfire `_toggle_campfire` lit-flip (with the `CAMPFIRE_ID`/`BED_ID`/`BOX_ID` ids they match on) — move to the NEW `scripts/app/field_object_routes.gd` (the one-delegation-per-precedence-tier idiom of `field_move_actions.gd`/`overworld_entity_actions.gd`; `on_context_action` keeps a single `_object_routes.route_camp_object(faced)` call at the same tier, and the `closed`-driven re-enable + save stays wired in the router). The campfire toggle's documented reach into `runtime._world_gen` and its `campfire_lit` trace are byte-identical — the trace's source string stays `"App.FieldActionRouter"` deliberately, so the trace contract is untouched. Costs, occupancy, the would-trap guard, the demolition/refund rules, the demolition-witness invariant, and the entity-first context-Z precedence are unchanged. The same cleanup registers the f98a7cab-late `scripts/app/dig_silence_scenario.gd` in this subsystem's `code_paths` (the dig-silence QoL guard scenario: a dig-less party's Z on diggable ground stays silent, witnessed loud by cut + dig-capable presses).

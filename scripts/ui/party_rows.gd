@@ -11,36 +11,8 @@ extends RefCounted
 
 const ShinyPalette := preload("res://scripts/ui/shiny_palette.gd")
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
-const SHINY_BADGE_COLOR := Color(1.0, 0.85, 0.2) # gold, like the GSC sparkle
-
-const HP_BAR_SIZE := Vector2(22.0, 4.0)
-# Fill floor (as a ratio) keeps a sliver visible at 1/max HP instead of an
-# invisible bar; colors follow the classic green/orange/red HP thresholds.
-const HP_BAR_MIN_FILL := 0.06
-const HP_HIGH_THRESHOLD := 0.5
-const HP_LOW_THRESHOLD := 0.2
-const HP_COLOR_HIGH := Color(0.35, 0.78, 0.35)
-const HP_COLOR_MID := Color(0.92, 0.66, 0.22)
-const HP_COLOR_LOW := Color(0.88, 0.28, 0.24)
-const HP_BAR_BG_COLOR := Color(0.10, 0.11, 0.13, 0.95)
-const MARKER_WIDTH := 7.0
-const NAME_FIELD_WIDTH := 98.0 # 126 (picker rows) - marker 7 - seps 2x2 - sprite 16 - 1px slack
-const ROW_HEIGHT := 16.0 # two fonts.ttf@7 lines
-const SPRITE_SIZE := Vector2(16.0, 16.0)
-const SPRITE_FRAME := Rect2(0, 0, 16, 16) # frame 0 (down-idle) of the 96x16 walking strip
-const OVERWORLD_SHEET := "res://assets/source/pokemon/pokemon/%s/overworld.png"
-const OVERWORLD_SHINY_SHEET := "res://assets/source/pokemon/pokemon/%s/overworld-shiny.png"
-const LINE2_Y := 8.0
-const LINE2_H := 9.0
-const HP_LABEL_POS := Vector2(26, 8)
-const HP_LABEL_SIZE := Vector2(44, 9)
-const STATUS_POS := Vector2(72, 8)
-const STATUS_SIZE := Vector2(20, 9)
-const STEPS_LABEL_SIZE := Vector2(72, 9)
-const EGG_TAG_POS := Vector2(74, 8)
-const EGG_TAG_SIZE := Vector2(20, 9)
-const ICON_SIZE := Vector2(8.0, 8.0)
-const BADGE_SIZE := Vector2(6.0, 6.0)
+# Style constants + the HP-bar builder live in party_row_style.gd (220-wall extraction).
+const RowStyle := preload("res://scripts/ui/party_row_style.gd")
 
 
 static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
@@ -50,7 +22,7 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 
 	var marker := Label.new()
 	marker.text = ">" if selected else ""
-	marker.custom_minimum_size = Vector2(MARKER_WIDTH, ROW_HEIGHT)
+	marker.custom_minimum_size = Vector2(RowStyle.MARKER_WIDTH, RowStyle.ROW_HEIGHT)
 	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	GbcStage.apply_font(marker, Color.BLACK)
 	row.add_child(marker)
@@ -68,14 +40,14 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 	# wave-2 blank-name bug the 07 sidecar recorded as [14,5,1,7]). 98px leaves
 	# room for the 16px row sprite (126px picker rows are the tightest container);
 	# a worst-case name still clips by design (the layout audit skips clip_text).
-	name_label.custom_minimum_size = Vector2(NAME_FIELD_WIDTH, ROW_HEIGHT)
+	name_label.custom_minimum_size = Vector2(RowStyle.NAME_FIELD_WIDTH, RowStyle.ROW_HEIGHT)
 	name_label.clip_text = true
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	GbcStage.apply_font(name_label, Color.BLACK)
 	row.add_child(name_label)
 
 	if is_egg:
-		row.add_child(_icon(ShinyPalette.egg_frame(), ICON_SIZE, Color.WHITE))
+		row.add_child(_icon(ShinyPalette.egg_frame(), RowStyle.ICON_SIZE, Color.WHITE))
 	else:
 		var sprite := _mon_sprite(mon)
 		if sprite != null:
@@ -83,42 +55,17 @@ static func build_row(mon: Dictionary, selected: bool) -> HBoxContainer:
 
 	if is_egg:
 		name_label.add_child(_line2_label("Steps: %d" % int(mon.get("egg", {}).get("steps_to_hatch", 0)),
-			Vector2(0, LINE2_Y), STEPS_LABEL_SIZE))
-		name_label.add_child(_line2_label("EGG", EGG_TAG_POS, EGG_TAG_SIZE))
+			Vector2(0, RowStyle.LINE2_Y), RowStyle.STEPS_LABEL_SIZE))
+		name_label.add_child(_line2_label("EGG", RowStyle.EGG_TAG_POS, RowStyle.EGG_TAG_SIZE))
 		return row
 
 	var max_hp := maxi(1, int(mon.get("max_hp", 1)))
 	var current_hp := clampi(int(mon.get("current_hp", 0)), 0, max_hp)
-	var hp_ratio := float(current_hp) / float(max_hp)
-	var hp_bar := ProgressBar.new()
-	hp_bar.min_value = 0.0
-	hp_bar.max_value = 1.0
-	hp_bar.value = maxf(hp_ratio, HP_BAR_MIN_FILL) if current_hp > 0 else 0.0
-	hp_bar.show_percentage = false
-	hp_bar.position = Vector2(0, 10)
-	hp_bar.size = HP_BAR_SIZE
-	hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var fill_style := StyleBoxFlat.new()
-	fill_style.bg_color = hp_bar_color(hp_ratio)
-	fill_style.set_corner_radius_all(1)
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = HP_BAR_BG_COLOR
-	bg_style.set_corner_radius_all(1)
-	hp_bar.add_theme_stylebox_override("background", bg_style)
-	hp_bar.add_theme_stylebox_override("fill", fill_style)
-	name_label.add_child(hp_bar)
+	name_label.add_child(RowStyle.hp_bar(mon))
 
-	name_label.add_child(_line2_label("%d/%d" % [current_hp, max_hp], HP_LABEL_POS, HP_LABEL_SIZE))
-	name_label.add_child(_line2_label(status_abbrev(mon), STATUS_POS, STATUS_SIZE))
+	name_label.add_child(_line2_label("%d/%d" % [current_hp, max_hp], RowStyle.HP_LABEL_POS, RowStyle.HP_LABEL_SIZE))
+	name_label.add_child(_line2_label(status_abbrev(mon), RowStyle.STATUS_POS, RowStyle.STATUS_SIZE))
 	return row
-
-
-static func hp_bar_color(hp_ratio: float) -> Color:
-	if hp_ratio > HP_HIGH_THRESHOLD:
-		return HP_COLOR_HIGH
-	if hp_ratio > HP_LOW_THRESHOLD:
-		return HP_COLOR_MID
-	return HP_COLOR_LOW
 
 
 static func set_selected(row: HBoxContainer, selected: bool) -> void:
@@ -217,25 +164,25 @@ static func _mon_sprite(mon: Dictionary) -> TextureRect:
 		return null
 	var shiny := bool(mon.get("is_shiny", false))
 	var path := ""
-	if shiny and ResourceLoader.exists(OVERWORLD_SHINY_SHEET % slug):
-		path = OVERWORLD_SHINY_SHEET % slug
-	elif ResourceLoader.exists(OVERWORLD_SHEET % slug):
-		path = OVERWORLD_SHEET % slug
+	if shiny and ResourceLoader.exists(RowStyle.OVERWORLD_SHINY_SHEET % slug):
+		path = RowStyle.OVERWORLD_SHINY_SHEET % slug
+	elif ResourceLoader.exists(RowStyle.OVERWORLD_SHEET % slug):
+		path = RowStyle.OVERWORLD_SHEET % slug
 	if path.is_empty():
 		return null
 	var atlas := AtlasTexture.new()
 	atlas.atlas = load(path)
-	atlas.region = SPRITE_FRAME
+	atlas.region = RowStyle.SPRITE_FRAME
 	var sprite := TextureRect.new()
 	sprite.texture = atlas
-	sprite.custom_minimum_size = SPRITE_SIZE
+	sprite.custom_minimum_size = RowStyle.SPRITE_SIZE
 	sprite.stretch_mode = TextureRect.STRETCH_KEEP
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sprite.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	if shiny: # the status-screen shiny symbol, overlaid on the sprite's top-right corner
-		var badge := _icon(ShinyPalette.shiny_icon(), BADGE_SIZE, SHINY_BADGE_COLOR)
-		badge.position = Vector2(SPRITE_SIZE.x - BADGE_SIZE.x, 0)
+		var badge := _icon(ShinyPalette.shiny_icon(), RowStyle.BADGE_SIZE, RowStyle.SHINY_BADGE_COLOR)
+		badge.position = Vector2(RowStyle.SPRITE_SIZE.x - RowStyle.BADGE_SIZE.x, 0)
 		sprite.add_child(badge)
 	return sprite
 

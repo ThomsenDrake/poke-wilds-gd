@@ -93,10 +93,8 @@ func close_screen() -> void:
 	visible = false
 	closed.emit()
 
-# Scenario seams (restyle design §2.2; the old Panel/Margin/VBox node reads).
-func step_title_label() -> Label: return _title_label
-func step_value_label() -> Label: return _value_label
-func seed_edit_active() -> bool: return _step == STEP_SEED and _digit_row.editing_active() # the old SeedPrompt-visible witness
+# Scenario seams (step_title_label/step_value_label/seed_edit_active) live in
+# creation_screen_render.gd with the step strings (the 220-wall extraction).
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or _generating: # input locked for the generating beat
@@ -179,7 +177,7 @@ func _begin() -> void:
 func _on_gen_timer_timeout() -> void:
 	if not visible or not _generating: # close_screen stopped the timer mid-beat
 		return
-	var creation := {"player_name": _committed_name(), "player_avatar": _avatar,
+	var creation := {"player_name": CreationRender.committed_name(self), "player_avatar": _avatar,
 		"shiny_odds": int(SessionState.SHINY_ODDS_CHOICES[_shiny_index]), "world_seed": _seed}
 	if _runtime != null:
 		_runtime.emit_trace("creation_confirmed", "CreationScreen", creation) # frozen contract, same moment as the signal
@@ -208,12 +206,6 @@ func _advance() -> void:
 
 func _overlay_open() -> bool:
 	return _name_entry.visible or _avatar_picker.visible
-
-func _committed_name() -> String:
-	return SessionState.DEFAULT_PLAYER_NAME if _name.is_empty() else _name
-
-func _seed_line() -> String:
-	return "RANDOM" if _seed < 0 else str(_seed)
 
 # Step strings live in creation_screen_render.gd (the 220-wall extraction);
 # they are the SAME pinned strings as the pre-restyle screen (design §2.2).

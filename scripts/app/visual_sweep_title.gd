@@ -20,6 +20,7 @@ extends RefCounted
 # both, hides both screens, and leaves the sweep's canonical state untouched.
 
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+const CreationRender := preload("res://scripts/ui/creation_screen_render.gd") # the step-label seams live here (creation_screen.gd's 220-wall extraction)
 
 const SHOT_SPLASH := "37_title_splash.png"
 const SHOT_ENTRIES := "38_title_entries.png"
@@ -69,13 +70,13 @@ static func _creation_shots(sweep: Node, creation: Control) -> void:
 	var tree: SceneTree = sweep.get_tree()
 	creation.open_screen() # the real seam main.gd wires; lands on the SEED step
 	if not _witness(sweep, SHOT_SEED,
-			creation.step_title_label().text == "WORLD SEED" and creation.step_value_label().text == "RANDOM",
+			CreationRender.step_title_label(creation).text == "WORLD SEED" and CreationRender.step_value_label(creation).text == "RANDOM",
 			"open_screen did not land on the WORLD SEED/RANDOM step"):
 		return
 	await sweep._capture(SHOT_SEED)
 	await SmokeTap.tap(tree, "action_a") # SEED -> SHINY
 	await SmokeTap.tap(tree, "action_a") # SHINY -> NAME
-	if not _witness(sweep, SHOT_NAME, creation.step_title_label().text == "NAME",
+	if not _witness(sweep, SHOT_NAME, CreationRender.step_title_label(creation).text == "NAME",
 			"the step navigation did not land on the NAME step"):
 		return
 	await SmokeTap.tap(tree, "action_a") # Z opens the name grid keyboard (cursor starts on A)
@@ -93,7 +94,7 @@ static func _creation_shots(sweep: Node, creation: Control) -> void:
 	if not _witness(sweep, SHOT_AVATAR, not entry.visible, "OK did not close the NameEntry grid"):
 		return
 	await SmokeTap.tap(tree, "action_a") # NAME -> AVATAR
-	if not _witness(sweep, SHOT_AVATAR, creation.step_title_label().text == "PLAYER",
+	if not _witness(sweep, SHOT_AVATAR, CreationRender.step_title_label(creation).text == "PLAYER",
 			"the step navigation did not land on the AVATAR step"):
 		return
 	await SmokeTap.tap(tree, "action_a") # Z opens the avatar picker (cursor 0: the sorted first set)
