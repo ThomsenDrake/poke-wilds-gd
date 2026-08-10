@@ -34,6 +34,7 @@ Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code o
 - `scripts/runtime/game_runtime.gd` instantiates + `setup()`s the new `field_move_runtime` beside the other runtimes (injected with the shared `_rng` and a `world_overridden.emit` callback so its way-stone/boulder placements re-render), and `generate_wild_encounter` short-circuits to `{}` while `field_move_runtime.repel_suppresses()` — BEFORE consuming any encounter rng (structural suppression).
 - `scripts/runtime/session_state.gd` gains the additive `repel_steps` counter (reset in `reset_for_new_game`, loaded in `apply_loaded_state`, saved in `to_save_payload`, decremented in `note_step_taken`). `SAVE_VERSION` is NOT bumped — it rides the v3/v4 additive-key pattern.
 
+
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
@@ -88,3 +89,7 @@ FROZEN by the rebuild: every public API, entry list, trace name/payload, latch s
 ## Custom Performance monitors (agent-neutral integration Phase 2 co-modification note)
 
 `scripts/runtime/performance_monitors.gd` (NEW) registers the `game/party_size`, `game/world_seed`, and `game/current_screen` custom monitors — ONE self-registering child node (`game_runtime.gd` spends exactly one `add_child` line): plain method Callables with values read off `get_parent()`, and `_exit_tree` unregisters because both lambda forms segfault at engine teardown on the pinned 4.6.1 binary. Queryable via `Performance.get_custom_monitor` even in release builds — the live-probe complement to the JSONL trace artifact. No behavior change.
+
+## Editor trace plugin (agent-neutral integration Phase 3 co-modification note)
+
+`scripts/core/trace_logger.gd` gains an ADDITIVE `EngineDebugger.send_message("agent_trace:event", [line])` hook behind `EngineDebugger.is_active()` — a strict no-op headless/exported, so file/stdout behavior is byte-identical to the pre-hook version. The opt-in `addons/agent_trace/` editor plugin (ships DISABLED by default; `project.godot` deliberately untouched) renders the live stream in a per-session debugger tab plus a bottom-panel activity log. Editor-only, never loaded in game runs; it visualizes the repo's own JSONL contract and gates nothing.
