@@ -213,6 +213,7 @@ def new_result(scenario: str, transport: str) -> dict[str, Any]:
     return {
         "scenario": scenario,
         "ok": False,
+        "error": None,
         "transport": transport,
         "duration_s": 0.0,
         "events_seen": [],
@@ -236,6 +237,7 @@ def finalize(
     collector: TraceCollector,
     exceptions: list[str],
     started: float,
+    error: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     requirements = SCENARIO_REQUIREMENTS[result["scenario"]]
     result["events_seen"] = sorted(collector.events)
@@ -258,6 +260,13 @@ def finalize(
         and not result["missing_any"]
         and not collector.failed_events
     )
+    # Error-as-directive: every red carries the structured {code, retryable,
+    # hint} envelope — explicit at the call site (dap_endpoint_unreachable), else
+    # derived from the named cause.
+    if error is not None:
+        result["error"] = error
+    elif not result["ok"]:
+        result["error"] = smoketest.scenario_failure_error(result)
     return result
 
 
@@ -272,7 +281,10 @@ def run_scenario_dap(project: Path, scenario: str, timeout: float, host: str, po
             sock = socket.create_connection((host, port), timeout=CONNECT_TIMEOUT_S)
         except OSError as exc:
             exceptions.append(f"Could not connect to the DAP endpoint at {host}:{port}: {exc}")
-            return finalize(result, collector, exceptions, started)
+            return finalize(result, collector, exceptions, started,
+                            error=smoketest.dap_unreachable_error(
+                                host, port,
+                                f"force the headless transport with {FORCE_HEADLESS_ENV}=1."))
         with sock:
             seq = 1
             handshake = [
@@ -576,6 +588,9 @@ def _print_failure_detail(result: dict[str, Any]) -> None:
     """Per-scenario failure payload lines, shared by the failures section and the
     quarantine section so a QUAR row stays as loud as a FAIL row."""
     name = result["scenario"]
+    error = result.get("error")
+    if error:
+        print(f"  {name}: error[{error['code']}] retryable={error['retryable']}: {error['hint']}")
     if result["missing_all"]:
         print(f"  {name}: missing required events: {', '.join(result['missing_all'])}")
     for group in result["missing_any"]:
@@ -779,6 +794,14 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     if seed_violations:
         result["sidecar_seed_violations"] = seed_violations
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "sidecar_seed_mismatch", False,
+                "Read the result's sidecar_seed_violations — each entry names the drifted "
+                "shot/kind; a sweep must capture under ONE crafted world_seed with a unique "
+                "shot_seq equal to the committed baselines. Fix the capture so it re-pins the "
+                "frozen world (or deliberately accept new baselines via the _update lane), "
+                f"then re-run: python3 tools/run_playtests.py --scenario {scenario}.")
 
     # The explainable region diff below is compare-mode only, scoped to the families
     # that carry the R4 coded-region oracle (REGION_ORACLE_SCENARIOS: main + the
@@ -798,6 +821,11 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     except Exception as exc:  # a broken region tool must not silently pass
         result.setdefault("exceptions", []).append(f"region diff failed: {exc}")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "region_gate_failed", True,
+                f"The region diff tool crashed: {exc}; re-run once to rule out a "
+                f"transient load failure, else investigate tools/visual_region_diff.py.")
         return
     result["region_failures"] = verdict["region_failures"]
     result["region_quarantine"] = verdict["quarantine"]
@@ -811,8 +839,21 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
     if verdict["errors"]:
         result.setdefault("exceptions", []).extend(f"region diff: {e}" for e in verdict["errors"])
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "region_gate_failed", True,
+                "Read the result's exceptions — the region diff tool reported errors; "
+                "re-run once to rule out a transient failure, else investigate "
+                "tools/visual_region_diff.py.")
     if verdict["region_failures"]:
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "region_gate_failed", False,
+                "Read the result's region_failures (RED-tier ink/canary/string/label diffs "
+                "per shot) and the artifacts under .godot-smoke/region-diff/; fix the "
+                "rendering regression or deliberately accept new baselines: python3 "
+                f"tools/run_playtests.py --scenario {scenario}_update, then review and commit.")
 
 
 _TOOL_MODULES: dict[str, Any] = {}
@@ -878,6 +919,12 @@ def apply_contrast_cvd(project: Path, result: dict[str, Any]) -> None:
     except Exception as exc:  # a broken tool must not silently pass
         result.setdefault("exceptions", []).append(f"contrast/cvd check failed: {exc}")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "contrast_failed", True,
+                f"The contrast/CVD tool crashed: {exc}; re-run once to rule out a "
+                f"transient load failure, else investigate tools/contrast_check.py / "
+                f"tools/cvd_sim.py.")
         return
     result["contrast_findings"] = contrast_verdict["findings"]
     result["contrast_images_checked"] = contrast_verdict.get("images_checked", 0)
@@ -885,11 +932,30 @@ def apply_contrast_cvd(project: Path, result: dict[str, Any]) -> None:
     if contrast_verdict.get("errors"):
         result.setdefault("exceptions", []).extend(f"contrast: {e}" for e in contrast_verdict["errors"])
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "contrast_failed", True,
+                "Read the result's exceptions — the contrast check reported errors; "
+                "re-run once to rule out a transient failure, else investigate "
+                "tools/contrast_check.py.")
     if cvd_verdict.get("errors"):
         result.setdefault("exceptions", []).extend(f"cvd: {e}" for e in cvd_verdict["errors"])
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "contrast_failed", True,
+                "Read the result's exceptions — the CVD simulation reported errors; "
+                "re-run once to rule out a transient failure, else investigate "
+                "tools/cvd_sim.py.")
     if CONTRAST_GRADUATED and result["contrast_findings"]:
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "contrast_failed", False,
+                "Read the result's contrast_findings (each names shot, label_text, and "
+                "ratio vs need); fix the low-contrast labels (re-tone the text or its "
+                "background), then re-run: python3 tools/run_playtests.py "
+                "--scenario visual_sweep.")
 
 
 def _record_vision_review(result: dict[str, Any], doc: dict[str, Any], review_path: Path) -> dict[str, Any]:
@@ -990,10 +1056,22 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
     except Exception as exc:
         result.setdefault("exceptions", []).append(f"required vision review failed: {exc}")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "vision_review_failed", True,
+                f"Re-run the scenario (the mandatory review retries with it): "
+                f"python3 tools/run_playtests.py --scenario {scenario}; if the reviewer keeps "
+                f"failing, check VISION_REVIEWER_CMD (default: python3 tools/vlm_reviewer.py).")
         return
     if not isinstance(doc, dict) or not vision_review.review_is_fresh(doc, shots_dir, baseline_dir):
         result.setdefault("exceptions", []).append("required vision review produced a stale manifest")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "vision_review_stale", True,
+                f"Re-run the scenario to regenerate a fresh review manifest: "
+                f"python3 tools/run_playtests.py --scenario {scenario} (the manifest must match "
+                f"the shots on disk).")
         return
     coverage = (doc.get("rubric_coverage") or {}).get("totals") or {}
     reviewer_kinds = set((doc.get("rubric_coverage") or {}).get("reviewer_kinds_ran") or [])
@@ -1005,6 +1083,12 @@ def apply_vision_review(project: Path, result: dict[str, Any]) -> None:
             "required vision review incomplete: a vision-capable model must review every shot and answer every rubric question"
         )
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "vision_review_incomplete", False,
+                f"Point VISION_REVIEWER_CMD at a vision-capable reviewer that reviews every shot "
+                f"and answers every rubric question, then re-run: python3 tools/run_playtests.py "
+                f"--scenario {scenario}.")
         return
     written = _record_vision_review(result, doc, review_path)
     print(f"  {scenario}: required vision review {written['findings']} finding(s), "
@@ -1101,7 +1185,8 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
     render_introspection collects it) are recorded UNVERIFIABLE, never silently
     passed. An empty registry is a no-op (the gate arms once >=1 anchor exists).
     """
-    if result.get("scenario") not in SWEEP_GATE_SCENARIOS:
+    scenario = str(result.get("scenario"))
+    if scenario not in SWEEP_GATE_SCENARIOS:
         return
     if result.get("transport") == "skipped-headless":
         return  # nothing captured to gate
@@ -1111,6 +1196,12 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
     except Exception as exc:  # a broken anchor tool must not silently pass
         result.setdefault("exceptions", []).append(f"art-anchor gate failed to load: {exc}")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "anchor_refused", True,
+                f"The art-anchor gate failed to load: {exc}; re-run once to rule out a "
+                f"transient import failure, else investigate tools/check_art_anchors.py / "
+                f"tools/art_geometry.py.")
         return
     registry = geometry.load_registry(project)
     if not registry:
@@ -1148,6 +1239,14 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
                       f"(tol {item['tol_px']}px). Restored {restored} prior baseline file(s); "
                       f"fix the alignment, not the baseline.")
             result["ok"] = False
+            if result.get("error") is None:
+                result["error"] = smoketest.error_envelope(
+                    "anchor_refused", False,
+                    "Read the result's anchor_refusals — an anchored element's live rect "
+                    "violates its art anchor (docs/registry/art-anchors.toml); the baseline "
+                    "regeneration was REFUSED and the prior baseline files restored. Fix the "
+                    f"alignment, not the baseline, then re-run: python3 "
+                    f"tools/run_playtests.py --scenario {scenario}.")
         else:
             result["anchor_gate"] = {"mode": "update", "violations": 0,
                                      "unverifiable": len(unverifiable)}
@@ -1162,6 +1261,13 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
         if ANCHOR_DRIFT_GRADUATED:
             result["anchor_drift_failures"] = violations
             result["ok"] = False  # graduated: anchor drift is coded red
+            if result.get("error") is None:
+                result["error"] = smoketest.error_envelope(
+                    "anchor_drift_failed", False,
+                    "Read the result's anchor_drift_failures — a live element drifted off "
+                    "its registered art anchor (docs/registry/art-anchors.toml); realign the "
+                    "element (or move the anchor deliberately), then re-run: python3 "
+                    f"tools/run_playtests.py --scenario {scenario}.")
         quarantine = result.setdefault("anchor_drift_quarantine", [])
         for item in violations:
             quarantine.append({"kind": "anchor_drift", "shot": item["shot"],
@@ -1187,6 +1293,16 @@ SOAK_WARNING_PIN_REL = Path("docs") / "generated" / "soak-warning-baseline.json"
 
 def _soak_warning_pin_path(project: Path) -> Path:
     return project / SOAK_WARNING_PIN_REL
+
+
+def _soak_pin_write_error(scenario: str) -> dict[str, Any]:
+    """The retryable envelope for a failed soak-pin write; shared by the
+    bootstrap-write and update-write paths so both name the identical directive."""
+    return smoketest.error_envelope(
+        "soak_tripwire", True,
+        f"The soak warning pin could not be written ({SOAK_WARNING_PIN_REL}); "
+        f"check the path is writable, then re-run: "
+        f"python3 tools/run_playtests.py --scenario {scenario}.")
 
 
 def _load_soak_warning_pin(project: Path) -> tuple[dict[str, Any] | None, list[str]]:
@@ -1225,8 +1341,19 @@ def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
     pin, errors = _load_soak_warning_pin(project)
     if errors:
         # A corrupt committed pin is a real defect, not a bootstrap -- red with cause.
-        result.setdefault("exceptions", []).extend(errors)
+        # Not an exceptions-array case: a deterministic pin red carries its own
+        # non-retryable gate code, so the error array stays for script errors.
+        result["soak_warning_tripwire"] = {
+            "scenario": scenario, "count": count, "pinned": None,
+            "bootstrapped": False, "pin_errors": errors}
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "soak_tripwire", False,
+                "Read the result's soak_warning_tripwire.pin_errors — the committed pin "
+                f"{SOAK_WARNING_PIN_REL} is unreadable/corrupt; repair it (or delete it, "
+                f"re-run to re-bootstrap, and commit the fresh pin), then re-run: "
+                f"python3 tools/run_playtests.py --scenario {scenario}.")
         return
 
     pin_path = _soak_warning_pin_path(project)
@@ -1244,6 +1371,8 @@ def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
             result.setdefault("exceptions", []).append(
                 f"soak warning pin bootstrap write failed: {exc}")
             result["ok"] = False
+            if result.get("error") is None:
+                result["error"] = _soak_pin_write_error(scenario)
         result["soak_warning_tripwire"] = {
             "scenario": scenario, "count": count, "pinned": None, "bootstrapped": True}
         return
@@ -1261,6 +1390,8 @@ def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
             result.setdefault("exceptions", []).append(
                 f"soak warning pin update failed: {exc}")
             result["ok"] = False
+            if result.get("error") is None:
+                result["error"] = _soak_pin_write_error(scenario)
         result["soak_warning_tripwire"] = {
             "scenario": scenario, "count": count, "pinned": None, "bootstrapped": True}
         return
@@ -1270,11 +1401,19 @@ def apply_soak_warning_tripwire(project: Path, result: dict[str, Any]) -> None:
         "scenario": scenario, "count": count, "pinned": pinned, "bootstrapped": False}
     if count > pinned:
         # REGRESSION: more warnings than pinned -- RED with the warning list payload.
+        # The cause lives in soak_warning_tripwire.warnings (not the exceptions
+        # array): a deterministic pin red must not masquerade as a retryable
+        # exceptions_captured flake.
         result["soak_warning_tripwire"]["warnings"] = messages
-        result.setdefault("exceptions", []).append(
-            f"soak warning tripwire: {scenario} emitted {count} warning(s) > pinned "
-            f"baseline {pinned}: {messages}")
         result["ok"] = False
+        if result.get("error") is None:
+            result["error"] = smoketest.error_envelope(
+                "soak_tripwire", False,
+                f"Read the result's soak_warning_tripwire.warnings — {scenario} emitted "
+                f"{count} warning(s) > the pinned baseline {pinned} ({SOAK_WARNING_PIN_REL}); "
+                f"fix the new warnings (or deliberately re-pin: remove the scenario's entry, "
+                f"re-run to re-bootstrap, and commit), then re-run: "
+                f"python3 tools/run_playtests.py --scenario {scenario}.")
 
 
 def _user_save_path(project: Path) -> Path | None:

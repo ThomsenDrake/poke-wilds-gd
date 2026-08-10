@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-09
+Last verified: 2026-08-10
 Review cadence days: 14
-Source paths: tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -78,8 +78,8 @@ lane certifies nothing, and no agent should treat it as a pass.
 ## Error-as-directive
 
 Every agent-facing failure this repo emits — tool exit, scenario failure, gate
-refusal — is a **directive, not a dead end**. The convention for any new
-agent-facing surface (and the shape existing surfaces already approximate):
+refusal — is a **directive, not a dead end**. The convention is emitted as
+plain JSON (no vendor channel) by the playtest suite and the local gate:
 
 - a **stable `code`** — machine-matchable, never reworded casually;
 - a **`retryable` flag** — whether re-running as-is can succeed;
@@ -97,6 +97,40 @@ Concrete example (the DAP-unreachable failure, structured):
   }
 }
 ```
+
+The builder (`error_envelope`) and the failure-class deriver
+(`scenario_failure_error`) are single-sourced in
+[tools/godot_dap_smoketest.py](../../tools/godot_dap_smoketest.py) and reused by
+both harnesses and the gate. Where the envelopes live:
+
+- **Per-scenario results** — every red entry in
+  `.godot-smoke/playtest-report.json` (and each `.godot-smoke/result-<scenario>.json`
+  from the DAP smoke runner) carries `"error": {code, retryable, hint}` (`null`
+  when green). Transport-derived reds are classified by `scenario_failure_error`:
+  `dap_endpoint_unreachable` (the editor endpoint is not listening; retryable),
+  `exceptions_captured` (a script error/timeout line is the named cause;
+  retryable), `scenario_failed` (a `<scenario>_failed` trace carries the
+  reasons; not retryable), `missing_required_events` (required trace events
+  absent; retryable — event timing is a known flake class). Every ok-flipping
+  post-step gate instead sets its own envelope at the flip site (never the
+  deriver): `region_gate_failed` (RED-tier region diffs not retryable, tool
+  crash/errors retryable — both transports), `sidecar_seed_mismatch` (not
+  retryable), `contrast_failed` (graduated findings not retryable, tool
+  crash/errors retryable), `anchor_refused` (baseline-regeneration refusal not
+  retryable, gate load crash retryable), `anchor_drift_failed` (graduated
+  drift; not retryable), `soak_tripwire` (corrupt pin / warning-count
+  regression not retryable, pin-write IO failure retryable), and the Lane-4
+  review codes `vision_review_failed` / `vision_review_stale` (retryable) /
+  `vision_review_incomplete` (not retryable). A deterministic pixel/seed/pin
+  red is NEVER labeled retryable — a plain re-run cannot pass, so the hint
+  names the exact gate artifact/command instead.
+- **`verify_all` refusals** — every row in the result's `refusals` array carries
+  `code` / `retryable` / `hint` beside `check` / `ok` / `detail` / `level`
+  (`null` for passing rows and envelope-less tool errors; the `detail` text and
+  exit-code semantics are unchanged). Stable codes: `stale_head_sha` (R1),
+  `report_invalid` (R2), `stamp_mismatch` (R3), `windowed_lane_missing` (R4),
+  `dap_endpoint_unreachable` (R5), `vision_review_stale` (R6, including its
+  warn-tier degradation under `--skip-windowed`).
 
 Existing exemplars of the convention: `verify_all`'s R5 refusal ("start the
 Godot editor with DAP on 127.0.0.1:6006, or pass `--skip-windowed`…"), the

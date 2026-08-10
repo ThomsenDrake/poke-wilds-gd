@@ -23,20 +23,19 @@ baseline capture_env + canonical window, windowed entries/transport, and
 vision-review freshness via vision_review.review_is_fresh — the ONE piece of
 reused logic, importlib-loaded, never forked; vision_metrics is never imported).
 
-Exit codes (most severe class wins):
-  0 GREEN        every step passed, no refusal fired
+Exit codes (most severe class wins; the full contract — precedence, the
+warn-degradation rules, the result-file schema — is docs/RELIABILITY.md § Local
+gate):
+  0 GREEN        every step passed, no exit-escalating refusal fired
   1 STEP_FAILURE trustworthy run that found real defects
   2 REFUSAL      evidence stale/mismatched — the run is NOT certified
   3 TOOL_ERROR   no valid result obtained (crash / timeout / binary missing)
 
 Honesty invariants: a transport-skip (headless visual_sweep) is NEVER a
 failure; a missing/stale report or stamp mismatch is a REFUSAL (never a silent
-pass); a missing Godot binary is a TOOL_ERROR (never a silent pass).
---skip-windowed reports the windowed lanes as SKIP, never PASS; the R6
-vision-review freshness check then degrades to a WARN — recorded and printed
-(counted under WARN in the summary and level="warn" in the result's refusals)
-but NEVER escalating the exit code, since a deliberately-skipped lane can
-neither certify nor block.
+pass); a missing Godot binary is a TOOL_ERROR; --skip-windowed reports the
+windowed lanes SKIP (never PASS) and degrades R6 to a recorded, printed WARN
+that never escalates the exit code.
 
 This is a LOCAL ritual — CI stays lint/contract-only; no workflow changes.
 Typical full-run wall time is ~1-2 minutes on this machine (~63s measured).
@@ -73,47 +72,19 @@ OUTPUT_TAIL_LINES = 40
 _UNSET = object()  # memoization sentinel (both cached values can legitimately be None/str)
 
 # Double-run determinism lane (deep-dive suite expansion), inserted AFTER S6: the
-# eleven rng-consumer scenarios run twice headless, each run persisting its ordered
+# ten rng-consumer scenarios run twice headless, each run persisting its ordered
 # trace JSONL, then determinism_verify.py's cmp --mode trace canonical-compares the
-# two trace sets (timing-stripped, key-sorted, order-sensitive). The per-group outer
-# budgets ([240, 300]s — each group's scenario count x the 45s per-scenario cap + 15s
-# cold-start overhead, index-aligned with the [5,6] groups) bound the two bounded runs
-# + the 10s compare; a
-# mismatch reds with the divergent event + both canonical payloads as the named
-# cause (miss-002). Phase 7: the two world-depth scenarios split ACROSS groups —
-# landmark_flow in group 1, Build 2's legendary_spawn in group 2 (self-pinned:
-# seed_for_smoke -> new_game -> rebuild; stamping is pure _mix, NO rng); Build 3's
-# world_chain (the ninth consumer) joined group 2 (self-pinned the same way; the
-# crossing path is pure SplitMix + an in-scenario double-run fingerprint).
-#
-# TENTH CONSUMER (Phase-7 audit, miss-002 loudness): night_cycle covers the
-# unlit-night ghost draws — night_system.gd:123,128, the shared game_runtime._rng
-# randf gate + the randi_range species pick — the ONE shared-stream consumer none
-# of the other ten ever enters: new games start at 10:00 (session_state
-# NEW_GAME_TIME_OF_DAY 600) and the playtest soaks never reach NIGHT_START 20:30
-# (day_phase 1230), so before this landed the ghost path could regress and replay
-# green in the lane (only S7's single run would red). night_cycle self-pins the
-# breed_flow way — seed_for_smoke BEFORE new_game + rebuild (the scenario co-mod;
-# a boot world rides the wall-clock root_seed and would red the cmp) — then drives
-# 40 crafted-dark draws at 23:00 (GHOST_CHANCE 0.5 on the pinned stream), so the
-# ghost draws replay cross-process here exactly as they fire in production. Each
-# scenario carries the 45s per-scenario cap; the per-group budgets are explicit
-# headroom, not a sum-stays-under hope.
-#
-# BUDGET RE-STAMP 2026-08-01 (repair): the overworld_mons gate scenario measures ~31s
-# end-to-end (determinism double-walk + the 11-band spawn walk + the charm/hostile/egg/
-# save battle drives + the disposition tails), so the original 30s per-scenario cap
-# truncated it MID-SCENARIO — a run SIGTERM'd at the deadline raced a run that self-quit
-# at ~30.1s, and the truncated tails diverged by exactly the save-reload re-spawn (or the
-# disposition probes) the shorter run never reached. A budget race, NOT a logic divergence:
-# two COMPLETED runs cmp byte-identical, ts-stripped (all eleven consumers re-proven green
-# under the retuned cap). Retune: cap 30->45s (~45% over the measured worst consumer),
-# outer [100,100]->[240,300]s. The configurable-encounters slice added encounter_config as a
-# consumer; the infinite-world slice RETIRED world_chain (the seamless plane has no edge to
-# cross), leaving TEN consumers regrouped [5,5]; each group's outer = its scenario count x the
-# 45s cap + 15s cold-start overhead (5x45+15=240 per group), so the outer budgets bound each
-# bounded run's worst case with headroom (measured group totals ~63-88s). Deviation recorded
-# in the repair report.
+# two trace sets (timing-stripped, key-sorted, order-sensitive); a mismatch reds
+# with the divergent event + both canonical payloads as the named cause (miss-002).
+# Every consumer must self-pin its seed (seed_for_smoke BEFORE new_game + rebuild —
+# a boot world rides the wall-clock root_seed and would red the cmp); night_cycle
+# rides that pattern to cover the unlit-night ghost draws no other consumer reaches
+# (new games start at 10:00; the soaks never hit NIGHT_START 20:30). The per-group
+# outer budgets are explicit headroom (count x the 45s cap + 15s cold start),
+# index-aligned with the [5,5] groups. The full history — consumer additions, the
+# retired world_chain, the 2026-08-01 30->45s budget re-stamp (a deadline-truncated
+# run raced a completed one: a budget race, NOT a logic divergence) — is
+# docs/RELIABILITY.md § Local gate S6b, the canonical narrative.
 DOUBLE_RUN_SCENARIOS = ["playtest_journey", "playtest_soak", "overworld_mons",
                         "encounter_config", "landmark_flow", "shiny_odds", "fishing_flow",
                         "breed_flow", "legendary_spawn", "night_cycle"]
@@ -142,15 +113,67 @@ def _load_run_playtests_constant(name: str):
     return getattr(_load_tool("run_playtests", ROOT / "tools" / "run_playtests.py"), name)
 
 
-# S9 windowed satellite sweep families (shots 15-23 + 26-27 + 30-34 minus retired,
-# windowed-diffed one-command alongside the main visual_sweep). SINGLE-SOURCED from
-# run_playtests.py (R3) so the orchestrator's loop and the runner's gates cover the
-# identical family set by construction. visual_sweep_fishing (26-27) is included in
-# the required model-review and windowed pixel lanes. world_depth ([31,32] + extra
-# [34]: the Ruins inner chamber, the Mansion room, the R11 heart tower — 33_beacon
-# RETIRED with world chaining) joins as the Phase 7 Build 1 landmark satellite
-# (world-depth.md § Smoke validation; its own seed + state).
+# S9 windowed satellite sweep families, windowed-diffed one-command alongside the
+# main visual_sweep. SINGLE-SOURCED from run_playtests.py (R3) so the orchestrator's
+# loop and the runner's gates cover the identical family set by construction; the
+# per-family shot ranges/retirement history live on the constant there.
 SATELLITE_SWEEP_SCENARIOS = list(_load_run_playtests_constant("SATELLITE_SWEEP_SCENARIOS"))
+
+# The error-as-directive envelope builders (agent-integration.md § Error-as-directive)
+# are single-sourced in the sibling smoke harness and reused here for the R1-R6
+# refusal rows — the same importlib load pattern as vision_review, never forked.
+_smoketest = _load_tool("godot_dap_smoketest", ROOT / "tools" / "godot_dap_smoketest.py")
+_error_envelope = _smoketest.error_envelope
+
+
+# Per-code refusal-envelope builders: ONE scannable home per stable code, so a
+# new/refined refusal edits a function here instead of hand-writing another
+# inline {code, retryable, hint} literal. The R1-R6 prose contracts stay in
+# docs/RELIABILITY.md § Local gate; the per-scenario gate codes live at the two
+# harnesses' flip sites.
+def _stale_head_sha_error() -> dict:
+    return _error_envelope(
+        "stale_head_sha", True,
+        "Re-run the gate on a clean HEAD: python3 tools/verify_all.py "
+        "(every report is re-stamped at the current HEAD each run).")
+
+
+def _report_invalid_error(partial: bool, rel: Path) -> dict:
+    if partial:
+        return _error_envelope(
+            "report_invalid", True,
+            f"Re-run the gate: python3 tools/verify_all.py — an interrupted "
+            f"run leaves a partial report; a fresh run re-stamps {rel}.")
+    return _error_envelope(
+        "report_invalid", True,
+        f"Delete the malformed report and re-run the gate: "
+        f"python3 tools/verify_all.py (it regenerates {rel} fresh).")
+
+
+def _stamp_mismatch_error() -> dict:
+    return _error_envelope(
+        "stamp_mismatch", False,
+        "Regenerate the baselines under this Godot "
+        "binary/renderer/window: python3 tools/run_playtests.py "
+        "--scenario visual_sweep_update, review and commit the "
+        "result, then re-run python3 tools/verify_all.py.")
+
+
+def _windowed_lane_error(scenario: str) -> dict:
+    return _error_envelope(
+        "windowed_lane_missing", True,
+        f"Run the pixel lane windowed (clear PLAYTEST_FORCE_HEADLESS from "
+        f"the env): python3 tools/run_playtests.py --scenario {scenario}, "
+        f"then re-run verify_all; or pass --skip-windowed to acknowledge "
+        f"the lane is skipped.")
+
+
+def _vision_stale_error(full: bool = True) -> dict:
+    hint = ("Re-run the windowed sweep to regenerate a fresh review: "
+            "python3 tools/run_playtests.py --scenario visual_sweep")
+    if full:
+        hint += " (the review manifest must match the shots on disk)"
+    return _error_envelope("vision_review_stale", True, hint + ".")
 
 # "warn" maps to GREEN on purpose: a warn-tier refusal (R6 vision-review
 # freshness under --skip-windowed) is recorded + printed but NEVER escalates
@@ -190,6 +213,25 @@ def _read_json(path: Path):
 def _tail(text: str) -> str:
     lines = (text or "").splitlines()
     return "\n".join(lines[-OUTPUT_TAIL_LINES:])
+
+
+def _counts(steps: list[dict], refusals: list[dict]) -> dict:
+    """One counting pass shared by the result JSON and the printed summary line
+    so the two surfaces can never disagree (finding: the printed TOOL_ERROR used
+    to be steps-only — refusal-level tool_errors merge into tool_errors here)."""
+    counts = {"passed": 0, "failed": 0, "skipped": 0, "refusals": 0,
+              "warnings": 0, "tool_errors": 0}
+    status_key = {"pass": "passed", "fail": "failed", "skip": "skipped",
+                  "tool_error": "tool_errors"}
+    for entry in steps:
+        key = status_key.get(entry["status"])
+        if key:
+            counts[key] += 1
+    level_key = {"refusal": "refusals", "warn": "warnings", "tool_error": "tool_errors"}
+    for refusal in refusals:
+        if not refusal["ok"] and refusal["level"] in level_key:
+            counts[level_key[refusal["level"]]] += 1
+    return counts
 
 
 def _invoke(argv: list[str], env: dict, timeout: float) -> dict:
@@ -243,6 +285,30 @@ class Runner:
         print(f"[SKIP]  {name:<40} ({reason})")
         return entry
 
+    def _run_windowed_playtest(self, scenario: str, report: Path, bin_: str,
+                               env_override: dict | None = None) -> dict | None:
+        """S8/S9 shared lane: SKIP honestly (skip_windowed / missing binary —
+        never a silent pass) or run one scenario windowed and return its entry
+        for the caller to certify."""
+        args = self.args
+        if args.skip_windowed:
+            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
+                             "windowed lane skipped (--skip-windowed)")
+            return None
+        if self.binary_missing:
+            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
+                             "godot binary missing (run_playtests exit 2)")
+            return None
+        return self.run_tool(
+            f"run_playtests:windowed:{scenario}", "windowed",
+            [sys.executable, "tools/run_playtests.py", "--scenario", scenario,
+             "--report", str(report.relative_to(ROOT)),
+             "--timeout", str(args.windowed_timeout), "--godot-bin", bin_],
+            pop_force_headless=True, env_override=env_override,
+            outer_timeout=args.windowed_timeout + 120, retry_once=True,
+            exit_map={0: "pass", 1: "fail", 2: "tool_error"},
+            extra={"report": str(report.relative_to(ROOT))})
+
     def run_tool(self, name: str, kind: str, argv: list[str], *,
                  env_override: dict | None = None, pop_force_headless: bool = False,
                  outer_timeout: float = 300.0, retry_once: bool = False,
@@ -285,15 +351,10 @@ class Runner:
             entry["status"] = mapping.get(code, "tool_error")
             if entry["status"] == "tool_error" and "error" not in entry:
                 entry["error"] = f"unexpected exit code {code}"
-            # Known honesty nuance (finding #2): an orchestrated tool that CRASHES
-            # with an unhandled Python exception exits 1, which every exit_map maps
-            # to "fail" — the same code it uses for "defects found". verify_all
-            # cannot distinguish a crash from a real failure on the exit code alone,
-            # and the tools own their 0/1(/2) contracts (left untouched by design).
-            # This stays honest — a crashed gate is reported non-pass (never a silent
-            # 0) — it is just labeled fail rather than tool_error. Timeouts and
-            # launch failures ARE tool_error (handled above); missing-binary is
-            # tool_error via exit 2 where the tools provide it.
+            # Known honesty nuance (finding #2): a crashed orchestrated tool exits
+            # 1 — indistinguishable from "defects found" on the code alone (the tools
+            # own their 0/1(/2) contracts, untouched by design), so a crash reports
+            # fail, never a silent pass. Timeouts/launch failures ARE tool_error.
         if count_issues and entry["status"] == "fail":
             # Count issues from the FULL captured output, not the ~40-line
             # output_tail, so a gate emitting more findings than the tail holds
@@ -328,8 +389,20 @@ class Runner:
                   file=sys.stderr)
 
     # -------------------------------------------------------------- refusals
-    def refuse(self, check: str, ok: bool, detail: str, level: str = "refusal") -> None:
-        self.refusals.append({"check": check, "ok": ok, "detail": detail, "level": level})
+    def refuse(self, check: str, ok: bool, detail: str, level: str = "refusal",
+               error: dict | None = None) -> None:
+        """Record one refusal row. `error` is the error-as-directive envelope
+        ({code, retryable, hint} from _error_envelope) for a NOT-ok row whose
+        failure maps to a stable code; the dict always carries the three keys
+        (None for passes and envelope-less tool_errors). `detail` and the
+        exit-code semantics are unchanged."""
+        refusal = {"check": check, "ok": ok, "detail": detail, "level": level,
+                   "code": None, "retryable": None, "hint": None}
+        if error:
+            refusal["code"] = error.get("code")
+            refusal["retryable"] = error.get("retryable")
+            refusal["hint"] = error.get("hint")
+        self.refusals.append(refusal)
         if not ok:
             if level == "refusal":
                 print(f"[REFUSE] {detail}")
@@ -360,9 +433,7 @@ class Runner:
         def py(rel: str) -> list[str]:
             return [sys.executable, f"tools/{rel}"]
 
-        # --- S1-S4: static gates (fast; failures surface at the top) ---
-        # S4.5 rides the same tuple: import_pokeapi.py --check fails non-zero when
-        # the committed catalog JSON is stale/missing vs the pinned-cache regen.
+        # --- S1-S4 + S4.5: static gates (fast; failures surface at the top) ---
         for name, tool, extra_argv in (
             ("check_repo_contracts", "check_repo_contracts.py", []),
             ("check_architecture", "check_architecture.py", []),
@@ -415,30 +486,15 @@ class Runner:
                 entry["error"] = f"Godot binary missing: {bin_} (run_playtests exit 2)"
             if not self.fail_fast_stop:
                 # --- S8: windowed ui_render_audit ---
-                if args.skip_windowed:
-                    self.record_skip("run_playtests:windowed:ui_render_audit", "windowed",
-                                     "windowed lane skipped (--skip-windowed)")
-                elif self.binary_missing:
-                    self.record_skip("run_playtests:windowed:ui_render_audit", "windowed",
-                                     "godot binary missing (run_playtests exit 2)")
-                else:
-                    entry = self.run_tool(
-                        "run_playtests:windowed:ui_render_audit", "windowed",
-                        py("run_playtests.py") + ["--scenario", "ui_render_audit",
-                                                  "--report", str(audit_report.relative_to(ROOT)),
-                                                  "--timeout", str(args.windowed_timeout),
-                                                  "--godot-bin", bin_],
-                        pop_force_headless=True,
-                        outer_timeout=args.windowed_timeout + 120, retry_once=True,
-                        exit_map=play_map,
-                        extra={"report": str(audit_report.relative_to(ROOT))})
-                    if entry["status"] in ("pass", "fail"):
-                        certified.append(audit_report)
-                # --- S9: windowed visual_sweep + the six satellite sweep families
-                # (shots 15-23 + 30-36 windowed-diffed one-command, single-sourced
-                # above; RUN LAST: freshest shots/review). The main sweep keeps
-                # sweep_report (post-refusals R4 + stamps key off it); each satellite
-                # gets its own report. ---
+                entry = self._run_windowed_playtest("ui_render_audit", audit_report, bin_)
+                if entry is not None and entry["status"] in ("pass", "fail"):
+                    certified.append(audit_report)
+                # --- S9: windowed visual_sweep + the satellite sweep families
+                # (single-sourced above; RUN LAST: freshest shots/review). The
+                # main sweep keeps sweep_report (post-refusals R4 + stamps key
+                # off it); each satellite gets its own report. Threaded per-shot
+                # review (Track D): 4 shot workers; the merged manifest is
+                # byte-identical to a sequential pass (proven 2026-08-07). ---
                 if not self.fail_fast_stop:
                     sweep_lanes = [("visual_sweep", sweep_report)] + [
                         (name, SMOKE_DIR / f"verify-{name}.json")
@@ -446,40 +502,18 @@ class Runner:
                     for scenario, report in sweep_lanes:
                         if self.fail_fast_stop:
                             break
-                        if args.skip_windowed:
-                            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
-                                             "windowed lane skipped (--skip-windowed)")
-                        elif self.binary_missing:
-                            self.record_skip(f"run_playtests:windowed:{scenario}", "windowed",
-                                             "godot binary missing (run_playtests exit 2)")
-                        else:
-                            entry = self.run_tool(
-                                f"run_playtests:windowed:{scenario}", "windowed",
-                                py("run_playtests.py") + ["--scenario", scenario,
-                                                          "--report", str(report.relative_to(ROOT)),
-                                                          "--timeout", str(args.windowed_timeout),
-                                                          "--godot-bin", bin_],
-                                pop_force_headless=True,
-                                # Threaded per-shot review (Track D): 4 shot workers,
-                                # reviewer subprocesses capped by vision_review's
-                                # default. The merged manifest is byte-identical to a
-                                # sequential pass (ordered merge, proven 2026-08-07).
-                                env_override={"VISION_REVIEW_WORKERS": "4"},
-                                outer_timeout=args.windowed_timeout + 120, retry_once=True,
-                                exit_map=play_map,
-                                extra={"report": str(report.relative_to(ROOT))})
-                            if entry["status"] in ("pass", "fail"):
-                                certified.append(report)
-                                if scenario == "visual_sweep":
-                                    self._vision_review_fresh()  # R6 memo: sample freshness the MOMENT the main sweep regenerated the review — later satellite captures land in .godot-smoke/shots and must not pollute the main-only manifest scope
+                        entry = self._run_windowed_playtest(
+                            scenario, report, bin_,
+                            env_override={"VISION_REVIEW_WORKERS": "4"})
+                        if entry is not None and entry["status"] in ("pass", "fail"):
+                            certified.append(report)
+                            if scenario == "visual_sweep":
+                                self._vision_review_fresh()  # R6 memo: sample freshness the MOMENT the main sweep regenerated the review — later satellite captures land in .godot-smoke/shots and must not pollute the main-only manifest scope
 
                 # --- S8.5: optional Command Code play agent (Track C.2) ---
-                # Default OFF locally; --with-play-agent opts in. Under
-                # --skip-windowed / missing binary it SKIP-with-reason (never PASS).
-                # The agent is windowed-only (real pixels + the in-engine
-                # play_agent scenario's injected input phases, driven over the
-                # windowed-subprocess transport — no DAP); headless force env is
-                # cleared so the agent can self-skip honestly.
+                # Default OFF locally (--with-play-agent opts in); windowed-only,
+                # so it SKIP-with-reason under --skip-windowed / a missing binary
+                # and the headless force env is cleared so it can self-skip honestly.
                 if not self.fail_fast_stop and getattr(args, "with_play_agent", False):
                     if args.skip_windowed:
                         self.record_skip("commandcode_play_agent", "windowed",
@@ -527,17 +561,13 @@ class Runner:
     def _run_double_determinism_lane(self, bin_: str) -> None:
         """S6.5 double-run determinism lane (after the S5-S6 pins/canary).
 
-        Runs the eleven rng-consumer scenarios twice headless, each run persisting its
-        ordered trace JSONL (--trace-dir), then canonical-compares the two trace
-        sets with determinism_verify.py's cmp --mode trace. Budget: 240+300s bounded
-        runs + 10s compare (the 2026-08-01 re-stamp retuned the per-scenario cap
-        30->45s — overworld_mons measures ~31s end-to-end, past the old cap; the
-        configurable-encounters slice added encounter_config as the eleventh consumer
-        and regrouped [5,5]->[5,6], so the per-group outer is [240,300]s = each group's
-        count x 45s + 15s cold start; deviation recorded in the repair report).
-        A trace mismatch reds with the divergent
-        event + both canonical payloads as the named cause (miss-002); a missing
-        binary skips honestly rather than faking a pass.
+        Runs the ten rng-consumer scenarios twice headless, each run persisting
+        its ordered trace JSONL (--trace-dir), then canonical-compares the two
+        trace sets with determinism_verify.py's cmp --mode trace. Budgets live on
+        the DOUBLE_RUN constants (ledger: RELIABILITY.md § Local gate S6b). A trace
+        mismatch reds with the divergent event + both canonical payloads as the
+        named cause (miss-002); a missing binary skips honestly rather than faking
+        a pass.
         """
         if self.binary_missing or not Path(bin_).exists():
             for label in ("run-A", "run-B", "cmp"):
@@ -558,10 +588,9 @@ class Runner:
                     except OSError:
                         pass
 
-        # Two groups (not one run of all) so each run's
-        # worst case fits its per-group outer budget with headroom; traces accumulate
-        # per dir across groups
-        # and the single cmp below compares the full eleven-scenario set.
+        # Two groups (not one run of all) so each run's worst case fits its
+        # per-group outer budget; traces accumulate per dir and the single cmp
+        # below compares the full ten-scenario set.
         for group_index, group in enumerate(DOUBLE_RUN_GROUPS, start=1):
             scenario_argv = [flag for name in group for flag in ("--scenario", name)]
             for label, trace_dir, report in (
@@ -615,13 +644,15 @@ class Runner:
                 continue
             if not isinstance(doc, dict):
                 self.refuse("report_shape", False,
-                            f"{rel} is not a JSON object — not a valid stamped report")
+                            f"{rel} is not a JSON object — not a valid stamped report",
+                            error=_report_invalid_error(False, rel))
                 continue
             missing = [k for k in STAMP_KEYS if k not in doc]
             if missing:
                 self.refuse("report_shape", False,
                             f"{rel} missing stamp key(s): {', '.join(missing)} — "
-                            f"not a valid stamped report")
+                            f"not a valid stamped report",
+                            error=_report_invalid_error(True, rel))
                 continue
             docs[path] = doc
             self.refuse("report_shape", True, f"{rel} carries all stamp keys")
@@ -631,7 +662,8 @@ class Runner:
             if doc.get("head_sha") != head:
                 self.refuse("report_head_sha", False,
                             f"{rel} head_sha {doc.get('head_sha')} != git HEAD {head} — "
-                            f"report is stale; re-run verify_all on a clean HEAD")
+                            f"report is stale; re-run verify_all on a clean HEAD",
+                            error=_stale_head_sha_error())
             else:
                 self.refuse("report_head_sha", True,
                             f"{rel} head_sha == HEAD {head[:10]}")
@@ -672,7 +704,8 @@ class Runner:
                                     f"under a different renderer/driver; regenerate")
                 if problems:
                     for problem in problems:
-                        self.refuse("windowed_stamps_vs_environment", False, problem)
+                        self.refuse("windowed_stamps_vs_environment", False, problem,
+                                    error=_stamp_mismatch_error())
                 else:
                     self.refuse("windowed_stamps_vs_environment", True,
                                 "godot_version/renderer/window match baseline capture_env + "
@@ -687,7 +720,8 @@ class Runner:
                 self.refuse("windowed_entries", False,
                             f"windowed visual_sweep entry missing or transport-skipped "
                             f"(transport={None if sweep_entry is None else sweep_entry.get('transport')})"
-                            f" — the pixel lane did not actually run")
+                            f" — the pixel lane did not actually run",
+                            error=_windowed_lane_error("visual_sweep"))
             else:
                 self.refuse("windowed_entries", True,
                             f"verify-visual_sweep.json carries a visual_sweep entry "
@@ -695,18 +729,11 @@ class Runner:
 
         # R4/R5 — ui_render_audit entry present + transport gate (a headless
         # fallback means the graduated red-tier pixel half never ran).
-        # NOTE (certification bar): the audit lane is certified on TRANSPORT alone
-        # here, NOT window-verified. R3's window/renderer/godot stamp check covers
-        # only `sweep` (the one report run_playtests stamps non-null); run_playtests
-        # emits null window/renderer/godot stamps for the DAP ui_render_audit run,
-        # so verify_all honestly cannot stamp-check the audit's pixel half against
-        # the baseline capture_env / canonical 1152x648 window (it does not
-        # fabricate). The audit's graduated red-tier findings are therefore gated by
-        # transport ∈ {dap, windowed} (R5) — i.e. a real renderer ran them — but
-        # are not independently window-verified the way the sweep's pixels are. The
-        # two windowed lanes are deliberately held to different bars; closing this
-        # would require run_playtests to stamp the DAP audit run, which would change
-        # an orchestrated tool's behavior (out of scope — it stays untouched).
+        # Certification bar: the audit lane is certified on TRANSPORT alone — R3's
+        # stamp check covers only `sweep` because run_playtests stamps null
+        # window/renderer/godot for the DAP audit run, and verify_all does not
+        # fabricate. Closing that would mean stamping the DAP audit run, which
+        # changes an orchestrated tool's behavior (out of scope by design).
         if audit is not None:
             audit_entry = next((item for item in audit.get("scenarios", [])
                                 if isinstance(item, dict)
@@ -715,7 +742,8 @@ class Runner:
                 self.refuse("windowed_entries", False,
                             "windowed ui_render_audit entry missing in "
                             "verify-ui_render_audit.json — the pixel lane did not "
-                            "actually run")
+                            "actually run",
+                            error=_windowed_lane_error("ui_render_audit"))
             else:
                 self.refuse("windowed_entries", True,
                             f"verify-ui_render_audit.json carries a ui_render_audit entry "
@@ -726,7 +754,10 @@ class Runner:
                                 f"ui_render_audit ran headless (transport={transport}) — its "
                                 f"graduated red-tier pixel half was not exercised; start the "
                                 f"Godot editor with DAP on 127.0.0.1:6006, or pass "
-                                f"--skip-windowed to acknowledge the lane is skipped")
+                                f"--skip-windowed to acknowledge the lane is skipped",
+                                error=_smoketest.dap_unreachable_error(
+                                    "127.0.0.1", 6006,
+                                    "pass --skip-windowed to acknowledge the lane is skipped."))
                 else:
                     self.refuse("ui_render_audit_transport", True,
                                 f"ui_render_audit transport={transport}")
@@ -744,23 +775,22 @@ class Runner:
                 self.refuse("vision_review_fresh", False,
                             "vision-review.json is stale vs current shots (review_is_fresh "
                             f"{'false' if fresh is False else fresh}) — manifest sha "
-                            f"mismatch; the next sweep regenerates it")
+                            f"mismatch; the next sweep regenerates it",
+                            error=_vision_stale_error(full=True))
         else:
             reason = ("windowed lanes skipped (--skip-windowed)" if args.skip_windowed
                       else "windowed visual_sweep produced no report")
             self.refuse("vision_review_fresh", fresh is True,
                         f"vision-review freshness not certified: {reason}; "
                         f"review_is_fresh={'true' if fresh is True else 'false/unavailable'}",
-                        level="warn")
+                        level="warn",
+                        error=None if fresh is True else _vision_stale_error(full=False))
 
-        # R7 — rubric-coverage honesty (advisory, NEVER red). When the sweep
-        # produced a FRESH vision-review.json, surface any shot-groups whose rubric
-        # questions have no fresh reviewer pass as a WARN: impossible to miss in the
-        # output, but warn maps to GREEN so coverage gaps never break the gate (the
-        # mechanized pilot _review row: "unanswered" is counted, never faked, never
-        # a failure). When coverage is uncertifiable (no fresh manifest / --skip-
-        # windowed) this stays silent — R6 already records that the review is
-        # uncertified, so there is no second, conflicting warn.
+        # R7 — rubric-coverage honesty (advisory, NEVER red): over a FRESH
+        # vision-review.json, shot-groups whose rubric questions have no fresh
+        # reviewer pass surface as a WARN (warn maps to GREEN, so coverage gaps
+        # never break the gate; "unanswered" is counted, never faked). Silent when
+        # uncertifiable — R6 already records that, so there is no second warn.
         coverage_gaps = self._vision_coverage_gaps()
         if coverage_gaps:
             self.refuse("rubric_coverage", False,
@@ -789,13 +819,10 @@ class Runner:
         return self._vision_fresh_cache
 
     def _vision_coverage_gaps(self):
-        """Rubric-coverage gap summaries from a FRESH vision-review.json, or None
-        when coverage cannot be certified (manifest absent/unreadable/stale, or it
-        predates the rubric-coverage ledger). Memoized; reuses the memoized R6
-        freshness check so the module/doc are not re-read. Coverage gaps are
-        ADVISORY (never red): they ride the WARN surface so they are impossible to
-        miss without ever breaking GREEN. Returns None (uncertifiable), [] (fresh,
-        no gaps), or [..] (fresh, with gaps)."""
+        """Rubric-coverage gap summaries from a FRESH vision-review.json: None
+        (uncertifiable), [] (fresh, no gaps), or [..] (fresh, with gaps). Memoized;
+        reuses the memoized R6 freshness check so the module/doc are not re-read.
+        Coverage gaps are ADVISORY (never red) — they ride the WARN surface."""
         if self._vision_coverage_cache is _UNSET:
             gaps = None
             if self._vision_review_fresh() is True:
@@ -834,7 +861,7 @@ class Runner:
         sweep_doc = sweep_doc if isinstance(sweep_doc, dict) else {}
         sidecar, _ = _read_json(BATTLE_SIDECAR)
         sidecar = sidecar if isinstance(sidecar, dict) else {}
-        capture_env = sidecar.get("capture_env", {}) if isinstance(sidecar, dict) else {}
+        capture_env = sidecar.get("capture_env", {})
         window_match = (sweep_doc.get("window") == CANONICAL_WINDOW == sidecar.get("window")
                         if sweep_doc.get("window") is not None else None)
         godot_match = (sweep_doc.get("godot_version") == capture_env.get("godot_version")
@@ -867,26 +894,7 @@ class Runner:
         return code
 
     def _write_result(self, head, args, exit_code, duration, stamps) -> None:
-        counts = {"passed": 0, "failed": 0, "skipped": 0, "refusals": 0,
-                  "warnings": 0, "tool_errors": 0}
-        for entry in self.steps:
-            if entry["status"] == "pass":
-                counts["passed"] += 1
-            elif entry["status"] == "fail":
-                counts["failed"] += 1
-            elif entry["status"] == "skip":
-                counts["skipped"] += 1
-            elif entry["status"] == "tool_error":
-                counts["tool_errors"] += 1
-        for refusal in self.refusals:
-            if refusal["ok"]:
-                continue
-            if refusal["level"] == "refusal":
-                counts["refusals"] += 1
-            elif refusal["level"] == "warn":
-                counts["warnings"] += 1
-            elif refusal["level"] == "tool_error":
-                counts["tool_errors"] += 1
+        counts = _counts(self.steps, self.refusals)
         result = {
             "schema": "verify-all/1",
             "head_sha": head,
@@ -911,9 +919,8 @@ class Runner:
         except OSError as exc:
             print(f"verify_all: could not write result file {json_path}: {exc}",
                   file=sys.stderr)
-        # Trend history (Track D): one slim record per run appended to the
-        # machine-local JSONL + the HTML dashboard re-rendered. Advisory only —
-        # a failure here warns on stderr, NEVER reds the gate.
+        # Trend history (Track D): machine-local JSONL + HTML re-render; advisory
+        # only — a failure here warns on stderr, NEVER reds the gate.
         try:
             trend = _load_tool("trend_report", ROOT / "tools" / "trend_report.py")
             total = trend.append_history(trend.slim_record(result))
@@ -924,23 +931,14 @@ class Runner:
                   file=sys.stderr)
 
     def _print_summary(self, exit_code, duration, stamps) -> None:
-        counts = {"pass": 0, "fail": 0, "skip": 0, "tool_error": 0}
-        for entry in self.steps:
-            counts[entry["status"]] = counts.get(entry["status"], 0) + 1
-        refusals = sum(1 for r in self.refusals if not r["ok"] and r["level"] == "refusal")
-        warns = sum(1 for r in self.refusals if not r["ok"] and r["level"] == "warn")
-        # Mirror _write_result (finding: printed TOOL_ERROR used to be steps-only):
-        # refusal-level tool_errors merge into the printed TOOL_ERROR count too, so
-        # the console line and the JSON summary.tool_errors agree and an R2-style
-        # refusal tool_error never vanishes from every printed counter.
-        tool_errors = (counts["tool_error"]
-                       + sum(1 for r in self.refusals
-                             if not r["ok"] and r["level"] == "tool_error"))
+        # Single-sourced with the JSON summary via _counts (finding: the printed
+        # TOOL_ERROR used to be steps-only; the merge now lives in ONE function).
+        counts = _counts(self.steps, self.refusals)
         print()
         print("==== verify_all summary ====")
-        print(f"PASS: {counts['pass']}  FAIL: {counts['fail']}  SKIP: {counts['skip']}  "
-              f"REFUSE: {refusals}  WARN: {warns}  TOOL_ERROR: {tool_errors}  "
-              f"(wall time {duration:.1f}s)")
+        print(f"PASS: {counts['passed']}  FAIL: {counts['failed']}  SKIP: {counts['skipped']}  "
+              f"REFUSE: {counts['refusals']}  WARN: {counts['warnings']}  "
+              f"TOOL_ERROR: {counts['tool_errors']}  (wall time {duration:.1f}s)")
         print("stamps:")
         print(f"  git_head:        {stamps['git_head']}")
         for name, sha in stamps["report_head_sha"].items():
