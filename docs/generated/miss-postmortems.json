@@ -283,9 +283,9 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
-          "tools/run_playtests.py": "5c7f33666c183b02eca9777aa18c6173ad0a3540e533ca996d0ed7c97bf3f47e",
-          "tools/godot_dap_smoketest.py": "45e5fb5079b1fa2294453b3c1f9587c18dd3abaf85f5975c10cb871e224ab6d0",
-          "tools/verify_all.py": "5cd123f0c17a66e198c849937646616c70928bf4d3683c31cb8d308c9303677a"
+          "tools/run_playtests.py": "5e658499bf1f0cf44acb8e38c4a432ccd9187d944d0c0e46513bbe6855ca7476",
+          "tools/godot_dap_smoketest.py": "1d82cb78e2690a8ff29406774fa30be6d14b19f177410cd230e139b33b3ea168",
+          "tools/verify_all.py": "714572208f2edbd1d536c1f66a9b7083ac53752fa712eb9f41344c814b9a4773"
         },
         "re_stamp_log": [
           {
@@ -700,6 +700,83 @@
             "old_pin": "7f39c5844ab1",
             "new_pin": "45e5fb5079b1",
             "reason": "legitimate edit (agent-neutral integration Phase 2): added the ui_tree_dump SCENARIO_REQUIREMENTS row (ui_tree_dump_passed all + the session_loaded|session_created any-pair; the symmetric ui_tree_dump_failed marker rides failed_event_entry, miss-002 loudness). Additive contract-table edit only; ERROR_MARKERS still carries 'ERROR: ' (:25), failed_event_entry still collects structured *_failed reasons (:540); the (A) determinism seam is untouched; the two nav_audit scope pins + the verify_all.py pin unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "45e5fb5079b1",
+            "new_pin": "fbd82518db58",
+            "reason": "legitimate edit (agent-surface completion sprint, Workstream B): single-sourced the error-as-directive envelope — error_envelope(code, retryable, hint) + dap_unreachable_error + scenario_failure_error (the failure-class deriver: exceptions_captured > scenario_failed > missing_required_events, post-step pixel gates falling back to scenario_failed) — and wired it into result_summary (a red summary now carries the structured error field), the DAP connect-failure path (an unreachable endpoint now writes result-<scenario>.json with the dap_endpoint_unreachable envelope instead of dying as a bare traceback; exit code stays 1), the windowed-skip summary (error: null), and the FAIL stdout line. The (C) honest-reporting mechanism is byte-for-byte untouched: ERROR_MARKERS still carries ('SCRIPT ERROR', 'Parse Error', 'ERROR: ') (:25), failed_event_entry still collects structured *_failed reasons; the (A) determinism seam is untouched; the two nav_audit scope pins unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "5c7f33666c18",
+            "new_pin": "c967c3b0f8b5",
+            "reason": "legitimate edit (agent-surface completion sprint, Workstream B): consumed the sibling harness's new envelope — new_result gains error: null, finalize populates the structured {code, retryable, hint} envelope on every red (explicit at the DAP connect-failure site as dap_endpoint_unreachable naming PLAYTEST_FORCE_HEADLESS=1, else derived via smoketest.scenario_failure_error), the three mandatory vision-review failure paths carry vision_review_failed / vision_review_stale / vision_review_incomplete, run_one backfills the envelope for post-step-gate reds (region/sidecar-seed/anchor/soak-tripwire), and _print_failure_detail prints the directive. finalize's ok contract is byte-for-byte unchanged (same four-term conjunction; the envelope is attached after it), ERROR_MARKERS + SCENARIO_REQUIREMENTS still single-sourced from the sibling harness, the TraceCollector failed_events collection untouched; the (A) determinism seam is untouched; the two nav_audit scope pins unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/verify_all.py",
+            "old_pin": "5cd123f0c17a",
+            "new_pin": "36484b7f194f",
+            "reason": "legitimate edit (agent-surface completion sprint, Workstream B): refuse() gains an optional error kwarg and every refusal dict now carries code/retryable/hint (null for passes and envelope-less tool_errors) built by the single-sourced godot_dap_smoketest.error_envelope (importlib-loaded like vision_review, never forked); the R1-R6 failure rows carry stale_head_sha / report_invalid / stamp_mismatch / windowed_lane_missing / dap_endpoint_unreachable / vision_review_stale. detail text, levels, and ALL exit-code semantics unchanged (the _verdict/_SEVERITY mapping untouched; the three keys are additive); the double-run x2 + cmp --mode trace mechanism untouched; the two nav_audit scope pins unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "fbd82518db58",
+            "new_pin": "a8246f34a92c",
+            "reason": "legitimate edit (agent-surface completion sprint, Workstreams D + F): registered dig_silence (the Phase-0 orphan — the scenario + dispatch existed; the harness simply could not select it) and legibility_soak (the NEW ui_tree x monitors x traces agreement gate) in SCENARIO_REQUIREMENTS, each as all:[<scenario>_passed] + the session_loaded|session_created any-pair with the symmetric *_failed marker riding failed_event_entry, mirroring the 2026-08-09 ui_tree_dump restamp exactly. Additive contract-table edits only: ERROR_MARKERS still carries ('SCRIPT ERROR', 'Parse Error', 'ERROR: ') (:25), failed_event_entry still collects structured *_failed reasons (:543); the (A) determinism seam is untouched (both scenarios self-pin seed_for_smoke BEFORE their drives); the two nav_audit scope pins + the verify_all.py pin unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "c967c3b0f8b5",
+            "new_pin": "323f78adceb3",
+            "reason": "legitimate edit (agent-surface completion sprint, Workstreams D + F): registered dig_silence (after battle_end_input, the qa_scenarios.gd adjacency) and legibility_soak (right after ui_tree_dump) in PLAYTEST_SCENARIOS — the single-sourced mirror of the sibling harness's new SCENARIO_REQUIREMENTS rows. Additive list edit only; the miss-002 honest-reporting mechanism (ERROR_MARKERS single-sourcing from the sibling harness :140, SCENARIO_REQUIREMENTS likewise :56, the TraceCollector failed_events collection, finalize's four-term ok contract) is byte-for-byte untouched; the (A) determinism seam is untouched; the two nav_audit scope pins + the verify_all.py pin unchanged and still hold"
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "a8246f34a92c",
+            "new_pin": "5618890b2ae7",
+            "reason": "legitimate edit (strict-review remedies F2+F4): dap_unreachable_error parameterized to (host, port, fallback_hint) so both harnesses share one builder with one phrasing (verify_all's R5 now calls it too); result_summary gains finalize's optional error= param; apply_region_step's three ok-flip sites set region_gate_failed envelopes at the flip site (retryable only on tool crash/errors, false on red-tier failures); scenario_failure_error's string-guessing fallthrough DELETED (the three derive cases — exceptions_captured / scenario_failed / missing_required_events — are the only ones; no-match returns None) and the post-region-step catch-all guard deleted; a DAP debugger stopped/exception event now appends its text to exceptions so that red classifies as exceptions_captured. The proved (C) honest-reporting mechanism is re-verified intact in the drifted bytes: ERROR_MARKERS still carries 'ERROR: ' (:25), failed_event_entry still collects structured *_failed reasons (:562), result_summary's ok contract unchanged; the (A) determinism seam untouched. Old pin: a8246f34a92c…."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "323f78adceb3",
+            "new_pin": "4eba3af1850c",
+            "reason": "legitimate edit (strict-review remedy F2): every ok-flipping post-step gate now sets its own {code, retryable, hint} envelope at the flip site, exactly like apply_vision_review — region gate (region_gate_failed; sidecar_seed_mismatch), contrast/CVD (contrast_failed), art anchors (anchor_refused / anchor_drift_failed), soak tripwire (soak_tripwire); deterministic pixel/seed/pin reds carry retryable=false and the soak tripwire's corrupt-pin/regression reds no longer append to exceptions (exceptions_captured narrows back to script errors/timeouts); the run_one catch-all deriver guard is deleted. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness (:140), failed_event_entry still collects the structured reasons (:184), finalize's four-term ok contract unchanged (:257-262); the scenario lists/requirements tables are untouched. Old pin: 323f78adceb3…."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/verify_all.py",
+            "old_pin": "36484b7f194f",
+            "new_pin": "714572208f2e",
+            "reason": "legitimate edit (strict-review remedy F3): the nine inline _error_envelope literals deduplicated into per-code module-level builders beside the single-sourced import (_stale_head_sha_error / _report_invalid_error / _stamp_mismatch_error / _windowed_lane_error / _vision_stale_error, and the shared smoketest dap_unreachable_error for R5) — builder outputs proven byte-identical to the replaced literals; the JSON-summary and printed-line counts single-sourced into _counts; the S8/S9 windowed lanes share _run_windowed_playtest; stale narrative re-stamped to committed reality (ten consumers, [5,5] groups, [240,240]s budgets) with the history pointed at RELIABILITY.md § Local gate S6b. File back under the 1000-line wall (998). No behavior change: R1-R6 checks, exit codes, and refusal payloads untouched. Old pin: 36484b7f194f…."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "4eba3af1850c",
+            "new_pin": "54269083c905",
+            "reason": "legitimate edit (approved-sprint non-blocking review nits N1+N2): apply_vision_review's three envelope assignments (vision_review_failed / vision_review_stale / vision_review_incomplete) gained the house first-red-wins guard (if result.get(\"error\") is None:) so a reviewer crash can no longer mask an already-named deterministic red from the region/contrast post-steps that run earlier — matching the idiom of the 15 guarded sibling flip sites; and the verbatim-duplicated soak pin-write OSError envelope literal was extracted into the module-level _soak_pin_write_error(scenario) builder beside _soak_warning_pin_path (same instinct as verify_all's per-code builders), called from both the bootstrap-write and update-write paths with byte-identical envelope output. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness (:140), SCENARIO_REQUIREMENTS likewise (:56), failed_event_entry still collects the structured reasons (:184), finalize's four-term ok contract unchanged (:257-262); the (A) determinism seam is untouched; the two nav_audit scope pins + the verify_all.py pin unchanged and still hold. Old pin: 4eba3af1850c…."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/run_playtests.py",
+            "old_pin": "54269083c905",
+            "new_pin": "5e658499bf1f",
+            "reason": "legitimate edit (PR-split landing, stack/08-harness-error-envelopes): this branch carries only the sprint's error-as-directive envelope changes for this file; the scenario registrations (dig_silence / legibility_soak rows) land in the stacked stack/09 branch, which re-stamps to the sprint-final bytes. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged. Old pin: 54269083c905..."
+          },
+          {
+            "date": "2026-08-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "5618890b2ae7",
+            "new_pin": "1d82cb78e269",
+            "reason": "legitimate edit (PR-split landing, stack/08-harness-error-envelopes): this branch carries only the sprint's error-as-directive envelope changes for this file; the scenario registrations (dig_silence / legibility_soak rows) land in the stacked stack/09 branch, which re-stamps to the sprint-final bytes. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged. Old pin: 5618890b2ae7..."
           }
         ]
       },

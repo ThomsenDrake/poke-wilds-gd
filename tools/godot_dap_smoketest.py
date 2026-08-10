@@ -554,6 +554,67 @@ def failed_event_entry(trace: dict[str, Any]) -> dict[str, Any] | None:
     return {"event": event, "payload": payload}
 
 
+def error_envelope(code: str, retryable: bool, hint: str) -> dict[str, Any]:
+    """The error-as-directive triple (agent-integration.md § Error-as-directive):
+    a stable machine-matchable code, whether re-running as-is can succeed, and an
+    imperative hint naming the exact next action. Plain JSON on every agent-facing
+    failure surface — scenario results, verify_all refusals — never a vendor
+    channel. Single-sourced here; run_playtests.py and verify_all.py import it so
+    both harnesses and the gate speak the same codes."""
+    return {"code": code, "retryable": retryable, "hint": hint}
+
+
+def dap_unreachable_error(host: str, port: int, fallback_hint: str) -> dict[str, Any]:
+    """The canonical envelope (the agent-integration.md worked example): the
+    editor's DAP endpoint is not listening. BOTH harnesses build it here so the
+    directive keeps one phrasing; `fallback_hint` is the caller's own fallback —
+    run_playtests passes its PLAYTEST_FORCE_HEADLESS env toggle, the DAP-only
+    smoke runner its headless/windowed re-run command (it has no in-process
+    fallback transport to name)."""
+    return error_envelope(
+        "dap_endpoint_unreachable", True,
+        f"Start the Godot editor with this project open (DAP listens on {host}:{port}), "
+        f"then re-run; or {fallback_hint}")
+
+
+def scenario_failure_error(result: dict[str, Any]) -> dict[str, Any] | None:
+    """Derive the stable error envelope for a RED scenario result (None when green).
+
+    Shared by both harnesses so the DAP and headless/windowed transports classify
+    failures identically. Priority: a captured exception outranks a
+    <scenario>_failed trace, which outranks bare missing events — the most
+    upstream cause names the red (miss-002: a silent script error must never
+    surface as a flat 'missing required events').
+
+    These three derive cases are the ONLY ones. Every ok-flipping post-step gate
+    (region diff, sidecar seeds, contrast, anchors, soak tripwire, vision review)
+    sets its own envelope at the flip site, so a red that matches none of them
+    returns None rather than string-guessing at field names that may not exist
+    on this transport. `exceptions_captured` names script errors/timeouts only —
+    a deterministic gate red carries its own non-retryable gate code instead.
+    """
+    if result.get("ok"):
+        return None
+    scenario = str(result.get("scenario", "?"))
+    rerun = f"python3 tools/run_playtests.py --scenario {scenario}"
+    if result.get("exceptions"):
+        return error_envelope(
+            "exceptions_captured", True,
+            f"Read the result's exceptions array — each entry names the script error or "
+            f"timeout; re-run once to rule out a flake: {rerun}.")
+    if result.get("failed_events"):
+        return error_envelope(
+            "scenario_failed", False,
+            f"Read the result's failed_events payload (the {scenario}_failed trace carries "
+            f"its reasons); fix the named failure, then re-run: {rerun}.")
+    if result.get("missing_all") or result.get("missing_any"):
+        return error_envelope(
+            "missing_required_events", True,
+            f"Re-run once (event timing is a known flake class): {rerun}; if it persists, "
+            f"diff missing_all/missing_any against events_seen and investigate the missing emitters.")
+    return None
+
+
 def write_smoke_request(project_path: Path, scenario: str) -> Path:
     request_path = project_path / ".godot-smoke" / "scenario.json"
     request_path.parent.mkdir(parents=True, exist_ok=True)
@@ -567,17 +628,20 @@ def result_summary(
     had_exception: bool,
     failed_events: list[dict[str, Any]] | None = None,
     exceptions: list[str] | None = None,
+    error: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Total-run summary: a red ALWAYS names its cause — a missing required
     event, a DAP/ERROR exception, or a structured <scenario>_failed trace
     (failed_event_entry). The failed_events/exceptions fields mirror the
-    run_playtests report so both transports report identically."""
+    run_playtests report so both transports report identically. The optional
+    `error` envelope mirrors run_playtests.finalize's parameter: explicit at
+    the call site (dap_endpoint_unreachable), else derived from the named cause."""
     requirements = SCENARIO_REQUIREMENTS[scenario]
     missing_all = sorted(event for event in requirements["all"] if event not in events)
     missing_any = [group for group in requirements["any"] if not any(event in events for event in group)]
     failed_events = failed_events or []
     exceptions = exceptions or []
-    return {
+    summary = {
         "scenario": scenario,
         "events_seen": sorted(events),
         "missing_all": missing_all,
@@ -586,7 +650,13 @@ def result_summary(
         "failed_events": failed_events,
         "exceptions": exceptions,
         "ok": not had_exception and not exceptions and not missing_all and not missing_any and not failed_events,
+        "error": None,
     }
+    if error is not None:
+        summary["error"] = error
+    elif not summary["ok"]:
+        summary["error"] = scenario_failure_error(summary)
+    return summary
 
 
 def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]) -> dict[str, Any]:
@@ -621,6 +691,11 @@ def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]
         summary["had_exception"] = True
         summary["ok"] = False
         summary["region_error"] = str(exc)
+        if summary.get("error") is None:
+            summary["error"] = error_envelope(
+                "region_gate_failed", True,
+                f"The region diff tool crashed: {exc}; re-run once to rule out a "
+                f"transient load failure, else investigate tools/visual_region_diff.py.")
         return summary
     summary["region_failures"] = verdict["region_failures"]
     summary["region_quarantine"] = verdict["quarantine"]
@@ -632,8 +707,21 @@ def apply_region_step(project_path: Path, scenario: str, summary: dict[str, Any]
         summary["had_exception"] = True
         summary["ok"] = False
         summary["region_errors"] = verdict["errors"]
+        if summary.get("error") is None:
+            summary["error"] = error_envelope(
+                "region_gate_failed", True,
+                "Read the result's region_errors — the region diff tool reported errors; "
+                "re-run once to rule out a transient failure, else investigate "
+                "tools/visual_region_diff.py.")
     if verdict["region_failures"]:
         summary["ok"] = False
+        if summary.get("error") is None:
+            summary["error"] = error_envelope(
+                "region_gate_failed", False,
+                "Read the result's region_failures (RED-tier ink/canary/string/label diffs "
+                "per shot) and the artifacts under .godot-smoke/region-diff/; fix the "
+                "rendering regression or deliberately accept new baselines: python3 "
+                f"tools/run_playtests.py --scenario {scenario}_update, then review and commit.")
     return summary
 
 
@@ -675,6 +763,7 @@ def main() -> int:
             "missing_any": [],
             "had_exception": False,
             "ok": True,
+            "error": None,
             "skipped_reason": reason,
         }
         result_file.parent.mkdir(parents=True, exist_ok=True)
@@ -689,7 +778,29 @@ def main() -> int:
     seq = 1
 
     try:
-        with socket.create_connection((args.host, args.port), timeout=3) as sock:
+        sock = socket.create_connection((args.host, args.port), timeout=3)
+    except OSError as exc:
+        # Error-as-directive: an unreachable endpoint used to die as a bare
+        # traceback with no result file; now the red lands as a structured
+        # envelope in result-<scenario>.json. Exit code stays 1, as the
+        # unhandled OSError produced before.
+        if request_path.exists():
+            request_path.unlink()
+        exceptions.append(f"Could not connect to the DAP endpoint at {args.host}:{args.port}: {exc}")
+        summary = result_summary(
+            args.scenario, events_seen, had_exception, failed_events, exceptions,
+            error=dap_unreachable_error(
+                args.host, args.port,
+                f"drive the scenario over the headless/windowed transport: "
+                f"python3 tools/run_playtests.py --scenario {args.scenario}."))
+        result_file.parent.mkdir(parents=True, exist_ok=True)
+        result_file.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+        print("RESULT: FAIL")
+        print(f"error[{summary['error']['code']}]: {summary['error']['hint']}")
+        return 1
+
+    try:
+        with sock:
             send(
                 sock,
                 {
@@ -744,6 +855,11 @@ def main() -> int:
                                 failed_events.append(entry)
                     elif event == "stopped" and body.get("reason") == "exception":
                         had_exception = True
+                        # Name the cause in exceptions too, so the envelope
+                        # deriver classifies this red as exceptions_captured
+                        # (a silent had_exception flip would otherwise leave
+                        # the result's error envelope null).
+                        exceptions.append(str(body.get("text", "Unknown debugger exception")))
                         print(f"Exception: {body.get('text', 'Unknown debugger exception')}")
                     elif event == "terminated":
                         end = min(end, time.time() + 0.2)
@@ -776,6 +892,9 @@ def main() -> int:
         return 0
 
     print("RESULT: FAIL")
+    if summary.get("error"):
+        print(f"error[{summary['error']['code']}] retryable={summary['error']['retryable']}: "
+              f"{summary['error']['hint']}")
     if summary["missing_all"]:
         print("Missing required events:", ", ".join(summary["missing_all"]))
     if summary["missing_any"]:
