@@ -14,6 +14,7 @@ func emit_event(event_name: String, source: String, payload: Dictionary = {}) ->
 	var line = JSON.stringify(record)
 	print(line)
 	_append_line(line)
+	_send_to_debugger(line)
 
 
 func warning(source: String, message: String, payload: Dictionary = {}) -> void:
@@ -32,3 +33,12 @@ func _append_line(line: String) -> void:
 		file.seek_end()
 	file.store_line(line)
 	file.close()
+
+
+# Editor-legibility mirror for addons/agent_trace: with no debugger attached
+# (headless, scenario, and export runs) the guard makes this a strict no-op,
+# so print + file behavior stays byte-identical to the pre-hook logger.
+func _send_to_debugger(line: String) -> void:
+	if not EngineDebugger.is_active():
+		return
+	EngineDebugger.send_message("agent_trace:event", [line])

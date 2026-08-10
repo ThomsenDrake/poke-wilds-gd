@@ -167,6 +167,17 @@ code_paths = [
   "scripts/runtime/cry_player.gd",
   "scripts/runtime/smoke_scenario_runner.gd",
   "scripts/runtime/performance_monitors.gd",
+  # AGENT-NEUTRAL INTEGRATION Phase 3: the opt-in editor plugin lives outside the
+  # scripts/ layer layout (addons/ is the editor-extension root — derive_layer
+  # deliberately does not reach it, so the files are registered here for registry
+  # visibility only; check_architecture never scans them). plugin.cfg is the
+  # enable-gate manifest; the README (comment-owned docs, the house style)
+  # documents the "agent_trace:event" message contract.
+  "addons/agent_trace/agent_trace_plugin.gd",
+  "addons/agent_trace/agent_trace_debugger.gd",
+  "addons/agent_trace/agent_trace_panel.gd",
+  "addons/agent_trace/agent_trace_activity.gd",
+  "addons/agent_trace/plugin.cfg",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/menu-and-save.md"
@@ -177,6 +188,27 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# AGENT-NEUTRAL INTEGRATION Phase 3 (editor legibility plugin): the NEW
+# addons/agent_trace/ editor plugin (code_paths above) is the in-editor viewer
+# for THIS subsystem's trace contract — scripts/core/trace_logger.gd gains an
+# ADDITIVE EngineDebugger hook (when EngineDebugger.is_active(), every emitted
+# record is ALSO sent as send_message("agent_trace:event", [line]) — the exact
+# JSONL string already printed + appended; a strict no-op headless/exported, so
+# file/stdout behavior is byte-identical to the pre-hook version). Editor side:
+# agent_trace_debugger.gd (an EditorDebuggerPlugin) declares the "agent_trace"
+# capture and routes parsed records to a per-session debugger tab
+# (agent_trace_panel.gd — scrollable monospace list, substring filter,
+# Pause/Clear) and rebroadcasts to a bottom-panel activity log
+# (agent_trace_activity.gd — *_passed green / *_failed red /
+# smoke_scenario_dispatched run markers + a running tally). Ships DISABLED by
+# default (project.godot deliberately untouched — Project Settings > Plugins
+# opt-in per developer machine); editor-only, never loaded in game runs; a
+# malformed line degrades to raw display, never dropped. Agent-vendor-neutral:
+# it renders the repo's own JSONL contract (docs/references/trace-events.md);
+# README: addons/agent_trace/README.md. AGENT-NEUTRAL INTEGRATION Phase 4 rides
+# THIS entry's trace surfaces only by adjacency — the AccessKit property
+# annotations themselves live in the title_flow entry's gbc_widgets/gbc_stage
+# (see its note) and are documented in docs/references/accessibility.md.
 # AGENT-NEUTRAL INTEGRATION Phase 2 co-modification: game_runtime.gd (the
 # standing 320 wall) gains ONLY the one add_child line in _ready for
 # scripts/runtime/performance_monitors.gd, which owns the game/party_size,
