@@ -85,6 +85,7 @@ func _ready() -> void:
 	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
 	music_router.setup(trace) # under this autoload so its lazy player is in the tree and audible
 	add_child(music_router)
+	add_child(preload("res://scripts/runtime/performance_monitors.gd").new()) # release-build-queryable agent surface (Performance.get_custom_monitor); self-registers in _ready, unregisters in _exit_tree
 
 func ensure_initialized(silent_new_game: bool = true) -> void:
 	if _initialized:
@@ -133,13 +134,11 @@ func save_game() -> void: # split save: clears + placements stay two keys; the m
 	trace.emit_event("save_written", "GameRuntime", {"party_size": session.party.size(),
 		"player_tile": _tile_payload(session.player_tile)})
 
-
 func emit_trace(event_name: String, source: String, payload: Dictionary = {}) -> void:
 	trace.emit_event(event_name, source, payload)
 
 func warn(source: String, message: String, payload: Dictionary = {}) -> void:
 	trace.warning(source, message, payload)
-
 
 func get_world_seed() -> int: return session.world_seed
 func get_player_tile() -> Vector2i: return session.player_tile

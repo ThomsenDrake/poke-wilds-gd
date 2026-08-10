@@ -109,6 +109,7 @@ Phase 4 (spec: [field-moves.md](field-moves.md)) touches this subsystem's code o
 - `scripts/app/smoke_scenarios.gd` gains the `playtest_field_soak` match arm; `scripts/app/playtest_scenarios.gd` grows `run_field_soak` (a thin wrapper delegating to the new `playtest_field_soak_scenario.gd`); `scripts/app/qa_scenarios.gd` registers `field_moves_flow` + `build_house_flow`; `scripts/runtime/playtest_bot.gd` gains `try_random_field_move` (the seeded field-move soak band). The fresh-game starter-party `playtest_soak` is untouched (the field soak is its own `playtest_` scenario).
 - `scripts/runtime/player_avatar.gd` gains the Ride mount speed mode (`set_mounted`/`is_mounted`, `mount_step_seconds` faster than the run gait; the run sheet is the documented mount-sprite fallback — no dedicated mount art ships in the submodule). Ledge-climbing is out of scope (traversal speed only).
 
+
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)
 
 Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishing.md)) touches this subsystem's code only:
@@ -193,3 +194,7 @@ The committed menu baseline PNGs (06/07/08/28/29 + the camping/storage satellite
 ## AccessKit annotations (agent-neutral integration Phase 4 co-modification note)
 
 `scripts/ui/gbc_widgets.gd` + `scripts/ui/gbc_stage.gd` co-mod by ANNOTATION only (metadata — zero geometry, visual, or input change): every row-list label, cursor, and hint the shared GBC library builds now carries the `accessibility_name` / `accessibility_description` / `accessibility_live` contract of [../references/accessibility.md](../references/accessibility.md) — one contract serving the player-facing AccessKit screen-reader tree and the agent-legibility surfaces that read the same properties. No scenario assertions or baselines change.
+
+## Runtime legibility surfaces (agent-neutral integration Phase 2 co-modification note)
+
+`scripts/app/ui_tree_dump_scenario.gd` (NEW) joins the scenario suite — the accessibility-snapshot analog: it drives title/menu/party/bag/battle through the established scenario seams and writes each visible Control subtree to `.godot-smoke/ui_tree/<screen>.json` (path/type/rect/disabled + text + the a11y annotations when set + screen id + cursor/selection where exposed), self-pinned via `seed_for_smoke` (the `new_game_flow` precedent, NOT a double-run consumer) and gated by the `ui_tree_dump_passed`/`ui_tree_dump_failed` pair. Registrations ride `tools/run_playtests.py`, `tools/godot_dap_smoketest.py`, and `scripts/app/qa_scenarios.gd`. No game behavior changes.
