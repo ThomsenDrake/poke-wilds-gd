@@ -35,6 +35,7 @@ func run(ctx: Dictionary) -> void:
 	runtime.seed_for_smoke(SEED)
 	runtime.new_game() # self-contained: the world + spawn derive from the PINNED seed (boot-save dependence was the headless flying-site failure; the double-run lane needs a pure function of (code, seed))
 	_world().rebuild(runtime.get_world_seed()) # the view owns its own generator: re-seed it or every far _world() logic read answers from the BOOT world (the _fresh_game precedent)
+	_runner.resync_player_tile(_world(), _player(), runtime) # new_game moves the SESSION tile, never the player NODE: without this the pen-site scan starts from the boot save's leftover tile and the lane diverges (the entity-soak hermeticity precedent; the 2026-08-09 double-run red)
 	runtime.session.time_of_day_minutes = DAY_MINUTES
 	# Spawn is the world origin (open water in the radial seed world): relocate to the nearest BUILDABLE tree pen site so the harvest/pen/habitat witnesses find terrain (siting validated the stand ring walkable, so +3 needs no re-check).
 	var tree_site := Sites.find_feature_pen_site(runtime._world_gen, _player().tile_position, 600, "tree")

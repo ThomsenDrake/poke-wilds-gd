@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd", "scripts/app/battle_scenario_fixtures.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -126,6 +126,15 @@ quality_bucket = "bootstrap"
 #     *_sim.gd setup signatures (codifying overworld_mons_sim.gd:11) and a shot-numbering
 #     COMPLETENESS check consuming the single-sourced shot-range registry (whitelist
 #     retired 17 only). See vision_fidelity + session_runtime co-mod notes below.
+# STRICT-REVIEW REMEDY F2 (dedup the triplicated guaranteed-capture fixture): the NEW
+# scripts/app/battle_scenario_fixtures.gd joins code_paths — ONE canonical static
+# guaranteed_capture_mon (1 HP + SLP + catch_rate >= 192 pins capture probability at
+# 1.0) replaces the three verbatim private copies in battle_end_input_scenario.gd,
+# wild_battle_scenario.gd, and storage_flow_party_checks.gd. The natural home
+# scripts/runtime/smoke_scenario_runner.gd was AT its 320/320 wall and main.gd /
+# playtest_scenarios.gd at 220/220, so the extraction-funded route would have forced
+# an unnatural cut across at-capacity callers; the battle-scenario fixture home (the
+# smoke_tap.gd single-home precedent) keeps the pin beside the scenarios that own it.
 
 [[subsystems]]
 name = "session_runtime"

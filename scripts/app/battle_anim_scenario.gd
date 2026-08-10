@@ -13,14 +13,16 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 
 const TRACE_LOG_PATH := "user://logs/agent_trace.jsonl"
 const MAX_ANIM_WAIT_SECONDS := 8.0
+const PIN := 2026080901 # seed_for_smoke pin (the new_game_flow precedent; NOT a double-run consumer): the Charmander/Geodude builds + the EMBER turn ride the pinned stream
 
 var _runner = SmokeScenarioRunner.new()
 
 
 func run(ctx: Dictionary) -> void:
 	await get_tree().create_timer(0.2).timeout
-	var fail := await _drive(ctx)
 	var runtime: Node = ctx["runtime"]
+	runtime.seed_for_smoke(PIN) # BEFORE the pass-gating battle: self-pinned, never the wall-clock randomize()
+	var fail := await _drive(ctx)
 	if fail.is_empty():
 		runtime.emit_trace("battle_anim_passed", "SmokeScenarios", {})
 	else:

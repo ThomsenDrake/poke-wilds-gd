@@ -10,11 +10,15 @@ extends Node
 # HERE (self-contained): the host lost _run_smoke_battle to the biome extraction.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
+const BattleScenarioFixtures := preload("res://scripts/app/battle_scenario_fixtures.gd")
+
+const PIN := 2026080903 # seed_for_smoke pin (the new_game_flow precedent; NOT a double-run consumer): the encounter/battle draws ride the pinned stream — the capture assert stays probability-1.0 by construction (1 HP + SLP + catch_rate >= 192)
 
 
 func run(ctx: Dictionary) -> void:
 	await get_tree().create_timer(0.2).timeout
 	var runtime: Node = ctx["runtime"]
+	runtime.seed_for_smoke(PIN) # BEFORE the pass-gating draws: self-pinned, never the wall-clock randomize()
 	var world: Node = ctx["world"]
 	var player: Node = ctx["player"]
 	var runner := SmokeScenarioRunner.new()
@@ -31,7 +35,7 @@ func run(ctx: Dictionary) -> void:
 	var party_before: Array = runner.swap_party(runtime, _species_sample(runtime, 6))
 	runtime.session.add_item("poke_ball", 5)
 	var cursor := runner.trace_log_line_count()
-	var target: Dictionary = _guaranteed_capture_mon(runtime)
+	var target: Dictionary = BattleScenarioFixtures.guaranteed_capture_mon(runtime)
 	if fail.is_empty() and target.is_empty():
 		fail = "no catalog species met the guaranteed-capture catch rate"
 	if fail.is_empty():
@@ -118,20 +122,6 @@ func _safe_move_index(mon: Dictionary) -> int:
 		if int(moves[i].get("power", 0)) > 0 and int(moves[i].get("pp", 0)) > 0 and effect != "EFFECT_LEECH_HIT" and effect != "EFFECT_HEAL":
 			return i
 	return 0
-
-
-# 1 HP + asleep + catch_rate >= 192 pins capture probability at 1.0 (deterministic).
-func _guaranteed_capture_mon(runtime) -> Dictionary:
-	for entry in runtime.catalog.species.values():
-		if entry is Dictionary and int((entry as Dictionary).get("catch_rate", 0)) >= 192:
-			var mon: Dictionary = runtime.pokemon_rules.create_pokemon_instance(entry, 3, Callable(runtime.catalog, "get_move"))
-			if mon.is_empty():
-				continue
-			mon["max_hp"] = 2
-			mon["current_hp"] = 1
-			mon["status"] = "SLP"
-			return mon
-	return {}
 
 
 func _species_sample(runtime, count: int) -> Array:
