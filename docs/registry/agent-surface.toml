@@ -1,0 +1,89 @@
+# Agent-facing surface manifest — the machine-readable "how to drive this repo".
+#
+# Prose companion: docs/references/agent-integration.md (the five integration
+# channels, the text-over-pixels rule, the error-as-directive convention).
+# Mechanically gated by tools/check_repo_contracts.py (agent_surface_issues):
+# every string value under a key ending in _path/_dir/_doc (plus the DAP `scene`)
+# must resolve to an existing repo path — res:// maps to the repo root; user://
+# and .godot-smoke/ values are runtime/gitignored locations and are skipped by
+# design — and every `port` must be a valid integer port.
+#
+# Agent-vendor-neutral by house rule: protocols and repo artifacts only. No
+# vendored MCP server, no committed agent-client configs (those are per-developer
+# and gitignored — see agent-integration.md § Attaching an agent or MCP server).
+schema_version = 1
+
+[protocols.dap]
+# Godot Debug Adapter Protocol endpoint (the Godot editor must be listening).
+# The repo's reference client / smoke driver writes .godot-smoke/scenario.json,
+# which the app consumes at boot; the canonical scenario set is the driver's
+# SCENARIO_REQUIREMENTS table.
+host = "127.0.0.1"
+port = 6006
+driver_path = "tools/godot_dap_smoketest.py"
+scene = "res://scenes/app/Main.tscn"
+command = "python3 tools/godot_dap_smoketest.py --project <abs-repo-path> --scene res://scenes/app/Main.tscn --scenario <name>"
+scenario_source_path = "tools/godot_dap_smoketest.py"
+reference_doc = "docs/references/godot-dap.md"
+
+[protocols.lsp]
+# GDScript language server: LSP over TCP ONLY (no stdio), and ONLY while the
+# Godot editor is running with this project open. An agent host that needs stdio
+# must run a per-developer stdio<->TCP bridge (never vendored in this repo).
+host = "127.0.0.1"
+port = 6005
+transport = "tcp"
+requires_editor_open = true
+
+[scenario_cli]
+# The automated playtest suite. PLAYTEST_SCENARIOS (in the tool) is the canonical
+# scenario list; --include-smoke appends SMOKE_SCENARIOS; PLAYTEST_FORCE_HEADLESS=1
+# forces the headless transport, under which windowed-only scenarios report
+# SKIP-with-reason, never FAIL (transport honesty).
+tool_path = "tools/run_playtests.py"
+scenario_list_source_path = "tools/run_playtests.py"
+smoke_list_flag = "--include-smoke"
+headless_env = "PLAYTEST_FORCE_HEADLESS=1"
+report_path = ".godot-smoke/playtest-report.json"
+
+[traces]
+# One JSON object per line, record shape {event, ts_msec, source, payload}.
+# Appended by the emitter below and mirrored on stdout (both harness transports
+# parse it there). Event schema and per-event meanings live in the schema doc.
+log_path = "user://logs/agent_trace.jsonl"
+record_shape = "{event, ts_msec, source, payload}"
+emitter_path = "scripts/core/trace_logger.gd"
+schema_doc = "docs/references/trace-events.md"
+
+[visual_baselines]
+# Committed golden screenshots plus metadata sidecars (<shot>.png.sidecar.json).
+# visual_sweep_update (and the satellite *_update scenarios) regenerate them;
+# compare-mode sweeps diff against them. Windowed lanes that cannot run report
+# SKIP, never PASS — a skipped lane certifies nothing.
+baseline_dir = "docs/generated/visual-baselines"
+sidecar_suffix = ".png.sidecar.json"
+update_scenario = "visual_sweep_update"
+
+[determinism]
+# Scenario-authoring convention: pin the runtime rngs with seed_for_smoke BEFORE
+# any pass-gating draw (the owner pins the shared, battle, and player rngs).
+# verify_all lanes: S5 project-settings pins, S6 pixel canary, S6.5 double-run
+# (the rng-consumer scenarios run twice headless, canonical trace cmp).
+seed_convention = "seed_for_smoke"
+seed_owner_path = "scripts/runtime/game_runtime.gd"
+verify_tool_path = "tools/verify_all.py"
+
+[golden_save]
+save_path = "docs/generated/golden-saves/v4_golden.json"
+
+[preflight]
+# The local pre-push gate. Display-less agents run the --skip-windowed form
+# (windowed lanes reported SKIP, never PASS); the full gate needs a display.
+gate_tool_path = "tools/verify_all.py"
+display_less_command = "python3 tools/verify_all.py --skip-windowed"
+full_command = "python3 tools/verify_all.py"
+
+[errors]
+# Every agent-facing failure is an error-as-directive: a stable code, a
+# `retryable` flag, and an imperative `hint` naming the next action. Defined in:
+convention_doc = "docs/references/agent-integration.md"

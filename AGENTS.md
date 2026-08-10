@@ -7,6 +7,7 @@ Use this file as the table of contents, not the encyclopedia.
 - Repo overview: [README.md](README.md)
 - Layer rules and allowed dependencies: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Subsystem registry: [docs/registry/subsystems.toml](docs/registry/subsystems.toml)
+- Agent surface (machine-readable manifest + integration guide): [docs/registry/agent-surface.toml](docs/registry/agent-surface.toml), [docs/references/agent-integration.md](docs/references/agent-integration.md)
 - Reliability and validation: [docs/RELIABILITY.md](docs/RELIABILITY.md)
 - Quality scorecard: [docs/QUALITY_SCORE.md](docs/QUALITY_SCORE.md)
 - Tech debt tracker: [docs/tech-debt-tracker.md](docs/tech-debt-tracker.md)
