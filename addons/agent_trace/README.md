@@ -1,5 +1,6 @@
 # Agent Trace (editor plugin)
 
+Umbrella doc: [docs/references/agent-integration.md](../../docs/references/agent-integration.md)
 (the repo-wide agent surface — protocols, channels, and conventions this
 plugin plugs into).
 

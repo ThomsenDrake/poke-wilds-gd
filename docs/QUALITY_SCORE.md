@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-04
+Last verified: 2026-08-09
 Review cadence days: 14
-Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, scripts, scenes, tools
+Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, scripts, scenes, tools
 
 # Quality Score
 

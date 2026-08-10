@@ -4,6 +4,7 @@ Review cadence days: 21
 Source paths: scripts/ui/gbc_widgets.gd, scripts/ui/gbc_stage.gd, scripts/ui/menu_list_stage.gd
 # Accessibility Annotations (GBC UI)
 
+Umbrella doc: [agent-integration.md](agent-integration.md) (the repo-wide
 agent surface; this file is the AccessKit annotation contract it points at).
 
 The GBC widget/stage library annotates every widget it builds with Godot 4.5+

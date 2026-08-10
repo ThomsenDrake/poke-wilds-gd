@@ -25,6 +25,21 @@ validation_commands = [
 ]
 required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked", "ui_tree_dump_passed", "ui_tree_dump_failed"]
 quality_bucket = "bootstrap"
+# AGENT-NEUTRAL INTEGRATION Phase 1 (agent surface contract): the NEW
+# docs/registry/agent-surface.toml manifest — the machine-readable "how to drive
+# this repo" (protocols dap:6006/lsp:6005, the scenario CLI, the trace stream,
+# visual baselines, determinism conventions, the golden save, the preflight
+# gate, the error-as-directive convention) — is comment-OWNED BY THIS ENTRY
+# (the scenario/tooling contract home; docs/registry artifacts are comment-owned,
+# the art-anchors.toml precedent, never in code_paths). Its mechanical gate lives
+# in tools/check_repo_contracts.py (agent_surface_issues, folded into run()):
+# schema_version must be an int, the eight required sections must be present,
+# every `port` must be a valid integer port, and every *_path/_dir/_doc string
+# (plus the DAP `scene`) must resolve to an existing repo path (user:// and
+# .godot-smoke/ values skipped by design; res:// maps to the repo root; an absent
+# manifest arms progressively, a present-but-unparseable one is RED
+# refuse-on-unreadable — the _load_miss_ledger precedent). Prose companion:
+# docs/references/agent-integration.md (linked from AGENTS.md's Read First).
 # AGENT-NEUTRAL INTEGRATION Phase 2 (runtime legibility surfaces): the NEW
 # scripts/app/ui_tree_dump_scenario.gd joins code_paths — the accessibility-snapshot
 # analog, driving title/menu/party/bag/battle through the established scenario seams

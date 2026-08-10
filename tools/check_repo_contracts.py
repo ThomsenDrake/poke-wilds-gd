@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 import sys
+import tomllib
 
 from legibility_lib import (
     METADATA_FIELDS,
@@ -331,7 +332,78 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(sim_rng_setup_issues(root))
     issues.extend(world_depth_rng_issues(root))
     issues.extend(shot_numbering_issues(root))
+    issues.extend(agent_surface_issues(root))
 
+    return issues
+
+
+AGENT_SURFACE_REL = "docs/registry/agent-surface.toml"
+# Key-name convention coupling the manifest to the gate: a string value under a
+# key ending in _path/_dir/_doc (plus the DAP `scene`) is a repo reference that
+# must exist — EXCEPT user:// (the runtime user dir) and .godot-smoke/
+# (gitignored run output), which are documented non-repo locations. res:// maps
+# to the repo root. Any key named `port` must be an integer in 1..65535.
+AGENT_SURFACE_PATH_SUFFIXES = ("_path", "_dir", "_doc")
+AGENT_SURFACE_REQUIRED_SECTIONS = (
+    "protocols", "scenario_cli", "traces", "visual_baselines",
+    "determinism", "golden_save", "preflight", "errors",
+)
+
+
+def _agent_surface_leaves(node: object, prefix: str = "") -> list[tuple[str, object]]:
+    """Flatten a parsed TOML table into (dotted_key, leaf_value) pairs."""
+    leaves: list[tuple[str, object]] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            leaves.extend(_agent_surface_leaves(value, f"{prefix}{key}."))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            leaves.extend(_agent_surface_leaves(value, f"{prefix}{index}."))
+    else:
+        leaves.append((prefix.rstrip("."), node))
+    return leaves
+
+
+def agent_surface_issues(root: Path) -> list[str]:
+    """Validate the agent-surface manifest (docs/registry/agent-surface.toml):
+    schema_version is an int, the required sections are present, every `port`
+    is a valid integer port, and every repo reference resolves to an existing
+    path. An ABSENT manifest returns [] (progressive arming, mirrors
+    art_anchor_issues); a present-but-unparseable one is RED
+    (refuse-on-unreadable, mirrors _load_miss_ledger)."""
+    path = root / AGENT_SURFACE_REL
+    if not path.exists():
+        return []
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return [f"{AGENT_SURFACE_REL} is present but unreadable "
+                f"(refuse-on-unreadable): {exc}"]
+    if not isinstance(data, dict):
+        return [f"{AGENT_SURFACE_REL} is not a TOML table"]
+    issues: list[str] = []
+    if not isinstance(data.get("schema_version"), int) or isinstance(data.get("schema_version"), bool):
+        issues.append(f"{AGENT_SURFACE_REL}: schema_version must be an integer")
+    for section in AGENT_SURFACE_REQUIRED_SECTIONS:
+        if section not in data:
+            issues.append(f"{AGENT_SURFACE_REL}: missing required section [{section}]")
+    for key, value in _agent_surface_leaves(data):
+        leaf = key.rsplit(".", 1)[-1]
+        if leaf == "port":
+            if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 65535:
+                issues.append(f"{AGENT_SURFACE_REL}: `{key}` must be an integer port "
+                              f"in 1..65535 (got {value!r})")
+            continue
+        if not isinstance(value, str):
+            continue
+        if leaf != "scene" and not leaf.endswith(AGENT_SURFACE_PATH_SUFFIXES):
+            continue
+        if value.startswith("user://") or value.startswith(".godot-smoke/"):
+            continue  # runtime user dir / gitignored run output: never repo-local
+        rel = value.removeprefix("res://")
+        if not (root / rel).exists():
+            issues.append(f"{AGENT_SURFACE_REL}: `{key}` references a missing repo "
+                          f"path: {value}")
     return issues
 
 
