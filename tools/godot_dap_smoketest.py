@@ -213,6 +213,15 @@ SCENARIO_REQUIREMENTS = {
         "all": ["ui_render_audit_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Agent-neutral integration Phase 2: the ui_tree_dump accessibility-snapshot
+    # analog (per-screen Control-tree JSON under .godot-smoke/ui_tree/). The
+    # symmetric ui_tree_dump_failed marker rides failed_event_entry (miss-002
+    # loudness; single-sourced mirror in run_playtests' PLAYTEST_SCENARIOS;
+    # miss-002 re-stamp).
+    "ui_tree_dump": {
+        "all": ["ui_tree_dump_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "battle_anim": {
         "all": ["battle_anim_passed"],
         "any": [["session_loaded", "session_created"]],

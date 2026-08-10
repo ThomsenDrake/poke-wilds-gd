@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd", "scripts/app/battle_scenario_fixtures.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd", "scripts/app/ui_tree_dump_scenario.gd", "scripts/app/battle_scenario_fixtures.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -23,8 +23,25 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_stability",
   "python3 tools/run_playtests.py",
 ]
-required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked"]
+required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked", "ui_tree_dump_passed", "ui_tree_dump_failed"]
 quality_bucket = "bootstrap"
+# AGENT-NEUTRAL INTEGRATION Phase 2 (runtime legibility surfaces): the NEW
+# scripts/app/ui_tree_dump_scenario.gd joins code_paths — the accessibility-snapshot
+# analog, driving title/menu/party/bag/battle through the established scenario seams
+# (begin_boot + the public show_title creation-cancel path, toggle_menu +
+# _activate_entry, the battle_anim crafted-mon presentation drive) and writing each
+# visible Control subtree to .godot-smoke/ui_tree/<screen>.json (path/type/rect/disabled
+# + text and the a11y_name/a11y_description/a11y_live annotations when set — every dumped
+# node passed the full-chain visibility filter, so no constant visible field — + the
+# screen id + cursor/selection where exposed; paths in the transcript,
+# never binary payloads). SELF-PINNED via seed_for_smoke (PIN 2026080904, the
+# new_game_flow precedent — NOT a double-run consumer). The ui_tree_dump_passed/
+# ui_tree_dump_failed pair rides the requirements row + PLAYTEST_SCENARIOS only (the
+# nav_audit passed+failed pairing precedent; NOT SMOKE_SCENARIOS — --include-smoke
+# concatenates without dedup). The same slice ALSO self-pins the three advisory
+# scenarios (battle_anim PIN 2026080901, smoke_biome 2026080902, wild_battle
+# 2026080903) — seed_for_smoke BEFORE the pass-gating draws, closing the
+# seed_convention_advisories debt without making any of them double-run consumers.
 # TITLE-FLOW SLICE (new-game flow + startup splash): scripts/app/new_game_flow_scenario.gd
 # + scripts/app/new_game_flow_checks.gd join code_paths (the SmokeScenarios home, the
 # save_migration_scenario precedent) — the gate drives the REAL TitleScreen/CreationScreen
@@ -149,6 +166,7 @@ code_paths = [
   "scripts/runtime/music_router.gd",
   "scripts/runtime/cry_player.gd",
   "scripts/runtime/smoke_scenario_runner.gd",
+  "scripts/runtime/performance_monitors.gd",
 ]
 scene_paths = []
 spec_doc = "docs/product-specs/menu-and-save.md"
@@ -159,6 +177,25 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# AGENT-NEUTRAL INTEGRATION Phase 2 co-modification: game_runtime.gd (the
+# standing 320 wall) gains ONLY the one add_child line in _ready for
+# scripts/runtime/performance_monitors.gd, which owns the game/party_size,
+# game/world_seed, and game/current_screen custom Performance monitors (queryable via
+# Performance.get_custom_monitor even in RELEASE builds — the JSONL trace is a file
+# artifact; these are the live-probe surface). game/current_screen's screen ids are
+# MANUALLY kept in sync with the ui_tree_dump scenario's — nothing constructs the
+# agreement. performance_monitors.gd joins THIS entry's code_paths.
+# REVIEW-FIX (same slice): the monitor callables are plain method Callables on a
+# dedicated child node — BOTH lambda forms segfault at engine teardown (Godot 4.6.1:
+# the Performance singleton destroys monitor callables after the autoload's
+# script is gone); the child's _exit_tree UNREGISTERS the monitors so every
+# shutdown path destroys callables while the script is alive (probed headless).
+# REVIEW-FIX 2 (strict-review remedies): performance_monitors.gd IS that child
+# now — the ONE self-registering Node (extends Node: registers the three
+# monitors in _ready, unregisters in _exit_tree, values read off get_parent();
+# screen_label_for stays a static here with get_node_or_null lookups degrading
+# to "unknown" on a Main.tscn rename) — and performance_monitor_values.gd is
+# DELETED (the pair collapsed into one file).
 # TITLE-FLOW SLICE co-modification (new-game flow + startup splash; the `title_flow`
 # entry owns the screens): game_runtime.gd's ensure_initialized gains the silent_new_game
 # flag (default true — scenario boots keep the silent new_game on absent/corrupt/refused

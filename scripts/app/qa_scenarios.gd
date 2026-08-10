@@ -11,6 +11,10 @@ const SCENARIOS := {
 	"layout_audit": [preload("res://scripts/app/layout_audit.gd"), "run", []],
 	"world_consistency_audit": [preload("res://scripts/app/world_consistency_audit.gd"), "run", []],
 	"ui_render_audit": [preload("res://scripts/app/ui_render_audit.gd"), "run", []],
+	# Agent legibility (agent-neutral integration Phase 2): the accessibility-snapshot
+	# analog — per-screen visible-Control-tree JSON dumps to .godot-smoke/ui_tree/
+	# (title/menu/party/bag/battle) + the ui_tree_dump_passed/failed pair. Self-pinned.
+	"ui_tree_dump": [preload("res://scripts/app/ui_tree_dump_scenario.gd"), "run", []],
 	"battle_anim": [preload("res://scripts/app/battle_anim_scenario.gd"), "run", []],
 	"display_matrix": [preload("res://scripts/app/display_matrix.gd"), "run", []],
 	"harvest_flow": [preload("res://scripts/app/harvest_flow_scenario.gd"), "run", []],

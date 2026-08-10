@@ -84,3 +84,7 @@ FROZEN by the rebuild: every public API, entry list, trace name/payload, latch s
 ## AccessKit annotations (agent-neutral integration Phase 4 co-modification note)
 
 `scripts/ui/menu_list_stage.gd`'s `Rows` (the greyed-row options/camp widget) co-mods by ANNOTATION only: per-row `accessibility_name` pinned at build (row strings are never rewritten), `, unavailable` on non-black-ink rows, and the cursor's `Row N of M: <text>` description — the `gbc_widgets.gd` `RowList` contract ([../references/accessibility.md](../references/accessibility.md)), metadata only. No behavior or baseline change.
+
+## Custom Performance monitors (agent-neutral integration Phase 2 co-modification note)
+
+`scripts/runtime/performance_monitors.gd` (NEW) registers the `game/party_size`, `game/world_seed`, and `game/current_screen` custom monitors — ONE self-registering child node (`game_runtime.gd` spends exactly one `add_child` line): plain method Callables with values read off `get_parent()`, and `_exit_tree` unregisters because both lambda forms segfault at engine teardown on the pinned 4.6.1 binary. Queryable via `Performance.get_custom_monitor` even in release builds — the live-probe complement to the JSONL trace artifact. No behavior change.
