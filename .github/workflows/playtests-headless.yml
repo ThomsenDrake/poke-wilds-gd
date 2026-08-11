@@ -1,0 +1,143 @@
+name: playtests-headless
+
+# The CI half of the verification story (docs/RELIABILITY.md § Local gate):
+# verify_all's honest display-less path. It certifies the static gates, catalog
+# freshness, determinism pins/canary, the double-run determinism lane, and the
+# 64-scenario headless suite; the windowed pixel lanes (S8/S9) report SKIP here
+# and stay a local ritual because their baselines are renderer-stamped.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+    paths:
+      - ".github/workflows/**"
+      - ".gitignore"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "README.md"
+      - "assets/**"
+      - "docs/**"
+      - "project.godot"
+      - "scenes/**"
+      - "scripts/**"
+      - "tools/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".gitignore"
+      - "AGENTS.md"
+      - "ARCHITECTURE.md"
+      - "README.md"
+      - "assets/**"
+      - "docs/**"
+      - "project.godot"
+      - "scenes/**"
+      - "scripts/**"
+      - "tools/**"
+  workflow_dispatch:
+
+concurrency:
+  group: playtests-headless-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.6.1-stable
+
+jobs:
+  headless-gate:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Restore the pinned PokeAPI cache (verify_all S4.5 input)
+        id: pokeapi-cache
+        uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: pokeapi-api-data-${{ hashFiles('tools/api_data_pin.json') }}
+      - name: Fetch the pinned api-data tarball on cache miss
+        if: steps.pokeapi-cache.outputs.cache-hit != 'true'
+        run: python3 tools/import_pokeapi.py --refresh
+      - name: Restore the pinned Godot binary
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+      - name: Download the pinned Godot binary on cache miss
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/godot-bin"
+          curl -fsSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d "$HOME/godot-bin"
+          mv "$HOME/godot-bin/Godot_v${GODOT_VERSION}_linux.x86_64" "$HOME/godot-bin/godot"
+          chmod +x "$HOME/godot-bin/godot"
+      - name: Assert the Godot version triple (the R3 pin rule)
+        run: |
+          version="$("$HOME/godot-bin/godot" --version)"
+          echo "godot --version: $version"
+          case "$version" in
+            4.6.1.*) ;;
+            *) echo "expected a 4.6.1.* Godot triple, got: $version"; exit 1 ;;
+          esac
+      - name: Import project resources (a fresh checkout has no .godot/)
+        run: timeout 300 "$HOME/godot-bin/godot" --headless --path . --import
+      - name: Run the headless gate (verify_all --skip-windowed)
+        env:
+          PR_BASE: ${{ github.base_ref }}
+        run: |
+          base_args=()
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_args=(--base "origin/$PR_BASE")
+          fi
+          python3 tools/verify_all.py --skip-windowed --godot-bin "$HOME/godot-bin/godot" "${base_args[@]}"
+      - name: Append the gate summary
+        if: always()
+        run: |
+          python3 - >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json
+          import pathlib
+
+          path = pathlib.Path(".godot-smoke/verify_all.json")
+          if not path.exists():
+              print("### verify_all (headless)\n\nNo result file produced — the gate crashed before writing one.")
+              raise SystemExit(0)
+          doc = json.loads(path.read_text())
+          counts = doc.get("summary", {})
+          verdict = {0: "GREEN", 1: "STEP_FAILURE", 2: "REFUSAL", 3: "TOOL_ERROR"}.get(doc.get("exit_code"), "?")
+          print(f"### verify_all (headless, --skip-windowed): {verdict}\n")
+          print(f"PASS {counts.get('passed', 0)} / FAIL {counts.get('failed', 0)} / "
+                f"SKIP {counts.get('skipped', 0)} / REFUSE {counts.get('refusals', 0)} / "
+                f"WARN {counts.get('warnings', 0)} / TOOL_ERROR {counts.get('tool_errors', 0)}")
+          bad = [e for e in doc.get("steps", []) if e.get("status") in ("fail", "tool_error")]
+          if bad:
+              print("\nFailed or errored steps:")
+              for entry in bad:
+                  print(f"- `{entry['name']}` — {entry.get('error') or entry['status']}")
+          not_ok = [r for r in doc.get("refusals", []) if not r.get("ok")]
+          if not_ok:
+              print("\nRefusals / warnings:")
+              for refusal in not_ok:
+                  print(f"- [{refusal.get('level')}] {refusal.get('detail')}")
+          EOF
+      - name: Upload gate reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-gate-reports
+          path: |
+            .godot-smoke/verify_all.json
+            .godot-smoke/playtest-report.json
+            .godot-smoke/determinism-run-a-report.json
+            .godot-smoke/determinism-run-b-report.json
+          if-no-files-found: ignore
+          retention-days: 7
