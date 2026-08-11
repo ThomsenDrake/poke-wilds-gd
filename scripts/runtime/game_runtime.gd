@@ -224,10 +224,11 @@ func get_item_count(item_id: String) -> int: return session.get_item_count(item_
 func set_party_lead(index: int) -> void: session.set_party_lead(index)
 
 
-# Smoke determinism seam: pins EVERY shared rng (encounter _rng, battle, the avatar's trigger-draw stream) so a scenario's inputs are a pure function of (code, save, seed), never _ready's wall-clock randomize().
+# Smoke determinism seam: pins every shared rng plus the creation-order nonce so a scenario's inputs are a pure function of (code, save, seed), never _ready's wall-clock randomize() or bootstrap history.
 func seed_for_smoke(seed: int) -> void:
 	_rng.seed = seed
 	battle_runtime._rng.seed = seed
+	pokemon_rules.reset_creation_nonce()
 	if player_avatar != null: player_avatar._rng.seed = seed
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:

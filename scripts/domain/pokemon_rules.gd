@@ -13,9 +13,9 @@ const GENDER_MALE := "male"
 const GENDER_FEMALE := "female"
 const GENDERLESS := "genderless"
 const GENDER_RATIO_PREFIX := "GENDER_F"
-
 # Per-instance nonce varying probabilistic gender rolls between created mons while staying deterministic for a given creation sequence (no injected rng in domain).
 var _gender_nonce := 0
+func reset_creation_nonce() -> void: _gender_nonce = 0
 func experience_for_level(level: int, growth_rate: String = "MEDIUM_FAST") -> int:
 	var n = clampi(level, 1, 100)
 	match normalize_growth_rate(growth_rate):

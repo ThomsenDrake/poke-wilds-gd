@@ -30,6 +30,9 @@ quality_bucket = "bootstrap"
 # suite-boot geometry. It also bounded-waits asynchronous turn playback before
 # deciding whether a terminal battle must be restarted; production battle code
 # and the total trap-tolerant RUN contract are unchanged.
+# SEEDED-SMOKE CREATION-ORDER REPAIR (2026-08-11): save_stability deliberately
+# advances PokemonRules' creation nonce before seed_for_smoke, proving the seam
+# resets every deterministic input rather than inheriting bootstrap order.
 # AGENT-NEUTRAL INTEGRATION Phase 1 (agent surface contract): the NEW
 # docs/registry/agent-surface.toml manifest — the machine-readable "how to drive
 # this repo" (protocols dap:6006/lsp:6005, the scenario CLI, the trace stream,
@@ -237,6 +240,9 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# SEEDED-SMOKE CREATION-ORDER REPAIR (2026-08-11): seed_for_smoke resets the
+# PokemonRules creation nonce alongside the three RNG streams, so fresh and
+# already-loaded boots produce the same scripted save under (code, save, seed).
 # AGENT-NEUTRAL INTEGRATION Phase 3 (editor legibility plugin): the NEW
 # addons/agent_trace/ editor plugin (code_paths above) is the in-editor viewer
 # for THIS subsystem's trace contract — scripts/core/trace_logger.gd gains an
@@ -428,6 +434,9 @@ validation_commands = [
 ]
 required_trace_events = ["warning", "evolution_stone_used"]
 quality_bucket = "progression"
+# SEEDED-SMOKE CREATION-ORDER REPAIR (2026-08-11): PokemonRules exposes the
+# narrow reset_creation_nonce seam used only by GameRuntime.seed_for_smoke;
+# ordinary play keeps monotonic creation-order gender/shiny resolution.
 # Phase 5 (docs/product-specs/breeding-shinies-drops-fishing.md § Evolution
 # stones): check_item_evolution (pokemon_rules.gd:176-183) is WIRED — the new
 # scripts/runtime/stone_evolution_runtime.gd (session_runtime code_paths;

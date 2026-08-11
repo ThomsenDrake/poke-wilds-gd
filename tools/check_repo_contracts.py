@@ -676,8 +676,8 @@ def miss_postmortem_advisories(root: Path | None = None) -> list[str]:
 
 
 # House seeding convention (miss-postmortem miss-002): the determinism half is
-# ADOPTED per scenario (the seed_for_smoke seam pins both runtime rngs), so the
-# convention is held by a loud advisory rather than silent trust.
+# ADOPTED per scenario (seed_for_smoke pins the runtime RNG streams and resets
+# Pokemon creation order), so a loud advisory holds the convention.
 SEED_DRIVE_MARKERS = ("generate_wild_encounter(", "start_wild_battle(")
 SEED_PIN_MARKERS = ("seed_for_smoke(", "_rng.seed")
 _PASSED_EMIT_RE = re.compile(r'emit_trace\(\s*"([A-Za-z0-9_]+)_passed"')
@@ -687,7 +687,7 @@ def seed_convention_advisories(root: Path | None = None) -> list[str]:
     """Advisory scenario-authoring checklist (stderr, NEVER red — the house
     progressive-arming style): any scenario file that drives wild/battle inputs
     (generate_wild_encounter / start_wild_battle) and emits a <scenario>_passed
-    trace must pin the runtime rng first (seed_for_smoke, or a direct _rng.seed
+    trace must pin deterministic inputs first (seed_for_smoke, or direct _rng.seed
     assignment as visual_sweep.gd's BATTLE_RNG_SEED). A file that skips the pin
     gates its pass event on the per-process wall-clock randomize() — the exact
     nav_audit false-red class (miss-002). A violation can still flake, but never

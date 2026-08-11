@@ -37,6 +37,8 @@ func run(ctx: Dictionary, extra: Dictionary = {}) -> void:
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
 	var update := str(extra.get("mode", "")) == "update"
+	# Poison creation order so the smoke seam, not boot/save history, must reset it.
+	runtime.pokemon_rules.create_pokemon_instance(runtime.catalog.get_species("EEVEE"), 5, Callable(runtime.catalog, "get_move"))
 	runtime.seed_for_smoke(SEED) # before new_game: pins the world-seed draw too
 	runtime.new_game()
 	# Pin the golden's creation identity: new_game deliberately INHERITS the boot session's

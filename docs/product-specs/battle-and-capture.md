@@ -60,3 +60,7 @@ Phase 6 (`overworld-pokemon.md`) consumes the provoked-mon buff in `battle_runti
 ## Strict-review remedy F2 (battle-scenario fixture extraction co-modification note)
 
 `wild_battle_scenario.gd` co-mods by EXTRACTION only (no behavior change): its verbatim `_guaranteed_capture_mon` copy moves to the NEW shared `scripts/app/battle_scenario_fixtures.gd` (`BattleScenarioFixtures.guaranteed_capture_mon(runtime)`), the single canonical home for the 1 HP + SLP + catch_rate >= 192 capture-certainty pin. The campsite-capture and defeat-clean-heal assertions, the smoke-battle driver, and the `wild_battle_passed` payload are unchanged.
+
+## Smoke creation-order determinism (2026-08-11)
+
+Probabilistic gender resolution uses `PokemonRules`' per-instance creation nonce when no RNG is injected. `GameRuntime.seed_for_smoke(seed)` therefore resets that nonce along with the shared RNGs: cold scenario boot (which creates a starter before dispatch) and loaded boot now craft identical battle/save fixtures. `save_stability` poisons creation order before reseeding and still matches the unchanged v4 golden, mechanically pinning the reset. This is a smoke-only reproducibility seam; normal battle and creation order are unchanged.

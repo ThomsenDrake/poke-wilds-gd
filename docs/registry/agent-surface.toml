@@ -107,8 +107,8 @@ override_env = "VISION_REVIEWER_CMD"
 required_env = "VLM_REQUIRED"
 
 [determinism]
-# Scenario-authoring convention: pin the runtime rngs with seed_for_smoke BEFORE
-# any pass-gating draw (the owner pins the shared, battle, and player rngs).
+# Scenario-authoring convention: call seed_for_smoke BEFORE any pass-gating draw;
+# it pins the shared, battle, and player rngs and resets Pokemon creation order.
 # verify_all lanes: S5 project-settings pins, S6 pixel canary, S6.5 double-run
 # (the rng-consumer scenarios run twice headless, canonical trace cmp).
 seed_convention = "seed_for_smoke"
