@@ -1,25 +1,24 @@
 extends Node
 
 # Far-field infinite-world visual sweep (Track A.3): distant scattered landmark
-# (42) + legendary lair beyond LAIR_MIN_RING (43). Seed single-sourced from
+# (42). The legendary-lair shot (43) is RETIRED with the repeating lairs
+# (legendary-dungeon slice): 43 rides the SHOT_REGISTRY retired list (prune-protected
+# forever) and its committed baselines are deleted. Seed single-sourced from
 # SHOT_REGISTRY["farfield"] (2026072908). Windowed-only; no puzzle/removal
 # mutation — craft_state + teleport + sync_visible only. Retired holes
-# 17/33/35/36 stay unused (farfield owns 42–43).
+# 17/33/35/36/43 stay unused.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const VisualSweepBaselines := preload("res://scripts/app/visual_sweep_baselines.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
-const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 const LandmarkScatter := LandmarkRuntime.LandmarkScatter
 const ContentScatter := LandmarkRuntime.ContentScatter
-const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
 
 const DEFAULT_THRESHOLD_PCT := 0.5
 const CRAFTED_STATE := {"world_seed": 2026072908, "time_of_day": 720, "party": [["MACHOP", 30]], "bag": {}}
 const SHOT_LANDMARK := "42_far_landmark.png"
-const SHOT_LAIR := "43_far_lair.png"
 const SCAN_RADII := [31, 63, 95] # content_scatter_scenario expanding chunk-radius precedent
 const ORIGIN_CORE_RING := 96
 
@@ -52,7 +51,6 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	_player().encounter_chance = 0.0
 	var found := _scan(int(_crafted.get("world_seed", 0)))
 	await _landmark_shot(found)
-	await _lair_shot(found)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()
@@ -74,32 +72,8 @@ func _landmark_shot(found: Dictionary) -> void:
 	await _capture(SHOT_LANDMARK)
 
 
-func _lair_shot(found: Dictionary) -> void:
-	var lair: Dictionary = found.get("lair", {})
-	if lair.is_empty():
-		_failures.append("%s: no legendary lair beyond LAIR_MIN_RING within scan" % SHOT_LAIR); return
-	var anchor: Vector2i = lair.get("anchor", Vector2i.ZERO)
-	var frame: Vector2i = anchor + Vector2i(3, 3) # beside, never ON (content_scatter precedent)
-	_crafted["far_lair"] = {"species_id": str(lair.get("species_id", "")), "anchor": [anchor.x, anchor.y],
-		"tile": [frame.x, frame.y]}
-	var mons: Object = null
-	if _runtime() != null and "overworld_mons_runtime" in _runtime():
-		mons = _runtime().get("overworld_mons_runtime")
-	var saved_active := false
-	if mons != null and ("active" in mons):
-		saved_active = bool(mons.get("active"))
-		mons.set("active", true)
-	_runner.teleport_player(_world(), _player(), _runtime(), frame)
-	_runtime().note_player_step() # window sync stamps the lair
-	_world().set_time_of_day(int(CRAFTED_STATE["time_of_day"]))
-	_world().sync_visible(frame)
-	await _capture(SHOT_LAIR)
-	if mons != null and ("active" in mons):
-		mons.set("active", saved_active)
-
-
 func _scan(seed: int) -> Dictionary:
-	var out := {"landmark": {}, "lair": {}}
+	var out := {"landmark": {}}
 	var seen := {}
 	for rmax in SCAN_RADII:
 		for cy in range(-int(rmax), int(rmax) + 1):
@@ -115,16 +89,7 @@ func _scan(seed: int) -> Dictionary:
 					var instance := LandmarkScatter.instance_for_chunk(seed, chunk)
 					if not instance.is_empty():
 						out["landmark"] = instance
-				if (out["lair"] as Dictionary).is_empty():
-					var biome: String = _world().get_tile_biome(center)
-					for species_id in LegendaryPlacement.LEGENDARY_IDS:
-						if LegendaryPlacement.affinity_for(str(species_id)) != biome:
-							continue
-						var anchor: Vector2i = LegendaryPlacement.lair_for_chunk(seed, chunk, str(species_id))
-						if anchor != LegendaryPlacement.NO_ANCHOR:
-							out["lair"] = {"species_id": str(species_id), "anchor": anchor}
-							break
-		if not (out["landmark"] as Dictionary).is_empty() and not (out["lair"] as Dictionary).is_empty():
+		if not (out["landmark"] as Dictionary).is_empty():
 			return out
 	return out
 

@@ -284,7 +284,7 @@
           "scripts/app/nav_audit.gd": "ad29dd5c17fbec2fbd2832687d584ae2821f492ba41f8a644b0e05a3982643d4",
           "scripts/app/nav_audit_battle.gd": "4a967b965eb0f00c699c82a7be2b57113eda672e037ea5ed0d61c2ea3831324e",
           "tools/run_playtests.py": "54269083c90534d129d33df85fe6ea4cef476f870aa3b8bfed5c4c3aa56ce00f",
-          "tools/godot_dap_smoketest.py": "5618890b2ae7f6c6d3121813daff53ab2bfda6064f421dfc43b768cd74497699",
+          "tools/godot_dap_smoketest.py": "d56928a2b072a8ab3970fdf5d3e17bb114b3908ef535c23af6b3b4db05595c5f",
           "tools/verify_all.py": "82e874576522faefb7cd9427dbf2e78a24e1be77d63c309c7968f8b03d594c70"
         },
         "re_stamp_log": [
@@ -798,6 +798,13 @@
             "old_pin": "714572208f2e",
             "new_pin": "82e874576522",
             "reason": "legitimate documentation-only edit (two-tier CI posture): the module title and live --help footer now distinguish the full renderer-stamped windowed/VLM local ritual from CI's honest --skip-windowed execution. No orchestrator code, double-run consumer, refusal, exit-code, or honest-reporting behavior changed; the miss-002 determinism and reason-carrying failure mechanisms remain intact."
+          },
+          {
+            "date": "2026-08-11",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "5618890b2ae7",
+            "new_pin": "d56928a2b072",
+            "reason": "legitimate edit (legendary-dungeon lair-retirement slice): corrected the farfield requirements comment from shots 42-43 with a lair to the surviving shot 42 landmark capture. Comment-only truthfulness co-mod; SCENARIO_REQUIREMENTS, ERROR_MARKERS, failed_event_entry, and the determinism seam remain unchanged."
           }
         ]
       },

@@ -107,7 +107,8 @@ const SCENARIOS := {
 	# ownership witness is:)
 	"waystone_selector": [preload("res://scripts/app/waystone_selector_scenario.gd"), "run", []],
 	# Infinite-world slice 3: the chunk-hash scattering witness — origin-core preservation,
-	# scattered-instance discovery + per-instance puzzle state, repeating-lair lifecycle.
+	# scattered-instance discovery + per-instance puzzle state (the repeating-lair lane
+	# retired with the legendary-dungeon slice).
 	"content_scatter": [preload("res://scripts/app/content_scatter_scenario.gd"), "run", []],
 	# Infinite-world slice 4: creation-time seed choice — custom-seed determinism (two
 	# re-pinned runs byte-identical), the beach-preference spawn, the random-path pin.
@@ -118,7 +119,8 @@ const SCENARIOS := {
 	"new_game_flow": [preload("res://scripts/app/new_game_flow_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
-	# Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+	# Far-field infinite-world sweep (shot 42, seed 2026072908): distant scatter (shot 43's
+	# far-lair frame retired with the lairs, legendary-dungeon slice).
 	"visual_sweep_farfield": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", []],
 	"visual_sweep_farfield_update": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", [{"mode": "update"}]],
 	# Bounded temporal capture (battle attack/capture adapters) — windowed-only.

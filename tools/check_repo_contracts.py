@@ -797,7 +797,7 @@ def world_depth_rng_issues(root: Path) -> list[str]:
 # directly. Format contract (see SHOT_REGISTRY):
 #   {"<sweep>": {"range": [lo, hi], "extra": [..], "seed": <int>}, ..., "retired": [..]}
 SHOT_REGISTRY_REL = Path("scripts") / "app" / "visual_sweep_baselines.gd"
-RETIRED_WHITELIST = {17, 33, 35, 36}  # 17 (original gap) + 33/35/36 retired with world chaining (infinite-world slice)
+RETIRED_WHITELIST = {17, 33, 35, 36, 43}  # 17 (original gap) + 33/35/36 retired with world chaining (infinite-world slice) + 43 (the farfield lair shot) retired with the legendary-dungeon slice
 BIOME_SHOT_FLOOR = 3      # committed 03_biome_* shots; loud-fail below this
 
 
@@ -841,7 +841,8 @@ def shot_numbering_issues(root: Path) -> list[str]:
 
     Every registered shot number (a sweep's range + extra) must be a committed
     baseline (NN_*.png) or formally retired; the ONLY retired numbers allowed are the
-    RETIRED_WHITELIST (17 + 33/35/36 retired with world chaining); committed shots must
+    RETIRED_WHITELIST (17 + 33/35/36 retired with world chaining + 43 retired with the
+    lairs); committed shots must
     themselves be registered; and the biome group (03_biome_*) must hold >= BIOME_SHOT_FLOOR
     shots (loud-fail). Arms progressively until SHOT_REGISTRY exists (cross-builder
     dependency on the visuals builder)."""

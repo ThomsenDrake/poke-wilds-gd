@@ -1359,7 +1359,8 @@ code_paths = [
   "scripts/domain/overworld_mons.gd",
   "scripts/runtime/overworld_mons_runtime.gd",
   "scripts/runtime/overworld_mons_sim.gd",
-  "scripts/runtime/overworld_mons_lairs.gd",
+  # overworld_mons_lairs.gd RETIRED (legendary-dungeon slice): the repeating lairs are
+  # superseded by the warp-entered hand-authored dungeons.
   "scripts/runtime/overworld_mons_actions.gd",
   "scripts/domain/contact_encounter.gd",
   "scripts/runtime/overworld_mons_probe.gd",
@@ -1469,6 +1470,8 @@ code_paths = [
   "scripts/domain/landmark_scatter.gd",
   # legendary-dungeon slice: the domain half (layouts + maps) registers HERE until the
   # validation layer's legendary_dungeons entry takes ownership (one owner per file).
+  # content_scatter.gd's lair + dungeon-site predicate legs are RETIRED by this slice
+  # (the warp-entered dungeons supersede both; the salts stay reserved).
   "scripts/domain/dungeon_layouts.gd",
   "scripts/domain/dungeon_maps.gd",
   "scripts/domain/save_migration.gd",

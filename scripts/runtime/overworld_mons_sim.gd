@@ -94,7 +94,7 @@ func sync_window(player_tile: Vector2i, time_label: String) -> void:
 	var player_cell := OverworldMons.cell_for_tile(player_tile)
 	for entity in _rt_ref.get_ref()._live_list(): # the invented distance un-materialization (re-derives on return)
 		if str(entity.get("kind", "")) == "legendary":
-			continue # world-fixed statics are window-exempt; the repeating LAIRS cull/re-derive in _lairs.sync_lairs below (slice 3)
+			continue # world-fixed statics are window-exempt
 		if not OverworldMons.in_spawn_band(entity.cell, player_cell):
 			_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_DISTANCE, false)
 	var edge := OverworldMons.DESPAWN_CELLS
@@ -102,7 +102,6 @@ func sync_window(player_tile: Vector2i, time_label: String) -> void:
 		for cx in range(player_cell.x - edge, player_cell.x + edge + 1):
 			_spawn_slot(Vector2i(cx, cy), time_label)
 			_spawn_nest(Vector2i(cx, cy))
-	_rt_ref.get_ref()._lairs.sync_lairs(player_tile) # slice 3: repeating lairs (window-scoped)
 
 func _spawn_slot(cell: Vector2i, time_label: String) -> void:
 	var slot_id := "mon_%d,%d" % [cell.x, cell.y]
@@ -185,7 +184,6 @@ func _spawn_nest(cell: Vector2i) -> void:
 # removal set; CLASS_STATIONARY + forced AGGRESSIVE + the guardian's +3, NEVER nest machinery, window-exempt; a world change (new_game/load) drops the previous statics, re-deriving per seed.
 func stamp_legendaries(chain: Vector2i) -> void:
 	var rt = _rt_ref.get_ref()
-	rt._lairs.clear_instance_state() # world change: drop the previous world's lair damage/stages (slice 3)
 	for id in rt._entities.keys():
 		if str((rt._entities[id] as Dictionary).get("kind", "")) == "legendary":
 			rt._entities.erase(id); rt._removed.erase(id)

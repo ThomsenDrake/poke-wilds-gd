@@ -417,7 +417,7 @@ SCENARIO_REQUIREMENTS = {
         "all": ["visual_sweep_world_depth_passed"],
         "any": [["session_loaded", "session_created"]],
     },
-    # Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+    # Far-field infinite-world sweep (shot 42, seed 2026072908): distant scatter.
     # Windowed-only like the other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_farfield": {
         "all": ["visual_sweep_farfield_passed"],
