@@ -9,6 +9,8 @@ Data flow (see docs/generated/pokeapi-import.md for the latest run report):
 
   - tools/api_data_pin.json pins the upstream master SHA (--refresh re-resolves it).
   - --refresh downloads the codeload tarball into the gitignored tools/.cache/api-data/.
+  - --fetch-pinned downloads the COMMITTED pin's tarball only (the CI cache-miss
+    path): no upstream re-resolve, no pin move, no regeneration.
   - Default run regenerates the catalog + reports from the cache (no network).
   - --check regenerates in memory and byte-compares against the committed JSON
     (exit 0 when fresh, 1 with a diff summary when stale/missing).
@@ -628,9 +630,17 @@ def build_current_catalog(move_names: dict, species_names: dict) -> tuple:
         if dex_number <= 0:
             dex_number = int(base_data.get("dex_number", 0))
 
+        # Host-portable existence probe: Path.exists() follows the HOST
+        # filesystem's case semantics, so back.png matched back.PNG on macOS
+        # but not on Linux and the committed catalog flip-flopped per host
+        # (8 sprite paths, incl. front_path flips that change encounter
+        # viability). Match the directory listing case-insensitively instead
+        # and emit the canonical requested spelling, so the catalog — and the
+        # S4.5 freshness gate — are byte-stable across macOS and Linux.
+        present_names = {entry.name.lower() for entry in os.scandir(base_path)}
+
         def _sprite(name: str) -> str:
-            path = base_path / name
-            return "%s/%s/%s" % (SPECIES_RES_ROOT, slug, name) if path.exists() else ""
+            return "%s/%s/%s" % (SPECIES_RES_ROOT, slug, name) if name.lower() in present_names else ""
 
         entries[species_id] = {
             "species_id": species_id,
@@ -1982,23 +1992,7 @@ def load_pin() -> dict:
         return json.load(handle)
 
 
-def cmd_refresh() -> dict:
-    request = urllib.request.Request(
-        GITHUB_API_COMMITS,
-        headers={"User-Agent": "poke-wilds-godot-importer", "Accept": "application/vnd.github+json"},
-    )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        data = json.load(response)
-    pin = {
-        "repo": API_REPO,
-        "sha": data["sha"],
-        "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-    with open(PIN_FILE, "w", encoding="utf-8") as handle:
-        json.dump(pin, handle, indent=2)
-        handle.write("\n")
-    print("pinned %s @ %s" % (API_REPO, pin["sha"]))
-
+def _download_and_extract(pin: dict) -> None:
     tarball = CACHE_DIR / ("api-data-%s.tar.gz" % pin["sha"])
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if not tarball.exists():
@@ -2023,6 +2017,37 @@ def cmd_refresh() -> dict:
     else:
         extract_to.rename(CACHE_API_DATA)
     print("extracted to %s" % CACHE_API_DATA.relative_to(ROOT))
+
+
+def cmd_refresh() -> dict:
+    request = urllib.request.Request(
+        GITHUB_API_COMMITS,
+        headers={"User-Agent": "poke-wilds-godot-importer", "Accept": "application/vnd.github+json"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        data = json.load(response)
+    pin = {
+        "repo": API_REPO,
+        "sha": data["sha"],
+        "fetched_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    with open(PIN_FILE, "w", encoding="utf-8") as handle:
+        json.dump(pin, handle, indent=2)
+        handle.write("\n")
+    print("pinned %s @ %s" % (API_REPO, pin["sha"]))
+    _download_and_extract(pin)
+    return pin
+
+
+def cmd_fetch_pinned() -> dict:
+    """Download + extract the tarball for the COMMITTED pin only — never
+    re-resolves upstream, never moves the pin, never regenerates. This is the
+    CI cache-miss path: --refresh would silently re-pin to the latest upstream
+    and rewrite the catalog in the working tree, making the S4.5 freshness
+    gate (--check) tautological exactly when the cache is cold."""
+    pin = load_pin()
+    print("fetching committed pin %s @ %s" % (pin["repo"], pin["sha"]))
+    _download_and_extract(pin)
     return pin
 
 
@@ -2039,16 +2064,24 @@ def report_unmapped(importer: Importer) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--refresh", action="store_true", help="re-resolve the upstream SHA, download + extract the tarball, then regenerate")
+    parser.add_argument("--fetch-pinned", action="store_true", help="download + extract the COMMITTED pin's tarball only (CI cache-miss path; never moves the pin, never regenerates)")
     parser.add_argument("--check", action="store_true", help="exit 0 when committed catalog JSON matches regeneration from the pinned cache")
     parser.add_argument("--diff-against-asm", action="store_true", help="print the ASM-parity summary (report is written on every generating run)")
     args = parser.parse_args()
 
     try:
-        pin = cmd_refresh() if args.refresh else load_pin()
+        if args.refresh:
+            pin = cmd_refresh()
+        elif args.fetch_pinned:
+            pin = cmd_fetch_pinned()
+        else:
+            pin = load_pin()
         api = ApiData(CACHE_API_DATA)
     except CacheMissing as error:
         print("import_pokeapi: %s" % error, file=sys.stderr)
         return 1
+    if args.fetch_pinned and not (args.check or args.refresh):
+        return 0  # fetch-only: no regeneration, no catalog writes
 
     overrides = load_overrides()
     try:
