@@ -43,15 +43,16 @@ func attack_entity(tile: Vector2i) -> Dictionary:
 			"message": "The egg gleams oddly... It's SHINY!" if shiny else "The egg breaks apart. It was not shiny."}
 	return _rt()._force_battle(entity, false)
 
-# Overworld Z on a mon: FRIENDLY (or a Charmed mon inside the calm window — DIVERGENCE #6
-# calm-then-interact) recruits; IRRITABLE warns once, then chases on a second consecutive
-# interact (:264-266); anything else refuses (:262).
+# Z on a chamber legendary provokes its +3 battle through the normal presentation bridge.
+# Otherwise FRIENDLY (or Charmed) recruits; IRRITABLE warns, then chases on a second Z.
 func interact(tile: Vector2i) -> Dictionary:
 	var entity: Dictionary = _rt().entity_at(tile)
 	if entity.is_empty():
 		return {"ok": false, "reason": "no_entity", "message": ""}
 	if str(entity.get("kind", "")) == "egg":
 		return egg_take(tile)
+	if str(entity.get("kind", "")) == "legendary":
+		return _rt()._force_battle(entity, true)
 	var disposition: String = _rt()._disposition_now(entity)
 	if disposition == OverworldMons.DISPOSITION_FRIENDLY or int(entity.get("pacify_steps", 0)) > 0:
 		return _recruit(entity)

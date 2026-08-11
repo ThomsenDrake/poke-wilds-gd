@@ -30,7 +30,7 @@ static func run_audit(seeds: Array, species: Dictionary, biome_encounters) -> Di
 		var gen = WorldGenerator.new()
 		gen.setup(seed_int)
 		var per_seed := [["cohesion", WorldGenCohesion.audit(gen, seed_int, WorldGenAudit.SCAN_RADIUS)],
-			["dungeons", WorldGenDungeons.audit(gen, seed_int)]] # chain frozen at origin (seamless plane)
+			["dungeons", WorldGenDungeons.audit(gen, seed_int, species, Callable(biome_encounters, "is_battle_viable"))]] # chain frozen at origin (seamless plane)
 		for entry in per_seed:
 			var goal := str(entry[0])
 			var result: Dictionary = entry[1]

@@ -55,6 +55,8 @@ func check_flash() -> void:
 	_runner.teleport_player(_world(), _player(), runtime, dark_tile)
 	_runner.swap_party(runtime, ["MACHOP"], FieldMovesParty.PARTY_LEVEL) # non-flash control
 	_ensure(not runtime.night_system.has_light_at(dark_tile), "flash: the non-flash control party is already lit")
+	var scope_token := str(runtime.dungeon_runtime.encounter_scope_for(dark_tile, _world().get_tile_biome(dark_tile)).get("token", ""))
+	_ensure(scope_token == "", "flash: dark control tile entered authored encounter scope: %s" % scope_token)
 	var dark_ghosts := _count_ghosts(true)
 	_runner.swap_party(runtime, FieldMovesParty.FIELD_MOVES_PARTY, FieldMovesParty.PARTY_LEVEL)
 	_ensure(runtime.night_system.has_light_at(dark_tile), "flash: the flash party did not light the dark tile")

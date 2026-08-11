@@ -34,6 +34,8 @@ func setup(session_state, catalog, trace_logger, world_generator, build_runtime,
 # Harvests one faced tile through the shared resolver: action, capability,
 # override stamp, yield, trace. A built tile instead routes to demolition.
 func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
+	if _in_dungeon():
+		return {"ok": false, "move_id": "", "message": "The cave walls resist the move.", "yield_item": ""} # the dungeon refusal (message-only — this route's refusals never trace)
 	var logic: Dictionary = _world_gen.get_tile_logic(tile)
 	var action := HarvestResolver.action_for_tile(logic)
 	if action.is_empty():
@@ -75,6 +77,9 @@ func _capable(move_id: String, mon_constraint: Dictionary) -> bool:
 		if mon is Dictionary and FieldMoves.can_perform(mon, move_id, get_species):
 			return true
 	return false
+
+
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the dungeon gate, session-direct: cut/dig/smash refuse inside dungeons (a dungeon-local clear must NEVER land in the overworld overrides map)
 
 
 func _tile_payload(tile: Vector2i) -> Array:

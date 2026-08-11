@@ -7,7 +7,11 @@ extends RefCounted
 # the seamless infinite plane retired chaining).
 #
 # TIER RULE: only structural invariants that HOLD TODAY ride `enforcing_failures` (red on
-# regression): the spawn flood reaching a minimum region. Every gap that needs a FUTURE fix
+# regression): the dungeon-map invariants (hand-authored const maps make them structural —
+# flood-fill spawn->chamber/spawn->exit, exactly one spawn/exit/chamber, no orphan walkable
+# cells, nonempty catalog-present/battle-viable nonlegendary scopes) + the per-seed entrance
+# presence/distinctness, and
+# the spawn flood reaching a minimum region. Every gap that needs a FUTURE fix
 # rides `advisory` and NEVER gates: spawn-disc intrusion and the gen-time landmark
 # reachability gate (spec §19(c), unimplemented). (Infinite-world slice 2: LAVA now
 # GENERATES under the climate field, so the LAVA-site and legendary NO_ANCHOR gaps
@@ -18,10 +22,11 @@ const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the
 const LandmarkScatter := preload("res://scripts/domain/landmark_scatter.gd") # the scattered-instance derivation (slice 3)
 const Landmarks := preload("res://scripts/domain/landmarks.gd")
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
+const DungeonMaps := preload("res://scripts/domain/dungeon_maps.gd") # the enforcing map-invariant lane (legendary-dungeon slice)
 
 
 # --- public entry -----------------------------------------------------------------
-static func audit(gen, seed: int) -> Dictionary:
+static func audit(gen, seed: int, species: Dictionary, is_viable: Callable) -> Dictionary:
 	var enforcing: Dictionary = {}
 	var failures: Array = []
 	var advisory: Array = []
@@ -49,10 +54,10 @@ static func audit(gen, seed: int) -> Dictionary:
 
 	# (1b) ADVISORY content density (infinite-world slice 3): the chunk-hash scattering,
 	# measured over the chunks whose centers sit BEYOND the origin core out to ring ~512 —
-	# scattered landmark instances, legendary lairs (per affinity biome), and dungeon-site
-	# rolls (present + footprint-fitting). The regression net for the future dungeon slice.
-	advisory.append({"kind": "content_density", "value": _content_density(gen, seed),
-		"detail": "Scattered landmarks / legendary lairs / dungeon sites across the beyond-core chunk sample (the infinite plane's content rates)."})
+	# scattered landmark instances. (The legendary-lair and dungeon-site measurements are
+	# RETIRED with the lairs/site predicates — the legendary-dungeon slice replaces them.)
+	advisory.append({"kind": "content_density", "value": _content_density(seed),
+		"detail": "Scattered landmarks across the beyond-core chunk sample (the infinite plane's landmark content rate)."})
 
 	# (4) ADVISORY spawn_disc_exclusion: a landmark footprint CAN intrude within SPAWN_DISC of
 	# origin (measured: the ring-34 Ruins reach manhattan <=24 on some seeds — its footprint's
@@ -69,14 +74,45 @@ static func audit(gen, seed: int) -> Dictionary:
 		advisory.append({"kind": "spawn_disc_intrusion", "value": in_disc,
 			"detail": "%d landmark footprint(s) intrude within manhattan %d of origin on this seed (spawn-disc exclusion is not guaranteed by world gen — the dungeon slice adds a placement-time gate)." % [in_disc, WorldGenAudit.SPAWN_DISC]})
 
-	# (5) ENFORCE spawn_reach: the spawn flood reaches a minimum walkable region.
+	# (5) ENFORCE dungeon maps (legendary-dungeon slice): the seven hand-authored const maps
+	# are STRUCTURAL — every DungeonMaps.validate_all() issue gates (ragged/unknown chars,
+	# exactly one spawn/exit/chamber, flood-fill spawn->chamber + spawn->exit, no orphan
+	# walkable cells, and nonempty catalog-present/battle-viable nonlegendary scopes).
+	# Plus the per-seed ENTRANCE lane:
+	# every anchored species' entrance serves its warp cell through the resolver (presence)
+	# and no two entrances share a warp tile (distinctness — the sibling-exclusion chain).
+	var map_issues: Dictionary = DungeonMaps.validate_all()
+	var scope_issues: Dictionary = DungeonMaps.DungeonLayouts.validate_encounter_scopes(species, is_viable)
+	var maps_clean := 0
+	for dungeon_id in DungeonMaps.DUNGEON_IDS: # the pinned roster order (never dict iteration)
+		var issues: Array = (map_issues.get(dungeon_id, ["missing from validate_all()"]) as Array).duplicate()
+		issues.append_array(scope_issues.get(dungeon_id, ["missing from validate_encounter_scopes()"]))
+		if issues.is_empty():
+			maps_clean += 1
+			continue
+		for issue in issues:
+			failures.append("dungeon_map: %s: %s" % [dungeon_id, str(issue)])
+	enforcing["dungeon_maps_valid"] = maps_clean
+	var entrance_warps: Dictionary = {}
+	for entrance in DungeonMaps.entrances_for_world(seed):
+		var warp_tile: Vector2i = entrance["warp_tile"]
+		var species_id := str(entrance["species_id"])
+		if entrance_warps.has(warp_tile):
+			failures.append("dungeon_entrance: %s shares its warp tile %s with %s" % [species_id, str(warp_tile), str(entrance_warps[warp_tile])])
+		entrance_warps[warp_tile] = species_id
+		var cell: Dictionary = DungeonMaps.entrance_cell_for(seed, warp_tile)
+		if not bool(cell.get("warp", false)) or str(cell.get("dungeon_id", "")) != str(entrance["dungeon_id"]):
+			failures.append("dungeon_entrance: %s anchor %s does not resolve to its own warp cell (facade overlap swallowed it)" % [species_id, str(warp_tile)])
+	enforcing["dungeon_entrances"] = entrance_warps.size()
+
+	# (6) ENFORCE spawn_reach: the spawn flood reaches a minimum walkable region.
 	var spawn: Vector2i = gen.find_walkable_spawn(seed)
 	var reachable := int(gen.reachable_walkable_count(spawn, WorldGenAudit.REACH_BUDGET))
 	enforcing["spawn_reachable"] = reachable
 	if reachable < WorldGenAudit.SPAWN_REACH_MIN:
 		failures.append("spawn_reach: spawn flood reached %d walkable tiles (< %d)" % [reachable, WorldGenAudit.SPAWN_REACH_MIN])
 
-	# (6) ADVISORY landmark reachability: the gen-time gate (spec §19(c)) is UNIMPLEMENTED, so every
+	# (7) ADVISORY landmark reachability: the gen-time gate (spec §19(c)) is UNIMPLEMENTED, so every
 	# landmark reports not_verified — the public seam exposes no visited set to confirm a footprint.
 	var reachability := {}
 	for landmark in landmarks:
@@ -98,11 +134,8 @@ static func audit(gen, seed: int) -> Dictionary:
 
 # The beyond-core chunk sample for the density metric: chunk centers with Manhattan ring in
 # (ORIGIN_CORE_RADIUS, 512] — bounded, never the plane.
-static func _content_density(gen, seed: int) -> Dictionary:
+static func _content_density(seed: int) -> Dictionary:
 	var landmarks_found: Array = []
-	var lairs := 0
-	var sites_present := 0
-	var sites_fit := 0
 	var chunks_sampled := 0
 	for cy in range(-8, 9):
 		for cx in range(-8, 9):
@@ -114,15 +147,7 @@ static func _content_density(gen, seed: int) -> Dictionary:
 			var instance := LandmarkScatter.instance_for_chunk(seed, chunk)
 			if not instance.is_empty():
 				landmarks_found.append(str(instance.get("instance_key", "")))
-			if ContentScatter.dungeon_site_present(seed, chunk):
-				sites_present += 1
-				if WorldGenAudit.footprint_fits(gen, ContentScatter.dungeon_site_center(seed, chunk), Landmarks.RUINS_SIZE):
-					sites_fit += 1
-			for species_id in LegendaryPlacement.LEGENDARY_IDS:
-				if LegendaryPlacement.lair_for_chunk(seed, chunk, str(species_id)) != LegendaryPlacement.NO_ANCHOR:
-					lairs += 1
-	return {"chunks": chunks_sampled, "landmarks": landmarks_found.size(), "landmark_keys": landmarks_found,
-		"lairs": lairs, "dungeon_sites": sites_present, "dungeon_sites_fit": sites_fit}
+	return {"chunks": chunks_sampled, "landmarks": landmarks_found.size(), "landmark_keys": landmarks_found}
 
 
 # The land biomes: WATER/SAND are the elevation bands and never site a dungeon.

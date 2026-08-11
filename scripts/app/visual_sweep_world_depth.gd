@@ -3,8 +3,9 @@ extends Node
 # Deterministic world-depth driver for the visual sweep (Phase 7; spec: docs/product-
 # specs/world-depth.md § Smoke validation). STANDALONE satellite: the Ruins inner chamber
 # + glowing statue pair (31), the Mansion room with the statue grid + both doors open (32),
-# and the R11 Heart Tower base chamber (34, via visual_sweep_world_depth_expand.gd). The
-# 33_beacon edge shot RETIRED with world chaining (infinite-world slice 1).
+# and the R11 Heart Tower base chamber (34, via visual_sweep_world_depth_expand.gd); the
+# legendary-dungeon slice appends the entrance-facade + chamber-interior pair (44/45, via
+# visual_sweep_world_depth_dungeon.gd). The 33_beacon edge shot RETIRED with world chaining.
 # Footprints are found by PROBING the view's tile logic for the landmark_id stamp (app never
 # preloads domain); puzzle state is CRAFTED through the frozen seam. NO rng: byte-stable.
 # The entity layer stays INERT and encounter_chance is pinned 0, so no pending seam can arm.
@@ -15,6 +16,7 @@ const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const WorldDepthOracle := preload("res://scripts/app/visual_sweep_world_depth_oracle.gd") # R4 regional pixel oracle (app-220 extraction)
 const WorldDepthExpand := preload("res://scripts/app/visual_sweep_world_depth_expand.gd") # R11 shot 34 + rest probe (app-220 extraction)
+const WorldDepthDungeon := preload("res://scripts/app/visual_sweep_world_depth_dungeon.gd") # the 44/45 dungeon pair (app-220 extraction)
 const ShowcaseSupport := preload("res://scripts/app/showcase_support.gd") # the instance-keyed mansion-state write (slice 3)
 
 const DEFAULT_THRESHOLD_PCT := 0.5
@@ -46,6 +48,7 @@ var _threshold_pct := DEFAULT_THRESHOLD_PCT
 var _shots: Array = []
 var _failures: Array = []
 var _pending_oracle: Dictionary = {} # R4: per-shot tile regions (set by a shot, consumed+cleared in _capture)
+var _rest_sample: Dictionary = {} # the entity-rest probe's sample cache (WorldDepthExpand.rest_state rides it; only read when the entity layer is opted in — the dungeon interior shot)
 
 
 func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
@@ -66,6 +69,7 @@ func run_sweep(ctx: Dictionary, options: Dictionary = {}) -> void:
 	await _ruins_shot()
 	await _mansion_shot()
 	await WorldDepthExpand.run(self) # R11: heart tower (34). (Shot 33 beacons retired with world chaining; 35/36 rode the retired world_chain satellite.)
+	await WorldDepthDungeon.run(self) # the legendary-dungeon pair: entrance facade (44) + chamber interior (45)
 	_player().encounter_chance = saved_chance
 	_baselines.restore_window_size(previous_window)
 	_finish()

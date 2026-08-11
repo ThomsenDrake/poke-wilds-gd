@@ -106,10 +106,13 @@ func get_tile_logic(map_pos: Vector2i) -> Dictionary:
 		logic = landmark_resolver.call(map_pos, logic)
 	# Mutations apply last, at this single boundary, clears then placements so a
 	# built structure shadows a cleared tile; empty maps keep base byte-identical.
-	if _overrides.has(map_pos):
-		logic = WorldOverrides.apply(logic, _overrides[map_pos])
-	if _placements.has(map_pos):
-		logic = WorldOverrides.apply(logic, _placements[map_pos])
+	# Dungeon interior cells (the resolver's dungeon_region mark) are hand-authored and
+	# immutable: overworld clears/placements at colliding local coords never leak in.
+	if str(logic.get("dungeon_region", "")) == "":
+		if _overrides.has(map_pos):
+			logic = WorldOverrides.apply(logic, _overrides[map_pos])
+		if _placements.has(map_pos):
+			logic = WorldOverrides.apply(logic, _placements[map_pos])
 	return logic
 
 

@@ -7,11 +7,12 @@ extends Node
 # build already have live callers (harvest_flow / placement_flow / the world_view surf
 # gate) and are re-asserted there, not here.
 #
-# Determinism: seed_for_smoke pins both runtime rngs (the house convention); repel's
-# suppression is proven STRUCTURALLY (a re-seeded stream that yields encounters with
-# repel off yields exactly zero with it on). Encounters are zeroed on the avatar; the
-# dispatcher's save guard restores the real save (in-memory crafted state — cleared
-# placements, a registered way stone, a pushed boulder — dies with the app at quit).
+# Determinism: seed_for_smoke runs before new_game, then the view/avatar are rebuilt at
+# the pinned spawn, so no wall-clock boot world or loaded save can choose the Flash
+# control's encounter scope. Repel's suppression is proven STRUCTURALLY (a re-seeded
+# stream that yields encounters with repel off yields exactly zero with it on).
+# Encounters are zeroed on the avatar; the dispatcher's save guard restores the real
+# save (in-memory crafted state dies with the app at quit).
 #
 # First act is the precondition WITNESS (FieldMovesParty.verify): the fixture must
 # cover all 13 ported moves against the LIVE catalog, so any catalog/AUTO_TYPES drift
@@ -40,7 +41,10 @@ func run(ctx: Dictionary) -> void:
 	_ctx = ctx
 	await get_tree().create_timer(0.2).timeout
 	var runtime = _runtime()
-	runtime.seed_for_smoke(SEED)
+	runtime.seed_for_smoke(SEED) # BEFORE new_game: pin the world-root draw as well as encounters
+	runtime.new_game() # self-contained: never inherit the full suite's wall-clock boot world/save
+	_world().rebuild(runtime.get_world_seed()) # the view owns a separate generator from the runtime
+	_runner.teleport_player(_world(), _player(), runtime, runtime.session.player_tile) # new_game moves session state, not the avatar node
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var party_before: Array = FieldMovesParty.swap_in(runtime)

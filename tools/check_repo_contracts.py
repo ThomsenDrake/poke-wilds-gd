@@ -676,8 +676,8 @@ def miss_postmortem_advisories(root: Path | None = None) -> list[str]:
 
 
 # House seeding convention (miss-postmortem miss-002): the determinism half is
-# ADOPTED per scenario (the seed_for_smoke seam pins both runtime rngs), so the
-# convention is held by a loud advisory rather than silent trust.
+# ADOPTED per scenario (seed_for_smoke pins the runtime RNG streams and resets
+# Pokemon creation order), so a loud advisory holds the convention.
 SEED_DRIVE_MARKERS = ("generate_wild_encounter(", "start_wild_battle(")
 SEED_PIN_MARKERS = ("seed_for_smoke(", "_rng.seed")
 _PASSED_EMIT_RE = re.compile(r'emit_trace\(\s*"([A-Za-z0-9_]+)_passed"')
@@ -687,7 +687,7 @@ def seed_convention_advisories(root: Path | None = None) -> list[str]:
     """Advisory scenario-authoring checklist (stderr, NEVER red — the house
     progressive-arming style): any scenario file that drives wild/battle inputs
     (generate_wild_encounter / start_wild_battle) and emits a <scenario>_passed
-    trace must pin the runtime rng first (seed_for_smoke, or a direct _rng.seed
+    trace must pin deterministic inputs first (seed_for_smoke, or direct _rng.seed
     assignment as visual_sweep.gd's BATTLE_RNG_SEED). A file that skips the pin
     gates its pass event on the per-process wall-clock randomize() — the exact
     nav_audit false-red class (miss-002). A violation can still flake, but never
@@ -763,7 +763,9 @@ def _world_depth_determinism_files(root: Path) -> list[Path]:
     deleted with the chain predicates; the seamless plane derives everything from
     the ONE world seed.)"""
     files = list(root.glob("scripts/domain/**/*.gd"))
-    for rel in ("scripts/runtime/landmark_runtime.gd",):
+    # dungeon_runtime.gd joins the scope with the legendary-dungeon slice (the world-depth
+    # runtime core: warps/resolver/seal/chamber — rng-free, the draws ride the shared _rng).
+    for rel in ("scripts/runtime/landmark_runtime.gd", "scripts/runtime/dungeon_runtime.gd"):
         path = root / rel
         if path.exists():
             files.append(path)
@@ -797,7 +799,7 @@ def world_depth_rng_issues(root: Path) -> list[str]:
 # directly. Format contract (see SHOT_REGISTRY):
 #   {"<sweep>": {"range": [lo, hi], "extra": [..], "seed": <int>}, ..., "retired": [..]}
 SHOT_REGISTRY_REL = Path("scripts") / "app" / "visual_sweep_baselines.gd"
-RETIRED_WHITELIST = {17, 33, 35, 36}  # 17 (original gap) + 33/35/36 retired with world chaining (infinite-world slice)
+RETIRED_WHITELIST = {17, 33, 35, 36, 43}  # 17 (original gap) + 33/35/36 retired with world chaining (infinite-world slice) + 43 (the farfield lair shot) retired with the legendary-dungeon slice
 BIOME_SHOT_FLOOR = 3      # committed 03_biome_* shots; loud-fail below this
 
 
@@ -841,7 +843,8 @@ def shot_numbering_issues(root: Path) -> list[str]:
 
     Every registered shot number (a sweep's range + extra) must be a committed
     baseline (NN_*.png) or formally retired; the ONLY retired numbers allowed are the
-    RETIRED_WHITELIST (17 + 33/35/36 retired with world chaining); committed shots must
+    RETIRED_WHITELIST (17 + 33/35/36 retired with world chaining + 43 retired with the
+    lairs); committed shots must
     themselves be registered; and the biome group (03_biome_*) must hold >= BIOME_SHOT_FLOOR
     shots (loud-fail). Arms progressively until SHOT_REGISTRY exists (cross-builder
     dependency on the visuals builder)."""

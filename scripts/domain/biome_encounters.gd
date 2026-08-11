@@ -142,6 +142,19 @@ func known_biomes() -> Array:
 	return BIOME_TYPES.keys()
 
 
+# Shared sanitizer for authored scope additions. Curated IDs bypass filter_species_ids,
+# so landmark/dungeon facades call this before their single deterministic pool draw.
+func battle_viable_ids(species_dict: Dictionary, candidates: Array) -> Array:
+	var ids: Array = []
+	for candidate in candidates:
+		var species_id := str(candidate)
+		var entry = species_dict.get(species_id, {})
+		if entry is Dictionary and is_battle_viable(species_id, entry) and not ids.has(species_id):
+			ids.append(species_id)
+	ids.sort()
+	return ids
+
+
 # A species must be battle-viable to enter any match path (direct biome hit
 # or type fallback): both battle sprites (battle renders 2x2 placeholder
 # squares without them), a parsed base_stats block with a real catch rate,

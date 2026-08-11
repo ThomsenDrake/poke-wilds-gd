@@ -101,13 +101,19 @@ const SCENARIOS := {
 	# trace, the never-encounter exclusion, the white-out re-battleable + KO gone-for-good
 	# (per-instance, slice 3) rematch rules. Joins the double-run lane.
 	"legendary_spawn": [preload("res://scripts/app/legendary_spawn_scenario.gd"), "run", []],
+	# Legendary-dungeon slice: the DUNGEON LOOP gate — entrance stamps at the seven pinned
+	# anchors, the real-step warp round-trip, the catch/KO-valve/seal-ladder proofs, the
+	# sim suppression + in-dungeon refusals, and the active_area/legendary_kos save
+	# round-trip. Checks split into legendary_dungeon_checks.gd (the app-220 wall).
+	"legendary_dungeon": [preload("res://scripts/app/legendary_dungeon_scenario.gd"), "run", []],
 	# (world_chain + beacon_selector scenarios RETIRED with world chaining — infinite-world
 	# slice: the seamless plane has no edge to cross and no edge beacons. Way-stone teleport
 	# stays, via the renamed WayStoneSelector — its multi-stone CHOICE + avatar-input
 	# ownership witness is:)
 	"waystone_selector": [preload("res://scripts/app/waystone_selector_scenario.gd"), "run", []],
 	# Infinite-world slice 3: the chunk-hash scattering witness — origin-core preservation,
-	# scattered-instance discovery + per-instance puzzle state, repeating-lair lifecycle.
+	# scattered-instance discovery + per-instance puzzle state. (The repeating-lair
+	# lifecycle lane is retired with the lairs — legendary-dungeon slice.)
 	"content_scatter": [preload("res://scripts/app/content_scatter_scenario.gd"), "run", []],
 	# Infinite-world slice 4: creation-time seed choice — custom-seed determinism (two
 	# re-pinned runs byte-identical), the beach-preference spawn, the random-path pin.
@@ -118,7 +124,8 @@ const SCENARIOS := {
 	"new_game_flow": [preload("res://scripts/app/new_game_flow_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
-	# Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+	# Far-field infinite-world sweep (shot 42, seed 2026072908): distant scatter. (The
+	# lair shot 43 is retired with the lairs — legendary-dungeon slice.)
 	"visual_sweep_farfield": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", []],
 	"visual_sweep_farfield_update": [preload("res://scripts/app/visual_sweep_farfield.gd"), "run_sweep", [{"mode": "update"}]],
 	# Bounded temporal capture (battle attack/capture adapters) — windowed-only.

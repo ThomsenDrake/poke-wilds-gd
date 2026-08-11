@@ -28,6 +28,7 @@ const BreedingRuntime := preload("res://scripts/runtime/breeding_runtime.gd")
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
 const WildEncounterDraw := preload("res://scripts/runtime/wild_encounter_draw.gd")
+const DungeonRuntime := preload("res://scripts/runtime/dungeon_runtime.gd")
 
 signal world_overridden(tile: Vector2i) # per harvest/placement so the view re-renders the tile in place
 
@@ -53,6 +54,7 @@ var breeding_runtime = BreedingRuntime.new()
 var overworld_mons_runtime = OverworldMonsRuntime.new()
 var landmark_runtime = LandmarkRuntime.new()
 var wild_encounter_draw = WildEncounterDraw.new()
+var dungeon_runtime = DungeonRuntime.new()
 var stone_evolution_runtime = preload("res://scripts/runtime/stone_evolution_runtime.gd").new()
 var player_avatar: Node = null # wired by field_action_router.setup; seed_for_smoke pins its trigger-draw rng
 var _rng = RandomNumberGenerator.new()
@@ -77,8 +79,10 @@ func _ready() -> void:
 	overworld_mons_runtime.setup(session, catalog, pokemon_rules, trace, _world_gen, _biome_encounters, field_move_runtime) # Phase 6: NO _rng — the derived-hash stream (spec § Determinism)
 	overworld_mons_runtime.encounter_requested.connect(_on_entity_encounter) # forced-battle presentation bridge (zero main.gd lines)
 	landmark_runtime.setup(session, catalog, trace, _world_gen, _biome_encounters, overworld_mons_runtime, music_router) # Phase 7 Build 1: entry/puzzle/scope; state ONLY via the frozen seam
-	_world_gen.landmark_resolver = Callable(landmark_runtime, "tile_logic_for_active") # footprints + the door overlay at the single mutation boundary
-	wild_encounter_draw.setup(session, catalog, pokemon_rules, trace, _rng, night_system, landmark_runtime, _biome_encounters) # Build-2 extraction: generate_wild_encounter's wild-draw tail (the shared _rng rides by REFERENCE)
+	dungeon_runtime.setup(session, catalog, trace, _world_gen, landmark_runtime, overworld_mons_runtime, music_router) # the legendary-dungeon core: warps/resolver/seal/chamber/music/scope facade
+	_world_gen.landmark_resolver = Callable(dungeon_runtime, "tile_logic_for_active") # the single tile-logic choke: dungeon cells ONLY inside; the landmark consult + entrance stamps outside
+	wild_encounter_draw.setup(session, catalog, pokemon_rules, trace, _rng, night_system, dungeon_runtime, _biome_encounters) # Build-2 extraction: generate_wild_encounter's wild-draw tail (the shared _rng rides by REFERENCE); the dungeon scope facade
+	music_router.dungeon_gate = Callable(dungeon_runtime, "in_dungeon") # the ONE surviving gate Callable (the router holds no session): the per-dungeon track is never stomped by a biome re-trigger; the session-holding runtimes read session.active_area directly
 	stone_evolution_runtime.setup(session, catalog, pokemon_rules, trace)
 	# Placements reuse the harvest sync path: one signal, world_view re-renders in place.
 	build_runtime.structure_placed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
@@ -122,7 +126,7 @@ func new_game(custom_seed: int = -1) -> void:
 	# both off the SESSION (footprints + the door overlay), so a pre-reset scan rates candidates against the PREVIOUS world's footprints and can commit a walled spawn; find_walkable_spawn's own setup(seed) reseeds the generator (no explicit setup here), and the scan draws no shared _rng.
 	var spawn = _world_gen.find_walkable_spawn(world_seed)
 	session.reset_for_new_game(world_seed, starter, spawn); _initialized = true
-	overworld_mons_runtime.stamp_legendaries() # Build 2: the frozen seven as world-fixed statics (AFTER the reset sets the seed)
+	dungeon_runtime.note_new_world() # the dungeon slice: the whittle + stale chamber entities die with the world (the chamber stamps on entry — the overworld stamp_legendaries is RETIRED)
 	save_game()
 	trace.emit_event("session_created", "GameRuntime", {"world_seed": session.world_seed,
 		"player_tile": _tile_payload(session.player_tile), "party_size": session.party.size()})
@@ -152,8 +156,9 @@ func note_player_step() -> void:
 	session.advance_time(1)
 	habitat_runtime.note_step()
 	breeding_runtime.tick() # party-egg hatch countdown + rate-limited pen lay scan
-	overworld_mons_runtime.note_player_step(int(session.total_steps), session.player_tile, DayPhase.time_of_day_label(session.time_of_day_minutes)) # Phase 6: after habitat/breeding
-	landmark_runtime.note_player_step(session.player_tile) # Phase 7: entry traces + tower music + ruins guardian (after the Phase 6 tick)
+	landmark_runtime.note_player_step(session.player_tile) # Phase 7: entry traces + tower music + ruins guardian — BEFORE the dungeon warp so the entrance tile still reads as the overworld footprint
+	dungeon_runtime.note_player_step() # the dungeon warp hook (AFTER landmark's, BEFORE the overworld sim): an entrance step warps FIRST, so the sim below can never arm an encounter at a tile the warp then clears mid-battle
+	overworld_mons_runtime.note_player_step(int(session.total_steps), session.player_tile, DayPhase.time_of_day_label(session.time_of_day_minutes)) # Phase 6: after habitat/breeding; LAST — post-warp the in_dungeon gate suppresses the sim at dungeon-local coords, and an exit step re-syncs the window at the anchor
 
 func get_time_of_day_minutes() -> int: return session.time_of_day_minutes
 
@@ -172,8 +177,7 @@ func retrieve_campsite_mon(index: int) -> Dictionary: return camping_runtime.ret
 
 
 # Harvest/demolish lives in harvest_runtime; callers keep this name.
-func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary:
-	return harvest_runtime.harvest_tile(tile, mon_constraint)
+func harvest_tile(tile: Vector2i, mon_constraint: Dictionary = {}) -> Dictionary: return harvest_runtime.harvest_tile(tile, mon_constraint)
 
 func deposit_to_nearest(party_index: int) -> Dictionary: # box first; Phase 5 falls back to the nearest pen
 	var result := storage_runtime.deposit_to_nearest(party_index)
@@ -181,12 +185,10 @@ func deposit_to_nearest(party_index: int) -> Dictionary: # box first; Phase 5 fa
 
 
 # Party-screen DEPOSIT gate callable (RUNTIME_METHODS maps "box_tile_near" here): {found, tile}, never a sentinel.
-func box_tile_near(center: Vector2i) -> Dictionary:
-	return storage_runtime.box_tile_near(center)
+func box_tile_near(center: Vector2i) -> Dictionary: return storage_runtime.box_tile_near(center)
 
 
-func nearest_box_tile() -> Dictionary:
-	return storage_runtime.nearest_box_tile()
+func nearest_box_tile() -> Dictionary: return storage_runtime.nearest_box_tile()
 
 
 # Phase 5 breeding pen pass-throughs (party-screen DEPOSIT gate, fence-Z action, ground-egg render read).
@@ -217,17 +219,16 @@ func apply_world_overrides(saved: Dictionary) -> void:
 func get_party_snapshot() -> Array:
 	return session.get_party_snapshot()
 
-func get_item_count(item_id: String) -> int:
-	return session.get_item_count(item_id)
+func get_item_count(item_id: String) -> int: return session.get_item_count(item_id)
 
-func set_party_lead(index: int) -> void:
-	session.set_party_lead(index)
+func set_party_lead(index: int) -> void: session.set_party_lead(index)
 
 
-# Smoke determinism seam: pins EVERY shared rng (encounter _rng, battle, the avatar's trigger-draw stream) so a scenario's inputs are a pure function of (code, save, seed), never _ready's wall-clock randomize().
+# Smoke determinism seam: pins every shared rng plus the creation-order nonce so a scenario's inputs are a pure function of (code, save, seed), never _ready's wall-clock randomize() or bootstrap history.
 func seed_for_smoke(seed: int) -> void:
 	_rng.seed = seed
 	battle_runtime._rng.seed = seed
+	pokemon_rules.reset_creation_nonce()
 	if player_avatar != null: player_avatar._rng.seed = seed
 
 func generate_wild_encounter(tile_pos: Vector2i, biome: String = "") -> Dictionary:
@@ -252,11 +253,9 @@ func start_wild_battle(wild_mon: Dictionary) -> Dictionary:
 	return battle_runtime.start_wild_battle(wild_mon)
 
 
-func perform_battle_move(index: int) -> Dictionary:
-	return _finish_battle(battle_runtime.perform_move(index))
+func perform_battle_move(index: int) -> Dictionary: return _finish_battle(battle_runtime.perform_move(index))
 
-func use_pokeball() -> Dictionary:
-	return _finish_battle(battle_runtime.use_pokeball())
+func use_pokeball() -> Dictionary: return _finish_battle(battle_runtime.use_pokeball())
 
 func use_potion() -> Dictionary:
 	return battle_runtime.use_potion()
@@ -271,7 +270,9 @@ func _finish_battle(response: Dictionary) -> Dictionary:
 	if not bool(response.get("finished", false)): return response
 	var outcome := str(response.get("outcome", ""))
 	var enemy: Dictionary = battle_runtime.get_snapshot().get("enemy_mon", {})
-	overworld_mons_runtime.note_battle_outcome(outcome, enemy) # reset on EVERY finished battle; removes on ko/catch (:288)
+	var tablet_message := overworld_mons_runtime.note_battle_outcome(outcome, enemy) # reset on EVERY finished battle; removes on ko/catch (:288); the catch-only tablet grant message
+	dungeon_runtime.note_battle_outcome(outcome, enemy) # AFTER the whittle write above: a white-out closes the dungeon context (battle_runtime already dumped the player to the campsite)
+	if tablet_message != "": response["message"] = str(response.get("message", "")) + " " + tablet_message # the post-battle message seam (battle_view renders response.message)
 	if ["victory", "caught", "caught_box_full"].has(outcome):
 		var drop := MaterialDrops.drop_for(catalog.get_species(str(enemy.get("species_id", ""))))
 		if not drop.is_empty():
@@ -301,7 +302,7 @@ func _apply_loaded_payload(payload: Dictionary) -> bool:
 	_world_gen.clear_placements()
 	_world_gen.apply_placements(session.structures)
 	breeding_runtime.apply_save_state(session.pastures) # v4-additive pen state (validates AFTER placements land)
-	overworld_mons_runtime.stamp_legendaries() # Build 2: the frozen seven, suppressed by the loaded legendary_removals (AFTER apply_loaded_state)
+	dungeon_runtime.note_world_loaded() # the dungeon slice: re-enter the loaded active_area (restamp/suppress; an invalid id degrades to the overworld) — the overworld stamp_legendaries is RETIRED
 	return true
 
 

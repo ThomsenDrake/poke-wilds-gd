@@ -38,7 +38,7 @@ func run(ctx: Dictionary) -> void:
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	await _audit_traversal()
-	var battle: Dictionary = NavAuditBattle.new().run(_ctx, NAV_AUDIT_SEED)
+	var battle: Dictionary = await NavAuditBattle.new().run(_ctx, NAV_AUDIT_SEED)
 	_failures.append_array(battle.get("failures", []))
 	_battle_options_checked = int(battle.get("options_checked", 0))
 	await _audit_menu()

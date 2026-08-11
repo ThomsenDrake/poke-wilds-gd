@@ -2986,5 +2986,5 @@ None — every remaining difference is accounted for by the expected classes.
 
 ## Items parity
 
-Zero diffs — `display_name`/`description` verified field-by-field against their sources (i18n properties + overrides supplements); `cost`/`pocket`/`category` are additive api-data enrichment with `0`/`""` where the item has no api-data counterpart or price.
+Zero diffs — `display_name`/`description` verified field-by-field against their sources (i18n properties + overrides supplements); `cost`/`pocket`/`category` come from api-data when available, otherwise from `item_supplements`; `cost` is `0` and pocket/category are empty only when neither source supplies them.
 

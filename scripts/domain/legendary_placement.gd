@@ -24,8 +24,6 @@ const OverworldMons := preload("res://scripts/domain/overworld_mons.gd") # _mix 
 const Landmarks := preload("res://scripts/domain/landmarks.gd") # prop/cliff mirror + footprint exclusion (same layer)
 const BiomeDefs := preload("res://scripts/domain/biome_defs.gd") # the affinity biomes' blocking-prop chances (same layer)
 const BiomeField := preload("res://scripts/domain/biome_field.gd") # the ONE climate source (infinite-world slice 2; the local mirrors are gone)
-const ContentScatter := preload("res://scripts/domain/content_scatter.gd") # the chunk rolls + lair suppression (slice 3; no cycle)
-const LandmarkScatter := preload("res://scripts/domain/landmark_scatter.gd") # the scattered-footprint exclusion (slice 3; no cycle)
 
 # --- The frozen seven (FROZEN set — spec § Legendaries) ---------------------------
 # Roster identity is grounded by the catalog + the ONE wired battle track
@@ -63,6 +61,7 @@ const LEGENDARY_ANCHOR_BUDGET := 300 # spec: bounded probe count (bounded genera
 const LEGENDARY_RING_MIN := 60 # PROGRESSION floor (re-justified in slice 2: no longer a biome-admission band — a legendary may never anchor within Manhattan 60 of origin, so early game stays safe and guardian levels (ring-fed) stay deep)
 const BATTLE_KIND_LEGENDARY := "legendary" # the music seam (music_router.gd:33) a legendary entity sets on the pending seam
 const NO_ANCHOR := Vector2i.MAX # the world's reach box lacks the affinity biome (the sim's no-anchor sentinel convention)
+const REGI_RESTAND_STEPS := 2880 # TUNABLE: the tablet-Regi KO re-stand cooldown (~2 in-game days off the 1 step = 1 minute clock)
 
 
 # --- Roster predicates ------------------------------------------------------------
@@ -77,9 +76,10 @@ static func ring_of(tile: Vector2i) -> int:
 
 
 # --- Removal grammar (gone-for-good per INSTANCE; spec § Persistence) -------------
-# Key "<ax>,<ay>:<SPECIES>" — the LAIR/anchor tile (infinite-world slice 3 re-keyed from
-# the frozen "0,0" chain tag: repeating lairs make per-instance removal meaningful — a
-# KO clears THAT lair forever, siblings stay). The persistent home is
+# Key "<ax>,<ay>:<SPECIES>" — the ANCHOR tile (infinite-world slice 3 re-keyed from the
+# frozen "0,0" chain tag, making removal per-instance; the repeating lairs that motivated
+# the re-key are RETIRED with the legendary-dungeon slice, the anchor-keyed grammar stays).
+# The persistent home is
 # session_state.legendary_removals (flat Array, absent -> [], NO SAVE_VERSION bump;
 # save_migration normalizes legacy "0,0:SPECIES" keys to the origin anchors losslessly);
 # this module never touches the save, only the grammar + the predicate.
@@ -87,6 +87,17 @@ static func removal_key(anchor: Vector2i, species_id: String) -> String:
 	return "%d,%d:%s" % [anchor.x, anchor.y, species_id]
 static func is_removed(removals: Array, anchor: Vector2i, species_id: String) -> bool:
 	return removals.has(removal_key(anchor, species_id))
+
+
+# --- KO re-stand valve (legendary-dungeon slice; the five tablet Regis ONLY) ----------
+# A tablet Regi's KO rides the additive session.legendary_kos log (removal key -> total_steps
+# at KO) INSTEAD of legendary_removals; the dungeon chamber stamp suppresses a KO'd Regi only
+# while the cooldown runs, then it re-stands at full HP/fresh stages. A catch still goes to
+# legendary_removals (gone-for-good); MEWTWO + REGIGIGAS keep both-outcomes-permanent and
+# never take this path. Pure: the caller passes now_steps (the session's total_steps).
+static func is_ko_cooling_down(kos: Dictionary, anchor: Vector2i, species_id: String, now_steps: int, cooldown: int = REGI_RESTAND_STEPS) -> bool:
+	var key := removal_key(anchor, species_id)
+	return kos.has(key) and now_steps - int(kos.get(key, 0)) < cooldown
 
 
 # --- The world's stationary set (stamp-time entry point; runtime owns lifetime) ---
@@ -213,45 +224,3 @@ static func _standable(channels: Dictionary, biome: String, props: Array, chain:
 		return false
 	var picked: Variant = Landmarks.pick_prop(tile, props, world_seed)
 	return not (picked is Dictionary and bool((picked as Dictionary).get("block", false)))
-# --- Repeating lairs (infinite-world slice 3; FLAGGED divergence) ---------------------
-# The frozen seven own the origin reach box (byte-identical anchors); BEYOND it, lairs
-# REPEAT across the plane (flagged: "one each" on an infinite plane is unfindable, and
-# per-instance removal gives the gone-for-good contract real teeth). A lair exists where
-# the chunk roll fires in the species' affinity biome; the anchor is a bounded spiral
-# from the chunk's home tile to a standable affinity tile outside any scattered landmark
-# footprint. NO_ANCHOR when absent/removed/never-fits (bounded generation, FAQ :208-210).
-const LAIR_SEARCH_BUDGET := 64 # bounded probes around the home tile (the chunk is 64 wide)
-
-static func lair_for_chunk(world_seed: int, chunk: Vector2i, species_id: String, removals: Array = []) -> Vector2i:
-	if not is_legendary(species_id):
-		push_warning("LegendaryPlacement: unknown species '%s'" % species_id)
-		return NO_ANCHOR
-	var index := LEGENDARY_IDS.find(species_id)
-	var biome := affinity_for(species_id)
-	if not ContentScatter.lair_present(world_seed, chunk, index, biome):
-		return NO_ANCHOR
-	var home := ContentScatter.lair_home_tile(world_seed, chunk, index)
-	var channels := BiomeField.make_channels(world_seed)
-	var props: Array = (BiomeDefs.new().definitions()[biome] as Dictionary).get("props", [])
-	var footprint := Rect2i()
-	var scattered := LandmarkScatter.instance_for_chunk(world_seed, chunk)
-	if not scattered.is_empty():
-		footprint = scattered["footprint"]
-	var checked := 0
-	var radius := 0
-	while checked < LAIR_SEARCH_BUDGET:
-		for y in range(-radius, radius + 1):
-			for x in range(-radius, radius + 1):
-				if checked >= LAIR_SEARCH_BUDGET:
-					break
-				if radius == 0 or maxi(absi(x), absi(y)) == radius:
-					checked += 1
-					var probe := home + Vector2i(x, y)
-					if ContentScatter.chebyshev_of(probe) <= ContentScatter.LAIR_MIN_RING:
-						continue # the lair must sit OUTSIDE the origin seven's ±256 reach box (authoritative floor)
-					if footprint.size != Vector2i.ZERO and footprint.has_point(probe):
-						continue
-					if BiomeField.biome_from(channels, probe) == biome and _standable(channels, biome, props, Vector2i.ZERO, probe, world_seed):
-						return NO_ANCHOR if is_removed(removals, probe, species_id) else probe # the lair tile IS the removal anchor
-		radius += 1
-	return NO_ANCHOR

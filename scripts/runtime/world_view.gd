@@ -6,6 +6,7 @@ const TileTextureCache := preload("res://scripts/runtime/tile_texture_cache.gd")
 const EGG_SHEET_PATH := "res://assets/source/phione-egg.png" # Phase 5 ground-egg sprite (16x16 cells)
 const RuntimePath := "/root/GameRuntime"
 const TIME_OF_DAY_DEFAULT := 720
+const DUNGEON_TINT := Color(0.66, 0.64, 0.72) # the cave-dim: a fixed cool dim neutralizes the day/night tint inside dungeons (world-depth.md § Legendaries)
 # Piecewise-linear tint keyframes (minute, color): midnight blue, dawn warmth, neutral midday, dusk warmth.
 const TIME_OF_DAY_KEYFRAMES := [
 	[0, Color(0.26, 0.28, 0.48)],
@@ -71,8 +72,7 @@ func sync_visible(center_tile: Vector2i) -> void:
 	_emit_biome_entered(center_tile)
 
 
-func map_to_world(map_pos: Vector2i) -> Vector2:
-	return Vector2(map_pos.x * TILE_SIZE, map_pos.y * TILE_SIZE)
+func map_to_world(map_pos: Vector2i) -> Vector2: return Vector2(map_pos.x * TILE_SIZE, map_pos.y * TILE_SIZE)
 
 func is_tile_walkable(map_pos: Vector2i) -> bool:
 	var tile = _get_tile_data(map_pos)
@@ -86,11 +86,9 @@ func is_tile_walkable(map_pos: Vector2i) -> bool:
 	return runtime.party_has_field_move_ability("surf")
 
 
-func is_encounter_tile(map_pos: Vector2i) -> bool:
-	return _get_tile_data(map_pos)["encounter"]
+func is_encounter_tile(map_pos: Vector2i) -> bool: return _get_tile_data(map_pos)["encounter"]
 
-func get_tile_biome(map_pos: Vector2i) -> String:
-	return str(_get_tile_data(map_pos).get("biome", ""))
+func get_tile_biome(map_pos: Vector2i) -> String: return str(_get_tile_data(map_pos).get("biome", ""))
 
 
 # Traversal block reason when the player bumps this tile; gated tiles get a hint
@@ -139,15 +137,17 @@ func get_prop_sprite(map_pos: Vector2i) -> Sprite2D:
 	return _prop_nodes.get(map_pos, null)
 
 
-func validate_world_invariants() -> Dictionary:
-	return _generator.validate_invariants(world_seed)
+func validate_world_invariants() -> Dictionary: return _generator.validate_invariants(world_seed)
 
 
 # Presentational day/night tint; repeated calls with advancing minutes yield a smooth gradient.
+# The cave-dim: a fixed dim neutralizes the tint inside dungeons (the night tint never leaks in).
 func set_time_of_day(minutes_0_1439: int) -> void:
 	if _canvas_modulate == null:
 		return
-	_canvas_modulate.color = _time_of_day_color(clampi(minutes_0_1439, 0, 1439))
+	_canvas_modulate.color = DUNGEON_TINT if _dungeon_dim_active() else _time_of_day_color(clampi(minutes_0_1439, 0, 1439))
+
+func _dungeon_dim_active() -> bool: var runtime := _runtime_or_null(); return runtime != null and "dungeon_runtime" in runtime and bool(runtime.dungeon_runtime.in_dungeon())
 
 
 func _time_of_day_color(minutes: int) -> Color:
@@ -171,7 +171,7 @@ func rebuild(seed_value: int) -> void:
 	_generator.setup(world_seed)
 	_generator.clear_overrides() # mirror the runtime's canonical map; clear first so stale entries never leak across seeds
 	var runtime := _runtime_or_null()
-	if runtime != null and "landmark_runtime" in runtime: _generator.landmark_resolver = Callable(runtime.landmark_runtime, "tile_logic_for_active") # Phase 7: footprints + door overlay stamp into base logic -> existing render
+	if runtime != null and "dungeon_runtime" in runtime: _generator.landmark_resolver = Callable(runtime.dungeon_runtime, "tile_logic_for_active") # the single tile-logic choke: dungeon cells inside; landmarks + entrance stamps outside
 	if runtime != null:
 		_generator.apply_overrides(runtime.mutations_for_view())
 	_tile_cache.clear()

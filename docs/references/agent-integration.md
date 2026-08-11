@@ -200,4 +200,7 @@ Before pushing, run the local gate: `python3 tools/verify_all.py
 tools/verify_all.py` otherwise. Semantics, exit codes, and refusals:
 [docs/RELIABILITY.md](../RELIABILITY.md) § Local gate. Serialize gate runs —
 exactly one harness writer against a project at a time (the scenario request
-file and the appended trace log are shared state).
+file and the appended trace log are shared state). If another checkout's Godot
+editor owns DAP 6006, launch this checkout's editor on a different port and pass
+that endpoint with `verify_all --dap-port <port>`; never validate through a
+foreign editor merely because its socket is open.

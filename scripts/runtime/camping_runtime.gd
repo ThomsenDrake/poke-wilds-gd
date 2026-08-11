@@ -32,11 +32,17 @@ func setup(session_state, trace_logger) -> void:
 # Rests the party by kind ("bag"|"bed"). Heals, advances time, establishes the
 # campsite anchor, and traces campsite_established + rested (rested carries kind,
 # tile, minutes_advanced, woke_at, healed, revived). Never silent on refusal.
+# The in-dungeon refusal (message-only, the harvest precedent): a dungeon-local
+# rest must NEVER overwrite the campsite anchor — the blackout return reads it
+# AFTER dungeon_runtime's defeat exit cleared the context, so a dungeon coord
+# would strand the player in the overworld (and destroy the real campsite).
 func rest(kind: String) -> Dictionary:
 	if kind != REST_BAG and kind != REST_BED:
 		return {"ok": false, "kind": kind, "message": "You can't rest like that."}
 	if _session.party.is_empty():
 		return {"ok": false, "kind": kind, "message": "There is no one to rest."}
+	if _in_dungeon():
+		return {"ok": false, "kind": kind, "reason": "in_dungeon", "message": "It's too dangerous to camp here."}
 	var result: Dictionary = _rest_bed() if kind == REST_BED else _rest_bag()
 	var advanced := _advance_for_rest()
 	# Resting establishes the campsite anchor the overflow hold + blackout return use.
@@ -115,6 +121,9 @@ func _advance_for_rest() -> int:
 
 func _rest_message(kind: String) -> String:
 	return "You slept in the bed and feel fully restored." if kind == REST_BED else "You rested in the sleeping bag."
+
+
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the dungeon gate, session-direct (the field_move/harvest/build refusal precedent)
 
 
 func _emit(event_name: String, payload: Dictionary) -> void:

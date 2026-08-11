@@ -75,8 +75,9 @@ QUARANTINED_SCENARIOS = {
 
 # R4 regional pixel-oracle scope (audit Major #2). The explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label) runs for the
-# main sweep AND the two world-depth/chain satellites that carry the R4 coded-region
-# sidecars (shots 31-36). Single-sourced here; run_playtests.py imports it so the two
+# main sweep AND the world-depth satellite that carries the R4 coded-region
+# sidecars (shots 31/32/34 + the legendary-dungeon pair 44/45; the chained 35/36 retired
+# with world chaining). Single-sourced here; run_playtests.py imports it so the two
 # transports gate the same families. The other satellites (camping/storage/pokemon/
 # overworld) carry no R4 coded regions and keep the in-engine global gate; update-mode
 # variants stay excluded (region diff is meaningless right after a baseline rewrite).
@@ -405,6 +406,16 @@ SCENARIO_REQUIREMENTS = {
                 "overworld_mon_despawned", "battle_finished", "legendary_spawn_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    # Legendary-dungeon slice: the dungeon-LOOP gate (the legendary_spawn sibling; same
+    # self-pin). The all-list pins the four registry-REQUIRED dungeon events (dungeon_
+    # entered/exited/entry_refused off the warp lanes, tablet_claimed off the catch lane)
+    # + the symmetric pass marker (the *_failed marker rides failed_event_entry; single-
+    # sourced mirror in run_playtests' PLAYTEST_SCENARIOS; miss-002 re-stamp).
+    "legendary_dungeon": {
+        "all": ["boot_started", "boot_ready", "dungeon_entered", "dungeon_exited",
+                "dungeon_entry_refused", "tablet_claimed", "legendary_dungeon_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     # (world_chain + beacon_selector requirement rows RETIRED with world chaining —
     # infinite-world slice: the seamless plane has no edge to cross and no edge beacons.)
     # World-depth sweep (shots 31/32/34; shot 33 beacons retired with chaining). Windowed-only
@@ -417,7 +428,7 @@ SCENARIO_REQUIREMENTS = {
         "all": ["visual_sweep_world_depth_passed"],
         "any": [["session_loaded", "session_created"]],
     },
-    # Far-field infinite-world sweep (shots 42-43, seed 2026072908): distant scatter + lair.
+    # Far-field infinite-world sweep (shot 42, seed 2026072908): distant scatter.
     # Windowed-only like the other sweeps: under PLAYTEST_FORCE_HEADLESS both transports skip-with-reason.
     "visual_sweep_farfield": {
         "all": ["visual_sweep_farfield_passed"],

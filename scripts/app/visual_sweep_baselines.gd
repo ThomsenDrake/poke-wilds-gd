@@ -32,9 +32,9 @@ const SHOT_REGISTRY := {
 	"pokemon": {"range": [20, 21], "seed": 2026072605},
 	"overworld": {"range": [22, 23], "extra": [30], "seed": 2026072722},
 	"fishing": {"range": [26, 27], "seed": 2026072804},
-	"world_depth": {"range": [31, 32], "extra": [34], "seed": 2026072907}, # 33 (beacons) retired with world chaining
-	"farfield": {"range": [42, 43], "seed": 2026072908}, # Track A.3; retired 17/33/35/36 stay unused
-	"retired": [17, 33, 35, 36], # 35/36 (chained world) + 33 (beacons) retired with world chaining (infinite-world slice)
+	"world_depth": {"range": [31, 32], "extra": [34, 44, 45], "seed": 2026072907}, # 33 (beacons) retired with world chaining; 44/45 the legendary-dungeon frames
+	"farfield": {"range": [42, 42], "seed": 2026072908}, # Track A.3; 43 (the far-lair shot) retired with the lairs (legendary-dungeon slice)
+	"retired": [17, 33, 35, 36, 43], # 35/36 (chained world) + 33 (beacons) retired with world chaining; 43 (far lair) retired with the lairs
 }
 
 

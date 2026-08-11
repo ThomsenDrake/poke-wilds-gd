@@ -36,6 +36,7 @@ const BATTLE_TRACKS := {
 var _trace = null
 var _player: AudioStreamPlayer = null
 var _owned_player: AudioStreamPlayer = null
+var dungeon_gate: Callable = Callable() # dungeon_runtime.in_dungeon (game_runtime wires it): inside a dungeon the per-dungeon track holds — the per-step biome re-trigger never stomps it
 
 
 func setup(trace_logger) -> void:
@@ -43,6 +44,8 @@ func setup(trace_logger) -> void:
 
 
 func play_biome_track(biome: String) -> void:
+	if dungeon_gate.is_valid() and bool(dungeon_gate.call()):
+		return # the dungeon music holds (dungeon_runtime restores the biome track on exit)
 	var track_path = str(BIOME_TRACKS.get(biome, ""))
 	if track_path.is_empty():
 		_warn("No track mapped for biome; falling back to the default overworld theme.", {"biome": biome})

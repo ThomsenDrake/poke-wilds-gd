@@ -73,13 +73,14 @@ func tile_logic_for_active(map_pos: Vector2i, base_logic: Dictionary) -> Diction
 
 # One overworld step: region first-entry traces + tower music, then the ruins guardian.
 func note_player_step(player_tile: Vector2i) -> void:
-	if _session == null:
+	if _session == null or _in_dungeon(): # dungeon-gated: inside a dungeon the step's tile is dungeon-LOCAL — the overworld footprints never see it
 		return
 	_note_region(player_tile)
 	_ensure_ruins_guardian(player_tile)
 
 # --- Mansion puzzle arms (called by landmark_actions; {} -> not this arm) -----------
 func interact(faced: Vector2i) -> Dictionary:
+	if _in_dungeon(): return {} # a dungeon-LOCAL faced tile never reaches the overworld puzzle arms (statue/key/journal/loot)
 	var arms := [interact_statue, use_key_at, interact_journal, interact_loot, interact_decor]
 	for arm in arms:
 		var result: Dictionary = arm.call(faced)
@@ -180,9 +181,8 @@ func pick_species_for(scope: Dictionary, biome_encounters, time_label: String, r
 	for species_id in filtered.get("ids", []):
 		ids.append(str(species_id))
 	for extra in scope.get("extra_ids", []):
-		if not ids.has(str(extra)):
-			ids.append(str(extra))
-	ids.sort() # sorted membership => deterministic pool (spec § Determinism)
+		ids.append(str(extra))
+	ids = biome_encounters.battle_viable_ids(_catalog.species, ids) # scope additions bypass filter_species_ids
 	if not ids.is_empty():
 		return str(ids[rng.randi_range(0, ids.size() - 1)])
 	return _catalog.get_random_encounter_species(rng)
@@ -302,11 +302,9 @@ func _is_mansion_local(faced: Vector2i, local: Vector2i) -> bool:
 	var mansion := _mansion_at(faced)
 	return not mansion.is_empty() and mansion["origin"] + local == faced
 
-func _chain() -> Vector2i: # infinite-world slice: a single seamless origin plane — chain frozen at (0,0); nothing below branches on it.
-	return Vector2i.ZERO
-
-func _world_seed() -> int:
-	return int(_session.world_seed) if _session != null else 0
+func _chain() -> Vector2i: return Vector2i.ZERO # infinite-world slice: a single seamless origin plane — chain frozen at (0,0); nothing below branches on it.
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the dungeon gate, session-direct (the dungeon_runtime.in_dungeon predicate)
+func _world_seed() -> int: return int(_session.world_seed) if _session != null else 0
 
 func _emit(event_name: String, payload: Dictionary) -> void:
 	if _trace != null:

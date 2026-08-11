@@ -1368,16 +1368,16 @@ class Importer:
         entries = {}
         for key in keys:
             item_id = key.upper()
+            supplement = supplements.get(key, {})
             if key in self.item_names or key in self.item_descriptions:
                 display_name = str(self.item_names.get(key, humanize_slug(key)))
                 description = str(self.item_descriptions.get(key, ""))
             else:
-                supplement = supplements.get(key, {})
                 display_name = str(supplement.get("display_name", humanize_slug(key)))
                 description = str(supplement.get("description", ""))
             cost = 0
-            pocket = ""
-            category = ""
+            pocket = str(supplement.get("pocket", ""))
+            category = str(supplement.get("category", ""))
             api_name = self.item_map.get(key)
             if api_name:
                 api_item = self.api.by_name("item", api_name)
@@ -1586,8 +1586,9 @@ def write_import_report(importer: Importer, pin: dict, counts: dict) -> None:
         "`NONE` when the move has no meta ailment).\n"
         "- **Items**: `cost` is the purchase price from the most-preferred version "
         "group in `VERSION_GROUP_CHAIN`, 0 when upstream has no price row; `pocket`/"
-        "`category` are empty strings when the item has no api-data counterpart "
-        "(PokeWilds customs like ANCIENTPOWDER).\n"
+        "`category` come from the item's api-data counterpart, or from the custom's "
+        "`item_supplements` entry when it has none (empty strings when neither "
+        "specifies them, e.g. ANCIENTPOWDER).\n"
     )
     IMPORT_REPORT.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
 
@@ -1885,8 +1886,9 @@ def write_parity_report(importer: Importer, pin: dict, emitted_species: dict,
         lines.append(
             "Zero diffs — `display_name`/`description` verified field-by-field against their "
             "sources (i18n properties + overrides supplements); `cost`/`pocket`/`category` "
-            "are additive api-data enrichment with `0`/`\"\"` where the item has no "
-            "api-data counterpart or price.\n"
+            "come from api-data when available, otherwise from `item_supplements`; "
+            "`cost` is `0` and pocket/category are empty only when neither source supplies "
+            "them.\n"
         )
     PARITY_REPORT.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
     summary = ("parity: %d expected diffs, %d UNEXPECTED, encounter +%d/-%d, "

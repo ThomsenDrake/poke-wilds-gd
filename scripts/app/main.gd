@@ -68,6 +68,7 @@ func _on_player_tile_changed(tile_position: Vector2i) -> void:
 	_world.sync_visible(tile_position)
 	_runtime().set_player_tile(tile_position)
 	_runtime().note_player_step()
+	if _runtime().get_player_tile() != tile_position: _sync_world_from_runtime(); _runtime().save_game(); return # a dungeon warp re-homed the player mid-step: re-anchor + rebuild on the canonical _sync path (the waystone-warp precedent)
 	_world.set_time_of_day(_runtime().get_time_of_day_minutes())
 	_play_biome_music()
 	_runtime().save_game()
@@ -178,6 +179,7 @@ func _connect_signals() -> void:
 	$UI/CreationScreen.creation_confirmed.connect(_on_creation_confirmed)
 	$UI/TitleScreen.new_game_chosen.connect($UI/CreationScreen.open_screen) # direct signal->method: creation opens straight from the title, no handler
 	$UI/CreationScreen.cancelled.connect($UI/TitleScreen.show_title) # direct signal->method: SEED-step X returns to the title
+	_runtime().dungeon_runtime.message_requested.connect(Callable(_message_box, "show_message")) # the Regigigas seal refusal surfaces on the step that triggers it
 
 
 # Title-flow entrypoints: CONTINUE and the confirmed creation both land in _enter_world.
@@ -187,12 +189,10 @@ func _on_creation_confirmed(creation: Dictionary) -> void:
 	_runtime().begin_created_game(creation); _enter_world()
 
 
-func _runtime() -> Node:
-	return get_node(GameRuntimePath)
+func _runtime() -> Node: return get_node(GameRuntimePath)
 
 
-func _music_router() -> Node:
-	return _runtime().music_router
+func _music_router() -> Node: return _runtime().music_router
 
 
 func _dex_for_species(species_id: String) -> int:
