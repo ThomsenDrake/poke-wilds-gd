@@ -191,6 +191,14 @@
     "item_id": "DRAGON_SCALE",
     "pocket": "MISC"
   },
+  "DRAGON_TABLET": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "Scorched braille tells of a dragon's maw.",
+    "display_name": "dragon tablet",
+    "item_id": "DRAGON_TABLET",
+    "pocket": "KEY"
+  },
   "DREAM_BALL": {
     "category": "SPECIAL_BALLS",
     "cost": 0,
@@ -366,6 +374,14 @@
     "display_name": "ice stone",
     "item_id": "ICE_STONE",
     "pocket": "MISC"
+  },
+  "ICE_TABLET": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "Frigid braille speaks of ice that never melts.",
+    "display_name": "ice tablet",
+    "item_id": "ICE_TABLET",
+    "pocket": "KEY"
   },
   "LEAF_STONE": {
     "category": "EVOLUTION",
@@ -703,6 +719,14 @@
     "item_id": "REVIVE",
     "pocket": "MEDICINE"
   },
+  "ROCK_TABLET": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "Heavy braille hums with a mountain's patience.",
+    "display_name": "rock tablet",
+    "item_id": "ROCK_TABLET",
+    "pocket": "KEY"
+  },
   "ROOT_FOSSIL": {
     "category": "DEX_COMPLETION",
     "cost": 0,
@@ -831,6 +855,14 @@
     "item_id": "STAR_PIECE",
     "pocket": "MISC"
   },
+  "STEEL_TABLET": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "Iron braille rings like a distant forge.",
+    "display_name": "steel tablet",
+    "item_id": "STEEL_TABLET",
+    "pocket": "KEY"
+  },
   "SUN_STONE": {
     "category": "EVOLUTION",
     "cost": 0,
@@ -894,6 +926,14 @@
     "display_name": "upgrade",
     "item_id": "UPGRADE",
     "pocket": "MISC"
+  },
+  "VOLT_TABLET": {
+    "category": "EVENT_ITEMS",
+    "cost": 0,
+    "description": "Charged braille crackles with static.",
+    "display_name": "volt tablet",
+    "item_id": "VOLT_TABLET",
+    "pocket": "KEY"
   },
   "WATER_STONE": {
     "category": "EVOLUTION",

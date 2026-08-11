@@ -79,13 +79,43 @@
     "egg": "No PokeAPI entry: source-game egg placeholder whose base_stats.asm is a Zubat-stat copy. Entry reproduced verbatim from its own ASM files so parity holds."
   },
   "item_supplements": {
-    "potion": {
-      "display_name": "Potion",
-      "description": "Restores 20 HP."
+    "dragon_tablet": {
+      "display_name": "dragon tablet",
+      "description": "Scorched braille tells of a dragon's maw.",
+      "pocket": "KEY",
+      "category": "EVENT_ITEMS"
+    },
+    "ice_tablet": {
+      "display_name": "ice tablet",
+      "description": "Frigid braille speaks of ice that never melts.",
+      "pocket": "KEY",
+      "category": "EVENT_ITEMS"
     },
     "moo_moo_milk": {
       "display_name": "Moo Moo Milk",
       "description": "Fresh milk from a happy Miltank."
+    },
+    "potion": {
+      "display_name": "Potion",
+      "description": "Restores 20 HP."
+    },
+    "rock_tablet": {
+      "display_name": "rock tablet",
+      "description": "Heavy braille hums with a mountain's patience.",
+      "pocket": "KEY",
+      "category": "EVENT_ITEMS"
+    },
+    "steel_tablet": {
+      "display_name": "steel tablet",
+      "description": "Iron braille rings like a distant forge.",
+      "pocket": "KEY",
+      "category": "EVENT_ITEMS"
+    },
+    "volt_tablet": {
+      "display_name": "volt tablet",
+      "description": "Charged braille crackles with static.",
+      "pocket": "KEY",
+      "category": "EVENT_ITEMS"
     }
   }
 }
