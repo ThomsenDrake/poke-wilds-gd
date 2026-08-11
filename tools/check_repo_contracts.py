@@ -78,6 +78,79 @@ THIRD_PARTY_EXEMPTIONS: set[str] = set()
 # and NEVER gates CI. Core tools remain stdlib-only; add no other names here.
 OPTIONAL_TOOL_EXEMPTIONS: set[str] = {"vision_metrics.py"}
 
+POKEAPI_CI_WORKFLOWS = (
+    ".github/workflows/repo-contracts.yml",
+    ".github/workflows/playtests-headless.yml",
+)
+POKEAPI_CACHE_KEY = "key: pokeapi-api-data-v2-${{ hashFiles('tools/api_data_pin.json') }}"
+POKEAPI_FETCH_COMMAND = "run: python3 tools/import_pokeapi.py --fetch-pinned"
+POKEAPI_CI_CONSUMERS = {
+    ".github/workflows/repo-contracts.yml": "python3 tools/import_pokeapi.py --check",
+    ".github/workflows/playtests-headless.yml": "python3 tools/verify_all.py --skip-windowed",
+}
+
+
+def _workflow_step_blocks(text: str) -> list[list[str]]:
+    """Return active lines for actual six-space GitHub Actions step blocks."""
+    starts = [match.start() for match in re.finditer(r"(?m)^      - ", text)]
+    blocks: list[list[str]] = []
+    for index, start in enumerate(starts):
+        end = starts[index + 1] if index + 1 < len(starts) else len(text)
+        lines = []
+        for line in text[start:end].splitlines():
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            lines.append(line.strip())
+        blocks.append(lines)
+    return blocks
+
+
+def pokeapi_ci_cache_issues(root: Path) -> list[str]:
+    """Keep CI freshness checks tied to the committed PokeAPI pin.
+
+    Actions caches are immutable.  The v2 key invalidates the one cache that
+    the former ``--refresh`` step populated from a newer upstream revision,
+    while the unconditional ``--fetch-pinned`` step repairs any restored
+    directory before ``--check`` consumes it.
+    """
+    issues: list[str] = []
+    for rel in POKEAPI_CI_WORKFLOWS:
+        path = root / rel
+        if not path.exists():
+            issues.append(f"Missing PokeAPI CI workflow: {rel}")
+            continue
+        steps = _workflow_step_blocks(path.read_text(encoding="utf-8"))
+        cache_steps = [
+            index for index, lines in enumerate(steps)
+            if "uses: actions/cache@v4" in lines and "path: tools/.cache" in lines
+        ]
+        fetch_steps = [
+            index for index, lines in enumerate(steps) if POKEAPI_FETCH_COMMAND in lines
+        ]
+        consumer_command = POKEAPI_CI_CONSUMERS[rel]
+        consumer_steps = [
+            index for index, lines in enumerate(steps)
+            if any(consumer_command in line for line in lines)
+        ]
+
+        if len(cache_steps) != 1:
+            issues.append(f"{rel} must contain exactly one tools/.cache restore step")
+        elif POKEAPI_CACHE_KEY not in steps[cache_steps[0]]:
+            issues.append(f"{rel} must use the versioned pinned PokeAPI cache key")
+        if len(fetch_steps) != 1:
+            issues.append(f"{rel} must run --fetch-pinned before catalog freshness")
+        elif any(line.startswith("if:") for line in steps[fetch_steps[0]]):
+            issues.append(f"{rel} must run --fetch-pinned unconditionally after cache restore")
+        if len(consumer_steps) != 1:
+            issues.append(f"{rel} must contain exactly one pinned-cache consumer step")
+        if len(cache_steps) == len(fetch_steps) == len(consumer_steps) == 1:
+            if not cache_steps[0] < fetch_steps[0] < consumer_steps[0]:
+                issues.append(
+                    f"{rel} must order pinned cache restore -> --fetch-pinned -> consumer")
+        if any("--refresh" in line for lines in steps for line in lines):
+            issues.append(f"{rel} must never run --refresh in CI")
+    return issues
+
 
 def _is_battle_shot(stem: str) -> bool:
     """Shot naming convention is NN_name; battle shots are pinned to 09-12."""
@@ -316,6 +389,12 @@ def run(root: Path | None = None) -> list[str]:
                 if (root / staged_path).exists():
                     issues.append(f"Doc {rel} carries a stale build-phase marker for an existing source path: {staged_path}")
                 continue
+            # user:// (the runtime user dir) and .godot-smoke/ (gitignored run
+            # output) are documented non-repo locations — the agent-surface
+            # manifest check below skips them by the same rule; a fresh CI
+            # checkout never has them.
+            if source.startswith("user://") or source.startswith(".godot-smoke/"):
+                continue
             if not (root / source).exists():
                 issues.append(f"Doc {rel} references a missing source path: {source}")
         for target in internal_links(path):
@@ -325,6 +404,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(report_stamp_issues(root))
     issues.extend(region_coverage_issues(root))
     issues.extend(core_tools_stdlib_issues(root))
+    issues.extend(pokeapi_ci_cache_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))

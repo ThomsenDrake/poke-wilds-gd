@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-20
+Last verified: 2026-08-11
 Review cadence days: 21
 Source paths: scripts/app/render_introspection.gd, scripts/app/snapshot_capture.gd, scripts/app/ui_render_model.gd, scripts/app/visual_sweep.gd, tools/visual_region_diff.py
 

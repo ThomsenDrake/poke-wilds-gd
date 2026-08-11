@@ -1,7 +1,7 @@
 Status: active
-Last verified: 2026-08-03
+Last verified: 2026-08-11
 Review cadence days: 14
-Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, scripts, scenes, tools
+Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, scripts, scenes, tools, .github/workflows/repo-contracts.yml, .github/workflows/playtests-headless.yml
 
 # PokeWilds Feature Completion
 
@@ -13,7 +13,7 @@ The port has nailed presentation, data, and combat. What remains is the survival
 
 **Non-goals** (explicit): online multiplayer (the original never shipped its v0.9 MMO mode), weather and seasons (absent from the original), mobile/Android, and an in-game Pokédex (the original lacks one; parity does not require it — kept as an optional stretch in Phase 9).
 
-**Operating constraint:** the playtest suite stays **local** for the foreseeable future. CI remains lint/contract-only; runtime verification is hardened locally instead (see the Local Verification workstream).
+**Operating constraint:** renderer-stamped windowed verification stays **local**. CI runs the honest headless form of the same gate plus the Godot-free static, freshness, determinism, and legibility checks (see the Local Verification workstream).
 
 ## Relationship to the active harness plan
 
@@ -242,9 +242,9 @@ Every phase is delivered as one or more **slices**, and a slice is not done unti
 
 ## Workstream L — Local verification hardening (continuous, per the stay-local constraint)
 
-CI stays lint/contract-only. The local suite absorbs the enforcement role instead:
+The full windowed suite stays local; CI mirrors the headless and Godot-free portions:
 
-1. **One-command local gate** — **LANDED** (Workstream L.1): `tools/verify_all.py` ORCHESTRATES the existing tools via subprocess (never forks their logic, stdlib-only) — static gates (`check_repo_contracts`, `check_architecture`, `check_quality_docs`, `check_change_contract`) → determinism (`determinism_verify.py pins` + `canary`) → full headless suite (`PLAYTEST_FORCE_HEADLESS=1 run_playtests.py --include-smoke`, `visual_sweep` transport-skipped honestly) → the windowed pixel lanes (`ui_render_audit`, then `visual_sweep` LAST so the stamp-bearing report + freshest shots/vision-review are the final artifacts) → legibility report (generate-only). Run-all by default (full picture, not fast-fail) with four exit codes — 0 GREEN / 1 STEP_FAILURE / 2 REFUSAL (stale/mismatched evidence, never a silent pass) / 3 TOOL_ERROR — precedence TOOL_ERROR > REFUSAL > STEP_FAILURE > GREEN. Refusals R1–R6 mechanize the refuse-on-mismatch + freshness rules (report `head_sha`==HEAD; windowed `godot_version`/`renderer`/`window` vs baseline `capture_env` + canonical window; windowed entries present + correct transport; `ui_render_audit` not headless; `vision-review.json` fresh via `review_is_fresh`). `--skip-windowed` reports the windowed lanes SKIP, never PASS (honest display-less path). Documented as *the* pre-push ritual in RELIABILITY.md § Local gate and AGENTS.md; stays a LOCAL ritual (CI unchanged).
+1. **One-command local gate** — **LANDED** (Workstream L.1): `tools/verify_all.py` ORCHESTRATES the existing tools via subprocess (never forks their logic, stdlib-only) — static gates (`check_repo_contracts`, `check_architecture`, `check_quality_docs`, `check_change_contract`) → determinism (`determinism_verify.py pins` + `canary`) → full headless suite (`PLAYTEST_FORCE_HEADLESS=1 run_playtests.py --include-smoke`, `visual_sweep` transport-skipped honestly) → the windowed pixel lanes (`ui_render_audit`, then `visual_sweep` LAST so the stamp-bearing report + freshest shots/vision-review are the final artifacts) → legibility report (generate-only). Run-all by default (full picture, not fast-fail) with four exit codes — 0 GREEN / 1 STEP_FAILURE / 2 REFUSAL (stale/mismatched evidence, never a silent pass) / 3 TOOL_ERROR — precedence TOOL_ERROR > REFUSAL > STEP_FAILURE > GREEN. Refusals R1–R6 mechanize the refuse-on-mismatch + freshness rules (report `head_sha`==HEAD; windowed `godot_version`/`renderer`/`window` vs baseline `capture_env` + canonical window; windowed entries present + correct transport; `ui_render_audit` not headless; `vision-review.json` fresh via `review_is_fresh`). `--skip-windowed` reports the windowed lanes SKIP, never PASS (honest display-less path). Documented as *the* pre-push ritual in RELIABILITY.md § Local gate and AGENTS.md; the full windowed run stays local while `playtests-headless` runs the same gate with `--skip-windowed` on CI.
 2. **Transport honesty** — **LANDED** (Slice): the runner marks windowed-only scenarios skipped (not failed) under `PLAYTEST_FORCE_HEADLESS`, reporting `19/19 (1 skipped-headless)` rather than a lying `18/19`; `verify_all` relies on this (a transport skip is never a failure).
 3. **Artifact freshness** — **LANDED**: `playtest-report.json` carries the HEAD sha (Slice 1 report stamps) and per-scenario `result-*.json` staleness (the stale red `result-visual_sweep.json`) is swept on each run; `verify_all.py` (L.1, landed) REFUSES (exit 2, refusal R1) to certify any report whose `head_sha` is older than HEAD, plus R3 stamp-vs-environment and R6 vision-review freshness refusals.
 4. **Lane 4 automation** — **LANDED** (Slice 5): `tools/vision_review.py` drives a reviewer over changed shots after each sweep and writes `.godot-smoke/vision-review.json` per the rubric/schema — fulfilling the oracle spec's "findings file on every sweep" criterion locally; its `review_is_fresh` is the freshness authority `verify_all`'s R6 refusal consumes.

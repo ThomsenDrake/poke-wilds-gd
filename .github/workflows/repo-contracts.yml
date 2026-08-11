@@ -53,3 +53,31 @@ jobs:
       - run: python3 tools/check_quality_docs.py
       - if: github.event_name == 'pull_request'
         run: python3 tools/check_change_contract.py --base origin/${{ github.base_ref }}
+      - name: Restore the pinned PokeAPI cache (verify_all S4.5 input)
+        uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: pokeapi-api-data-v2-${{ hashFiles('tools/api_data_pin.json') }}
+      - name: Validate or fetch the pinned api-data tarball
+        run: python3 tools/import_pokeapi.py --fetch-pinned
+      - name: Catalog freshness (verify_all S4.5)
+        run: python3 tools/import_pokeapi.py --check
+      - name: Determinism pins + canary (verify_all S5/S6, Godot-free)
+        run: |
+          python3 tools/determinism_verify.py pins
+          python3 tools/determinism_verify.py canary --shot docs/generated/visual-baselines/09_battle.png
+
+  legibility:
+    if: ${{ !github.event.repository.private && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate the legibility report (gated findings only)
+        run: python3 tools/generate_legibility_report.py --output "$RUNNER_TEMP/legibility-report.md" --fail-on-findings
+      - name: Publish the report to the step summary
+        if: always()
+        run: cat "$RUNNER_TEMP/legibility-report.md" >> "$GITHUB_STEP_SUMMARY"
