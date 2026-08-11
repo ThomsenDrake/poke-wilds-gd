@@ -78,6 +78,43 @@ THIRD_PARTY_EXEMPTIONS: set[str] = set()
 # and NEVER gates CI. Core tools remain stdlib-only; add no other names here.
 OPTIONAL_TOOL_EXEMPTIONS: set[str] = {"vision_metrics.py"}
 
+POKEAPI_CI_WORKFLOWS = (
+    ".github/workflows/repo-contracts.yml",
+    ".github/workflows/playtests-headless.yml",
+)
+POKEAPI_CACHE_KEY = "key: pokeapi-api-data-v2-${{ hashFiles('tools/api_data_pin.json') }}"
+POKEAPI_FETCH_COMMAND = "run: python3 tools/import_pokeapi.py --fetch-pinned"
+
+
+def pokeapi_ci_cache_issues(root: Path) -> list[str]:
+    """Keep CI freshness checks tied to the committed PokeAPI pin.
+
+    Actions caches are immutable.  The v2 key invalidates the one cache that
+    the former ``--refresh`` step populated from a newer upstream revision,
+    while the unconditional ``--fetch-pinned`` step repairs any restored
+    directory before ``--check`` consumes it.
+    """
+    issues: list[str] = []
+    for rel in POKEAPI_CI_WORKFLOWS:
+        path = root / rel
+        if not path.exists():
+            issues.append(f"Missing PokeAPI CI workflow: {rel}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        if POKEAPI_CACHE_KEY not in text:
+            issues.append(f"{rel} must use the versioned pinned PokeAPI cache key")
+        fetch_step = re.search(
+            r"(?ms)^      - name: [^\n]+\n(?P<body>.*?"
+            + re.escape(POKEAPI_FETCH_COMMAND)
+            + r".*?)(?=^      - |\Z)",
+            text,
+        )
+        if fetch_step is None:
+            issues.append(f"{rel} must run --fetch-pinned before catalog freshness")
+        elif re.search(r"(?m)^\s+if:", fetch_step.group("body")):
+            issues.append(f"{rel} must run --fetch-pinned unconditionally after cache restore")
+    return issues
+
 
 def _is_battle_shot(stem: str) -> bool:
     """Shot naming convention is NN_name; battle shots are pinned to 09-12."""
@@ -331,6 +368,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(report_stamp_issues(root))
     issues.extend(region_coverage_issues(root))
     issues.extend(core_tools_stdlib_issues(root))
+    issues.extend(pokeapi_ci_cache_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))

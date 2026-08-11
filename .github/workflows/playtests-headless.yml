@@ -63,9 +63,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tools/.cache
-          key: pokeapi-api-data-${{ hashFiles('tools/api_data_pin.json') }}
-      - name: Fetch the pinned api-data tarball on cache miss
-        if: steps.pokeapi-cache.outputs.cache-hit != 'true'
+          key: pokeapi-api-data-v2-${{ hashFiles('tools/api_data_pin.json') }}
+      - name: Validate or fetch the pinned api-data tarball
         run: python3 tools/import_pokeapi.py --fetch-pinned
       - name: Restore the pinned Godot binary
         id: godot-cache

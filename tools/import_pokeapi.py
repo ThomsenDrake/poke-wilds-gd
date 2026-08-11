@@ -9,8 +9,9 @@ Data flow (see docs/generated/pokeapi-import.md for the latest run report):
 
   - tools/api_data_pin.json pins the upstream master SHA (--refresh re-resolves it).
   - --refresh downloads the codeload tarball into the gitignored tools/.cache/api-data/.
-  - --fetch-pinned downloads the COMMITTED pin's tarball only (the CI cache-miss
-    path): no upstream re-resolve, no pin move, no regeneration.
+  - --fetch-pinned downloads and re-extracts the COMMITTED pin's tarball only
+    (the CI cache validation/repair path): no upstream re-resolve, no pin move,
+    no regeneration.
   - Default run regenerates the catalog + reports from the cache (no network).
   - --check regenerates in memory and byte-compares against the committed JSON
     (exit 0 when fresh, 1 with a diff summary when stale/missing).
@@ -633,7 +634,7 @@ def build_current_catalog(move_names: dict, species_names: dict) -> tuple:
         # Host-portable existence probe: Path.exists() follows the HOST
         # filesystem's case semantics, so back.png matched back.PNG on macOS
         # but not on Linux and the committed catalog flip-flopped per host
-        # (8 sprite paths, incl. front_path flips that change encounter
+        # (9 sprite paths, incl. front_path flips that change encounter
         # viability). Match the directory listing case-insensitively instead
         # and emit the canonical requested spelling, so the catalog — and the
         # S4.5 freshness gate — are byte-stable across macOS and Linux.
@@ -2042,9 +2043,9 @@ def cmd_refresh() -> dict:
 def cmd_fetch_pinned() -> dict:
     """Download + extract the tarball for the COMMITTED pin only — never
     re-resolves upstream, never moves the pin, never regenerates. This is the
-    CI cache-miss path: --refresh would silently re-pin to the latest upstream
-    and rewrite the catalog in the working tree, making the S4.5 freshness
-    gate (--check) tautological exactly when the cache is cold."""
+    CI cache validation/repair path: --refresh would silently re-pin to the
+    latest upstream and rewrite the catalog in the working tree, making the
+    S4.5 freshness gate (--check) tautological exactly when the cache is cold."""
     pin = load_pin()
     print("fetching committed pin %s @ %s" % (pin["repo"], pin["sha"]))
     _download_and_extract(pin)
@@ -2064,7 +2065,7 @@ def report_unmapped(importer: Importer) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--refresh", action="store_true", help="re-resolve the upstream SHA, download + extract the tarball, then regenerate")
-    parser.add_argument("--fetch-pinned", action="store_true", help="download + extract the COMMITTED pin's tarball only (CI cache-miss path; never moves the pin, never regenerates)")
+    parser.add_argument("--fetch-pinned", action="store_true", help="download + re-extract the COMMITTED pin's tarball only (CI cache validation/repair path; never moves the pin, never regenerates)")
     parser.add_argument("--check", action="store_true", help="exit 0 when committed catalog JSON matches regeneration from the pinned cache")
     parser.add_argument("--diff-against-asm", action="store_true", help="print the ASM-parity summary (report is written on every generating run)")
     args = parser.parse_args()
