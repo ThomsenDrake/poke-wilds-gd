@@ -316,6 +316,12 @@ def run(root: Path | None = None) -> list[str]:
                 if (root / staged_path).exists():
                     issues.append(f"Doc {rel} carries a stale build-phase marker for an existing source path: {staged_path}")
                 continue
+            # user:// (the runtime user dir) and .godot-smoke/ (gitignored run
+            # output) are documented non-repo locations — the agent-surface
+            # manifest check below skips them by the same rule; a fresh CI
+            # checkout never has them.
+            if source.startswith("user://") or source.startswith(".godot-smoke/"):
+                continue
             if not (root / source).exists():
                 issues.append(f"Doc {rel} references a missing source path: {source}")
         for target in internal_links(path):
