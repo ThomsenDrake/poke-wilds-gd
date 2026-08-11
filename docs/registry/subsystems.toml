@@ -25,6 +25,11 @@ validation_commands = [
 ]
 required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked", "ui_tree_dump_passed", "ui_tree_dump_failed", "legibility_soak_passed", "legibility_soak_failed"]
 quality_bucket = "bootstrap"
+# NAV-AUDIT FIXTURE HARDENING (2026-08-11): its battle half now owns a seeded
+# new game, rebuilt WorldView, and avatar resync instead of inheriting random
+# suite-boot geometry. It also bounded-waits asynchronous turn playback before
+# deciding whether a terminal battle must be restarted; production battle code
+# and the total trap-tolerant RUN contract are unchanged.
 # AGENT-NEUTRAL INTEGRATION Phase 1 (agent surface contract): the NEW
 # docs/registry/agent-surface.toml manifest — the machine-readable "how to drive
 # this repo" (protocols dap:6006/lsp:6005, the scenario CLI, the trace stream,

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-10
+Last verified: 2026-08-11
 Review cadence days: 14
 Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, scripts, scenes, tools
 
@@ -8,6 +8,8 @@ Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, doc
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
 Legendary-dungeon runtime layer (2026-08-11): validation remains at the existing score, now backed by an rng-free warp/resolver/chamber core, additive dungeon-context persistence, and explicit in-dungeon mutation/refusal guards. The dedicated end-to-end scenario and presentation baselines land in the following validation layer, so no score is raised here.
+
+Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.
 
 | Subsystem | Layer | Quality bucket | Legibility | Validation | Architecture | Product completeness | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |

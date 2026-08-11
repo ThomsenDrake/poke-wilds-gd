@@ -9,14 +9,15 @@ extends RefCounted
 # the battle text names it); cancel from each submenu returns to the action
 # state and RUN ends the battle — trap-tolerantly: a legitimate "Can't escape!"
 # refusal is PROVEN, the trap expired, and escape re-proven, never a failure.
-# Determinism pin: run() takes the caller's seed and calls seed_for_smoke so
-# the wild draw and every battle roll are a pure function of (code, seed) — the
-# party is swap-pinned and the clock DAY-pinned below (house seeding convention).
-# Fully synchronous: activations resolve through the runtime without frame waits.
+# Determinism pin: run() takes the caller's seed, owns a new world/view/avatar,
+# and pins the party + DAY clock, so wild scope/level and every battle roll are
+# pure functions of (code, seed). Move activation bounded-waits the async visual
+# playback before deciding whether a finished battle must be restarted.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
 const DIRECTIONS := [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+const MAX_ANIM_WAIT_SECONDS := 8.0
 
 var _runner = SmokeScenarioRunner.new()
 var _failures: Array = []
@@ -26,6 +27,9 @@ var _options_checked := 0
 func run(ctx: Dictionary, rng_seed: int) -> Dictionary:
 	var runtime: Node = ctx["runtime"]
 	runtime.seed_for_smoke(rng_seed)
+	runtime.new_game(rng_seed) # own the encounter scope/level; never inherit the suite's boot world
+	ctx["world"].rebuild(runtime.get_world_seed())
+	_runner.teleport_player(ctx["world"], ctx["player"], runtime, runtime.session.player_tile)
 	# Phase 2 made the wild draw time-aware (nocturnal pool filter + the unlit-night
 	# ghost roll on this very rng): pin DAY so a save left at night — the unguarded
 	# playtest entries advance the clock — cannot shift the audit's encounter stream.
@@ -45,7 +49,7 @@ func run(ctx: Dictionary, rng_seed: int) -> Dictionary:
 	_audit_state(view, "action")
 	_audit_submenu(view, "fight", "moves")
 	_audit_submenu(view, "item", "item")
-	_audit_move_activation(view, ctx)
+	await _audit_move_activation(view, ctx)
 	if view.visible:
 		_check_run_escape(view, ctx)
 	elif _start_battle(ctx):
@@ -146,6 +150,9 @@ func _audit_move_activation(view: Node, ctx: Dictionary) -> void:
 		view._set_menu_state("moves")
 		view._selection = "move_0"
 		view._activate_selection()
+		if not await _wait_for_animation(view):
+			_failures.append("battle: move animation did not finish within %.1fs" % MAX_ANIM_WAIT_SECONDS)
+			return
 		var spent := _runner.spent_move_rows(pp_before, _runner.move_pp_list(view._snapshot.get("player_mon", {}).get("moves", [])))
 		if spent == [0] and view._message.contains(use_line):
 			_options_checked += 1
@@ -154,6 +161,14 @@ func _audit_move_activation(view: Node, ctx: Dictionary) -> void:
 			_failures.append("battle: move_0 activated rows %s (message: %s)" % [str(spent), view._message])
 			return
 	_failures.append("battle: move_0 never performed the lead mon's first move")
+
+
+func _wait_for_animation(view: Node) -> bool:
+	var waited := 0.0
+	while view.is_animating() and waited < MAX_ANIM_WAIT_SECONDS:
+		await view.get_tree().create_timer(0.1).timeout
+		waited += 0.1
+	return not view.is_animating()
 
 
 # Total RUN contract: escape ends the battle when legal; while trapped the
