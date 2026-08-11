@@ -50,7 +50,7 @@ jobs:
   headless-gate:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,10 +89,12 @@ jobs:
             4.6.1.*) ;;
             *) echo "expected a 4.6.1.* Godot triple, got: $version"; exit 1 ;;
           esac
-      # A cold import of the ~113k-asset tree measures ~14 min on a 2-core
-      # runner; a warm no-op re-scan is ~6s. Cache .godot keyed on the asset
-      # tree's content hash; on a partial restore (assets changed) Godot
-      # re-imports only the deltas.
+      # A cold import of the ~113k-asset tree measures ~34 min on the GitHub
+      # runner (I/O-bound re-scan); a warm no-op re-scan is ~6s. Cache .godot
+      # keyed on the asset tree's content hash; on a partial restore (assets
+      # changed) Godot re-imports only the deltas. NOTE: actions/cache saves
+      # only on job success, so the cold import's budget must be survivable
+      # once to seed the cache — hence the generous 3000s backstop.
       - name: Restore the imported-resource cache
         uses: actions/cache@v4
         with:
@@ -100,7 +102,7 @@ jobs:
           key: godot-import-${{ env.GODOT_VERSION }}-${{ hashFiles('assets/**', 'project.godot') }}
           restore-keys: godot-import-${{ env.GODOT_VERSION }}-
       - name: Import project resources (a fresh checkout has no .godot/)
-        run: timeout 1200 "$HOME/godot-bin/godot" --headless --path . --import
+        run: timeout 3000 "$HOME/godot-bin/godot" --headless --path . --import
       - name: Run the headless gate (verify_all --skip-windowed)
         env:
           PR_BASE: ${{ github.base_ref }}
