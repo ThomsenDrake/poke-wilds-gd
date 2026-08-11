@@ -59,7 +59,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Restore the pinned PokeAPI cache (verify_all S4.5 input)
-        id: pokeapi-cache
         uses: actions/cache@v4
         with:
           path: tools/.cache

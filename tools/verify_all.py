@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""One-command LOCAL verification gate (Workstream L.1): the pre-push ritual.
+"""One-command verification gate (Workstream L.1): full windowed local ritual,
+honest headless CI path.
 
 Orchestrates the existing tools via subprocess — it NEVER forks their logic,
 mutates their behavior, or touches their exit-code contracts:
@@ -37,7 +38,8 @@ pass); a missing Godot binary is a TOOL_ERROR; --skip-windowed reports the
 windowed lanes SKIP (never PASS) and degrades R6 to a recorded, printed WARN
 that never escalates the exit code.
 
-This is a LOCAL ritual — CI stays lint/contract-only; no workflow changes.
+The full windowed gate is a LOCAL ritual. CI runs this same orchestrator with
+--skip-windowed; renderer-stamped pixel and VLM lanes remain local.
 Typical full-run wall time is ~1-2 minutes on this machine (~63s measured).
 """
 
