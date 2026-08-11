@@ -1474,6 +1474,9 @@ code_paths = [
   # (the warp-entered dungeons supersede both; the salts stay reserved).
   "scripts/domain/dungeon_layouts.gd",
   "scripts/domain/dungeon_maps.gd",
+  # legendary-dungeon runtime layer: temporary ownership until the validation layer
+  # transfers the complete domain/runtime/scenario surface to legendary_dungeons.
+  "scripts/runtime/dungeon_runtime.gd",
   "scripts/domain/save_migration.gd",
   "scripts/runtime/landmark_runtime.gd",
   "scripts/runtime/session_payload.gd",
@@ -1485,6 +1488,7 @@ code_paths = [
   "scripts/app/seed_choice_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
+  "scripts/app/legendary_spawn_battle_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd", "scripts/app/visual_sweep_farfield.gd",

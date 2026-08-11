@@ -763,7 +763,9 @@ def _world_depth_determinism_files(root: Path) -> list[Path]:
     deleted with the chain predicates; the seamless plane derives everything from
     the ONE world seed.)"""
     files = list(root.glob("scripts/domain/**/*.gd"))
-    for rel in ("scripts/runtime/landmark_runtime.gd",):
+    # dungeon_runtime.gd joins the scope with the legendary-dungeon slice (the world-depth
+    # runtime core: warps/resolver/seal/chamber — rng-free, the draws ride the shared _rng).
+    for rel in ("scripts/runtime/landmark_runtime.gd", "scripts/runtime/dungeon_runtime.gd"):
         path = root / rel
         if path.exists():
             files.append(path)

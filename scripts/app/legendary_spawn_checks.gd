@@ -24,6 +24,7 @@ const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runt
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const MusicRouter := preload("res://scripts/runtime/music_router.gd")
 const LandmarkRuntime := preload("res://scripts/runtime/landmark_runtime.gd")
+const DungeonRuntime := preload("res://scripts/runtime/dungeon_runtime.gd") # the seal proof rides its DungeonLayouts preload (the layer table)
 # App may not preload domain directly (check_architecture.gd layer table) — ride the
 # runtime's own preload (the landmark_flow precedent).
 const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
@@ -122,15 +123,45 @@ static func roundtrip_removal(runtime, species_id: String, anchored: Array) -> S
 	return ""
 
 
-# Phase 7 audit R6: the curated/extra_ids exclusion path the per-biome pool scan cannot see.
-# generate_wild_encounter injects a scope's extra_ids/curated AFTER the biome filter
-# (landmark_runtime.pick_species_for), so a legendary added to a LIVE landmark scope
-# (e.g. MEWTWO into Landmarks.RUINS_INNER_CURATED) becomes drawable on that footprint's
-# tiles while every per-biome exclusion assert stays green. Walk the LIVE scope tables
-# (mutation-proven, the world_depth_checks style) and assert curated ∩ legendaries == ∅ and
-# extra_ids ∩ legendaries == ∅ for every tokened footprint tile. Appends named failures.
+# --- Shared scenario helpers (the ONE home; the dungeon + battle checks ride these) --------
+# A damaging move that cannot stall (heal/leech would never end the battle path).
+static func damaging_move_index(mon: Dictionary) -> int:
+	var moves: Array = mon.get("moves", [])
+	for i in range(moves.size()):
+		var move: Dictionary = moves[i]
+		if int(move.get("power", 0)) > 0 and int(move.get("pp", 0)) > 0 and str(move.get("effect", "")) != "EFFECT_LEECH_HIT" and str(move.get("effect", "")) != "EFFECT_HEAL": return i
+	return 0
+
+
+static func ensure(ok: bool, label: String, failures: Array) -> bool:
+	if not ok:
+		failures.append(label)
+	return ok
+
+
+# The Regigigas five-tablet seal (the legendary-dungeon slice): the warp REFUSES with an
+# incomplete set (no warp; the dungeon_entry_refused trace names the dungeon), then granting
+# all five tablets opens it (never consumed). Returns "" on pass and leaves the caller
+# INSIDE the dungeon; a failure label otherwise (the caller bails).
+static func seal_refusal_pin(runtime, dungeon_id: String, warp: Vector2i, runner) -> String:
+	var cursor: int = runner.trace_log_line_count()
+	if runtime.dungeon_runtime.try_enter_at(warp):
+		return "ko: the Regigigas seal opened WITHOUT the five tablets"
+	if not runner.trace_log_has_since("dungeon_entry_refused", cursor, {"dungeon_id": dungeon_id}):
+		return "ko: no dungeon_entry_refused trace off the sealed warp"
+	for tablet in DungeonRuntime.DungeonLayouts.TABLET_FOR_SPECIES.values():
+		runtime.session.add_item(str(tablet), 1)
+	if not runtime.dungeon_runtime.try_enter_at(warp):
+		return "ko: the seal refused the five-tablet bag"
+	return ""
+
+
+# Phase 7 audit R6: curated/extra_ids are injected AFTER the biome filter, so every live
+# landmark and dungeon scope must independently reject legendaries AND non-battle-viable
+# catalog entries. Walk the production scopes (mutation-proven) and append named failures.
 static func curated_exclusion_pin(runtime, failures: Array) -> void:
 	var seed: int = runtime.get_world_seed()
+	var seen_tokens: Dictionary = {}
 	for landmark in Landmarks.landmarks_in_world(seed, ORIGIN):
 		var footprint: Rect2i = landmark["footprint"]
 		for y in range(footprint.position.y, footprint.end.y):
@@ -138,16 +169,39 @@ static func curated_exclusion_pin(runtime, failures: Array) -> void:
 				var tile := Vector2i(x, y)
 				var logic: Dictionary = runtime._world_gen.get_tile_logic(tile)
 				var token := str(logic.get("encounter_token", ""))
-				if token == "":
+				if token == "" or seen_tokens.has(token):
 					continue
+				seen_tokens[token] = true
 				var scope: Dictionary = runtime.landmark_runtime.encounter_scope_for(tile, str(logic.get("biome", "")))
 				var curated: Dictionary = scope.get("curated", {}) if scope.get("curated", {}) is Dictionary else {}
 				var extra: Array = scope.get("extra_ids", []) if scope.get("extra_ids", []) is Array else []
 				if curated.is_empty() and extra.is_empty():
 					continue
-				for species in LegendaryPlacement.LEGENDARY_IDS:
-					var sid := str(species)
-					if curated.has(sid):
-						failures.append("exclusion: %s is curated into the %s scope (curated ∩ legendaries must be empty — a legendary is drawable on that footprint)" % [sid, token])
-					if extra.has(sid):
-						failures.append("exclusion: %s is an extra_id of the %s scope (extra_ids ∩ legendaries must be empty)" % [sid, token])
+				_assert_curated_scope(token, curated, extra, runtime, failures)
+	for dungeon_id in DungeonRuntime.DungeonMaps.DUNGEON_IDS:
+		var scope: Dictionary = DungeonRuntime.DungeonMaps.encounter_scope_for(str(dungeon_id))
+		_assert_curated_scope(str(dungeon_id), scope.get("curated", {}), scope.get("extra_ids", []), runtime, failures, true)
+	# A known dungeon with malformed authored data keeps its token but exposes no drawable pool.
+	var malformed_scopes := [{}, {"level_band": [5, 6], "curated": []}, {"curated": {"SNORUNT": [5, 6]}}, {"level_band": [5], "curated": {"SNORUNT": [5, 6]}}, {"level_band": [5, 6], "curated": {"SNORUNT": [5]}}]
+	for index in range(malformed_scopes.size()):
+		var refused: Dictionary = DungeonRuntime.DungeonLayouts.normalize_encounter_scope("dungeon_regice", malformed_scopes[index])
+		if str(refused.get("token", "")) != "dungeon_regice" or not (refused.get("extra_ids", []) as Array).is_empty() or not (refused.get("curated", {}) as Dictionary).is_empty():
+			failures.append("exclusion: malformed dungeon scope %d did not preserve a tokened-empty refusal" % index)
+
+static func _assert_curated_scope(token: String, curated: Dictionary, extra: Array, runtime, failures: Array, require_nonempty: bool = false) -> void:
+	var curated_ids: Array = curated.keys(); curated_ids.sort()
+	var extra_ids: Array = []
+	for species_id in extra:
+		if not extra_ids.has(str(species_id)): extra_ids.append(str(species_id))
+	extra_ids.sort()
+	if require_nonempty and curated_ids.is_empty(): failures.append("exclusion: %s curated scope is empty" % token)
+	if curated_ids != extra_ids: failures.append("exclusion: %s extra_ids %s != curated keys %s" % [token, str(extra_ids), str(curated_ids)])
+	var ids: Array = curated_ids.duplicate()
+	for species_id in extra_ids:
+		if not ids.has(species_id): ids.append(species_id)
+	for species_id in ids:
+		var sid := str(species_id)
+		if LegendaryPlacement.LEGENDARY_IDS.has(sid):
+			failures.append("exclusion: %s is drawable in the %s curated scope (legendaries must stay static)" % [sid, token])
+		if not runtime._biome_encounters.is_battle_viable(sid, runtime.catalog.get_species(sid)):
+			failures.append("exclusion: %s is not battle-viable in the %s curated scope" % [sid, token])

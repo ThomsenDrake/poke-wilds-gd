@@ -68,6 +68,8 @@ func _capable(move_id: String) -> bool:
 			return true
 	return false
 
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the dungeon gate, session-direct: the dungeon field-action refusals (teleport/fly/waystone/boulder/power)
+
 # --- FLASH (passive light is night_system's; the active caller only traces) ----
 
 func use_flash(tile: Vector2i) -> Dictionary:
@@ -101,6 +103,7 @@ func last_way_stone() -> Vector2i:
 # Registers a warp point: stamps the way_stone placement (rides the structures save
 # key) + traces waystone_registered. Refuses an occupied/unplaceable tile.
 func register_way_stone(tile: Vector2i) -> Dictionary:
+	if _in_dungeon(): _refuse("teleport", {"tile": _t(tile), "reason": "in_dungeon"}); return {"ok": false, "reason": "in_dungeon"} # a dungeon-local way stone must NEVER land in the overworld placements map
 	if not _capable("teleport"):
 		_refuse("teleport", {"tile": _t(tile), "reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}
@@ -117,6 +120,7 @@ func register_way_stone(tile: Vector2i) -> Dictionary:
 # Warps to `target`, or the last registered way stone when target is Vector2i.MAX.
 # Returns the destination tile; the caller (router/scenario) moves the avatar.
 func use_teleport(target: Vector2i = Vector2i.MAX) -> Dictionary:
+	if _in_dungeon(): _refuse("teleport", {"reason": "in_dungeon"}); return {"ok": false, "reason": "in_dungeon"} # no warping out of a dungeon (the exit tile is the way back)
 	if not _capable("teleport"):
 		_refuse("teleport", {"reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}
@@ -130,6 +134,7 @@ func use_teleport(target: Vector2i = Vector2i.MAX) -> Dictionary:
 # --- FLY (to a VISITED/registered way stone; intra-world only — the seamless plane retired edge-fly with chaining) -----
 
 func use_fly(target: Vector2i) -> Dictionary:
+	if _in_dungeon(): _refuse("fly", {"tile": _t(target), "reason": "in_dungeon"}); return {"ok": false, "reason": "in_dungeon"} # no flying out of a dungeon
 	if not _capable("fly"):
 		_refuse("fly", {"tile": _t(target), "reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}
@@ -188,6 +193,7 @@ func boulder_tiles() -> Array:
 # Seeds a movable boulder (setup/scenario seam); rides the placements map so it
 # renders, blocks, and survives save like any placed prop.
 func place_boulder(tile: Vector2i) -> Dictionary:
+	if _in_dungeon(): return {"ok": false, "reason": "in_dungeon"} # the scenario/setup seam: a dungeon-local boulder must NEVER land in the overworld placements map (no trace — this path never traces)
 	if not Structures.can_place_on(_world_gen.get_tile_logic(tile)):
 		return {"ok": false, "reason": "not_placeable"}
 	if not _world_gen.add_placement(tile, Structures.BOULDER_ID, "power", int(_session.total_steps)):
@@ -199,6 +205,7 @@ func place_boulder(tile: Vector2i) -> Dictionary:
 # Pushes the boulder on `tile` one tile along `direction` when the destination is
 # open ground. Refuses with no faced boulder or a blocked destination.
 func use_power(tile: Vector2i, direction: Vector2i) -> Dictionary:
+	if _in_dungeon(): _refuse("power", {"tile": _t(tile), "reason": "in_dungeon"}); return {"ok": false, "reason": "in_dungeon"} # no boulder pushes in a dungeon
 	if not _capable("power"):
 		_refuse("power", {"tile": _t(tile), "reason": "not_capable"})
 		return {"ok": false, "reason": "not_capable"}

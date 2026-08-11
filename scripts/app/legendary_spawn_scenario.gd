@@ -1,36 +1,38 @@
 extends Node
 
-# Legendary spawn scenario (Phase 7 Build 2; spec: docs/product-specs/world-depth.md
-# § Legendaries). The climate-anchored spawn proof, self-pinned seed_for_smoke(SEED)
-# -> new_game -> rebuild (the breed_flow precedent; joins the double-run lane —
-# legendary stamping is pure _mix, NO rng). (1) ANCHORS — each frozen species anchors at
-# ring >= LEGENDARY_RING_MIN (the progression floor) in its affinity biome (stamped
-# entity == derived anchor, resolver biome == affinity, AGGRESSIVE, battle_kind
-# "legendary"); the partition is PINNED to the exact derived set under SEED
-# (anchor_set_pin) — ALL SEVEN anchor under the climate field (slice 2: LAVA generates;
-# the radial quantization-tail EMPIRICAL FLAG is RESOLVED). The NO_ANCHOR negative
-# proof rides a SYNTHETIC reach-1 witness (the natural case is vacuous on this seed).
-# (2) EXCLUSION — no legendary in any pool (DAY+NIGHT filter, the forced full-catalog
-# fallback, the is_battle_viable TYPE-fallback guard the night-ghost pool shares).
-# (3) ENCOUNTER — chase-catch +3 (:284), the legendary_encounter battle-start trace,
-# player-initiated +0 (:280). (4) WHITE-OUT — defeat leaves it standing, damage
-# persisted, re-battleable (:284/:288). (5) KO — gone-for-good per world (PORT
-# DECISION inverting wiki :224): removal key -> session.legendary_removals, despawn,
-# re-stamp suppression + the to_payload/apply_into round-trip. Battles ride the DIRECT
-# seam under the set_battle latch; play_battle_track rides a verbatim MIMIC of
-# main.gd:92 (latch-bypassed; music_track_selected + a grep pin make it observable).
+# Legendary spawn scenario (Phase 7 Build 2 + the legendary-dungeon slice; spec:
+# docs/product-specs/world-depth.md § Legendaries). The climate-anchored spawn proof,
+# self-pinned seed_for_smoke(SEED) -> new_game -> rebuild (the breed_flow precedent; joins
+# the double-run lane — the derivation is pure _mix, NO rng). (1) ANCHORS — each frozen
+# species anchors at ring >= LEGENDARY_RING_MIN in its affinity biome; the OVERWORLD entity
+# stamp is RETIRED (the dungeon slice): the anchor now stamps the ENTRANCE warp cell
+# (DungeonMaps.entrance_cell_for — warp flag + dungeon_id, resolver biome == affinity) and
+# NO legendary_0,0:* entity exists at boot. The partition stays PINNED to the exact derived
+# set under SEED (anchor_set_pin); the NO_ANCHOR negative proof rides the synthetic reach-1
+# witness. (2) EXCLUSION — no legendary in any pool (DAY+NIGHT filter, the forced
+# full-catalog fallback, the is_battle_viable TYPE-fallback guard + the curated pin).
+# (3) WHITE-OUT — the chamber legendary (MEWTWO's dungeon): the provoked +3, the
+# battle-start trace (dungeon_id on the payload), the defeat dumps the player to the
+# campsite OUTSIDE the dungeon, the whittle persists across the re-entry re-stamp, the
+# rematch carries the +3. (4) KO — REGIGIGAS (both-outcomes-permanent; a tablet Regi's KO
+# rides the re-stand valve into legendary_kos instead): the five-tablet SEAL refuses first
+# (dungeon_entry_refused), the KO writes legendary_removals, the re-entry re-stamp
+# suppresses, an untouched dungeon still stamps. Battles ride the DIRECT seam under the
+# set_battle latch; play_battle_track rides a verbatim MIMIC of main.gd:92 (latch-bypassed;
+# music_track_selected + a grep pin make it observable).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const OverworldMonsRuntime := preload("res://scripts/runtime/overworld_mons_runtime.gd")
+const DungeonRuntime := preload("res://scripts/runtime/dungeon_runtime.gd") # rides its domain preloads (the layer table; the landmark_flow precedent)
 const LegendarySpawnChecks := preload("res://scripts/app/legendary_spawn_checks.gd") # the hardened proofs extracted at the app 220 budget wall
+const LegendarySpawnBattleChecks := preload("res://scripts/app/legendary_spawn_battle_checks.gd") # the chamber-battle proofs (the second extraction at the wall)
 # Domain access rides the runtime's own preload (the layer table; the landmark_flow precedent).
 const LegendaryPlacement := OverworldMonsRuntime.LegendaryPlacement
+const DungeonMaps := DungeonRuntime.DungeonMaps
 
 const SEED := 2026073001
-const ORIGIN := Vector2i.ZERO # stamps the origin world (chain frozen — slice 1)
 const DAY_MINUTES := 600
-const PROVOKED_ATTACK_STAGES := 3 # mirrors OverworldMons.PROVOKED_ATTACK_STAGES (:284)
-const WHITEOUT_ENEMY_HP := 9999 # the white-out subject survives one hit so the persisted damage is observable
+const KO_SUBJECT := "REGIGIGAS" # both-outcomes-permanent (a tablet Regi's KO rides the re-stand valve); MEWTWO stays the white-out subject
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()
@@ -55,7 +57,7 @@ func run(ctx: Dictionary) -> void:
 	else: _failures.append("skipped: exclusion (cascaded from an anchor red)")
 	if _failures.is_empty(): _oks["whiteout_ok"] = _prove_whiteout(runtime, str(_anchored[0]))
 	else: _failures.append("skipped: whiteout (cascaded from an earlier red)")
-	if _failures.is_empty(): _oks["ko_ok"] = _prove_ko(runtime, str(_anchored[1]))
+	if _failures.is_empty(): _oks["ko_ok"] = _prove_ko(runtime, KO_SUBJECT)
 	else: _failures.append("skipped: ko (cascaded from an earlier red)")
 	if _failures.is_empty():
 		var payload: Dictionary = _oks.duplicate(); payload["pin"] = SEED; payload["seed"] = runtime.get_world_seed(); payload["anchored"] = _anchored; payload["lava_absent"] = _lava_absent
@@ -70,8 +72,9 @@ func run(ctx: Dictionary) -> void:
 	runtime.session.time_of_day_minutes = DAY_MINUTES
 
 # Every frozen species derives off the LIVE seed (NEVER hardcoded tiles): an anchor resolves ->
-# one entity on that tile (kind/battle_kind/AGGRESSIVE, biome == affinity, ring >= 60); NO_ANCHOR
-# -> NO entity. The expected set derives through legendaries_for_world (the sim's exact source).
+# the ENTRANCE warp cell stamps on that tile (warp flag + dungeon_id; the overworld entity stamp
+# is RETIRED — the chamber stamp moved into the dungeon); NO_ANCHOR -> NO entrance. The expected
+# set derives through legendaries_for_world (the entrance derivation's exact source).
 func _prove_anchors(runtime) -> bool:
 	var start: int = _failures.size()
 	var seed: int = runtime.get_world_seed()
@@ -79,20 +82,17 @@ func _prove_anchors(runtime) -> bool:
 	var expected: Dictionary = LegendarySpawnChecks.expected_anchor_set(seed) # the sim's exact source set (the sibling-exclusion chain)
 	for species in LegendaryPlacement.LEGENDARY_IDS:
 		var sid := str(species)
-		var id := "legendary_0,0:%s" % sid
 		var anchor: Vector2i = expected.get(sid, {}).get("tile", LegendaryPlacement.NO_ANCHOR)
-		var entity: Dictionary = entities.get(id, {})
 		if anchor == LegendaryPlacement.NO_ANCHOR:
-			_ensure(entity.is_empty(), "anchor: %s resolved NO_ANCHOR yet entity %s is stamped" % [sid, id])
 			_lava_absent.append(sid) # contract-legal; the payload witnesses it (the header's empirical flag)
 			continue
 		var ring := LegendaryPlacement.ring_of(anchor)
 		_ensure(ring >= LegendaryPlacement.LEGENDARY_RING_MIN, "anchor: %s anchored at ring %d (< %d)" % [sid, ring, LegendaryPlacement.LEGENDARY_RING_MIN])
 		_ensure(_world().get_tile_biome(anchor) == LegendaryPlacement.affinity_for(sid), "anchor: %s tile %s resolver biome %s != affinity %s" % [sid, str(anchor), str(_world().get_tile_biome(anchor)), LegendaryPlacement.affinity_for(sid)])
-		if _ensure(not entity.is_empty(), "anchor: %s anchored at %s but the sim stamped no entity" % [sid, str(anchor)]):
-			_ensure(entity.get("tile", Vector2i.MAX) == anchor and int(entity.get("ring", 0)) == ring, "anchor: %s entity tile/ring %s/%d != derived %s/%d" % [sid, str(entity.get("tile", "")), int(entity.get("ring", 0)), str(anchor), ring])
-			_ensure(str(entity.get("kind", "")) == "legendary" and str(entity.get("battle_kind", "")) == "legendary", "anchor: %s kind/battle_kind %s/%s" % [sid, str(entity.get("kind", "")), str(entity.get("battle_kind", ""))])
-			_ensure(str(entity.get("disposition", "")) == "AGGRESSIVE", "anchor: %s disposition %s != AGGRESSIVE" % [sid, str(entity.get("disposition", ""))])
+		var cell: Dictionary = DungeonMaps.entrance_cell_for(seed, anchor)
+		if _ensure(bool(cell.get("warp", false)), "anchor: %s anchored at %s but no entrance warp cell stamps there" % [sid, str(anchor)]):
+			_ensure(str(cell.get("dungeon_id", "")) == DungeonMaps.dungeon_for_species(sid), "anchor: %s entrance dungeon %s != %s" % [sid, str(cell.get("dungeon_id", "")), DungeonMaps.dungeon_for_species(sid)])
+			_ensure(not entities.has("legendary_0,0:%s" % sid), "anchor: %s still stamps an OVERWORLD entity (the retired stamp_legendaries)" % sid)
 			_anchored.append(sid)
 	var labels := [LegendarySpawnChecks.anchor_set_pin(_anchored, _lava_absent, seed), LegendarySpawnChecks.synthetic_no_anchor_witness(seed)] # the EXACT derived set + distinctness + the reach-1 NO_ANCHOR witness (vacuous naturally once all seven anchor)
 	return _ensure(str(labels[0]) == "", str(labels[0])) and _ensure(str(labels[1]) == "", str(labels[1])) and _failures.size() == start
@@ -120,91 +120,18 @@ func _prove_exclusion(runtime) -> bool:
 			_failures.append("exclusion: %s passes is_battle_viable (the TYPE-fallback guard the night-ghost pool shares)" % sid)
 	LegendarySpawnChecks.curated_exclusion_pin(runtime, _failures); return _failures.size() == start # R6: the curated/extra_ids path the per-biome scan cannot see
 
-# Chase-catch provoked +3 -> the battle-start trace -> a white-out leaves it standing (damage
-# persisted on the entity, dropped to idle) and re-battleable (:284/:288); the REMATCH carries the
-# PERSISTED +3 + a second legendary_encounter. The :280 no-buff witness rides the KO case's FIRST engagement (stages 0).
+# The chamber-legendary battle proofs (white-out whittle persistence; the KO removal + the
+# Regigigas seal) live in legendary_spawn_battle_checks.gd — extracted at the app 220 wall
+# (the legendary_spawn_checks.gd precedent). These wrappers keep the run() driver readable.
 func _prove_whiteout(runtime, species_id: String) -> bool:
 	var start: int = _failures.size()
-	var mons = runtime.overworld_mons_runtime
-	var entity: Dictionary = mons._entities.get("legendary_0,0:%s" % species_id, {})
-	if not _ensure(not entity.is_empty(), "whiteout: no stamped entity for %s" % species_id): return false
-	var tile: Vector2i = entity.get("tile", Vector2i.MAX)
-	mons._force_battle(entity, true) # the forced-AGGRESSIVE chase-catch, exactly like a Phase-6 guardian
-	var cursor: int = _runner.trace_log_line_count()
-	var battle_mon: Dictionary = _take_and_assert_payload(runtime, species_id, cursor, PROVOKED_ATTACK_STAGES, "whiteout")
-	if battle_mon.is_empty(): return false
-	_ctx["music_router"].play_battle_track(str(battle_mon.get("battle_kind", "wild"))) # a verbatim MIMIC of the main.gd:92 seam — kind plumbing only (headless never plays audio, miss-002)
-	var music_pin := LegendarySpawnChecks.music_seam_pin(_runner, cursor) # music_track_selected{legendary} witness + the main.gd:92 consumer grep pin (the live bridge is latch-bypassed)
-	_ensure(music_pin == "", music_pin)
-	battle_mon["max_hp"] = WHITEOUT_ENEMY_HP; battle_mon["current_hp"] = WHITEOUT_ENEMY_HP # survives the one damaging hit so the persisted damage is observable
-	runtime.start_wild_battle(battle_mon)
-	runtime.battle_runtime._player_mon["max_hp"] = WHITEOUT_ENEMY_HP; runtime.battle_runtime._player_mon["current_hp"] = WHITEOUT_ENEMY_HP # unkillable lead: the damaging move lands whatever the ring-band level/speed
-	runtime.perform_battle_move(_damaging_move_index(runtime.battle_runtime._player_mon))
-	for mon in runtime.session.party: mon["current_hp"] = 0 # zero the WHOLE party: the faint handler finds no healthy successor -> defeat (wild_battle's single-mon precedent, generalized)
-	runtime.battle_runtime._player_mon["current_hp"] = 0
-	var defeat: Dictionary = runtime.perform_battle_move(_damaging_move_index(runtime.battle_runtime._player_mon))
-	if not _ensure(str(defeat.get("outcome", "")) == "defeat", "whiteout: the defeat path reached outcome %s" % str(defeat.get("outcome", ""))): return false
-	var standing: Dictionary = mons.entity_at(tile)
-	if not _ensure(not standing.is_empty() and str(standing.get("kind", "")) == "legendary", "whiteout: the white-out REMOVED the legendary (:288 violation)"): return false
-	_ensure(int(standing.get("current_hp", 0)) > 0 and int(standing.get("current_hp", WHITEOUT_ENEMY_HP)) < WHITEOUT_ENEMY_HP, "whiteout: the enemy's damage did not persist on the entity (hp %d)" % int(standing.get("current_hp", 0)))
-	_ensure(str(standing.get("state", "")) == "idle", "whiteout: the surviving entity did not drop to idle")
-	var atk: Dictionary = mons.attack_entity(tile)
-	if not _ensure(bool(atk.get("ok", false)), "whiteout: the surviving legendary refused a second battle (%s)" % str(atk.get("reason", ""))): return false
-	var cursor2: int = _runner.trace_log_line_count()
-	var retry: Dictionary = runtime.generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
-	_ensure(int(retry.get("attack_stages", 0)) == PROVOKED_ATTACK_STAGES, "whiteout: the provoked +3 did NOT persist across the white-out (:284 stat persistence; the :280 no-buff witness rides the ko case's fresh attack)")
-	_ensure(_runner.trace_log_has_since("legendary_encounter", cursor2, {"species_id": species_id, "battle_kind": "legendary"}), "whiteout: no second legendary_encounter on the rematch")
-	runtime.start_wild_battle(retry)
-	_ensure(str(runtime.run_from_battle().get("outcome", "")) == "escaped", "whiteout: the rematch escape failed")
+	LegendarySpawnBattleChecks.whiteout_proof(runtime, species_id, _player(), _world(), _ctx["music_router"], _runner, _failures)
 	return _failures.size() == start
 
-# KO -> gone-for-good per instance: overworld_mon_despawned{ko}, the removal key rides
-# legendary_removals, a second attempt finds NO target, a re-stamp re-derives suppression, and the payload round-trip keeps it gone.
 func _prove_ko(runtime, species_id: String) -> bool:
 	var start: int = _failures.size()
-	var mons = runtime.overworld_mons_runtime
-	var id := "legendary_0,0:%s" % species_id
-	var entity_ko: Dictionary = mons._entities.get(id, {})
-	var tile: Vector2i = entity_ko.get("tile", Vector2i.MAX); var anchor: Vector2i = entity_ko.get("anchor", tile) # removals key off `anchor` (chase moves `tile`; slice 3)
-	var atk: Dictionary = mons.attack_entity(tile)
-	if not _ensure(bool(atk.get("ok", false)), "ko: attack on %s refused (%s)" % [species_id, str(atk.get("reason", ""))]): return false
-	var cursor: int = _runner.trace_log_line_count()
-	var battle_mon: Dictionary = _take_and_assert_payload(runtime, species_id, cursor, 0, "ko")
-	if battle_mon.is_empty(): return false
-	battle_mon["current_hp"] = 1 # any damaging hit KOs
-	runtime.start_wild_battle(battle_mon)
-	runtime.battle_runtime._player_mon["max_hp"] = WHITEOUT_ENEMY_HP; runtime.battle_runtime._player_mon["current_hp"] = WHITEOUT_ENEMY_HP # unkillable lead: victory lands whatever the ring-band level/speed order
-	var victory: Dictionary = runtime.perform_battle_move(_damaging_move_index(runtime.battle_runtime._player_mon))
-	if not _ensure(str(victory.get("outcome", "")) == "victory", "ko: outcome %s != victory" % str(victory.get("outcome", ""))): return false
-	_ensure(_runner.trace_log_has_since("overworld_mon_despawned", cursor, {"species_id": species_id, "reason": "ko"}), "ko: no overworld_mon_despawned{reason:ko}")
-	_ensure((runtime.session.legendary_removals as Array).has(LegendaryPlacement.removal_key(anchor, species_id)), "ko: the removal key %s never reached session.legendary_removals (%s)" % [LegendaryPlacement.removal_key(anchor, species_id), str(runtime.session.legendary_removals)])
-	var roundtrip := LegendarySpawnChecks.roundtrip_removal(runtime, species_id, _anchored) # the save marshalling round-trip (to_payload/apply_into into a fresh session)
-	_ensure(roundtrip == "", roundtrip)
-	var again: Dictionary = mons.attack_entity(tile) # the second encounter attempt finds it gone
-	_ensure(str(again.get("reason", "")) == "no_target", "ko: the KO'd legendary is still attackable (%s)" % str(again.get("reason", "")))
-	mons.stamp_legendaries() # suppression re-derives from the persistent removal set (the untouched anchored re-stamp)
-	_ensure(not mons._entities.has(id), "ko: the re-stamp re-created the KO'd legendary (suppression not re-derived)")
-	for other in _anchored:
-		if str(other) != species_id: _ensure(mons._entities.has("legendary_0,0:%s" % str(other)), "ko: the re-stamp dropped the untouched %s" % str(other))
+	LegendarySpawnBattleChecks.ko_proof(runtime, species_id, _anchored, _player(), _world(), _runner, _failures)
 	return _failures.size() == start
-
-# The pending-seam take + the legendary_encounter payload (species/kind/ring/stages). {} on any red, so the caller bails.
-func _take_and_assert_payload(runtime, species_id: String, cursor: int, stages: int, label: String) -> Dictionary:
-	var battle_mon: Dictionary = runtime.generate_wild_encounter(_player().tile_position, _world().get_tile_biome(_player().tile_position))
-	if not _ensure(str(battle_mon.get("species_id", "")) == species_id, "%s: the seam returned %s, expected %s" % [label, str(battle_mon.get("species_id", "")), species_id]): return {}
-	var ok := _ensure(str(battle_mon.get("battle_kind", "")) == "legendary", "%s: battle_kind %s != legendary" % [label, str(battle_mon.get("battle_kind", ""))])
-	ok = _ensure(int(battle_mon.get("attack_stages", 0)) == stages, "%s: attack_stages %d != %d" % [label, int(battle_mon.get("attack_stages", 0)), stages]) and ok
-	ok = _ensure(int(battle_mon.get("ring", 0)) >= LegendaryPlacement.LEGENDARY_RING_MIN, "%s: the encounter's ring %d < %d" % [label, int(battle_mon.get("ring", 0)), LegendaryPlacement.LEGENDARY_RING_MIN]) and ok
-	ok = _ensure(_runner.trace_log_has_since("legendary_encounter", cursor, {"species_id": species_id, "battle_kind": "legendary"}), "%s: no legendary_encounter{battle_kind:legendary} at battle start" % label) and ok
-	return battle_mon if ok else {}
-
-# A damaging move that cannot stall (heal/leech would never end the defeat path).
-func _damaging_move_index(mon: Dictionary) -> int:
-	var moves: Array = mon.get("moves", [])
-	for i in range(moves.size()):
-		var move: Dictionary = moves[i]
-		if int(move.get("power", 0)) > 0 and int(move.get("pp", 0)) > 0 and str(move.get("effect", "")) != "EFFECT_LEECH_HIT" and str(move.get("effect", "")) != "EFFECT_HEAL": return i
-	return 0
 
 func _ensure(ok: bool, label: String) -> bool:
 	if not ok:

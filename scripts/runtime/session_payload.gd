@@ -51,6 +51,13 @@ static func to_payload(session: RefCounted, world_overrides: Dictionary, structu
 	# legendary_removals key — spec § Save v5 byte-preservation witness).
 	if not (session.legendary_removals as Array).is_empty():
 		payload["legendary_removals"] = session.legendary_removals
+	# Legendary-dungeon slice (additive, NO bump): the tablet-Regi KO re-stand log + the
+	# active dungeon context; each written ONLY when non-default so an overworld /
+	# never-KO'd save keeps the exact pre-slice byte shape (the legendary_removals precedent).
+	if not (session.legendary_kos as Dictionary).is_empty():
+		payload["legendary_kos"] = session.legendary_kos
+	if str(session.active_area) != "":
+		payload["active_area"] = session.active_area
 	# Encounter opt-in (v5-additive, NO bump): written ONLY when non-default so an untouched
 	# save keeps the exact pre-feature byte shape (the golden fixture carries no key).
 	if not (session.encounter_settings as Dictionary).is_empty():
@@ -99,6 +106,12 @@ static func apply_into(session: RefCounted, data: Dictionary, normalized_party: 
 	# LegendaryPlacement re-derives stamp-time suppression from this set per world/chain.
 	var raw_removals: Variant = migrated.get("legendary_removals", [])
 	session.legendary_removals = (raw_removals as Array).duplicate(true) if raw_removals is Array else []
+	# Legendary-dungeon slice (additive; absent -> defaults): the KO re-stand log mirrors the
+	# legendary_removals grammar; the dungeon context re-enters on load (game_runtime hooks
+	# dungeon_runtime.note_world_loaded, which validates the id before re-stamping).
+	var raw_kos: Variant = migrated.get("legendary_kos", {})
+	session.legendary_kos = (raw_kos as Dictionary).duplicate(true) if raw_kos is Dictionary else {}
+	session.active_area = str(migrated.get("active_area", ""))
 	# Encounter opt-in (v5-additive; absent/{} == "off" — the contact-only default).
 	session.encounter_settings = normalize_encounter_settings(migrated.get("encounter_settings", {}))
 	# Creation identity + shiny odds (v6-additive, NO bump; absent keys backfill from the

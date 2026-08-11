@@ -190,3 +190,7 @@ The player-action surface (Attack/Charm hooks, dialogue recruitment, the wild-eg
 ## New-game flow slice (co-modification note)
 
 The new-game-flow slice ([bootstrap-and-overworld.md](bootstrap-and-overworld.md) § Boot, splash, title, and creation) co-mods this subsystem's shared `scenes/app/Main.tscn` scene OWNERSHIP only: the `$UI` CanvasLayer gains the `TitleScreen` + `CreationScreen` instances (the boot-time splash/title/creation flow). NO overworld-mons behavior changes — entity spawning, disposition, the contact seam, and the derived-hash stream are untouched; the entity layer's `Main` child position and self-wiring are unchanged, and scenario boots bypass the title screens entirely, so every overworld baseline + scenario stays byte-identical.
+
+## Legendary-dungeon chamber integration (2026-08-11)
+
+The seven boot-time overworld legendary statics are replaced by one chamber entity stamped on dungeon entry. `overworld_mons_runtime` preserves the existing forced-battle payload and derived entity construction, adds dungeon-local chamber state seams, and suppresses its normal roam/contact simulation while `active_area` is set. Catch grants a tablet when applicable; KO records the Regi cooldown without granting one; white-out keeps the chamber whittle for the session.

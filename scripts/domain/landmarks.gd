@@ -1,5 +1,4 @@
 extends RefCounted
-
 # Phase 7 Build 1 — landmarks (spec: docs/product-specs/world-depth.md § Landmarks).
 # Deterministic-from-seed multi-tile footprints (Mansion / Desert Ruins / Heart Tower)
 # stamped into base tile logic at world_generator's single mutation boundary — NOT
@@ -18,8 +17,9 @@ const MANSION_STATUES := 3
 const MANSION_LEVEL_BAND := [18, 26]       # FLAGGED #11 (no documented levels)
 const RUINS_OUTER_LEVEL_BAND := [22, 30]   # FLAGGED #11
 const RUINS_INNER_LEVEL_FLOOR := 30
-# FLAGGED #9: Volcarona/Golurk are bare db TYPE sentinels with NO RUINS_* token — a PORT CURATION over the faithful Lunatone-only RUINS_INNER token.
-const RUINS_INNER_CURATED := {"VOLCARONA": [38, 45], "GOLURK": [38, 45]}
+# FLAGGED #9: Volcarona is a bare db TYPE sentinel with NO RUINS_* token — a PORT
+# CURATION over the faithful Lunatone-only token. Sprite-less Golurk is deliberately culled.
+const RUINS_INNER_CURATED := {"VOLCARONA": [38, 45]}
 # Dusclops Underground = ALWAYS-AGGRESSIVE (wiki :270); Phase 6 held it DORMANT — now that a ruins sub-region exists it goes LIVE (runtime entity).
 const RUINS_UNDERGROUND_SPECIES := "DUSCLOPS"
 const MANSION_KEY_ID := "mansion_key"

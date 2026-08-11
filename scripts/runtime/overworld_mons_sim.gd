@@ -178,23 +178,6 @@ func _spawn_nest(cell: Vector2i) -> void:
 		var guardian: Dictionary = _rt_ref.get_ref()._entities.get(guardian_id, {})
 		_rt_ref.get_ref()._emit("nest_found", {"tile": _rt_ref.get_ref()._t(guardian.get("tile", OverworldMons.cell_center(cell))), "guardian_species_id": str(guardian.get("species_id", "")), "eggs": eggs})
 
-# Phase 7 Build 2 (world-depth.md § Legendaries): the frozen seven as world-fixed STATIONARY
-# statics, stamped on world load/new-game (AFTER the session's seed + legendary_removals land).
-# Gone-for-good PER-INSTANCE (the flagged PORT DECISION inverting wiki :224) rides the persistent
-# removal set; CLASS_STATIONARY + forced AGGRESSIVE + the guardian's +3, NEVER nest machinery, window-exempt; a world change (new_game/load) drops the previous statics, re-deriving per seed.
-func stamp_legendaries(chain: Vector2i) -> void:
-	var rt = _rt_ref.get_ref()
-	for id in rt._entities.keys():
-		if str((rt._entities[id] as Dictionary).get("kind", "")) == "legendary":
-			rt._entities.erase(id); rt._removed.erase(id)
-	for entry in LegendaryPlacement.legendaries_for_world(int(rt._session.world_seed), chain, rt._session.legendary_removals):
-		var species_id := str(entry.get("species_id", ""))
-		var id := "legendary_%d,%d:%s" % [chain.x, chain.y, species_id]
-		if rt._entities.has(id) or rt._removed.has(id):
-			continue
-		rt._entities[id] = new_legendary(id, chain, species_id, entry.get("tile", Vector2i.MAX), str(entry.get("biome", "")), int(entry.get("ring", 0)))
-		_trace_spawned(rt._entities[id])
-
 # biome_encounters is the ONE biome truth (the same filter the grass stream rides), minus
 # Undiscovered-group species — legendaries/mythicals never roam (the prototype's banlist;
 # data-driven off the LIVE catalog, never a hardcoded list).

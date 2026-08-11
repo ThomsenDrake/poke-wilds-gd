@@ -93,3 +93,7 @@ FROZEN by the rebuild: every public API, entry list, trace name/payload, latch s
 ## Editor trace plugin (agent-neutral integration Phase 3 co-modification note)
 
 `scripts/core/trace_logger.gd` gains an ADDITIVE `EngineDebugger.send_message("agent_trace:event", [line])` hook behind `EngineDebugger.is_active()` — a strict no-op headless/exported, so file/stdout behavior is byte-identical to the pre-hook version. The opt-in `addons/agent_trace/` editor plugin (ships DISABLED by default; `project.godot` deliberately untouched) renders the live stream in a per-session debugger tab plus a bottom-panel activity log. Editor-only, never loaded in game runs; it visualizes the repo's own JSONL contract and gates nothing.
+
+## Legendary-dungeon persistence co-modification (2026-08-11)
+
+Dungeon state is additive and schema-neutral: `active_area` is written only while inside a dungeon, and `legendary_kos` only when a tablet Regi is cooling down after a KO; absent keys restore `""` and `{}`. Loading validates the dungeon id before re-entering, while the chamber HP/stage whittle stays session-scoped and deliberately is not saved. Existing default saves retain their pre-slice byte shape.

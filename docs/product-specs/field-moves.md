@@ -126,3 +126,7 @@ The Phase-7 audit repair removes the DORMANT `_rng` injection from `field_move_r
 ## Infinite-world slice — way-stone teleport (co-modification note)
 
 With world chaining RETIRED (the seamless infinite plane), the world-edge **Teleport Beacon** concept is retired too: there is no edge band, so no `beacon_placed`, no `edge_suppressed` teleport/fly refusal, and no `beacon_index` listing (`world_chain_runtime` deleted). Way-stones remain plain **intra-world warp points** — `register_way_stone` fires `waystone_registered` only, and teleport/fly warp to a registered way-stone (or the last-registered one). When more than one way-stone is registered, `field_move_actions._route_warp` opens the renamed **WayStoneSelector** (`scripts/ui/waystone_selector.gd`, the former BeaconSelector — content-agnostic, retitled) listing ALL registered way-stones in registration order. `TELEPORT_EDGE_MARGIN` is gone.
+
+## Legendary-dungeon field-action refusals (2026-08-11)
+
+Teleport, Fly, way-stone registration, boulder placement, and Power refuse with `reason: in_dungeon`; Cut, Dig, and Smash return the existing message-only refusal before any overworld override mutation. The authored dungeon exit tile is the sole field route back out, so dungeon-local coordinates never enter the sparse overworld placements or mutation maps.

@@ -36,6 +36,7 @@ const OverworldMonsSim := preload("res://scripts/runtime/overworld_mons_sim.gd")
 const OverworldMonsActions := preload("res://scripts/runtime/overworld_mons_actions.gd") # player-action surface, extracted at the 320 wall
 const ContactEncounter := preload("res://scripts/domain/contact_encounter.gd") # the shared-tile collision predicate (contact-only default)
 const LegendaryPlacement := preload("res://scripts/domain/legendary_placement.gd")
+const DungeonLayouts := preload("res://scripts/domain/dungeon_layouts.gd") # the tablet-Regi table (the KO valve + the catch grant)
 const PokemonRules := preload("res://scripts/domain/pokemon_rules.gd")
 const DayPhase := preload("res://scripts/domain/day_phase.gd")
 
@@ -80,6 +81,9 @@ func setup(session_state, catalog, pokemon_rules, trace_logger, world_generator,
 # shared-tile CONTACT check (collision-only default), the roam tick, then the window sync
 # (spawn/despawn + nests).
 func note_player_step(total_steps: int, player_tile: Vector2i, time_label: String) -> void:
+	if _in_dungeon():
+		_check_player_contact(player_tile)
+		return # chamber contact stays live; the overworld sim never moves/spawns at dungeon-local coords
 	if not active:
 		return
 	_sim.recompute_on_time_change(time_label)
@@ -135,11 +139,57 @@ func note_warp(tile: Vector2i) -> void:
 			continue
 		if ["chasing", "fleeing"].has(state):
 			entity["state"] = "idle"; entity["flee_steps"] = 0
-	if active:
+	if active and not _in_dungeon():
 		_sim.sync_window(tile, DayPhase.time_of_day_label(int(_session.time_of_day_minutes)))
 
-func stamp_legendaries() -> void: # Phase 7 Build 2: stamps the frozen seven as world-fixed statics (world-depth.md § Legendaries) on new-game/load, AFTER the session seed + legendary_removals land; the sim owns the records. Infinite-world slice: chain frozen at origin (0,0).
-	_sim.stamp_legendaries(Vector2i.ZERO)
+# --- The dungeon seam (dungeon_runtime rides here; the sim stays the entity owner) -----------
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the sim-suppression gate, session-direct (the dungeon_runtime.in_dungeon predicate; unset session == the overworld)
+
+# Stamps the chamber legendary: the sim's new_legendary (kind/battle_kind "legendary"
+# preserved; the tile is the dungeon-local chamber; the ring is the entrance ring so
+# guardian_level_for stays deep; the biome is the caller's — dungeon_runtime owns the
+# DUNGEON_BIOME constant). The anchor is OVERWRITTEN to the ENTRANCE anchor so the removal
+# key stays world-anchored (new_legendary pins anchor = the stamp tile). The session-scoped
+# whittle ({current_hp, attack_stages}) re-applies. Idempotent.
+func stamp_dungeon_chamber(dungeon_id: String, species_id: String, tile: Vector2i, anchor: Vector2i, ring: int, biome: String, instance_state: Dictionary = {}) -> void:
+	var id := "legendary_%s" % dungeon_id
+	if _entities.has(id) or _removed.has(id):
+		return # already standing (or KO'd this session — the re-stand valve clears the mark first)
+	var entity: Dictionary = _sim.new_legendary(id, Vector2i.ZERO, species_id, tile, biome, ring)
+	entity["anchor"] = anchor # the ENTRANCE anchor: removal keys stay world-anchored
+	entity["dungeon_id"] = dungeon_id
+	entity["current_hp"] = int(instance_state.get("current_hp", 0))
+	entity["attack_stages"] = int(instance_state.get("attack_stages", 0))
+	_entities[id] = entity
+	_sim._trace_spawned(entity) # the overworld_mon_spawned witness (the sim's own spawn path)
+
+# The warp-in/out seam: drops every live entity (the overworld sim's live entities never leak
+# into dungeon-local coords; the next in-context sync re-derives them). The _removed marks
+# survive — a fled/despawned overworld mon stays marked.
+func clear_live_entities() -> void:
+	_entities.clear()
+
+# New game / load: drops any stale chamber entity (it re-stamps subject to suppression).
+func clear_dungeon_entities() -> void:
+	for id in _entities.keys():
+		if str(((_entities[id] as Dictionary).get("dungeon_id", ""))) != "":
+			_entities.erase(id)
+
+func has_removed_mark(id: String) -> bool:
+	return _removed.has(id)
+
+# The KO re-stand valve: a tablet Regi's session-scoped KO mark lapses WITH the cooldown, so
+# the re-entry re-stamps it FRESH (full HP/fresh stages — dungeon_runtime erases the whittle).
+func clear_removed_mark(id: String) -> void:
+	_removed.erase(id)
+
+# The chamber entity's whittle state ({current_hp, attack_stages}; {} when absent) — the ONE
+# owner of the "legendary_%s" id grammar's read side (dungeon_runtime._snapshot_chamber rides it).
+func chamber_state_for(dungeon_id: String) -> Dictionary:
+	var entity: Dictionary = _entities.get("legendary_%s" % dungeon_id, {})
+	if entity.is_empty():
+		return {}
+	return {"current_hp": int(entity.get("current_hp", 0)), "attack_stages": int(entity.get("attack_stages", 0))}
 
 # The forced-battle seam: {} when none; consumed exactly once — game_runtime.generate_wild_
 # encounter calls this BEFORE fishing, so Repel/unlit-night ghosts never touch a provoked
@@ -152,21 +202,33 @@ func take_pending_encounter() -> Dictionary:
 # victory/catch removes the entity (:288); escaped/defeat keeps it with persisted HP +
 # stages (:284) and drops chasing→idle on EVERY such outcome (DIVERGENCE #11). The pending
 # entity is always a mon/guardian/legendary — eggs never arm into the seam (:250 dropped).
-func note_battle_outcome(outcome: String, enemy: Dictionary) -> void:
+# Returns the post-battle message ("" when none) — the tablet grant surfaces through it.
+func note_battle_outcome(outcome: String, enemy: Dictionary) -> String:
 	if not _last_battle_was_entity:
-		return
+		return ""
 	_last_battle_was_entity = false
 	var entity: Dictionary = _entities.get(_pending_id, {})
 	_pending_id = ""
 	if entity.is_empty():
-		return
+		return ""
 	entity["current_hp"] = int(enemy.get("current_hp", 0)); entity["state"] = "idle"
 	if outcome == "victory":
 		_remove_entity(entity, OverworldMons.REASON_KO)
 	elif outcome.begins_with("caught"):
 		_remove_entity(entity, OverworldMons.REASON_CAUGHT)
-	if str(entity.get("kind", "")) == "legendary" and (outcome == "victory" or outcome.begins_with("caught")): # gone-for-good PER INSTANCE (flagged PORT DECISION inverting wiki :224); a white-out leaves it re-battleable above
-		_session.legendary_removals.append(LegendaryPlacement.removal_key(entity.get("anchor", entity.get("tile", Vector2i.ZERO)), str(entity.species_id))) # v4-additive; session_payload marshals; slice 3: anchor-keyed (per-instance)
+	if str(entity.get("kind", "")) != "legendary" or not (outcome == "victory" or outcome.begins_with("caught")):
+		return "" # a white-out leaves the legendary re-battleable above
+	var key := LegendaryPlacement.removal_key(entity.get("anchor", entity.get("tile", Vector2i.ZERO)), str(entity.species_id))
+	var tablet := str(DungeonLayouts.TABLET_FOR_SPECIES.get(str(entity.species_id), ""))
+	if outcome == "victory" and tablet != "" and str(entity.get("dungeon_id", "")) != "": # the KO re-stand valve: a tablet Regi rests in the additive session.legendary_kos log (NEVER the persistent removals) until REGI_RESTAND_STEPS lapses; MEWTWO/REGIGIGAS keep both-outcomes-permanent below
+		_session.legendary_kos[key] = int(_session.total_steps)
+		return "" # KO grants NOTHING (the tablets are catch-only)
+	_session.legendary_removals.append(key) # gone-for-good PER INSTANCE (flagged PORT DECISION inverting wiki :224); v4-additive; session_payload marshals; anchor-keyed (per-instance)
+	if outcome.begins_with("caught") and tablet != "" and _session.get_item_count(tablet) == 0: # the catch-only tablet grant (once per save; KO grants nothing)
+		_session.add_item(tablet, 1)
+		_emit("tablet_claimed", {"species_id": str(entity.species_id), "item_id": tablet, "tile": _t(entity.tile)})
+		return "The %s left behind a tablet etched in Braille." % str(entity.species_id).capitalize()
+	return ""
 
 # Player actions (Attack/Charm hooks, dialogue recruitment, the wild-egg TAKE/Attack binary
 # :248, the interact-provocation memory) live in overworld_mons_actions.gd — extracted at the
@@ -181,6 +243,8 @@ func _force_battle(entity: Dictionary, provoked: bool) -> Dictionary:
 	var mon := _stamp_instance(entity, int(entity.get("level", 5)))
 	if mon.is_empty():
 		return {"ok": false, "reason": "no_species"}
+	var standing_hp := int(entity.get("current_hp", 0))
+	if standing_hp > 0: mon["current_hp"] = clampi(standing_hp, 1, maxi(1, int(mon.get("max_hp", 1))))
 	var stages := maxi(int(entity.get("attack_stages", 0)), OverworldMons.attack_stages_for(provoked))
 	entity["attack_stages"] = stages
 	if stages > 0:
@@ -195,6 +259,8 @@ func _arm_pending(entity: Dictionary, mon: Dictionary) -> void:
 	mon["battle_kind"] = str(entity.get("battle_kind", "wild")) # Build 2 seam: a legendary static sets "legendary" (music_router.gd:33); the battle-start path reads it
 	if str(entity.get("kind", "")) == "legendary": # the legendary_encounter payload rides the pending (game_runtime owns the SINGLE trace)
 		mon["tile"] = _t(entity.tile); mon["biome"] = str(entity.get("biome", "")); mon["ring"] = int(entity.get("ring", 0))
+		if str(entity.get("dungeon_id", "")) != "":
+			mon["dungeon_id"] = str(entity["dungeon_id"]) # additive: the chamber stamp's dungeon (wild_encounter_draw.trace_legendary forwards it)
 	_pending = mon; _pending_id = str(entity.id); _last_battle_was_entity = true
 	encounter_requested.emit(entity.tile)
 

@@ -61,6 +61,8 @@ func can_afford(structure_id: String, biome: String) -> bool:
 # would-trap guard -> shared override cap. Only a fully accepted placement
 # consumes materials (and every refusal carries a reason, never silent).
 func try_place(tile: Vector2i, structure_id: String, mon_constraint: Dictionary = {}) -> Dictionary:
+	if _in_dungeon():
+		return _refuse(structure_id, tile, "in_dungeon") # a dungeon-local placement must NEVER land in the overworld placements map
 	var biome := _biome_for(tile)
 	if not Structures.is_valid(structure_id) or not _capable(BUILD_MOVE, mon_constraint):
 		return _refuse(structure_id, tile, "not_capable" if Structures.is_valid(structure_id) else "not_placeable")
@@ -249,6 +251,9 @@ func _demolish_refusal(logic: Dictionary, move_id: String, mon_constraint: Dicti
 
 func _label(structure_id: String) -> String:
 	return str(structure_id).replace("_", " ")
+
+
+func _in_dungeon() -> bool: return _session != null and str(_session.active_area) != "" # the dungeon gate, session-direct: building refuses inside dungeons
 
 
 func _biome_for(tile: Vector2i) -> String:

@@ -62,6 +62,8 @@ var total_steps: int = 0
 var repel_steps: int = 0 # Phase 4 Repel: while >0 encounters suppress; counts down in note_step_taken.
 var landmark_state: Dictionary = {} # Phase 7 v4-additive: per-landmark puzzle progress (world-depth.md § Persistence; absent in save -> {}).
 var legendary_removals: Array = [] # Phase 7 Build 2 v4-additive: gone-for-good legendary keys "<cx>,<cy>:<SPECIES>" (world-depth.md § Persistence; absent in save -> []).
+var legendary_kos: Dictionary = {} # Legendary-dungeon slice (additive; absent -> {}): the tablet-Regi KO re-stand log — removal key -> total_steps at KO (LegendaryPlacement.is_ko_cooling_down).
+var active_area: String = "" # Legendary-dungeon slice (additive; absent -> ""): the active dungeon id ("" == the overworld); dungeon_runtime owns the context.
 var encounter_settings: Dictionary = {} # Configurable-encounter opt-in (additive; absent/{} == "off" contact-only). session_payload marshals; title-screen Options configures.
 var player_name: String = DEFAULT_PLAYER_NAME
 var player_avatar: String = DEFAULT_PLAYER_AVATAR
@@ -83,6 +85,8 @@ func reset_for_new_game(new_world_seed: int, starter: Dictionary, spawn_tile: Ve
 	repel_steps = 0
 	landmark_state = {}
 	legendary_removals = []
+	legendary_kos = {}
+	active_area = ""
 	# player_name/player_avatar/shiny_odds_choice deliberately NOT reset: creation identity persists across new games (the encounter_settings precedent).
 	if not starter.is_empty():
 		party.append(starter)

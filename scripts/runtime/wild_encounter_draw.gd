@@ -20,24 +20,25 @@ var _rules = null
 var _trace = null
 var _rng = null
 var _night_system = null
-var _landmark_runtime = null
+var _scope_facade = null # dungeon_runtime (game_runtime wires it): the landmark scope consult outside a dungeon, the DungeonMaps scope inside
 var _biome_encounters = null
 
-func setup(session_state, catalog, pokemon_rules, trace_logger, rng, night_system, landmark_runtime, biome_encounters) -> void:
+func setup(session_state, catalog, pokemon_rules, trace_logger, rng, night_system, scope_facade, biome_encounters) -> void:
 	_session = session_state; _catalog = catalog; _rules = pokemon_rules; _trace = trace_logger
-	_rng = rng; _night_system = night_system; _landmark_runtime = landmark_runtime; _biome_encounters = biome_encounters
+	_rng = rng; _night_system = night_system; _scope_facade = scope_facade; _biome_encounters = biome_encounters
 
 
 # The wild draw: footprint-local token scope ("" outside -> byte-identical stream), the
-# species pick (landmark table OR the world biome pool with the night-ghost branch), the
+# species pick (landmark/dungeon table OR the world biome pool with the night-ghost branch), the
 # instance + the every-creation shiny_rolled (odds provable both directions).
 func draw(tile_pos: Vector2i, biome: String) -> Dictionary:
-	var scope: Dictionary = _landmark_runtime.encounter_scope_for(tile_pos, biome) # Phase 7: footprint-local token scope ("" outside -> byte-identical stream)
-	var species_id = _landmark_runtime.pick_species_for(scope, _biome_encounters, DayPhase.time_of_day_label(_session.time_of_day_minutes), _rng) if str(scope.get("token", "")) != "" else _pick_encounter_species(biome)
+	var scope: Dictionary = _scope_facade.encounter_scope_for(tile_pos, biome) # Phase 7: footprint-local token scope ("" outside -> byte-identical stream); the dungeon token inside
+	var species_id = _scope_facade.pick_species_for(scope, _biome_encounters, DayPhase.time_of_day_label(_session.time_of_day_minutes), _rng) if str(scope.get("token", "")) != "" else _pick_encounter_species(biome)
+	if str(scope.get("token", "")) != "" and str(species_id) == "": return {} # never fabricate CHIKORITA for a broken authored scope
 	var species_entry: Dictionary = EncounterSelection.species_entry_for(_catalog, species_id, str(scope.get("biome", biome)), _trace)
 	if species_entry.is_empty():
 		return {}
-	var level = _landmark_runtime.level_for_scope(scope, species_id, tile_pos, _rng)
+	var level = _scope_facade.level_for_scope(scope, species_id, tile_pos, _rng)
 	var wild_mon: Dictionary = _rules.create_pokemon_instance(species_entry, level, Callable(_catalog, "get_move"), _rng)
 	# shiny_rolled fires on EVERY creation (odds provable both directions; the shiny_odds scenario).
 	_trace.emit_event("shiny_rolled", "GameRuntime", {"species_id": str(wild_mon.get("species_id", "")), "is_shiny": bool(wild_mon.get("is_shiny", false)), "odds": PokemonRules.shiny_odds, "origin": "wild"})
@@ -56,4 +57,4 @@ func _pick_encounter_species(biome: String) -> String:
 static func trace_legendary(mon: Dictionary, trace) -> void:
 	if str(mon.get("battle_kind", "")) != "legendary":
 		return
-	trace.emit_event("legendary_encounter", "GameRuntime", {"species_id": str(mon.get("species_id", "")), "tile": mon.get("tile", [0, 0]), "biome": str(mon.get("biome", "")), "ring": int(mon.get("ring", 0)), "battle_kind": "legendary"})
+	trace.emit_event("legendary_encounter", "GameRuntime", {"species_id": str(mon.get("species_id", "")), "tile": mon.get("tile", [0, 0]), "biome": str(mon.get("biome", "")), "ring": int(mon.get("ring", 0)), "battle_kind": "legendary", "dungeon_id": str(mon.get("dungeon_id", ""))}) # additive dungeon_id: the chamber stamp's dungeon ("" for a scenario-stamped overworld pin)
