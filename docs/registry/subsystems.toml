@@ -1478,15 +1478,8 @@ code_paths = [
   "scripts/domain/legendary_placement.gd",
   "scripts/domain/content_scatter.gd",
   "scripts/domain/landmark_scatter.gd",
-  # legendary-dungeon slice: the domain half (layouts + maps) registers HERE until the
-  # validation layer's legendary_dungeons entry takes ownership (one owner per file).
   # content_scatter.gd's lair + dungeon-site predicate legs are RETIRED by this slice
   # (the warp-entered dungeons supersede both; the salts stay reserved).
-  "scripts/domain/dungeon_layouts.gd",
-  "scripts/domain/dungeon_maps.gd",
-  # legendary-dungeon runtime layer: temporary ownership until the validation layer
-  # transfers the complete domain/runtime/scenario surface to legendary_dungeons.
-  "scripts/runtime/dungeon_runtime.gd",
   "scripts/domain/save_migration.gd",
   "scripts/runtime/landmark_runtime.gd",
   "scripts/runtime/session_payload.gd",
@@ -1498,7 +1491,6 @@ code_paths = [
   "scripts/app/seed_choice_scenario.gd",
   "scripts/app/legendary_spawn_scenario.gd",
   "scripts/app/legendary_spawn_checks.gd",
-  "scripts/app/legendary_spawn_battle_checks.gd",
   "scripts/app/landmark_guardian_checks.gd",
   "scripts/app/world_depth_checks.gd",
   "scripts/app/visual_sweep_world_depth.gd", "scripts/app/visual_sweep_farfield.gd",
@@ -1574,7 +1566,7 @@ quality_bucket = "landmarks"
 # (baselines did NOT move). content_scatter (pin 2026080301) witnesses the origin core +
 # scatter discovery + per-instance state + the lair lifecycle; NOT a double-run consumer.
 # See docs/product-specs/infinite-world.md § Chunk-hash content scattering.
-# PHASE 7 BUILD 2 OF 3 (world-depth.md § Legendaries) — DOMAIN + RUNTIME LANES LANDED: the
+# HISTORICAL PHASE 7 BUILD 2 shape (superseded by the legendary-dungeon slice below): the
 # frozen seven's PURE placement module (scripts/domain/legendary_placement.gd —
 # LEGENDARY_IDS, flagged SNOW/LAVA affinity, pure _mix ring-≥60 anchors bounded to 300, the
 # "<cx>,<cy>:<SPECIES>" removal grammar + legendaries_for_world suppression) joins THIS
@@ -1625,7 +1617,8 @@ quality_bucket = "landmarks"
 # FOOTPRINT-LOCAL: tile logic carries encounter_token; generate_wild_encounter threads it
 # to filter_species_ids' landmark_token path (dormant PKMNMANSION / RUINS_OUTER /
 # RUINS_INNER tokens direct-match verbatim off the parsed catalog; RUINS_INNER_CURATED
-# {VOLCARONA, GOLURK 38-45} + the RUINS_UNDERGROUND DUSCLOPS flagged; level bands 18-26 /
+# {VOLCARONA 38-45} (sprite-less GOLURK culled by the shared viability rule) + the
+# RUINS_UNDERGROUND DUSCLOPS flagged; level bands 18-26 /
 # 22-30 / inner floor 30 invented); token "" outside footprints => pools byte-identical
 # to pre-Phase-7. Heart Tower ships footprint + entry + the dedicated field track
 # (Wilds_HeartTower.ogg on entry via the auxiliary landmark_music{trigger: entry} trace;
@@ -1647,11 +1640,13 @@ quality_bucket = "landmarks"
 # slice 1 RETIRED the world_chain consumer with world chaining, leaving TEN consumers
 # regrouped [5,5], outer [240,240]s, and the infinite-world scenarios (content_scatter,
 # seed_choice) deliberately stay OUT of the lane). The visual_sweep_world_depth satellite (seed 2026072907; shot range
-# [31,32] + extra [34], single-sourced in the visual_sweep_baselines.gd registry) baselines
+# [31,32] + extra [34, 44, 45], single-sourced in the visual_sweep_baselines.gd registry) baselines
 # 31_ruins_interior + 32_mansion (puzzle state CRAFTED through the frozen seam, never
 # played live) + the R11
 # 34_heart_tower (visual_sweep_world_depth_expand.gd; asserted on rendered wall/decor
-# props — the tower has NO encounter token); the R4 regional oracle (visual_sweep_world_depth_oracle.gd)
+# props — the tower has NO encounter token) + the legendary-dungeon pair 44_dungeon_entrance
+# + 45_dungeon_interior (visual_sweep_world_depth_dungeon.gd — OWNED by the legendary_dungeons
+# entry, one owner per file; the driver stays here); the R4 regional oracle (visual_sweep_world_depth_oracle.gd)
 # merges projected landmark/tower tiles into the sidecars — 31/32 carry
 # expected_regions.ink + canary_rect, while 34_heart_tower is ink-only (canary_rect
 # empty: the tower decor's alpha edge is not strict-canary-safe, so
@@ -1695,8 +1690,9 @@ quality_bucket = "landmarks"
 #     logic -> the existing map render; interior props per the spec's asset notes).
 #     Owned by world_runtime.
 #   scripts/app/visual_sweep_baselines.gd — the SHOT_REGISTRY world_depth entry (range
-#     [31, 32] + extra [34], seed 2026072907; the Phase-7-audit world_chain entry (range
-#     [35, 36]) RETIRED with world chaining — 33/35/36 on the retired whitelist).
+#     [31, 32] + extra [34, 44, 45], seed 2026072907; the Phase-7-audit world_chain entry
+#     (range [35, 36]) RETIRED with world chaining — 33/35/36 on the retired whitelist,
+#     joined by 43 (the farfield far-lair shot) in the legendary-dungeon slice).
 #     Owned by app_bootstrap/vision_fidelity (the NEW visual_sweep_registry_support.gd
 #     extraction — the R3 registry single-source + the R11 rest-probe/legendary-framing
 #     helpers the world-depth satellites share with every OTHER satellite — is listed
@@ -1805,6 +1801,89 @@ quality_bucket = "landmarks"
 # waystone_selector scenario (the multi-stone choice + the avatar-input
 # ownership pin) drives the rebuild unchanged. Presentation-only: no
 # landmark/legendary/warp/save surface is touched.
+
+[[subsystems]]
+name = "legendary_dungeons"
+status = "active"
+layer = "runtime"
+code_paths = [
+  "scripts/domain/dungeon_layouts.gd",
+  "scripts/domain/dungeon_maps.gd",
+  "scripts/runtime/dungeon_runtime.gd",
+  "scripts/app/legendary_dungeon_scenario.gd",
+  "scripts/app/legendary_dungeon_checks.gd",
+  "scripts/app/legendary_dungeon_journey_checks.gd",
+  "scripts/app/legendary_spawn_battle_checks.gd",
+  "scripts/app/visual_sweep_world_depth_dungeon.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/world-depth.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario legendary_dungeon",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_world_depth",
+]
+required_trace_events = ["dungeon_entered", "dungeon_exited", "dungeon_entry_refused", "tablet_claimed", "legendary_dungeon_passed", "legendary_dungeon_failed"]
+quality_bucket = "legendary_dungeons"
+# LEGENDARY-DUNGEON SLICE (2026-08-10, the world-depth.md § Legendaries dungeon LOOP):
+# the seven hand-authored dungeons (dungeon_layouts.gd const ASCII grids/themes/scopes/
+# entrance facades; dungeon_maps.gd the PURE parsed-cell API — landmarks-grammar cells,
+# the species<->dungeon mapping, the entrance-anchor derivation delegating to
+# LegendaryPlacement.legendaries_for_world with EMPTY removals so entrances stamp even
+# after a catch and anchors stay byte-identical to the legendary_spawn pins, the warp
+# tables, and the enforcing invariants validate_map/validate_all: exactly-one S/E/P
+# markers, flood-fill spawn->chamber + spawn->exit, no orphan walkable cells, the exit
+# south band, nonempty/catalog-present/battle-viable curated tables, and no legendary in a
+# curated scope — ridden by world_gen_dungeons.gd's
+# ENFORCING lane, owned by the world_gen_audit entry) + the runtime (dungeon_runtime.gd:
+# active_area, the tile-logic choke point, the step-hook warps, the Regigigas five-tablet
+# seal — READ-ONLY, never consumes — the chamber stamp through overworld_mons_runtime's
+# dungeon seam with removal/legendary_kos suppression + the REGI_RESTAND_STEPS re-stand
+# valve, the session-scoped whittle, the per-dungeon music arm, the field-action refusal
+# scope the field_moves/building_loop/harvest/camping runtimes wire to). The GATE scenario
+# legendary_dungeon (SEED 2026073001, self-pinned per the legendary_spawn precedent;
+# checks split into legendary_dungeon_checks.gd at the app-220 wall) proves: the seven
+# entrance stamps at the pinned anchors with pairwise-distinct warp tiles (pure
+# derivation AND the live resolver), the REAL-step warp round-trip (entrance -> spawn,
+# exit -> entrance; dungeon_entered/dungeon_exited with the pinned payloads), real avatar
+# contact plus ordinary-Z provocation through Main's battle bridge, invalid loaded dungeon
+# tiles normalizing to spawn, the chamber legendary standing dungeon-locally and NOT in the
+# overworld, the catch -> tablet_claimed
+# EXACTLY once -> removal persisted -> re-entry finds the chamber empty forever, the
+# tablet-Regi KO valve (NO tablet on KO, legendary_kos logs at the KO's total_steps,
+# suppression through the cooldown, a FRESH re-stand after a synthetic
+# REGI_RESTAND_STEPS advance), the seal ladder (0..4 tablets refuse with the shrinking
+# missing list, all five open, never consumed), overworld-sim suppression while chamber
+# contact/Z stays live, the in-dungeon field-action refusals (teleport/fly trace
+# field_move_refused{in_dungeon}, build traces structure_refused{in_dungeon}, harvest/dig
+# refuse message-only by design, camping refuses), and the active_area + legendary_kos
+# save round-trip plus invalid loaded-tile normalization through the production
+# `_apply_loaded_payload` path on the live runtime.
+# legendary_spawn_battle_checks.gd (the whiteout/KO chamber-battle
+# proofs driven by the landmarks-owned legendary_spawn scenario) is OWNED HERE — it
+# exercises ONLY dungeon-runtime behavior (one owner per file; the caller stays in
+# landmarks). The symmetric legendary_dungeon_passed/failed pair (miss-002) + the four
+# runtime events register above; the scenario rides PLAYTEST_SCENARIOS + the
+# SCENARIO_REQUIREMENTS row (dungeon_entered/exited/entry_refused/tablet_claimed pinned
+# in its all-list), NOT a double-run consumer (the battles ride the DIRECT seam with the
+# runtime's pinned streams; the KO lane's accuracy retry loops until the round FINISHES,
+# so the seed-locked stream decides identically every run). CO-MODIFICATIONS (files stay
+# OWNED BY their home subsystems): scripts/runtime/overworld_mons_runtime.gd (the
+# chamber-stamp seam, note_battle_outcome's tablet grant + legendary_kos valve), the
+# field_moves/building_loop/harvest runtimes (the in-dungeon refusals), scripts/runtime/
+# session_payload.gd + session_state.gd (the v6-additive active_area/legendary_kos
+# marshalling — session_runtime), scripts/app/main.gd (the mid-step re-home guard) +
+# qa_scenarios.gd (app_bootstrap), tools/run_playtests.py + tools/godot_dap_smoketest.py
+# (the registration rows). The retired lairs (overworld_mons_lairs.gd) and the farfield
+# shot-43 cleanup rode the content_scatter/vision_fidelity homes. VISUAL LANE: scripts/app/
+# visual_sweep_world_depth_dungeon.gd (OWNED HERE) appends the 44_dungeon_entrance facade
+# + 45_dungeon_interior chamber frames to the landmarks-owned world_depth sweep (SHOT_REGISTRY
+# extra [44, 45] under the family's 2026072907 seed; the dungeon is DISCOVERED — first
+# anchored unsealed species in the pinned roster order — the facade warp/mouth live-asserted
+# pre-capture, the interior entered through the runtime warp with the entity layer opted in
+# for the standing chamber legendary, regions on the oracle's DYNAMIC seam with the interior
+# ink-only at the 34_heart_tower tier).
 
 [[subsystems]]
 name = "world_gen_audit"

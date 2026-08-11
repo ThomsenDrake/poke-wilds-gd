@@ -84,6 +84,6 @@ FROZEN by the rebuild: the box loop (open/deposit/withdraw), the confirm-gated R
 
 `scripts/app/storage_flow_party_checks.gd` co-mods by EXTRACTION only (no behavior change): its verbatim `_guaranteed_capture_mon` copy (the overflow NO-ROUTING capture fixture) moves to the NEW shared `scripts/app/battle_scenario_fixtures.gd` (`BattleScenarioFixtures.guaranteed_capture_mon(runtime)`). The overflow group, the confirm-gated release, the empty-box Cut, the witness guard, and the party-screen MOVE reorder assertions are all unchanged; the extraction only buys the file headroom off its 220/220 wall.
 
-## Legendary-dungeon session co-modification (2026-08-11)
+## Legendary-dungeon slice (co-modification note)
 
-The shared session payload adds only the dungeon-context keys `active_area` and `legendary_kos`, both omitted at their defaults. Party, box, pasture, campsite-hold, and structure payloads are unchanged; a dungeon white-out still uses the existing campsite return and storage overflow behavior.
+Co-modified only through the shared save seam (`session_payload.gd`, co-owned with the `landmarks` subsystem): the additive `active_area` + `legendary_kos` keys marshal write-only-when-non-default (see docs/product-specs/menu-and-save.md's slice note for the contract). The box loop, the confirm-gated release, the overflow routing, and every storage refusal are untouched. A dungeon white-out still uses the existing campsite return and storage overflow behavior.
