@@ -44,7 +44,7 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 
 ## Validation Expectations
 
-- Run `python3 tools/verify_all.py` as the pre-push local gate (`--skip-windowed` on a display-less machine); it orchestrates the static gates, determinism, the full playtest suite, the windowed pixel lanes, legibility, and the refuse-on-mismatch/freshness checks in one run, and stays a LOCAL ritual (CI is lint/contract-only). See `docs/RELIABILITY.md` § Local gate.
+- Run `python3 tools/verify_all.py` as the pre-push local gate (`--skip-windowed` on a display-less machine); it orchestrates the static gates, determinism, the full playtest suite, the windowed pixel lanes, legibility, and the refuse-on-mismatch/freshness checks in one run. The full (windowed) run stays the local ritual; CI mirrors it two-tier — the `playtests-headless` workflow runs the same gate with `--skip-windowed` (windowed pixel lanes honestly SKIP there; baselines are renderer-stamped) and `repo-contracts` runs the Godot-free static/freshness/determinism gates plus a PR legibility check. See `docs/RELIABILITY.md` § Local gate.
 - Static checks must pass before asking for review.
 - Use the DAP smoke runner for runtime validation when the Godot editor is listening on `127.0.0.1:6006`.
 - The gated suite is 64 scenarios (51 playtest + 13 smoke); the canonical lists are `PLAYTEST_SCENARIOS`/`SMOKE_SCENARIOS` in `tools/run_playtests.py` — cite them instead of re-enumerating them here.
