@@ -1467,6 +1467,10 @@ code_paths = [
   "scripts/domain/legendary_placement.gd",
   "scripts/domain/content_scatter.gd",
   "scripts/domain/landmark_scatter.gd",
+  # legendary-dungeon slice: the domain half (layouts + maps) registers HERE until the
+  # validation layer's legendary_dungeons entry takes ownership (one owner per file).
+  "scripts/domain/dungeon_layouts.gd",
+  "scripts/domain/dungeon_maps.gd",
   "scripts/domain/save_migration.gd",
   "scripts/runtime/landmark_runtime.gd",
   "scripts/runtime/session_payload.gd",
