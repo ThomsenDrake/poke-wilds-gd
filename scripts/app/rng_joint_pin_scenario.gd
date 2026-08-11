@@ -39,6 +39,8 @@ func run(ctx: Dictionary) -> void:
 	_ensure(bool(first.get("water", false)), "no water tile within %d rings of the pinned spawn" % WATER_SCAN)
 	_ensure(bool(first.get("grass", false)), "no encounter tile within %d rings of the pinned spawn" % ENCOUNTER_SCAN)
 	_ensure(bool(first.get("dig", false)), "no dig tile within %d rings of the pinned spawn" % DIG_SCAN)
+	_ensure(int(first.get("hooks", 0)) > 0, "the pinned fishing sequence never hooked a Pokemon")
+	_ensure(int(first.get("digs", 0)) > 0, "the pinned harvest sequence never completed a dig")
 	var seq_a: Array = first.get("seq", [])
 	var seq_b: Array = second.get("seq", [])
 	_ensure(not seq_a.is_empty(), "the interleaving produced no draws")
@@ -69,11 +71,17 @@ func _run_once(runtime) -> Dictionary:
 	runtime.session.add_item("old_rod", 1)
 	_runner.swap_party(runtime, FieldMovesParty.FIELD_MOVES_PARTY, FieldMovesParty.PARTY_LEVEL)
 	var center: Vector2i = runtime.session.player_tile
+	# Direct new_game() updates the runtime generator but does not emit Main's reset
+	# signal. Rebuild the view explicitly so both in-process passes scan the new
+	# world's clean seed/override state instead of inheriting the previous pass.
+	_world().rebuild(runtime.get_world_seed())
+	_runner.teleport_player(_world(), _player(), runtime, center)
 	var water: Dictionary = _find_water(center)
 	var grass: Vector2i = _find_encounter_tile(center)
 	var dig: Dictionary = _runner.find_harvest_target(_world(), center, DIG_SCAN, "dig")
 	var seq: Array = []
 	var hooks := 0
+	var digs := 0
 	if not water.is_empty():
 		_runner.teleport_player(_world(), _player(), runtime, water["stand"])
 	for _cycle in range(CYCLES):
@@ -87,8 +95,10 @@ func _run_once(runtime) -> Dictionary:
 			seq.append(["enc", str(enc.get("species_id", "")), int(enc.get("level", 0))])
 		if not dig.is_empty():
 			var found: Dictionary = runtime.harvest_tile(dig["tile"])
-			seq.append(["dig", str(found.get("action", "")), str(found.get("item_id", ""))])
-	return {"seq": seq, "hooks": hooks, "water": not water.is_empty(), "grass": grass != Vector2i.ZERO, "dig": not dig.is_empty()}
+			if bool(found.get("ok", false)):
+				digs += 1
+			seq.append(["dig", str(found.get("move_id", "")), str(found.get("yield_item", ""))])
+	return {"seq": seq, "hooks": hooks, "digs": digs, "water": not water.is_empty(), "grass": grass != Vector2i.ZERO, "dig": not dig.is_empty()}
 
 
 # Nearest WATER-biome tile with a walkable stand (the fishing satellite's ring-scan shape).

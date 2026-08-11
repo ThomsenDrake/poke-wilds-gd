@@ -158,7 +158,9 @@ quality_bucket = "bootstrap"
 # save_migration_passed precedent) — rng_joint_pin pins ONE seed_for_smoke seed over a
 # FIXED interleaving of encounter draws + fishing casts (fishing shares game_runtime._rng)
 # + harvest dig steps (step-pure, NO shared _rng) and asserts the exact species/item
-# sequence byte-stable across two in-scenario runs; save_stability drives scripted
+# sequence byte-stable across two in-scenario runs. Each pass rebuilds WorldView after
+# its direct new_game() call, resyncs the player, rejects zero hooks/digs, and records
+# the live dig move_id/yield_item keys; save_stability drives scripted
 # v4-surface mutations (deposit/withdraw, craft, repel_steps, pastures, stone/rod bag) →
 # save → reload → save → byte-compare of the CANONICALIZED save JSON (key-sorted,
 # ts/version-stripped) and commits ONE golden v4 fixture at docs/generated/golden-saves/
