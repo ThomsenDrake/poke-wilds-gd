@@ -1105,6 +1105,9 @@ validation_commands = [
 # input_gate passed+failed pairing precedent). field_moves_flow + build_house_flow
 # are qa-dispatched; playtest_field_soak routes through smoke_scenarios' playtest_
 # branch (self-guarded by PlaytestBot.backup_save/restore_save) like journey/soak.
+# field_moves_flow pins BEFORE new_game, rebuilds the separate WorldView generator,
+# resyncs the avatar, and requires its Flash control tile's authored encounter token
+# to be empty; inherited suite saves therefore cannot bypass the night-ghost branch.
 # Phase 5 stone acquisition: the dig group (field_moves_dig_checks.gd, wired LAST into
 # field_moves_flow's plan — its step shifts sit downstream of every other check) proves the
 # harvest resolver's dig bonus pool end to end and is the WITNESS for dig_item_found (emitted
