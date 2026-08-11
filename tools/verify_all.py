@@ -305,7 +305,8 @@ class Runner:
             f"run_playtests:windowed:{scenario}", "windowed",
             [sys.executable, "tools/run_playtests.py", "--scenario", scenario,
              "--report", str(report.relative_to(ROOT)),
-             "--timeout", str(args.windowed_timeout), "--godot-bin", bin_],
+             "--timeout", str(args.windowed_timeout), "--godot-bin", bin_,
+             "--host", args.dap_host, "--port", str(args.dap_port)],
             pop_force_headless=True, env_override=env_override,
             outer_timeout=args.windowed_timeout + 120, retry_once=True,
             exit_map={0: "pass", 1: "fail", 2: "tool_error"},
@@ -534,7 +535,7 @@ class Runner:
                             ],
                             pop_force_headless=True,
                             outer_timeout=300.0, retry_once=False,
-                            exit_map={0: "pass", 1: "fail", 2: "error"})
+                            exit_map={0: "pass", 1: "fail", 2: "tool_error"})
 
         # --- S10: legibility report (generate-only, findings already gated) ---
         if not self.fail_fast_stop:
@@ -755,10 +756,10 @@ class Runner:
                     self.refuse("ui_render_audit_transport", False,
                                 f"ui_render_audit ran headless (transport={transport}) — its "
                                 f"graduated red-tier pixel half was not exercised; start the "
-                                f"Godot editor with DAP on 127.0.0.1:6006, or pass "
+                                f"Godot editor with DAP on {args.dap_host}:{args.dap_port}, or pass "
                                 f"--skip-windowed to acknowledge the lane is skipped",
                                 error=_smoketest.dap_unreachable_error(
-                                    "127.0.0.1", 6006,
+                                    args.dap_host, args.dap_port,
                                     "pass --skip-windowed to acknowledge the lane is skipped."))
                 else:
                     self.refuse("ui_render_audit_transport", True,
@@ -980,6 +981,10 @@ def main() -> int:
     parser.add_argument("--windowed-timeout", type=float, default=600,
                         help="per-scenario budget (s) for the windowed lanes (default 600, "
                              "matching the documented 600000 ms windowed bound)")
+    parser.add_argument("--dap-host", default="127.0.0.1",
+                        help="DAP host for editor-driven windowed lanes (default 127.0.0.1)")
+    parser.add_argument("--dap-port", type=int, default=6006,
+                        help="DAP port for editor-driven windowed lanes (default 6006)")
     parser.add_argument("--json", default=str((SMOKE_DIR / "verify_all.json").relative_to(ROOT)),
                         help="machine-readable result path (default "
                              ".godot-smoke/verify_all.json, gitignored)")

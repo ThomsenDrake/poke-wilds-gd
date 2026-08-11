@@ -285,7 +285,7 @@
           "scripts/app/nav_audit_battle.gd": "b3468cadbaaf368cf7f9e34fc5861b6ec03006a417118ed23b8217604a26f291",
           "tools/run_playtests.py": "de442e061dae4f78ad89efad3ab2c2821ef62d54ed54ecdd78c8cf0552f44e0c",
           "tools/godot_dap_smoketest.py": "3050e3809bd184bd63726aafc9bfc8a70c1ae1ac6989003c217fc778d418b90d",
-          "tools/verify_all.py": "82e874576522faefb7cd9427dbf2e78a24e1be77d63c309c7968f8b03d594c70"
+          "tools/verify_all.py": "9b7d08c4ba3fc93b897d6a380a4b674b74e807dce1286fbeed6fa95101dd4642"
         },
         "re_stamp_log": [
           {
@@ -833,6 +833,13 @@
             "old_pin": "d56928a2b072",
             "new_pin": "3050e3809bd1",
             "reason": "legitimate edit (legendary-dungeon validation slice): registered the NEW legendary_dungeon scenario in PLAYTEST_SCENARIOS / SCENARIO_REQUIREMENTS (its all-list pins the four registry-REQUIRED dungeon events) + two comment-only REGION_ORACLE accuracy edits naming the world-depth family's 44/45 dungeon shots, on top of the lair-retirement slice's farfield-comment correction. Mechanisms re-verified intact: ERROR_MARKERS still single-sourced from the sibling harness, failed_event_entry still collects the structured reasons, finalize's ok contract unchanged; the mechanism FIRED live on the scenario's pre-fix RED runs (named reasons on both channels). Old pin: d56928a2b072..."
+          },
+          {
+            "date": "2026-08-11",
+            "file": "tools/verify_all.py",
+            "old_pin": "82e874576522",
+            "new_pin": "9b7d08c4ba3f",
+            "reason": "legitimate endpoint-routing edit (parallel-checkout safety): verify_all accepts --dap-host/--dap-port; editor-driven windowed run_playtests lanes consume that endpoint, and the R5 failure directive reports the selected endpoint, so an open DAP socket from another checkout cannot hijack or misdirect the gate. Defaults remain 127.0.0.1:6006; the headless/double-run lanes and standalone pixel/VLM execution paths are unchanged. The same bounded orchestrator touch also retires the tracked S8.5 exit-2 debt by mapping commandcode_play_agent's tool-error contract to the valid tool_error status. Refusal precedence, exit codes, and miss-002 reason-carrying failure mechanisms remain unchanged."
           }
         ]
       },

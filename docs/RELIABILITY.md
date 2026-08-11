@@ -13,7 +13,8 @@ Legendary-dungeon validation layer (2026-08-11): after changing `dungeon_runtime
 
 ```bash
 python3 tools/verify_all.py [--skip-windowed] [--timeout N] [--windowed-timeout N] \
-  [--json PATH] [--godot-bin PATH] [--base REF] [--fail-fast] [--quiet]
+  [--dap-host HOST] [--dap-port PORT] [--json PATH] [--godot-bin PATH] \
+  [--base REF] [--fail-fast] [--quiet]
 ```
 
 | Flag | Meaning |
@@ -21,6 +22,7 @@ python3 tools/verify_all.py [--skip-windowed] [--timeout N] [--windowed-timeout 
 | `--skip-windowed` | Display-less environments. Skips the windowed pixel lanes (S8/S9), suppresses refusals R3/R4/R5, and degrades R6 to a WARN (R6 always runs — it is never suppressed); those lanes are reported SKIP (reason "windowed lane skipped (--skip-windowed)"), NEVER PASS, and the result records `skip_windowed=true`. R1/R2 still apply to the headless report. This is the honest headless path — see below. |
 | `--timeout N` | Per-scenario wall-clock budget passed to `run_playtests --timeout` for the headless suite (default 120). |
 | `--windowed-timeout N` | Per-scenario budget for the two windowed lanes (default 600, matching the documented 600000 ms windowed bound). |
+| `--dap-host HOST` / `--dap-port PORT` | Editor endpoint for DAP-driven windowed lanes (defaults `127.0.0.1:6006`). Use an alternate port when another checkout's editor already owns 6006; the standalone pixel/VLM subprocess lanes remain unchanged. |
 | `--json PATH` | Machine-readable result; default `.godot-smoke/verify_all.json` (gitignored). |
 | `--godot-bin PATH` | Passthrough to `run_playtests --godot-bin` (default `GODOT_BIN` env else `/Applications/Godot.app/Contents/MacOS/Godot`). |
 | `--base REF` | Optional passthrough to `check_change_contract.py --base` (default none ⇒ diffs working tree + untracked vs HEAD). |
