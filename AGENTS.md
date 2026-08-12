@@ -23,6 +23,7 @@ Use this file as the table of contents, not the encyclopedia.
 ## Canonical Commands
 
 ```bash
+python3 tools/setup_worktree.py               # bootstrap an existing worktree; add --seed-from /path/to/warm/worktree to clone missing caches
 python3 tools/verify_all.py                  # THE pre-push local gate: static + determinism + full suite + windowed pixel lanes + legibility + refuse-on-mismatch/freshness (details: docs/RELIABILITY.md § Local gate)
 python3 tools/verify_all.py --skip-windowed  # display-less environments: windowed lanes reported SKIP, never PASS (honest headless path)
 python3 tools/check_repo_contracts.py

@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-10
+Last verified: 2026-08-12
 Review cadence days: 14
-Source paths: tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -28,11 +28,14 @@ goes missing reds the static gate).
 
 Attach at the protocol level only:
 
-1. Read the manifest for the endpoints and commands (DAP `6006`, LSP `6005`,
+1. In a fresh worktree, run `python3 tools/setup_worktree.py` (manifest
+   `[preflight]`) before testing; optionally seed missing independent caches
+   with `--seed-from /absolute/path/to/a/warm/worktree`.
+2. Read the manifest for the endpoints and commands (DAP `6006`, LSP `6005`,
    the scenario CLI, the trace path, the preflight gate).
-2. Drive the scenario CLI ([tools/run_playtests.py](../../tools/run_playtests.py))
+3. Drive the scenario CLI ([tools/run_playtests.py](../../tools/run_playtests.py))
    or the DAP smoke runner directly — both are plain stdlib Python.
-3. An MCP server that wraps these protocols is a **per-developer** install: the
+4. An MCP server that wraps these protocols is a **per-developer** install: the
    repo vendors no server and commits no client configuration. Client config
    files (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`,
    `.claude/settings.local.json`) are gitignored.

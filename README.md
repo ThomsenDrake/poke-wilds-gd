@@ -34,6 +34,7 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 ## Canonical Commands
 
 ```bash
+python3 tools/setup_worktree.py         # bootstrap an existing worktree (runtime checks + ignored caches + Godot import)
 python3 tools/verify_all.py            # the one-command local gate (static gates + determinism + headless suite + windowed lanes + legibility)
 python3 tools/check_repo_contracts.py
 python3 tools/check_architecture.py

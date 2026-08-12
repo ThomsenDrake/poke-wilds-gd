@@ -1,9 +1,22 @@
 Status: current
 Last verified: 2026-08-12
 Review cadence days: 14
-Source paths: tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/godot_dap_smoketest.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/godot_dap_smoketest.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
+
+## Worktree setup
+
+Run `python3 tools/setup_worktree.py` once from each new worktree before its first test. The stdlib-only bootstrap verifies Python 3.12+ and the pinned Godot 4.6.1 binary, repairs and stamps the ignored cache against the committed PokeAPI pin when it is missing or unverified, and runs the same explicit headless resource import as CI. It never creates or switches a worktree, refreshes the upstream PokeAPI pin, replaces a non-empty cache from another worktree, reverts a tracked file, or runs the full gate.
+
+```bash
+python3 tools/setup_worktree.py
+python3 tools/setup_worktree.py --seed-from /absolute/path/to/a/warm/worktree
+python3 tools/setup_worktree.py --check        # add the four canonical static checks
+python3 tools/setup_worktree.py --dry-run      # inspect mutating commands without running them
+```
+
+`--seed-from` accepts only another worktree of this Git repository. It clones only missing `.godot/` and `tools/.cache/` trees; on macOS the copy uses APFS copy-on-write, and the target remains independently writable. The PokeAPI cache is copied only when both worktrees carry byte-identical committed pin files. Setup serializes cache/import work across sibling worktrees to avoid duplicate cold imports competing for disk, then compares tracked working-tree bytes before and after. If Godot changes a tracked file, setup reports the exact paths and exits nonzero without reverting anything. Use `--skip-cache` or `--skip-import` only when deliberately preparing a partial environment; `--import-timeout` defaults to the CI backstop of 3000 seconds.
 
 ## Local gate (verify_all)
 
