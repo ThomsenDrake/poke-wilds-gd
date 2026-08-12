@@ -97,7 +97,10 @@ quality_bucket = "bootstrap"
 # save_migration_scenario precedent) — the gate drives the REAL TitleScreen/CreationScreen
 # through the player-boot seam (begin_boot -> MessageBox save-wipe confirm -> creation
 # steps SEED/SHINY/NAME/AVATAR/GO) with PIN 2026080601 + the probed beach-spawn WORLD_SEED
-# 2026080602, ending on the exact creation_confirmed payload + world/persistence witnesses.
+# 2026080001 (the first bounded ascending dual-contract fixture: beach spawn + all seven
+# dungeon entrances), ending on the exact creation_confirmed payload + world/persistence
+# witnesses. `new_game_flow_scenario.gd` remains app_bootstrap-owned; its dungeon journey
+# helper is separately owned by legendary_dungeons below.
 # Self-pinned (seed_for_smoke BEFORE creation), NOT a double-run consumer (the seed_choice
 # precedent); the new_game_flow_passed/failed pair rides the requirements row +
 # PLAYTEST_SCENARIOS only (NOT SMOKE_SCENARIOS — --include-smoke concatenates the two lists
@@ -1822,6 +1825,7 @@ code_paths = [
   "scripts/app/legendary_dungeon_scenario.gd",
   "scripts/app/legendary_dungeon_checks.gd",
   "scripts/app/legendary_dungeon_journey_checks.gd",
+  "scripts/app/new_game_dungeon_journey_checks.gd",
   "scripts/app/legendary_spawn_battle_checks.gd",
   "scripts/app/visual_sweep_world_depth_dungeon.gd",
 ]
@@ -1878,6 +1882,12 @@ quality_bucket = "legendary_dungeons"
 # in its all-list), NOT a double-run consumer (the battles ride the DIRECT seam with the
 # runtime's pinned streams; the KO lane's accuracy retry loops until the round FINISHES,
 # so the seed-locked stream decides identically every run). CO-MODIFICATIONS (files stay
+# OWNED BY their home subsystems): new_game_flow_scenario.gd remains app_bootstrap-owned;
+# new_game_dungeon_journey_checks.gd is owned HERE and extends that real title/creation
+# journey only as a verification consumer. Its dual-contract fixture seed 2026080001
+# proves the complete generated roster through Main-routed avatar entry/exit steps, with
+# the Regigigas empty-bag refusal and temporary-tablet restoration; it does not alter the
+# production dungeon/domain/runtime mapping. Other co-modifications (files stay
 # OWNED BY their home subsystems): scripts/runtime/overworld_mons_runtime.gd (the
 # chamber-stamp seam, note_battle_outcome's tablet grant + legendary_kos valve), the
 # field_moves/building_loop/harvest runtimes (the in-dungeon refusals), scripts/runtime/

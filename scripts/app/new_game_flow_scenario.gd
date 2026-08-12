@@ -26,9 +26,10 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const NewGameFlowChecks := preload("res://scripts/app/new_game_flow_checks.gd")
+const NewGameDungeonJourneyChecks := preload("res://scripts/app/new_game_dungeon_journey_checks.gd")
 
 const PIN := 2026080601 # seed_for_smoke pin: the starter shiny draw rides this stream
-const WORLD_SEED := 2026080602 # probed beach spawn: find_walkable_spawn lands SAND + walkable + a cardinal surf neighbor (temp probe, design §7)
+const WORLD_SEED := 2026080001 # dual-contract pin: beach spawn + all seven DungeonMaps entrances
 const NAME := "ASH" # non-default on purpose: proves the name grid + persistence
 const AVATAR := "kris" # non-default on purpose (sorted AVATARS index 11): proves the swap end-to-end
 const ODDS := 64 # non-default: proves the shiny ladder + the load-path odds re-apply
@@ -54,6 +55,10 @@ func run(ctx: Dictionary) -> void:
 				var checks := NewGameFlowChecks.new() # parts 4-6 (the app budget split)
 				add_child(checks)
 				await checks.run(_ctx, _runner, _failures, _oks)
+				if _failures.is_empty():
+					var dungeon_checks := NewGameDungeonJourneyChecks.new()
+					add_child(dungeon_checks)
+					await dungeon_checks.run(_ctx, _runner, _failures, _oks)
 	if _failures.is_empty():
 		var payload: Dictionary = _oks.duplicate()
 		payload["pin"] = PIN; payload["seed"] = PIN; payload["world_seed"] = WORLD_SEED

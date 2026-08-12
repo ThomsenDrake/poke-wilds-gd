@@ -22,7 +22,7 @@ const Geo := preload("res://scripts/app/new_game_flow_geo.gd")
 const CreationRender := preload("res://scripts/ui/creation_screen_render.gd") # the step-label seams live here (creation_screen.gd's 220-wall extraction)
 
 # The scenario's pins, mirrored here (single pin set per file, the menu_checks precedent).
-const WORLD_SEED := 2026080602 # probed beach spawn (the scenario's WORLD_SEED)
+const WORLD_SEED := 2026080001 # dual-contract beach + seven-dungeon-roster pin (the scenario's WORLD_SEED)
 const NAME := "ASH"
 const AVATAR := "kris" # sorted AVATARS index 11
 const ODDS := 64
