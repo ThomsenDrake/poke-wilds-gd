@@ -1543,7 +1543,7 @@ validation_commands = [
 # pair registered here in the scenario lane (Build 2). INFINITE-WORLD: the world_chain +
 # beacon_selector scenario pairs RETIRED with world chaining (slice 1); their SUCCESSORS
 # registered here — waystone_selector (the multi-stone teleport choice + the avatar-input
-# ownership pin), content_scatter (slice 3: origin-core preservation + per-instance state
+# ownership pin + the C-under-selector build-toggle pin), content_scatter (slice 3: origin-core preservation + per-instance state
 # + the lair lifecycle), and seed_choice (slice 4: custom-seed determinism + beach spawn
 # + the random-path pin).
 required_trace_events = ["landmark_entered", "puzzle_state_changed", "legendary_encounter", "landmark_flow_passed", "landmark_flow_failed", "legendary_spawn_passed", "legendary_spawn_failed", "waystone_selector_passed", "waystone_selector_failed", "content_scatter_passed", "content_scatter_failed", "seed_choice_passed", "seed_choice_failed", "visual_sweep_world_depth_passed", "showcase_capture_passed", "showcase_capture_failed"]
@@ -1814,7 +1814,7 @@ quality_bucket = "landmarks"
 # the opener-supplied rows + resolve Callable (the ui-may-not-import-domain
 # layer contract), the self-wired input latch, and every trace — the
 # waystone_selector scenario (the multi-stone choice + the avatar-input
-# ownership pin) drives the rebuild unchanged. Presentation-only: no
+# ownership pin + the C-under-selector build-toggle pin) drives the rebuild unchanged. Presentation-only: no
 # landmark/legendary/warp/save surface is touched.
 
 [[subsystems]]

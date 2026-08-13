@@ -13,7 +13,9 @@ extends Node
 # FALSE (the field-move route emits BEFORE start_menu hides the menu, so the selector's
 # disable lands first and main._on_menu_closed's re-enable — which re-checks the selector's
 # visibility — must not clobber it; an unconditional re-enable regresses to
-# walking-under-the-modal and reds HERE).
+# walking-under-the-modal and reds HERE). C must not open build mode under the modal
+# (the selector does not consume build_toggle; an unguarded overworld-free poll would
+# arm StructureLayer so the next Z both warps and places).
 # Then a REAL input pick of the SECOND-registered stone (index 1) must warp the avatar to
 # THAT tile, and a cancel must change nothing. Self-pinned seed_for_smoke BEFORE new_game
 # (house convention); encounter_chance 0 (no wild stream). Input rides the selector's
@@ -96,6 +98,7 @@ func _register_two_stones(runtime) -> bool:
 # rides the same drive: while the modal selector is open the avatar must stay input-DISABLED
 # (the selector's disable lands during the emit, BEFORE start_menu hides the menu; main's
 # menu-close re-enable re-checks the selector's visibility rather than clobbering it).
+# C must not arm the build overlay (the selector does not consume build_toggle).
 # Then a REAL pick of index 1 warps to stones[1], not index 0.
 func _pick_second_stone(runtime) -> bool:
 	var start: int = _failures.size()
@@ -107,6 +110,10 @@ func _pick_second_stone(runtime) -> bool:
 		return false
 	_ensure(not _start_menu().visible, "pick: the start menu stayed open under the selector (the field move must close the menu)")
 	_ensure(not bool(_player().input_enabled), "pick: the avatar is INPUT-ENABLED under the open selector (the menu-close re-enable clobbered the selector's ownership — main._on_menu_closed must re-check the selector's visibility)")
+	var build_cursor: int = _runner.trace_log_line_count()
+	await _tap("build_toggle")
+	_ensure(not _structure_layer().is_active(), "pick: C opened build mode under the way-stone selector")
+	_ensure(not _runner.trace_log_has_since("build_mode_entered", build_cursor), "pick: C emitted build_mode_entered under the way-stone selector")
 	var rows: Array = selector.get("_rows")
 	_ensure(rows.size() == 2 and rows[0].get("tile") == _stones[0] and rows[1].get("tile") == _stones[1], "pick: the selector rows %s != registration order %s" % [str(rows), str(_stones)])
 	await _tap("move_down") # row 0 -> row 1 (the second-registered stone)
@@ -193,3 +200,4 @@ func _world() -> Node: return _ctx["world"]
 func _player() -> Node: return _ctx["player"]
 func _runtime() -> Node: return _ctx["runtime"]
 func _start_menu() -> Node: return _ctx["start_menu"]
+func _structure_layer() -> Node: return _ctx["structure_layer"]

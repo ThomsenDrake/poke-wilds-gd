@@ -60,7 +60,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var free: bool = not _in_battle and not _menu_open and not _player.is_moving() and not $UI/StorageScreen.visible and not $UI/TitleScreen.visible and not $UI/CreationScreen.visible
+	var free: bool = not _in_battle and not _menu_open and not _player.is_moving() and not $UI/StorageScreen.visible and not $UI/TitleScreen.visible and not $UI/CreationScreen.visible and not $UI/WayStoneSelector.visible
 	_input_router.poll_menu_toggle(); _input_router.poll_build_toggle(free); _input_router.poll_context_action(free and not _structure_layer.is_active())
 
 
