@@ -114,7 +114,10 @@ func note_press_consumed() -> void:
 
 
 # Called from Main._process. Snapshots the latch, resets it, then dispatches
-# menu / build / context. An ate frame returns before any arm fires.
+# menu / build / context. An ate frame returns before any arm fires. Build
+# runs before context so a same-frame C+Z cannot harvest while opening the
+# overlay: Main's context_ok snapshot is stale once the toggle flips
+# is_active (the pre-collapse poll_build_toggle then re-read order).
 func poll(overworld_free: bool, context_ok: bool) -> void:
 	var ate := _ui_ate_press
 	_ui_ate_press = false
@@ -124,6 +127,7 @@ func poll(overworld_free: bool, context_ok: bool) -> void:
 		_on_menu_toggle.call()
 	if overworld_free and _on_build_toggle.is_valid() and Input.is_action_just_pressed("build_toggle"):
 		_on_build_toggle.call()
+		context_ok = false
 	if context_ok and _on_context_action.is_valid() and Input.is_action_just_pressed("action_a"):
 		_on_context_action.call()
 

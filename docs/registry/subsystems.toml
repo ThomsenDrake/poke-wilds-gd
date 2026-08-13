@@ -742,9 +742,10 @@ code_paths = [
   # swallowed press (f98a7cab's scenario, registered late — the Phase-0 fix;
   # harness registration completed 2026-08-10 by the agent-surface completion
   # sprint: SCENARIO_REQUIREMENTS + PLAYTEST_SCENARIOS + the required_trace_events
-  # pair below, so the suite can actually select it). D/E/F (build_toggle_checks.gd)
+  # pair below, so the suite can actually select it). D/E/F/G (build_toggle_checks.gd)
   # pin the C-toggle build path: Z on a diggable+placeable tile Digs and never
-  # opens build; C opens the overlay without placing; overlay Z places a wall.
+  # opens build; C opens the overlay without placing; overlay Z places a wall;
+  # same-frame C+Z opens the overlay and does not Dig.
   "scripts/app/dig_silence_scenario.gd",
   "scripts/app/build_toggle_checks.gd",
 ]

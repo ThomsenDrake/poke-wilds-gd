@@ -13,9 +13,10 @@ extends Node
 #       swallowed press;
 #   (C) dig-capable party (geodude), Z on a fresh dig tile: the success toast
 #       speaks — the silence never over-suppresses a real harvest.
-# D/E/F live in build_toggle_checks.gd (the 220-wall extraction): Z on a
+# D/E/F/G live in build_toggle_checks.gd (the 220-wall extraction): Z on a
 # diggable+placeable tile with MACHOP+GEODUDE Digs and never opens build; C
-# opens the overlay without placing; overlay Z places a wall.
+# opens the overlay without placing; overlay Z places a wall; C+Z same frame
+# opens the overlay and does not Dig.
 # Seeded fresh game (harvest_flow idiom) so dig/cut targets sit near spawn.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
