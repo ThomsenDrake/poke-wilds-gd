@@ -91,6 +91,9 @@ func _tap(action: String) -> void:
 func _tile_is_placeable(tile: Vector2i) -> bool:
 	var logic: Dictionary = _world().get_tile_logic(tile)
 	return bool(logic.get("walkable", false)) and str(logic.get("prop_path", "")) == "" and str(logic.get("structure_id", "")) == "" and str(logic.get("landmark_id", "")) == ""
+
+
+func _expect(ok: bool, label: String) -> bool:
 	if not ok:
 		_failures.append(label)
 	return ok
