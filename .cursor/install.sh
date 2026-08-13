@@ -36,10 +36,21 @@ fi
 
 # 2. Make GODOT_BIN the default for the tools (verify_all / setup_worktree read
 #    GODOT_BIN before falling back to the macOS app path). Persist it for the
-#    agent's interactive shells too, idempotently.
+#    agent's interactive shells too, idempotently and self-healingly: match the
+#    EXACT intended export line (not any "GODOT_BIN=" substring, which a comment,
+#    an OLD_GODOT_BIN=, or an export pointing elsewhere would satisfy). When the
+#    exact line is absent, drop any stale export GODOT_BIN= lines we manage, then
+#    append the authoritative value so a later shell never resolves a wrong path.
 export GODOT_BIN
-if ! grep -qs 'GODOT_BIN=' "${HOME}/.bashrc"; then
-  echo "export GODOT_BIN=\"${GODOT_BIN}\"" >> "${HOME}/.bashrc"
+BASHRC="${HOME}/.bashrc"
+GODOT_BIN_EXPORT="export GODOT_BIN=\"${GODOT_BIN}\""
+touch "${BASHRC}"
+if ! grep -qxF "${GODOT_BIN_EXPORT}" "${BASHRC}"; then
+  if grep -qE '^[[:space:]]*export[[:space:]]+GODOT_BIN=' "${BASHRC}"; then
+    grep -vE '^[[:space:]]*export[[:space:]]+GODOT_BIN=' "${BASHRC}" > "${BASHRC}.tmp"
+    mv "${BASHRC}.tmp" "${BASHRC}"
+  fi
+  echo "${GODOT_BIN_EXPORT}" >> "${BASHRC}"
 fi
 
 # 3. Repo-native bootstrap: version checks, pinned PokeAPI cache fetch, and the
