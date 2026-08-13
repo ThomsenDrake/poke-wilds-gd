@@ -13,11 +13,15 @@ extends Node
 #       swallowed press;
 #   (C) dig-capable party (geodude), Z on a fresh dig tile: the success toast
 #       speaks — the silence never over-suppresses a real harvest.
+# D/E/F live in dig_silence_checks.gd (the 220-wall extraction): Z on a
+# diggable+placeable tile with MACHOP+GEODUDE Digs and never opens build; C
+# opens the overlay without placing; overlay Z places a wall.
 # Seeded fresh game (harvest_flow idiom) so dig/cut targets sit near spawn.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
+const DigSilenceChecks := preload("res://scripts/app/dig_silence_checks.gd")
 
 const SEED := 2026080901
 const SCAN_RADIUS := 40
@@ -47,6 +51,10 @@ func run(ctx: Dictionary) -> void:
 		await _part_b_cut_press_still_speaks()
 	if _failures.is_empty():
 		await _part_c_capable_dig_still_speaks()
+	if _failures.is_empty():
+		var checks := DigSilenceChecks.new()
+		add_child(checks)
+		await checks.run(_ctx, _runner, _failures)
 	_runner.restore_party(runtime, party_before)
 	_player().encounter_chance = saved_chance
 	_runner.resync_player_tile(_world(), _player(), runtime)

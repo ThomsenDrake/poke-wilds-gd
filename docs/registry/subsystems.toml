@@ -742,8 +742,11 @@ code_paths = [
   # swallowed press (f98a7cab's scenario, registered late — the Phase-0 fix;
   # harness registration completed 2026-08-10 by the agent-surface completion
   # sprint: SCENARIO_REQUIREMENTS + PLAYTEST_SCENARIOS + the required_trace_events
-  # pair below, so the suite can actually select it).
+  # pair below, so the suite can actually select it). D/E/F (dig_silence_checks.gd)
+  # pin the C-toggle build path: Z on a diggable+placeable tile Digs and never
+  # opens build; C opens the overlay without placing; overlay Z places a wall.
   "scripts/app/dig_silence_scenario.gd",
+  "scripts/app/dig_silence_checks.gd",
 ]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/building-and-placement.md"
@@ -1442,7 +1445,7 @@ quality_bucket = "overworld_mons"
 #     note_battle_finished (game_runtime:276 keeps the 1-line caller); take_pending_encounter /
 #     consume_fishing_battle untouched. Owned by fishing.
 #   scripts/app/field_action_router.gd:58,136 — the entity-FIRST context-Z precedence line
-#     (entities -> camp objects -> fishing -> harvest -> build) + the fence pen_action
+#     (entities -> camp objects -> fishing -> harvest; Build is C, not a Z fallthrough) + the fence pen_action
 #     delegation (moved VERBATIM into overworld_entity_actions.pen_action). Owned by
 #     building_loop.
 #   scripts/app/field_move_actions.gd:63-78,88 — the REAL Attack/Charm targets resolved via
@@ -1690,7 +1693,7 @@ quality_bucket = "landmarks"
 #     paid by extraction). Owned by session_runtime.
 #   scripts/app/field_action_router.gd — the puzzle/statue/key interact arms EXTRACTED to
 #     scripts/app/landmark_actions.gd (precedence: entities -> landmarks -> camp objects
-#     -> fish -> harvest -> build). Owned by building_loop.
+#     -> fish -> harvest; Build is C, not a Z fallthrough). Owned by building_loop.
 #   scripts/runtime/overworld_mons_runtime.gd — the Ruins Underground DUSCLOPS rides the
 #     Phase-6 stationary-entity mechanism (documented reach into _entities/_removed/
 #     _sim.new_mon — the guardian precedent, no public spawn API; KO/catch permanent via

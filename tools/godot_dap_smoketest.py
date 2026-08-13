@@ -263,13 +263,13 @@ SCENARIO_REQUIREMENTS = {
                 "field_move_used", "battle_end_input_passed"],
         "any": [["session_loaded", "session_created"]],
     },
-    # Dig-silence QoL guard (the Phase-0 orphan, harness-registered by the
-    # agent-surface completion sprint): Z on diggable ground with no Dig-capable
-    # party member stays silent; the cut + capable-dig presses stay loud as the
-    # delivery witnesses. The symmetric dig_silence_failed marker rides
-    # failed_event_entry (miss-002 loudness).
+    # Dig-silence QoL guard + C-toggle build entry: A/B/C keep the silence
+    # witnesses; D/E/F prove Z never opens build on a diggable tile, C opens
+    # the overlay without placing, and overlay Z places. Pin build_mode_entered
+    # so a C-path skip cannot hide behind dig_silence_passed. The symmetric
+    # dig_silence_failed marker rides failed_event_entry (miss-002 loudness).
     "dig_silence": {
-        "all": ["dig_silence_passed"],
+        "all": ["dig_silence_passed", "build_mode_entered"],
         "any": [["session_loaded", "session_created"]],
     },
     # Phase 2 camping / crafting / night-survival proofs (camping-crafting-survival.md).
