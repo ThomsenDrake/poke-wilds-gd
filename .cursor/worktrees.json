@@ -1,5 +1,5 @@
 {
   "setup-worktree-unix": [
-    "python3 tools/setup_worktree.py --seed-from \"$ROOT_WORKTREE_PATH\""
+    "python3 tools/setup_worktree.py --quick"
   ]
 }

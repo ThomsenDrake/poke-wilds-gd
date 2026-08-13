@@ -3,11 +3,48 @@ from __future__ import annotations
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import setup_worktree
 
 
 class SetupWorktreeTests(unittest.TestCase):
+    def test_quick_mode_skips_heavy_work(self) -> None:
+        args = setup_worktree._parse_args(["--quick"])
+        self.assertTrue(args.quick)
+        self.assertTrue(args.skip_cache)
+        self.assertTrue(args.skip_import)
+        self.assertIsNone(args.seed_from)
+
+    def test_quick_mode_refuses_cache_seed(self) -> None:
+        with mock.patch("sys.stderr"):
+            with self.assertRaises(SystemExit):
+                setup_worktree._parse_args(["--quick", "--seed-from", "/tmp/warm"])
+
+    def test_quick_mode_never_enters_shared_lock_or_heavy_operations(self) -> None:
+        with (
+            mock.patch.object(setup_worktree, "_worktree_root", return_value=setup_worktree.ROOT),
+            mock.patch.object(setup_worktree, "_tracked_state", return_value={}),
+            mock.patch.object(setup_worktree, "_check_versions", return_value="/godot"),
+            mock.patch.object(setup_worktree, "_refuse_shared_cache_links"),
+            mock.patch.object(setup_worktree, "_setup_lock") as setup_lock,
+            mock.patch.object(setup_worktree, "_prepare_pokeapi_cache") as prepare_cache,
+            mock.patch.object(setup_worktree, "_import_resources") as import_resources,
+        ):
+            self.assertEqual(setup_worktree.run(["--quick"]), 0)
+        setup_lock.assert_not_called()
+        prepare_cache.assert_not_called()
+        import_resources.assert_not_called()
+
+    def test_full_import_silences_progress_but_preserves_errors(self) -> None:
+        root = Path("/tmp/worktree")
+        with mock.patch.object(setup_worktree, "_run") as run_command:
+            setup_worktree._import_resources(
+                root, "/godot", timeout=30, dry_run=False
+            )
+        argv = run_command.call_args.args[0]
+        self.assertEqual(argv[:3], ["/godot", "--quiet", "--headless"])
+
     def test_godot_version_pin(self) -> None:
         self.assertTrue(setup_worktree.is_supported_godot_version(
             "4.6.1.stable.official.14d19694e"))

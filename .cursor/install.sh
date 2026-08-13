@@ -55,7 +55,9 @@ fi
 
 # 3. Repo-native bootstrap: version checks, pinned PokeAPI cache fetch, and the
 #    Godot resource import. setup_worktree.py is idempotent and never mutates
-#    tracked files (it aborts if it would).
+#    tracked files (it aborts if it would). This deliberately uses the full
+#    default preparation for the reusable cloud environment snapshot; local
+#    Cursor and Codex worktree hooks use --quick instead.
 cd "${REPO_ROOT}"
 python3 tools/setup_worktree.py --godot-bin "${GODOT_BIN}"
 

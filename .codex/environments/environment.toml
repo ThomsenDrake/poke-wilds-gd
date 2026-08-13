@@ -3,4 +3,4 @@ version = 1
 name = "poke-wilds-godot"
 
 [setup]
-script = "python3 tools/setup_worktree.py"
+script = "python3 tools/setup_worktree.py --quick"

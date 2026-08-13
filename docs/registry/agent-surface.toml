@@ -125,6 +125,7 @@ save_path = "docs/generated/golden-saves/v4_golden.json"
 # prepares only ignored caches/import output and refuses tracked-byte drift.
 worktree_setup_tool_path = "tools/setup_worktree.py"
 worktree_setup_command = "python3 tools/setup_worktree.py"
+worktree_quick_setup_command = "python3 tools/setup_worktree.py --quick"
 # The local pre-push gate. Display-less agents run the --skip-windowed form
 # (windowed lanes reported SKIP, never PASS); the full gate needs a display.
 gate_tool_path = "tools/verify_all.py"

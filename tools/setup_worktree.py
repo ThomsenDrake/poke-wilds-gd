@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Bootstrap an existing PokeWilds-Godot worktree without touching its branch.
 
-The setup is intentionally separate from ``git worktree add``.  It verifies the
-local runtime, prepares ignored per-worktree caches, imports Godot resources,
-and can run the cheap static gates.  It never refreshes the committed PokeAPI
-pin and never reverts tracked files.
+The setup is intentionally separate from ``git worktree add``.  Local editor
+hooks use ``--quick`` to verify the runtime without taking the repository-wide
+cache/import lock.  The default full preparation creates ignored per-worktree
+caches, imports Godot resources, and can run the cheap static gates.  It never
+refreshes the committed PokeAPI pin or reverts tracked files.
 """
 
 from __future__ import annotations
@@ -442,7 +443,7 @@ def _import_resources(
     root: Path, godot_bin: str, *, timeout: float, dry_run: bool
 ) -> None:
     _run(
-        [godot_bin, "--headless", "--path", str(root), "--import"],
+        [godot_bin, "--quiet", "--headless", "--path", str(root), "--import"],
         cwd=root,
         timeout=timeout,
         dry_run=dry_run,
@@ -476,6 +477,15 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="optionally clone missing .godot and pinned tools/.cache from another worktree",
     )
     parser.add_argument(
+        "--quick",
+        action="store_true",
+        help=(
+            "local Cursor/Codex hook: verify Python, Godot, Git, and cache safety "
+            "without copying/fetching caches, importing resources, or taking the "
+            "repository-wide setup lock"
+        ),
+    )
+    parser.add_argument(
         "--skip-cache",
         action="store_true",
         help="do not fetch a missing pinned PokeAPI cache",
@@ -504,6 +514,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--dry-run", action="store_true", help="print mutating commands without running them"
     )
     args = parser.parse_args(argv)
+    if args.quick and args.seed_from:
+        parser.error("--quick cannot be combined with --seed-from")
+    if args.quick:
+        args.skip_cache = True
+        args.skip_import = True
     if args.import_timeout <= 0 or args.lock_timeout <= 0:
         parser.error("timeouts must be greater than zero")
     return args
@@ -525,8 +540,10 @@ def run(argv: list[str] | None = None) -> int:
     _refuse_shared_cache_links(root)
 
     operation_error: SetupError | None = None
-    try:
-        with _setup_lock(_common_git_dir(root), args.lock_timeout, dry_run=args.dry_run):
+
+    def _prepare() -> None:
+        nonlocal operation_error
+        try:
             if args.seed_from:
                 _seed_from_worktree(args.seed_from, root, dry_run=args.dry_run)
             if not args.skip_cache:
@@ -539,8 +556,16 @@ def run(argv: list[str] | None = None) -> int:
                 )
             else:
                 print("Godot resource import: skipped by request")
-    except SetupError as exc:
-        operation_error = exc
+        except SetupError as exc:
+            operation_error = exc
+
+    serialized_work = bool(args.seed_from or not args.skip_cache or not args.skip_import)
+    if serialized_work:
+        with _setup_lock(_common_git_dir(root), args.lock_timeout, dry_run=args.dry_run):
+            _prepare()
+    else:
+        print("Repository setup lock: not needed (cache and import work skipped)")
+        _prepare()
 
     if not args.dry_run:
         after = _tracked_state(root)
