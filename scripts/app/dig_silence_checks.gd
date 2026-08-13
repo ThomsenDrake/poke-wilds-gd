@@ -49,7 +49,7 @@ func _part_d_z_digs_and_does_not_open_build() -> void:
 	_runner.teleport_player(_world(), _player(), _runtime(), _site["from_tile"])
 	_player()._facing = _site["direction"]
 	_expect(_player().facing_tile() == _site["tile"], "D: the player does not face the dig tile")
-	var cursor := _runner.trace_log_line_count()
+	var cursor: int = _runner.trace_log_line_count()
 	await _tap("action_a")
 	_expect(_runner.trace_log_has_since("field_move_used", cursor, {"move_id": "dig"}), "D: Z on a diggable tile did not Dig")
 	_expect(not _structure_layer().is_active(), "D: Z opened build mode")
@@ -59,7 +59,7 @@ func _part_d_z_digs_and_does_not_open_build() -> void:
 
 func _part_e_c_opens_build_without_placing() -> void:
 	_expect(_player().facing_tile() == _site["tile"], "E: the player no longer faces the harvested tile")
-	var cursor := _runner.trace_log_line_count()
+	var cursor: int = _runner.trace_log_line_count()
 	await _tap("build_toggle")
 	_expect(_runner.trace_log_has_since("build_mode_entered", cursor), "E: C did not emit build_mode_entered")
 	_expect(_structure_layer().is_active(), "E: C did not open the build overlay")
@@ -73,7 +73,7 @@ func _part_f_z_in_overlay_places() -> void:
 	for item_id in WALL_GRANT.keys():
 		_runtime().session.add_item(str(item_id), int(WALL_GRANT[item_id]))
 	_structure_layer().select_structure("wall")
-	var cursor := _runner.trace_log_line_count()
+	var cursor: int = _runner.trace_log_line_count()
 	await _tap("action_a")
 	_expect(_runner.trace_log_has_since("structure_placed", cursor, {"structure_id": "wall"}), "F: Z in the overlay did not place a wall")
 	_expect(not _structure_layer().is_active(), "F: a successful place left the overlay open")
