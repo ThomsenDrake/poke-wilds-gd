@@ -10,6 +10,7 @@ Everything you need to play, on one page. The same keys work everywhere — what
 | `Z` | Confirm / activate; in the overworld, act on the tile you're facing |
 | `X` | Cancel / go back; **hold** to run in the overworld |
 | `Enter` | Open (or close) the start menu |
+| `C` | Toggle [Build Mode](#build-mode) (port binding — see below) |
 | Left mouse button | Click menu entries and battle options — see [Mouse](#mouse) |
 
 `X` plays two roles: cancel in menus and battle, and hold-to-run in the overworld. These contexts never overlap — while any menu or screen is open, `X` only cancels; with nothing open, holding it makes you run.
@@ -49,23 +50,25 @@ In the overworld, `Z` acts on the tile you're facing. The game checks the follow
 2. **Placed camp objects** — a campfire opens the [camp menu](#camp-menu-z-on-a-placed-campfire); a bed lets you rest; a storage box opens the [storage screen](#storage-screen-z-on-a-placed-storage-box); a fence of a pen you built picks up an egg from the pen interior — or takes out the most recently penned Pokémon when there are no eggs (see [Breeding & pens](#breeding--pens)).
 3. **Water with a fishing rod** — facing water with a fishing rod in your bag casts the line (see [Fishing](#fishing)).
 4. **Harvestable tiles and built structures** — trees, rocks, and similar are cut, smashed, or dug if a party member knows the right move. Facing a structure **you built** (wall, door, roof, partition, fence, or torch) with a Pokémon that knows Cut — or Smash for stone-built structures — demolishes it and **refunds every material** it cost. A storage box holding Pokémon can't be demolished until it's empty.
-5. **Open ground with a builder** — if the faced tile is walkable and your party has a Pokémon that knows Build (Fighting types), you enter [Build Mode](#build-mode).
-6. **Otherwise** — you get a short "There is nothing left here." message.
+5. **Otherwise** — you get a short "There is nothing left here." message.
 
-`Z` does nothing in the overworld while you're in battle, mid-step, in build mode, or while a menu or screen is open.
+`Z` does nothing in the overworld while you're in battle, mid-step, in build mode, or while a menu or screen is open. It does **not** enter build mode — that is `C`.
 
 `Enter` opens the start menu (press it again to close it). Closing the start menu saves the game and shows "Saved."
 
 ## Build Mode
 
-Enter build mode by pressing `Z` on open ground with a Build-capable Pokémon, or by choosing the FIELD: Build move from the party screen. You build on the tile you were facing — the target tile is locked in when you enter, and you can't move while building.
+Enter build mode by pressing `C` with a Build-capable Pokémon (Fighting types), or by choosing the FIELD: Build move from the party screen. You build on the tile you were facing — the target tile is locked in when you enter, and you can't move while building. `C` is a **port binding**: the original game's C/V keys are a dev-mode paint tool, not Build.
 
 - **Cycle structures with the movement keys**: Left or Up = previous, Right or Down = next, wrapping around the full list: wall, door, roof, partition, fence, campfire, storage box, bed, torch, way stone. The wall is selected by default.
 - A ghost preview shows whether the spot works: **white** = placeable, **magenta** = not, along with a hint of the materials you have versus what's needed. A door placed beside a fence previews as a gate.
 - **`Z`** places the selected structure. Success exits build mode; if placement is refused, the reason is shown and the mode stays open so you can try again.
 - **`X`** exits without placing anything.
+- **`C`** toggles build mode off.
 
 Either way you leave, your movement returns and the game saves.
+
+A party with no Build-capable Pokémon shows "No party Pokemon can BUILD." House loop: face a tile → `C` → cycle → `Z` (places, exits) → step → `C` → …
 
 ## Battle
 

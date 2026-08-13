@@ -14,10 +14,11 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 ## Controls
 
 - Move: arrow keys or `WASD`.
-- `Z`: confirm in menus/battle, and the overworld CONTEXT action on the faced tile — harvest (Cut/Smash/Dig), interact with a placed campfire (craft menu) or bed (rest), or enter build mode on open ground with a Build-capable party member.
+- `Z`: confirm in menus/battle, and the overworld CONTEXT action on the faced tile — harvest (Cut/Smash/Dig) and interact with a placed campfire (craft menu) or bed (rest). `Z` does not enter build mode.
+- `C`: toggle build mode (port binding; the original C/V is a dev-mode paint tool). Requires a Build-capable party member.
 - `X`: cancel in menus/battle; HOLD to run in the overworld — one key, mutually exclusive contexts (never both live at once).
 - `Enter`: open the start menu. While the campfire craft menu is open, `Z`/`X`/`Enter` belong to it (a key that closes it does nothing else that frame).
-- Build mode: movement keys cycle the structure, `Z` places, `X` exits.
+- Build mode: movement keys cycle the structure, `Z` places, `X` exits, `C` toggles off.
 - Menus also accept a left-click on an entry (the start menu and the campfire craft menu).
 - The canonical Input map lives in [docs/product-specs/bootstrap-and-overworld.md](docs/product-specs/bootstrap-and-overworld.md) § Input map.
 

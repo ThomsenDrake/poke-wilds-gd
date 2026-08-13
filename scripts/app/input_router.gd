@@ -2,18 +2,21 @@ extends RefCounted
 
 # App-layer input routing extracted from main.gd so the scene script stays
 # under its line budget. Owns the InputMap action set — movement, confirm/
-# cancel (action_a/action_b), run modifier, and the start/menu toggle — plus
-# the per-frame polls that forward "start" to Main's menu handler and
-# "action_a" to Main's context action. Movement and confirm/cancel reach
+# cancel (action_a/action_b), run modifier, the start/menu toggle, and the
+# build-mode toggle (C) — plus the per-frame polls that forward "start" to
+# Main's menu handler, "build_toggle" to the field router's overlay toggle,
+# and "action_a" to Main's context action. Movement and confirm/cancel reach
 # their other consumers (player avatar, UI screens) directly through these
-# actions; only the menu toggle and context action are routed here. The polls
-# also honor a same-frame latch that EVERY input-phase UI close/confirm sets
-# (see bind_ui_consumers) AND that Main._on_battle_finished sets when a press
-# ENDS A BATTLE (note_press_consumed), so a press that closed/confirmed an
-# overlay or ended a battle there cannot re-fire them. CALL-ORDER CONTRACT:
-# Main._process calls poll_menu_toggle() FIRST and poll_context_action()
-# SECOND, every frame — the context poll is the second and last poll, and it
-# resets the latch (a toggle-only frame strands it for one harmless frame).
+# actions; only the menu toggle, build toggle, and context action are routed
+# here. The polls also honor a same-frame latch that EVERY input-phase UI
+# close/confirm sets (see bind_ui_consumers) AND that Main._on_battle_finished
+# sets when a press ENDS A BATTLE (note_press_consumed), so a press that
+# closed/confirmed an overlay or ended a battle there cannot re-fire them.
+# CALL-ORDER CONTRACT: Main._process calls poll_menu_toggle() FIRST,
+# poll_build_toggle() SECOND, and poll_context_action() LAST, every frame —
+# the context poll is the last poll, and it resets the latch (a toggle-only
+# frame strands it for one harmless frame). Do NOT reset the latch in the
+# build poll.
 
 const ACTION_BINDINGS := {
 	"move_up": [Key.KEY_UP, Key.KEY_W],
@@ -34,10 +37,14 @@ const ACTION_BINDINGS := {
 	"action_b": [Key.KEY_X],
 	"run": [Key.KEY_X],
 	"start": [Key.KEY_ENTER],
+	# Port binding: C toggles the tile-locked build overlay. Original C/V is
+	# the dev-mode paint tool's tile cycle, a different feature.
+	"build_toggle": [Key.KEY_C],
 }
 
 var _on_menu_toggle: Callable
 var _on_context_action: Callable
+var _on_build_toggle: Callable
 # The "a UI consumed this press this frame" latch. Every overlay owns Z/X/Enter
 # via _unhandled_input during the INPUT PHASE, which runs BEFORE Main._process
 # polls; a press that closes or confirms an overlay there must not also fire
@@ -49,15 +56,20 @@ var _on_context_action: Callable
 # superseded the "New game started." toast, a start-menu CLOSE re-harvested the
 # faced tile, and a party FIELD MOVE on an inert move harvested the faced
 # cut-tile the capability message had just declined. One latch, set by every
-# producer, consumed by both polls — NOT a per-menu patch.
+# producer, consumed by all three polls — NOT a per-menu patch.
 var _ui_ate_press := false
 
 
-# The context action callable is optional so single-argument construction
+# Context and build callables are optional so single-argument construction
 # (menu toggle only) keeps working.
-func _init(on_menu_toggle: Callable, on_context_action: Callable = Callable()) -> void:
+func _init(on_menu_toggle: Callable, on_context_action: Callable = Callable(), on_build_toggle: Callable = Callable()) -> void:
 	_on_menu_toggle = on_menu_toggle
 	_on_context_action = on_context_action
+	_on_build_toggle = on_build_toggle
+
+
+func bind_build_toggle(on_build_toggle: Callable) -> void:
+	_on_build_toggle = on_build_toggle
 
 
 # Idempotent: existing actions and key events are left untouched.
@@ -119,11 +131,21 @@ func poll_menu_toggle() -> void:
 		_on_menu_toggle.call()
 
 
+# Called from Main._process with overworld-free state. Unlike the context
+# poll, this stays live while build mode is active so C can toggle off. Does
+# NOT reset the latch — poll_context_action stays last and owns the reset.
+func poll_build_toggle(overworld_free: bool) -> void:
+	if _ui_ate_press or not overworld_free or not _on_build_toggle.is_valid():
+		return
+	if Input.is_action_just_pressed("build_toggle"):
+		_on_build_toggle.call()
+
+
 # Called from Main._process with Main's overworld-idle state (not in a menu,
 # battle, or step animation) so the context route can only fire while the
 # player is free to act in the overworld. Captures + resets the latch
-# unconditionally FIRST — it is the second and last poll each frame (the order
-# contract above), so it owns the reset even on frames the toggle early-
+# unconditionally FIRST — it is the last poll each frame (the order
+# contract above), so it owns the reset even on frames a toggle early-
 # returned.
 func poll_context_action(overworld_idle: bool) -> void:
 	var ui_ate_press := _ui_ate_press

@@ -6,8 +6,8 @@ extends RefCounted
 # CampMenu — demolition STAYS in the menu so the witness escape is never shadowed; bed ->
 # rest; storage_box -> StorageScreen; fence -> Phase 5 pen action); then FISHING (Phase 5:
 # faced water + a bagged rod -> fishing_runtime.try_fish; a hooked mon rides game_runtime's
-# pending-encounter seam through main's normal battle path); then harvest; then build mode
-# on a walkable faced tile with a Build-capable mon. The campfire lit toggle mutates the
+# pending-encounter seam through main's normal battle path); then harvest (Cut / Dig /
+# Smash / demolish). Build mode is a dedicated C toggle, not a Z fallthrough. The campfire lit toggle mutates the
 # live placement entry ("lit": false when extinguished, ABSENT when lit — map is canonical).
 # Party-screen FIELD MOVE: Build -> constrained build mode; cut/dig/smash -> constrained
 # harvest; Phase 4 moves -> field_move_actions; else capability display (never a silent
@@ -49,7 +49,7 @@ func setup(runtime: Node, world: Node, player: Node, structure_layer: Node, show
 	_object_routes.setup(runtime, world, player, _entity_actions, show_message, camp_menu, storage_screen) # the routes own the camp/storage overlay open+close lifecycle
 
 
-# Overworld context Z: entities, camp objects, then fishing (faced water), then harvest, then build mode (header precedence).
+# Overworld context Z: entities, camp objects, then fishing (faced water), then harvest.
 func on_context_action() -> void:
 	if _object_routes.overlay_open():
 		return # an overlay owns Z/X while open; the Main poll still fires
@@ -64,16 +64,12 @@ func on_context_action() -> void:
 		return
 	var result: Dictionary = _runtime.harvest_tile(faced)
 	var move_id := str(result.get("move_id", ""))
-	if move_id != "":
-		# QoL: Z on diggable ground with no Dig-capable mon stays silent — diggable
-		# tiles are walkable and everywhere (beach spawn), so the refusal toast fired
-		# on constantly-pressed Z (annoyance, not information). Success + cut/smash
-		# refusals still speak; the party-menu FIELD MOVE path keeps its feedback.
-		if bool(result.get("ok", false)) or move_id != DIG_MOVE:
-			_message(result)
-	elif _world.is_tile_walkable(faced) and _runtime.party_has_field_move_ability(BUILD_MOVE):
-		enter_build_mode({})
-	else:
+	# QoL: Z on diggable ground with no Dig-capable mon stays silent — diggable
+	# tiles are walkable and everywhere (beach spawn), so the refusal toast fired
+	# on constantly-pressed Z (annoyance, not information). Success + cut/smash
+	# refusals + empty move_id ("nothing left here") still speak; the party-menu
+	# FIELD MOVE path keeps its feedback. Build is C, never this Z fallthrough.
+	if move_id == "" or bool(result.get("ok", false)) or move_id != DIG_MOVE:
 		_message(result)
 
 
@@ -114,6 +110,20 @@ func on_field_move_requested(move_id: String, mon_index: int) -> void:
 		_show_message.call("%s knows %s, but there's nothing here that needs it." % [str(mon.get("name", "That Pokemon")), _runtime.catalog.get_field_move_name(move_id)], 1.8)
 		return
 	_message(_runtime.harvest_tile(_player.facing_tile(), mon))
+
+
+# C toggles the tile-locked build overlay (Z stays harvest). Overlay-open
+# no-ops so camp/storage keep C; active overlay exits; else enter on the faced tile.
+func toggle_build_mode() -> void:
+	if _object_routes.overlay_open():
+		return
+	if _structure_layer.is_active():
+		_structure_layer.stop_build()
+		return
+	if not _runtime.party_has_field_move_ability(BUILD_MOVE):
+		_show_message.call("No party Pokemon can BUILD.", 1.6)
+		return
+	enter_build_mode({})
 
 
 func enter_build_mode(mon_constraint: Dictionary) -> void:
