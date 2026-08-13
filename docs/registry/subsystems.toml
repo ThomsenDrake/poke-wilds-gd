@@ -1020,8 +1020,9 @@ quality_bucket = "storage"
 # one of the four producers (this subsystem's validation_commands therefore include the
 # input_gate regression scenario); the input-driven checks extract into the NEW
 # scripts/app/smoke_tap.gd (shared real-input-phase tap injection), scripts/app/
-# input_gate_menu_checks.gd (the start-CLOSE / NEW-GAME-confirm / inert-FIELD-MOVE leak
-# paths, wired into input_gate_scenario), and scripts/app/storage_release_mouse_check.gd
+# input_gate_menu_checks.gd (the start-CLOSE / Enter-close over-suppression /
+# NEW-GAME-confirm / inert-FIELD-MOVE leak paths, wired into input_gate_scenario),
+# and scripts/app/storage_release_mouse_check.gd
 # (the S2 release-confirm mouse-bypass group, wired into storage_flow_party_checks);
 # scripts/ui/party_screen.gd (menu_ui-owned) extracts
 # its action-list construction into the NEW scripts/ui/party_actions.gd FIRST, then

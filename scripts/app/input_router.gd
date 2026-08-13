@@ -80,9 +80,11 @@ func configure_input_map() -> void:
 # (submenu X-close, camp craft Z): the overlay stays visible, so Main's
 # overworld-idle state and field_action_router's _overlay_open early-return
 # already neutralize poll. QUIRK: MessageBox.show_message while
-# confirming emits cancelled; if that ever fires during _process (after the
-# latch reset) the NEXT frame's first press dies once — post-fix no toast can
+# confirming emits cancelled; if that ever fires during _process after poll
+# returns, the NEXT frame's first press dies once — post-fix no toast can
 # interrupt a confirm (avatar disabled, poll guarded), so the quirk is latent.
+# Callback-raised latches DURING poll (Enter-close -> hide_menu -> closed) are
+# cleared before return and cannot leak into the next frame.
 func bind_ui_consumers(ui_nodes: Array) -> void:
 	for ui_node in ui_nodes:
 		if not (ui_node is Node):
@@ -118,6 +120,9 @@ func note_press_consumed() -> void:
 # runs before context so a same-frame C+Z cannot harvest while opening the
 # overlay: Main's context_ok snapshot is stale once the toggle flips
 # is_active (the pre-collapse poll_build_toggle then re-read order).
+# Dispatch may raise the latch (Enter-close -> hide_menu -> closed); clear it
+# again before return so that cannot swallow the next frame's first press
+# (the pre-collapse context poll owned this reset).
 func poll(overworld_free: bool, context_ok: bool) -> void:
 	var ate := _ui_ate_press
 	_ui_ate_press = false
@@ -130,6 +135,7 @@ func poll(overworld_free: bool, context_ok: bool) -> void:
 		context_ok = false
 	if context_ok and _on_context_action.is_valid() and Input.is_action_just_pressed("action_a"):
 		_on_context_action.call()
+	_ui_ate_press = false
 
 
 func _ensure_action(action_name: StringName, keys: Array) -> void:

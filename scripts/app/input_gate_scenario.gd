@@ -9,7 +9,7 @@ extends Node
 # input_router.gd's GENERALIZED closed/confirm latch (bind_ui_consumers) now
 # swallows poll on the closing/confirming frame for EVERY overlay;
 # input_gate_menu_checks.gd covers the other leak paths (start-menu CLOSE,
-# MessageBox NEW GAME confirm, inert FIELD MOVE). This scenario drives REAL
+# MessageBox NEW GAME confirm, inert FIELD MOVE, Enter-close over-suppression). This scenario drives REAL
 # input-phase events — never direct runtime calls — to prove both camp races
 # are gone: (A) Enter with the camp menu open closes ONLY the camp menu (start
 # menu stays shut, no menu_opened trace, avatar cleanly re-enabled); (B) Z on
@@ -59,7 +59,7 @@ func run(ctx: Dictionary) -> void:
 	if site_ok: # both parts run even if part A fails, so pre-fix reds name BOTH races
 		await _part_a_enter_closes_only_camp_menu()
 		await _part_b_demolish_does_not_refire(fire_tile)
-		var menu_checks := InputGateMenuChecks.new() # parts C/E/D: the other leak paths
+		var menu_checks := InputGateMenuChecks.new() # parts C/F/E/D: the other leak paths
 		add_child(menu_checks)
 		await menu_checks.run(_ctx, _runner, _failures)
 	if _failures.is_empty():
