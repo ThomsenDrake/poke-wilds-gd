@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-04
+Last verified: 2026-08-13
 Review cadence days: 21
 Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/BagScreen.tscn, scenes/ui/MessageBox.tscn, scenes/ui/OptionsScreen.tscn, scripts/ui/start_menu.gd, scripts/ui/party_screen.gd, scripts/ui/bag_screen.gd, scripts/ui/party_rows.gd, scripts/ui/party_row_style.gd, scripts/ui/message_box.gd, scripts/ui/options_screen.gd, scripts/ui/menu_context.gd, scripts/ui/seed_prompt.gd, scripts/runtime/game_runtime.gd, scripts/runtime/stone_evolution_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/session_payload.gd, scripts/runtime/save_store.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd, scripts/domain/encounter_selection.gd
 

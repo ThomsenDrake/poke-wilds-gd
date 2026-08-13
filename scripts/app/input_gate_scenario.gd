@@ -7,7 +7,7 @@ extends Node
 # frame polls (Enter opened the start menu under a closing camp menu;
 # Z-on-Demolish re-fired the context route on the bare former campfire tile).
 # input_router.gd's GENERALIZED closed/confirm latch (bind_ui_consumers) now
-# swallows BOTH polls on the closing/confirming frame for EVERY overlay;
+# swallows poll on the closing/confirming frame for EVERY overlay;
 # input_gate_menu_checks.gd covers the other leak paths (start-menu CLOSE,
 # MessageBox NEW GAME confirm, inert FIELD MOVE). This scenario drives REAL
 # input-phase events — never direct runtime calls — to prove both camp races

@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-13
 Review cadence days: 21
-Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/field_object_routes.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/app/dig_silence_scenario.gd, scripts/app/dig_silence_checks.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
+Source paths: scripts/domain/structures.gd, scripts/runtime/build_runtime.gd, scripts/runtime/structure_layer.gd, scripts/app/field_action_router.gd, scripts/app/field_object_routes.gd, scripts/app/placement_flow_scenario.gd, scripts/app/placement_flow_demolition.gd, scripts/app/dig_silence_scenario.gd, scripts/app/build_toggle_checks.gd, scripts/domain/world_overrides.gd, scripts/domain/world_generator.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/domain/field_moves.gd, scripts/domain/recipes.gd, scripts/domain/material_drops.gd
 
 # Building And Placement
 
