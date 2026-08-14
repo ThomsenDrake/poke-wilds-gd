@@ -74,7 +74,7 @@ Required Cloud env (never commit values):
 - `COMMANDCODE_SKIP_UPDATES=1` — persist across boots so the CLI does not self-update mid-run
 - `GODOT_AUDIO_DRIVER=Dummy` — no ALSA card on Cloud; Dummy avoids Godot's `ERR_CANT_OPEN` false-red through miss-002 `ERROR:` capture
 
-Install/start live in `.cursor/install.sh` and `.cursor/start.sh`. The personal Cloud environment must Save those scripts (and the API key secret) before new agents inherit them.
+Install/start live in `.cursor/install.sh` and `.cursor/start.sh`. The personal Cloud environment must Save those scripts (and the API key secret) before new agents inherit them. Codex GitHub reviews: Cloud `gh` is the Cursor app and cannot `@codex`. On the Mac, `python3 tools/codex_review_bridge.py --pr 37 --install-launchd` posts as you.
 
 ## Common Entry Points
 
