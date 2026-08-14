@@ -70,6 +70,7 @@ Required Cloud env (never commit values):
 - `DISPLAY` — set by `tools/ensure_cloud_display.sh` (reuses computer-use `:1` when live)
 - `COMMAND_CODE_API_KEY` — environment secret; Command Code CLI (`cmd`) is the Lane-4 backend
 - `COMMANDCODE_SKIP_UPDATES=1` — persist across boots so the CLI does not self-update mid-run
+- `GODOT_AUDIO_DRIVER=Dummy` — no ALSA card on Cloud; Dummy avoids Godot's `ERR_CANT_OPEN` false-red through miss-002 `ERROR:` capture
 
 Install/start live in `.cursor/install.sh` and `.cursor/start.sh`. The personal Cloud environment must Save those scripts (and the API key secret) before new agents inherit them.
 

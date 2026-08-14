@@ -145,6 +145,22 @@ SETTLE_S = 0.5
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
+def godot_audio_args() -> list[str]:
+    """Playtest subprocesses default to Dummy audio.
+
+    Cloud / CI boxes have no ALSA card; Godot's ALSA probe then prints
+    `ERROR: Condition "status < 0"` from audio_driver_alsa.cpp, which
+    ERROR_MARKERS correctly treats as an exception. Dummy is the honest
+    driver for automated runs (tracks still select). Set
+    GODOT_AUDIO_DRIVER=- to pass no flag (engine default) or a real
+    driver name.
+    """
+    driver = os.environ.get("GODOT_AUDIO_DRIVER", "Dummy")
+    if driver in ("", "-"):
+        return []
+    return ["--audio-driver", driver]
+
+
 class TraceCollector:
     """Accumulates events, warnings, the *_passed payload, the *_failed
     reasons (symmetric failure contract), and snapshot stamps."""
@@ -420,9 +436,11 @@ def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bi
     if windowed:
         # No --headless/--quit-after: the scenario quits the app itself; the
         # wall-clock deadline below is the backstop.
-        cmd = [godot_bin, "--path", str(project)]
+        cmd = [godot_bin, "--path", str(project), *godot_audio_args()]
     else:
-        cmd = [godot_bin, "--headless", "--path", str(project), "--quit-after", str(headless_quit_after_frames(timeout))]
+        cmd = [godot_bin, "--headless", "--path", str(project),
+               "--quit-after", str(headless_quit_after_frames(timeout)),
+               *godot_audio_args()]
     try:
         try:
             proc = subprocess.Popen(

@@ -71,5 +71,6 @@ umask 077
     printf 'export GODOT_BIN=%q\n' "${GODOT_BIN}"
   fi
   printf 'export COMMANDCODE_SKIP_UPDATES=1\n'
+  printf 'export GODOT_AUDIO_DRIVER=Dummy\n'
 } > "${ENV_FILE}"
 echo "ensure_cloud_display: wrote ${ENV_FILE}"

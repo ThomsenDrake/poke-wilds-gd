@@ -13,4 +13,5 @@ if [[ -f "${HOME}/.pokewilds-cloud.env" ]]; then
   # shellcheck disable=SC1091
   source "${HOME}/.pokewilds-cloud.env"
 fi
-echo "start: DISPLAY=${DISPLAY:-unset} GODOT_BIN=${GODOT_BIN:-unset} cmd=$(command -v cmd || echo missing)"
+export GODOT_AUDIO_DRIVER="${GODOT_AUDIO_DRIVER:-Dummy}"
+echo "start: DISPLAY=${DISPLAY:-unset} GODOT_BIN=${GODOT_BIN:-unset} cmd=$(command -v cmd || echo missing) audio=${GODOT_AUDIO_DRIVER}"

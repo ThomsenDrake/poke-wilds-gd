@@ -283,7 +283,7 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "da8ed8283c70b908a1836e2ea2df4b9b35e46ddb350621daa5e8f1bfb7911094",
           "scripts/app/nav_audit_battle.gd": "b3468cadbaaf368cf7f9e34fc5861b6ec03006a417118ed23b8217604a26f291",
-          "tools/run_playtests.py": "96387addf5446013fb406a0319662042661fc2c8ac70bf5ddc96ea193ee7b81d",
+          "tools/run_playtests.py": "b7cd1e0fd84bebbf2837f2201375472a945f614e3235b5cf6022339d7bdf2b0e",
           "tools/godot_dap_smoketest.py": "6e517eb97194a9aec0d765f356832593b34a838dbb5f26b21562fb767297120e",
           "tools/verify_all.py": "8ab89b6853c748499c90a9f20a515cbda81ccee055a3c0fa7cecbb067e0f76b0"
         },
@@ -868,6 +868,13 @@
             "old_pin": "9b7d08c4ba3f",
             "new_pin": "8ab89b6853c7",
             "reason": "legitimate edit (Cursor Cloud VLM path): adapter-aware PNG/region skip (paired_adapter_mismatch) so lavapipe cannot false-red against Apple M4 baselines; ui_render_audit + visual_sweep_overworld added to WINDOWED_SUBPROCESS_SCENARIOS; R3 adapter_mismatch warn. miss-002 (C) honest-reporting intact: ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects *_failed reasons, run_playtests still single-sources both tables from the sibling harness."
+          },
+          {
+            "date": "2026-08-14",
+            "file": "tools/run_playtests.py",
+            "old_pin": "96387addf544",
+            "new_pin": "b7cd1e0fd84b",
+            "reason": "legitimate edit (Cursor Cloud audio): playtest Godot launches default to --audio-driver Dummy so a missing ALSA card cannot print ERROR: ERR_CANT_OPEN and false-red the miss-002 ERROR: capture. Override via GODOT_AUDIO_DRIVER=-. Mechanisms intact: ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects *_failed reasons, run_playtests still single-sources both tables from the sibling harness."
           }
         ]
       },

@@ -335,6 +335,7 @@ Endpoint / secret configuration (flags win over env):
 | --- | --- | --- | --- |
 | `VLM_RUNTIME` | `--runtime` | `auto` | Backend: `command_code` \| `dashscope` \| `ollama` \| `auto` (auto = headless Command Code `gpt-5.6-luna`, then hosted DashScope, then local Ollama) |
 | `COMMAND_CODE_API_KEY` | — | (unset) | SECRET — Command Code provider key; overrides `~/.commandcode/auth.json`. Presence-only in `reviewer_meta`. Required on Cursor Cloud (no interactive `cmd login`) |
+| `GODOT_AUDIO_DRIVER` | — | `Dummy` (playtest subprocesses) | Godot `--audio-driver`. Cloud has no ALSA card; Dummy avoids the ALSA `ERR_CANT_OPEN` that miss-002 `ERROR:` capture would otherwise false-red. Set `-` to pass no flag |
 | `VLM_MODEL` | `--model` | `qwen3-vl:8b` | Ollama tag (explicit, never `latest`); `qwen3-vl:4b` is the lower-fidelity fallback; 30b/32b avoided on 24GB |
 | `OLLAMA_HOST` | `--ollama-host` | `http://127.0.0.1:11434` | Local Ollama base URL |
 | `DASHSCOPE_BASE_URL` | `--dashscope-base` | `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` | Hosted OpenAI-compatible endpoint (the user's token-plan MaaS endpoint; swap for `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` etc. as needed) |
