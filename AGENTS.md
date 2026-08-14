@@ -69,7 +69,7 @@ python3 tools/verify_all.py --windowed-timeout 1800   # full gate once DISPLAY +
 Required Cloud env (never commit values):
 
 - `GODOT_BIN` — set by `.cursor/install.sh` to `$HOME/godot-bin/godot`
-- `DISPLAY` — set by `tools/ensure_cloud_display.sh` (reuses computer-use `:1` when live)
+- `DISPLAY` — set by `tools/ensure_cloud_display.sh` (reuses computer-use `:1` when live). Installer provisions `x11-utils` (`xdpyinfo`); the probe falls back to `/tmp/.X11-unix` if that binary is missing.
 - `COMMAND_CODE_API_KEY` — environment secret; Command Code CLI (`cmd`) is the Lane-4 backend
 - `COMMANDCODE_SKIP_UPDATES=1` — persist across boots so the CLI does not self-update mid-run
 - `GODOT_AUDIO_DRIVER=Dummy` — no ALSA card on Cloud; Dummy avoids Godot's `ERR_CANT_OPEN` false-red through miss-002 `ERROR:` capture

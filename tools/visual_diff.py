@@ -12,6 +12,12 @@ Stdout carries a single JSON verdict consumed by
 scripts/app/visual_sweep_baselines.gd; human-readable lines go to stderr.
 Exit 0 = all shots within threshold, 1 = drift or missing files,
 2 = usage/decode error. CI can run this without Godot.
+
+When a fresh/baseline sidecar `capture_env.adapter_name` pair differs
+(Apple M4 vs lavapipe), PNG decode and percent-diff are skipped entirely
+(`pixel_compare: skipped_adapter_mismatch`). Missing/uncaptured names
+still fail. A below-threshold or decoder-error compare is never reported
+as `compared` on mismatched hardware.
 """
 
 from __future__ import annotations
@@ -223,33 +229,37 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
     per_shot: dict[str, float] = {}
     records: dict[str, dict] = {}
     errors: list[str] = []
-    for name in shot_names:
-        if name in missing_baselines:
-            continue
-        try:
-            record = compare_pair(shots_dir / name, baseline_dir / name, tolerance)
-        except (PngError, OSError) as exc:
-            errors.append(f"{name}: {exc}")
-            continue
-        records[name] = record
-        per_shot[name] = record["pct_changed"]
-
-    mismatched = sorted(name for name, pct in per_shot.items() if pct > threshold_pct)
-    max_drift = max(per_shot.values(), default=0.0)
-    compared = len(per_shot)
-    adapter = paired_adapter_mismatch(shots_dir, baseline_dir)
     skipped_mismatched: list[str] = []
-    pixel_compare = "compared"
-    if adapter and mismatched:
-        skipped_mismatched = mismatched
-        mismatched = []
+    adapter = paired_adapter_mismatch(shots_dir, baseline_dir)
+    if adapter:
+        # Sidecar adapter_name is enough: do not decode or percent-diff PNGs.
+        # Mac baselines are not authority on lavapipe (or any other mismatch),
+        # including the below-threshold and decoder-error cases.
         pixel_compare = "skipped_adapter_mismatch"
         print(
-            f"visual_diff: skipping pixel fail (adapter {adapter['fresh']} != "
-            f"{adapter['baseline']} on {adapter['shot']}); recorded "
-            f"{len(skipped_mismatched)} drifted shot(s)",
+            f"visual_diff: skipping pixel compare (adapter {adapter['fresh']} != "
+            f"{adapter['baseline']} on {adapter['shot']}); missing/uncaptured "
+            f"names still fail",
             file=sys.stderr,
         )
+        mismatched: list[str] = []
+        max_drift = 0.0
+        compared = 0
+    else:
+        pixel_compare = "compared"
+        for name in shot_names:
+            if name in missing_baselines:
+                continue
+            try:
+                record = compare_pair(shots_dir / name, baseline_dir / name, tolerance)
+            except (PngError, OSError) as exc:
+                errors.append(f"{name}: {exc}")
+                continue
+            records[name] = record
+            per_shot[name] = record["pct_changed"]
+        mismatched = sorted(name for name, pct in per_shot.items() if pct > threshold_pct)
+        max_drift = max(per_shot.values(), default=0.0)
+        compared = len(per_shot)
     ok = not errors and not missing_baselines and not uncaptured_baselines and not mismatched
     return {
         "ok": ok,

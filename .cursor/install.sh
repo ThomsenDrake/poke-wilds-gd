@@ -54,15 +54,18 @@ if ! grep -qxF "${GODOT_BIN_EXPORT}" "${BASHRC}"; then
 fi
 
 # 3. Windowed Godot runtime libs + lavapipe (software Vulkan). Skip apt when
-#    the ICD is already present so a warm re-run stays a no-op.
+#    the ICD, Xvfb, AND xdpyinfo are already present so a warm re-run stays a
+#    no-op. x11-utils is required: ensure_cloud_display.sh probes with xdpyinfo
+#    (xvfb does not depend on it). A warm image that has Xvfb but not
+#    xdpyinfo must still apt-get, or start.sh never sees a live display.
 LVP_ICD="/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
-if [[ -f "${LVP_ICD}" ]] && command -v Xvfb >/dev/null; then
-  echo "Xvfb + lavapipe already present: ${LVP_ICD}"
+if [[ -f "${LVP_ICD}" ]] && command -v Xvfb >/dev/null && command -v xdpyinfo >/dev/null; then
+  echo "Xvfb + lavapipe + xdpyinfo already present: ${LVP_ICD}"
 else
-  echo "Installing Xvfb, lavapipe, and Godot X11 runtime libs..."
+  echo "Installing Xvfb, x11-utils, lavapipe, and Godot X11 runtime libs..."
   sudo apt-get update -qq
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    xvfb mesa-vulkan-drivers vulkan-tools \
+    xvfb x11-utils mesa-vulkan-drivers vulkan-tools \
     libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libxrender1 libgl1
 fi
 

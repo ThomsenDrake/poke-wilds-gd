@@ -15,9 +15,22 @@ LVP_ICD_CANDIDATES=(
   /usr/share/vulkan/icd.d/lvp_icd.json
 )
 
+_display_num() {
+  local d="$1"
+  local num="${d##*:}"
+  printf '%s' "${num%%.*}"
+}
+
 _display_alive() {
   local d="$1"
-  DISPLAY="$d" xdpyinfo >/dev/null 2>&1
+  # Prefer xdpyinfo (x11-utils). xvfb does not depend on it, so a Cloud
+  # image that only installed xvfb would otherwise treat every display as
+  # dead and exit before writing ~/.pokewilds-cloud.env.
+  if command -v xdpyinfo >/dev/null 2>&1; then
+    DISPLAY="$d" xdpyinfo >/dev/null 2>&1
+    return
+  fi
+  [[ -S "/tmp/.X11-unix/X$(_display_num "${d}")" ]]
 }
 
 _pick_lvp_icd() {
@@ -30,6 +43,10 @@ _pick_lvp_icd() {
   done
   return 1
 }
+
+if ! command -v xdpyinfo >/dev/null 2>&1; then
+  echo "ensure_cloud_display: xdpyinfo missing; probing /tmp/.X11-unix sockets (install x11-utils)"
+fi
 
 if [[ -n "${DISPLAY:-}" ]] && _display_alive "${DISPLAY}"; then
   echo "ensure_cloud_display: reusing live DISPLAY=${DISPLAY}"
