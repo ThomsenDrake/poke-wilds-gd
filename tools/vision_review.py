@@ -1324,6 +1324,24 @@ def _reviewer_params() -> dict:
                     "runs once -- votes are meaningless when deterministic"}
 
 
+def reviewer_cmd_error_detail(stderr: str, limit: int = 400) -> str:
+    """Prefer the last internal-error line from a failed reviewer-cmd.
+
+    vlm_reviewer prints art-anchor live-unverified notes to stderr first
+    (counted, never a finding). Taking stderr[:400] hid the real
+    ``required vision review incomplete: answers 6/7`` on Cloud and made
+    the 27-shot visual_sweep look like an anchor bug.
+    """
+    lines = [ln.strip() for ln in (stderr or "").splitlines() if ln.strip()]
+    if not lines:
+        return "no stderr"
+    preferred = [ln for ln in lines
+                 if "internal error" in ln or "required vision" in ln
+                 or "RuntimeError" in ln or "cmd reviewer" in ln]
+    chosen = preferred[-1] if preferred else lines[-1]
+    return chosen[:limit]
+
+
 def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str], dict]:
     """Run the configured plugin reviewer. FAIL-CLOSED per the grounding
     contract: non-zero exit, timeout, invalid JSON, or findings-not-a-list is
@@ -1349,7 +1367,8 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str],
     except (OSError, subprocess.SubprocessError) as exc:
         raise ValueError(f"reviewer-cmd failed: {exc}") from exc
     if proc.returncode != 0:
-        raise ValueError(f"reviewer-cmd exit {proc.returncode}: {proc.stderr.strip()[:400]}")
+        raise ValueError(
+            f"reviewer-cmd exit {proc.returncode}: {reviewer_cmd_error_detail(proc.stderr)}")
     try:
         doc = json.loads(proc.stdout)
         findings = doc.get("findings") if isinstance(doc, dict) else None

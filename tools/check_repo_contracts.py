@@ -419,6 +419,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
     issues.extend(command_code_reviewer_issues(root))
+    issues.extend(reviewer_cmd_error_detail_issues(root))
     issues.extend(cloud_env_display_issues(root))
     issues.extend(install_cmd_path_issues(root))
 
@@ -1061,6 +1062,73 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             issues.append(
                 "_command_code_prompt path order must match shuffled SoM then crops"
             )
+
+    have = [{"question_id": "q1-aaa"}, {"question_id": "q1-ccc"}]
+    omitted = reviewer.omitted_question_ids(have, {"q1-aaa", "q1-bbb", "q1-ccc"})
+    if omitted != ["q1-bbb"]:
+        issues.append(
+            f"omitted_question_ids must report the unanswered rubric id; got {omitted}"
+        )
+    repair = reviewer.incomplete_answers_repair_system("SYS", ["q1-bbb"])
+    if "q1-bbb" not in repair or "EVERY rubric question" not in repair:
+        issues.append(
+            "incomplete_answers_repair_system must name omitted ids and demand a "
+            "complete answers[]"
+        )
+    src = tool_path.read_text(encoding="utf-8")
+    if "incomplete_answers_repair_system(system, missing)" not in src:
+        issues.append(
+            "run_model must call incomplete_answers_repair_system on a short pass"
+        )
+    return issues
+
+
+def reviewer_cmd_error_detail_issues(root: Path) -> list[str]:
+    """Lock reviewer-cmd failures to the last internal-error line.
+
+    Art-anchor live-unverified notes print first and used to occupy stderr[:400],
+    hiding ``required vision review incomplete: answers 6/7`` on Cloud.
+    """
+    del root
+    tool_path = Path(__file__).resolve().with_name("vision_review.py")
+    if not tool_path.exists():
+        return []
+    try:
+        vision_review = _load_tool("vision_review", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"reviewer-cmd error detail: cannot load vision_review.py: {exc}"]
+
+    issues: list[str] = []
+    noise = (
+        "vlm_reviewer: art-anchor live-unverified (counted, never a finding): "
+        + "; ".join(
+            f"menu/{name} (node absent from draw_order: {node})"
+            for name, node in (
+                ("party_list", "ListPlate"),
+                ("party_summary_plate", "SummaryPlate"),
+                ("bag_list_plate", "BackgroundList"),
+                ("bag_item_row", "PickerPlate"),
+                ("storage_box_plate", "BoxPlate"),
+                ("storage_party_plate", "PartyPlate"),
+            )
+        )
+    )
+    real = ("vlm_reviewer: internal error: RuntimeError: required vision model "
+            "failed: RuntimeError: required vision review incomplete: "
+            "passes 1/1, answers 6/7")
+    detail = vision_review.reviewer_cmd_error_detail(noise + "\n" + real)
+    if "answers 6/7" not in detail:
+        issues.append(
+            "reviewer_cmd_error_detail must surface the incomplete-answers line, "
+            f"not the leading art-anchor note; got {detail!r}"
+        )
+    if "art-anchor live-unverified" in detail:
+        issues.append(
+            "reviewer_cmd_error_detail must not prefer the art-anchor note when "
+            "an internal error line is present"
+        )
+    if vision_review.reviewer_cmd_error_detail("") != "no stderr":
+        issues.append("reviewer_cmd_error_detail must say 'no stderr' when empty")
     return issues
 
 
