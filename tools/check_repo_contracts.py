@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
 import sys
+import tempfile
 import tomllib
 
 from legibility_lib import (
@@ -413,6 +416,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(world_depth_rng_issues(root))
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
+    issues.extend(adapter_authority_gate_issues(root))
 
     return issues
 
@@ -907,6 +911,117 @@ def shot_numbering_issues(root: Path) -> list[str]:
     if biome_count < BIOME_SHOT_FLOOR:
         issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
+
+    return issues
+
+
+def adapter_authority_gate_issues(root: Path) -> list[str]:
+    """Lock Cloud adapter authority: satellite ``*_update`` names are snapshotted,
+    and a farfield-style silent copy (no ``auto_update``) still refuses/restores.
+    """
+    del root  # runner path is sibling-absolute; root is unused
+    tool_path = Path(__file__).resolve().with_name("run_playtests.py")
+    if not tool_path.exists():
+        return []
+    try:
+        runner = _load_tool("run_playtests", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"adapter authority gate: cannot load run_playtests.py: {exc}"]
+
+    issues: list[str] = []
+    gate = tuple(runner.SWEEP_GATE_SCENARIOS)
+    vision = tuple(runner.VISION_REVIEW_SCENARIOS)
+    if gate != vision:
+        issues.append(
+            "SWEEP_GATE_SCENARIOS must equal VISION_REVIEW_SCENARIOS so every "
+            f"satellite *_update name is snapshotted; gate={gate} vision={vision}"
+        )
+    satellite_updates = [
+        name for name in runner.SATELLITE_SWEEP_SCENARIOS
+        if str(name).endswith("_update")
+    ]
+    if satellite_updates:
+        issues.append(
+            "SATELLITE_SWEEP_SCENARIOS must stay compare-only (verify_all S9); "
+            f"found update names {satellite_updates}"
+        )
+
+    apple = b'{"capture_env":{"adapter_name":"Apple M4"}}'
+    lava = b'{"capture_env":{"adapter_name":"llvmpipe"}}'
+    shot = "42_far_landmark.png"
+
+    def write_pair(directory: Path, adapter: bytes) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / shot).write_bytes(b"png")
+        (directory / f"{shot}.sidecar.json").write_bytes(adapter)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project = Path(tmp)
+        baseline_dir = project / "docs" / "generated" / "visual-baselines"
+        shots_dir = project / ".godot-smoke" / "shots"
+        write_pair(baseline_dir, apple)
+        snapshot = {
+            path.name: path.read_bytes()
+            for path in baseline_dir.iterdir() if path.is_file()
+        }
+        write_pair(shots_dir, lava)
+        write_pair(baseline_dir, lava)
+        sink = io.StringIO()
+        farfield = {
+            "scenario": "visual_sweep_farfield",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "compare", "shots": [shot]},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, farfield, snapshot)
+        if farfield.get("ok") is not False:
+            issues.append(
+                "adapter authority gate did not refuse a silent farfield baseline copy"
+            )
+        err = farfield.get("error") or {}
+        if not isinstance(err, dict) or err.get("code") != "adapter_baseline_refused":
+            issues.append(
+                f"silent farfield copy must set adapter_baseline_refused, got {err!r}"
+            )
+        if (baseline_dir / f"{shot}.sidecar.json").read_bytes() != apple:
+            issues.append("silent farfield copy did not restore the Apple M4 sidecar")
+
+        write_pair(baseline_dir, lava)
+        fishing = {
+            "scenario": "visual_sweep_fishing_update",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "update"},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, fishing, snapshot)
+        if fishing.get("ok") is not False:
+            issues.append(
+                "adapter authority gate did not refuse visual_sweep_fishing_update"
+            )
+        ferr = fishing.get("error") or {}
+        if not isinstance(ferr, dict) or ferr.get("code") != "adapter_baseline_refused":
+            issues.append(
+                f"fishing_update must set adapter_baseline_refused, got {ferr!r}"
+            )
+        if (baseline_dir / f"{shot}.sidecar.json").read_bytes() != apple:
+            issues.append("fishing_update did not restore the Apple M4 sidecar")
+
+        write_pair(baseline_dir, apple)
+        compare = {
+            "scenario": "visual_sweep_farfield",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "compare"},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, compare, snapshot)
+        if compare.get("ok") is not True or compare.get("error") is not None:
+            issues.append("unmutated farfield compare must remain a no-op")
 
     return issues
 

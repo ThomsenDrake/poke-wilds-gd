@@ -174,8 +174,9 @@ both harnesses and the gate. Where the envelopes live:
   crash/errors retryable — both transports), `sidecar_seed_mismatch` (not
   retryable), `contrast_failed` (graduated findings not retryable, tool
   crash/errors retryable),   `anchor_refused` (baseline-regeneration refusal not
-  retryable, gate load crash retryable), `adapter_baseline_refused` (Cloud/lavapipe
-  auto-update of Apple M4 baselines not retryable; prior files restored), `anchor_drift_failed` (graduated
+  retryable, gate load crash retryable),   `adapter_baseline_refused` (Cloud/lavapipe
+  write of Apple M4 baselines — explicit `*_update` or a silent farfield copy —
+  not retryable; prior files restored), `anchor_drift_failed` (graduated
   drift; not retryable), `soak_tripwire` (corrupt pin / warning-count
   regression not retryable, pin-write IO failure retryable), and the Lane-4
   review codes `vision_review_failed` / `vision_review_stale` (retryable) /
