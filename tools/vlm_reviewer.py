@@ -192,6 +192,7 @@ class Config:
             "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
+            "command_code_key_present": bool(os.environ.get("COMMAND_CODE_API_KEY")),
             "temperature": 0.2 if self.independent_vote else 0,
             "n": self.n,
             "vote": "both-passes-must-emit (unanimity)",
@@ -569,6 +570,9 @@ def _command_code_available() -> tuple[bool, str]:
     cmd = shutil.which("cmd")
     if not cmd:
         return False, "cmd CLI not found"
+    auth_file = Path.home() / ".commandcode" / "auth.json"
+    if not os.environ.get("COMMAND_CODE_API_KEY") and not auth_file.is_file():
+        return False, "COMMAND_CODE_API_KEY unset and no ~/.commandcode/auth.json"
     try:
         proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
                               timeout=PROBE_TIMEOUT, check=False)

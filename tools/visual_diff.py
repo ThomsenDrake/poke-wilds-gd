@@ -177,6 +177,39 @@ def compare_pair(shot_path: Path, base_path: Path, tolerance: int) -> dict:
     return record
 
 
+def read_adapter_name(png_path: Path) -> str | None:
+    """Sidecar capture_env.adapter_name for a PNG, or None if unreadable."""
+    sidecar = Path(str(png_path) + ".sidecar.json")
+    try:
+        doc = json.loads(sidecar.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    env = doc.get("capture_env") if isinstance(doc, dict) else None
+    if not isinstance(env, dict):
+        return None
+    name = env.get("adapter_name")
+    return str(name) if name else None
+
+
+def paired_adapter_mismatch(shots_dir: Path, baseline_dir: Path) -> dict | None:
+    """First fresh/baseline adapter_name pair that differs, else None.
+
+    Pixel baselines are hardware-stamped (Apple M4 vs lavapipe, etc.). A
+    mismatch means PNG/region compare is not authority on this machine.
+    """
+    if not shots_dir.is_dir() or not baseline_dir.is_dir():
+        return None
+    for shot in sorted(shots_dir.glob("*.png")):
+        baseline = baseline_dir / shot.name
+        if not baseline.is_file():
+            continue
+        fresh = read_adapter_name(shot)
+        base = read_adapter_name(baseline)
+        if fresh and base and fresh != base:
+            return {"fresh": fresh, "baseline": base, "shot": shot.name}
+    return None
+
+
 def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, tolerance: int) -> dict:
     if not shots_dir.is_dir():
         return {"ok": False, "errors": [f"shots directory missing: {shots_dir}"]}
@@ -204,6 +237,19 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
     mismatched = sorted(name for name, pct in per_shot.items() if pct > threshold_pct)
     max_drift = max(per_shot.values(), default=0.0)
     compared = len(per_shot)
+    adapter = paired_adapter_mismatch(shots_dir, baseline_dir)
+    skipped_mismatched: list[str] = []
+    pixel_compare = "compared"
+    if adapter and mismatched:
+        skipped_mismatched = mismatched
+        mismatched = []
+        pixel_compare = "skipped_adapter_mismatch"
+        print(
+            f"visual_diff: skipping pixel fail (adapter {adapter['fresh']} != "
+            f"{adapter['baseline']} on {adapter['shot']}); recorded "
+            f"{len(skipped_mismatched)} drifted shot(s)",
+            file=sys.stderr,
+        )
     ok = not errors and not missing_baselines and not uncaptured_baselines and not mismatched
     return {
         "ok": ok,
@@ -216,6 +262,9 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
         "errors": errors,
         "threshold_pct": threshold_pct,
         "tolerance": tolerance,
+        "adapter_mismatch": adapter,
+        "pixel_compare": pixel_compare,
+        "skipped_mismatched": skipped_mismatched,
         "_records": records,
     }
 

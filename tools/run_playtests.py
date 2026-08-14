@@ -813,6 +813,17 @@ def apply_region_gate(project: Path, result: dict[str, Any]) -> None:
         return
     if update_mode:
         return
+    shots_dir = project / ".godot-smoke" / "shots"
+    adapter = _load_tool_module("visual_diff").paired_adapter_mismatch(
+        shots_dir, _baseline_dir(project))
+    if adapter:
+        result["pixel_compare"] = "skipped_adapter_mismatch"
+        result["adapter_fresh"] = adapter["fresh"]
+        result["adapter_baseline"] = adapter["baseline"]
+        print(f"  {scenario}: skipping region pixel compare "
+              f"(adapter {adapter['fresh']} != {adapter['baseline']} on "
+              f"{adapter['shot']}); sidecar-seed and VLM review still run")
+        return
     try:
         verdict = _load_region_diff().run_region_diff(
             project / ".godot-smoke" / "shots",

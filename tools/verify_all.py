@@ -161,6 +161,15 @@ def _stamp_mismatch_error() -> dict:
         "result, then re-run python3 tools/verify_all.py.")
 
 
+def _adapter_mismatch_error() -> dict:
+    return _error_envelope(
+        "adapter_mismatch", False,
+        "PNG/region pixel compare is not certified on this GPU adapter; "
+        "Mac baselines stay local pixel authority. Keep the windowed "
+        "transport and Lane-4 VLM review; do not regenerate Mac baselines "
+        "from this machine.")
+
+
 def _windowed_lane_error(scenario: str) -> dict:
     return _error_envelope(
         "windowed_lane_missing", True,
@@ -193,6 +202,11 @@ def _git_head() -> str | None:
         return None
     sha = proc.stdout.strip()
     return sha if proc.returncode == 0 and sha else None
+
+
+def _load_visual_diff():
+    """Sanctioned importlib load of visual_diff (adapter-mismatch helper)."""
+    return _load_tool("visual_diff", ROOT / "tools" / "visual_diff.py")
 
 
 def _load_vision_review():
@@ -713,6 +727,20 @@ class Runner:
                     self.refuse("windowed_stamps_vs_environment", True,
                                 "godot_version/renderer/window match baseline capture_env + "
                                 "canonical window")
+                adapter = _load_visual_diff().paired_adapter_mismatch(
+                    SHOTS_DIR, BATTLE_SIDECAR.parent)
+                if adapter:
+                    self.refuse(
+                        "windowed_adapter_authority", False,
+                        f"fresh adapter {adapter['fresh']} != baseline "
+                        f"{adapter['baseline']} ({adapter['shot']}) — PNG/region "
+                        f"compare is not pixel authority on this machine; Lane-4 "
+                        f"VLM review remains the Cloud visual check",
+                        level="warn", error=_adapter_mismatch_error())
+                else:
+                    self.refuse("windowed_adapter_authority", True,
+                                "fresh capture_env.adapter_name matches the "
+                                "baseline sidecar (pixel compare is authority)")
 
             # R4 — visual_sweep entry present with windowed transport (guards
             # against PLAYTEST_FORCE_HEADLESS leaking into the windowed env).
@@ -871,6 +899,8 @@ class Runner:
                        if sweep_doc.get("godot_version") is not None else None)
         renderer_match = (sweep_doc.get("renderer") == capture_env.get("renderer")
                           if sweep_doc.get("renderer") is not None else None)
+        adapter = _load_visual_diff().paired_adapter_mismatch(
+            SHOTS_DIR, BATTLE_SIDECAR.parent) if SHOTS_DIR.is_dir() else None
         return {
             "git_head": head,
             "report_head_sha": report_heads,
@@ -883,6 +913,9 @@ class Runner:
             "renderer": {"report": sweep_doc.get("renderer"),
                          "baseline_capture_env": capture_env.get("renderer"),
                          "match": renderer_match},
+            "adapter": {"fresh": None if adapter is None else adapter.get("fresh"),
+                        "baseline": None if adapter is None else adapter.get("baseline"),
+                        "match": adapter is None},
             "vision_review_fresh": self._vision_review_fresh(),
             "rubric_coverage_gaps": self._vision_coverage_gaps(),
         }
@@ -956,6 +989,9 @@ class Runner:
         print(f"  renderer:        report={stamps['renderer']['report']} "
               f"baseline={stamps['renderer']['baseline_capture_env']} "
               f"match={stamps['renderer']['match']}")
+        print(f"  adapter:         fresh={stamps['adapter']['fresh']} "
+              f"baseline={stamps['adapter']['baseline']} "
+              f"match={stamps['adapter']['match']}")
         print(f"  vision_review:   fresh={stamps['vision_review_fresh']}")
         meaning = {
             EXIT_GREEN: "GREEN — every step passed, no refusal fired",

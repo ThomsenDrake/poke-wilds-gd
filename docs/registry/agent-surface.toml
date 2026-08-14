@@ -131,6 +131,9 @@ worktree_quick_setup_command = "python3 tools/setup_worktree.py --quick"
 gate_tool_path = "tools/verify_all.py"
 display_less_command = "python3 tools/verify_all.py --skip-windowed"
 full_command = "python3 tools/verify_all.py"
+cloud_display_tool_path = "tools/ensure_cloud_display.sh"
+cloud_install_tool_path = ".cursor/install.sh"
+cloud_start_tool_path = ".cursor/start.sh"
 
 [errors]
 # Every agent-facing failure is an error-as-directive: a stable code, a

@@ -54,6 +54,25 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 - `legibility_soak` gates the agent-legibility surfaces: it drives the five agent-facing screens and asserts the ui_tree dumps, the `game/*` Performance monitors, and the trace lifecycle agree (details: `docs/RELIABILITY.md` § Runtime smoke checks).
 - Lane 4 (VLM vision review): every windowed sweep run regenerates `.godot-smoke/vision-review.json` via `tools/vlm_reviewer.py` (quarantine-forever findings; `verify_all` R6 refuses a stale manifest) — see `docs/RELIABILITY.md` § Agent vision review.
 
+## Cursor Cloud specific instructions
+
+Cursor Cloud VMs can run the windowed + Lane-4 path. They do **not** certify Mac PNG baselines (those are `forward_plus` + `Apple M4` hardware stamps). On adapter mismatch the pixel/region compare is skipped (warn, never a silent pass) and Command Code reviews the live frames.
+
+```bash
+bash .cursor/start.sh                          # DISPLAY + lavapipe; reuses a live desktop
+python3 tools/verify_all.py --skip-windowed    # still the honest path if display/VLM is down
+python3 tools/verify_all.py --windowed-timeout 1800   # full gate once DISPLAY + cmd + COMMAND_CODE_API_KEY are up
+```
+
+Required Cloud env (never commit values):
+
+- `GODOT_BIN` — set by `.cursor/install.sh` to `$HOME/godot-bin/godot`
+- `DISPLAY` — set by `tools/ensure_cloud_display.sh` (reuses computer-use `:1` when live)
+- `COMMAND_CODE_API_KEY` — environment secret; Command Code CLI (`cmd`) is the Lane-4 backend
+- `COMMANDCODE_SKIP_UPDATES=1` — persist across boots so the CLI does not self-update mid-run
+
+Install/start live in `.cursor/install.sh` and `.cursor/start.sh`. The personal Cloud environment must Save those scripts (and the API key secret) before new agents inherit them.
+
 ## Common Entry Points
 
 - App scene: `res://scenes/app/Main.tscn`

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-13
+Last verified: 2026-08-14
 Review cadence days: 14
 Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
@@ -185,7 +185,10 @@ both harnesses and the gate. Where the envelopes live:
   `code` / `retryable` / `hint` beside `check` / `ok` / `detail` / `level`
   (`null` for passing rows and envelope-less tool errors; the `detail` text and
   exit-code semantics are unchanged). Stable codes: `stale_head_sha` (R1),
-  `report_invalid` (R2), `stamp_mismatch` (R3), `windowed_lane_missing` (R4),
+  `report_invalid` (R2),   `stamp_mismatch` (R3), `adapter_mismatch` (R3 adapter-authority warn when
+  `capture_env.adapter_name` differs — PNG/region compare is not certified;
+  never a silent pass and never an exit-escalating refusal),
+  `windowed_lane_missing` (R4),
   `dap_endpoint_unreachable` (R5), `vision_review_stale` (R6, including its
   warn-tier degradation under `--skip-windowed`).
 
