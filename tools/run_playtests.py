@@ -443,6 +443,8 @@ def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bi
                *godot_audio_args()]
     try:
         try:
+            env = os.environ.copy()
+            env.setdefault("GODOT_AUDIO_DRIVER", "Dummy")
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(project),
@@ -451,6 +453,7 @@ def run_scenario_headless(project: Path, scenario: str, timeout: float, godot_bi
                 text=True,
                 errors="replace",
                 bufsize=1,
+                env=env,
             )
         except OSError as exc:
             exceptions.append(f"Could not launch the Godot binary at {godot_bin}: {exc}")

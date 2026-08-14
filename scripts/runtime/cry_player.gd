@@ -27,7 +27,7 @@ func play_cry(dex_number: int) -> void:
 	# Headless has no audio device; a cry playing at process exit leaks the OGG
 	# stream (the mixer thread holds it past the ResourceCache sweep). Gate
 	# before create/play so headless battle scenarios stay leak-free.
-	if DisplayServer.get_name() == "headless":
+	if not _playback_allowed():
 		return
 	var cry_path := cry_path_for_dex(dex_number)
 	if not ResourceLoader.exists(cry_path):
@@ -47,6 +47,13 @@ func play_cry(dex_number: int) -> void:
 	player.volume_db = VOLUME_DB
 	if player.is_inside_tree():
 		player.play()
+
+
+static func _playback_allowed() -> bool:
+	# Same leak class as music_router: Dummy still holds the OGG chain at quit.
+	if DisplayServer.get_name() == "headless":
+		return false
+	return str(OS.get_environment("GODOT_AUDIO_DRIVER")).to_lower() != "dummy"
 
 
 func stop() -> void:

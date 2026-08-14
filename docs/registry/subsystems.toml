@@ -243,6 +243,10 @@ validation_commands = [
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
+# CLOUD DUMMY-AUDIO LEAK GATE (2026-08-14): music_router + cry_player also
+# skip create/play when GODOT_AUDIO_DRIVER=Dummy (playtest/Cloud driver).
+# Dummy still holds the OGG chain at quit — same leak class as headless.
+# music_track_selected emits before the gate. Windowed _exit_tree stop remains.
 # SEEDED-SMOKE CREATION-ORDER REPAIR (2026-08-11): seed_for_smoke resets the
 # PokemonRules creation nonce alongside the three RNG streams, so fresh and
 # already-loaded boots produce the same scripted save under (code, save, seed).
