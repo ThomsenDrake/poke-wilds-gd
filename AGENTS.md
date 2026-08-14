@@ -54,6 +54,28 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 - `legibility_soak` gates the agent-legibility surfaces: it drives the five agent-facing screens and asserts the ui_tree dumps, the `game/*` Performance monitors, and the trace lifecycle agree (details: `docs/RELIABILITY.md` § Runtime smoke checks).
 - Lane 4 (VLM vision review): every windowed sweep run regenerates `.godot-smoke/vision-review.json` via `tools/vlm_reviewer.py` (quarantine-forever findings; `verify_all` R6 refuses a stale manifest) — see `docs/RELIABILITY.md` § Agent vision review.
 
+## Cursor Cloud specific instructions
+
+Cursor Cloud VMs can run the windowed + Lane-4 path. They do **not** certify Mac PNG baselines (those are `forward_plus` + `Apple M4` hardware stamps). On adapter mismatch the pixel/region compare is skipped (warn, never a silent pass) and Command Code reviews the live frames. Paired shots still appear in `per_shot` so satellite `*_passed` coverage checks do not suppress the VLM path. A missing-shot `auto_update` (or a satellite copy that omits `auto_update`, including `*_update` names) that would copy lavapipe frames over committed Mac baselines is refused and the pre-run snapshot is restored.
+
+```bash
+bash .cursor/start.sh                          # DISPLAY + lavapipe; reuses a live desktop
+python3 tools/verify_all.py --skip-windowed    # still the honest path if display/VLM is down
+python3 tools/verify_all.py --windowed-timeout 1800   # full gate once DISPLAY + cmd + COMMAND_CODE_API_KEY are up
+```
+
+`start.sh` is a short-lived child of `environment.json` `start`. It writes `~/.pokewilds-cloud.env` (no secrets). Later interactive shells source that file via a bashrc/profile hook; `tools/verify_all.py` / `tools/run_playtests.py` load it through `tools/cloud_env.py` when `DISPLAY` is unset or dead, and prepend `$HOME/.local/bin` so `cmd` is found without a login PATH. A manual `source ~/.pokewilds-cloud.env` is not required.
+
+Required Cloud env (never commit values):
+
+- `GODOT_BIN` — set by `.cursor/install.sh` to `$HOME/godot-bin/godot`
+- `DISPLAY` — set by `tools/ensure_cloud_display.sh` (reuses computer-use `:1` when live). Installer provisions `x11-utils` (`xdpyinfo`); the probe falls back to `/tmp/.X11-unix` if that binary is missing.
+- `COMMAND_CODE_API_KEY` — environment secret; Command Code CLI (`cmd`) is the Lane-4 backend
+- `COMMANDCODE_SKIP_UPDATES=1` — persist across boots so the CLI does not self-update mid-run
+- `GODOT_AUDIO_DRIVER=Dummy` — no ALSA card on Cloud; Dummy avoids Godot's `ERR_CANT_OPEN` false-red through miss-002 `ERROR:` capture
+
+Install/start live in `.cursor/install.sh` and `.cursor/start.sh`. The personal Cloud environment must Save those scripts (and the API key secret) before new agents inherit them.
+
 ## Common Entry Points
 
 - App scene: `res://scenes/app/Main.tscn`

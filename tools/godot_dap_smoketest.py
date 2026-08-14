@@ -16,6 +16,20 @@ from typing import Any
 
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 
+
+def _apply_cloud_env() -> None:
+    # start.sh is a child of environment.json `start`; inherit DISPLAY here.
+    spec = importlib.util.spec_from_file_location(
+        "cloud_env", Path(__file__).resolve().with_name("cloud_env.py"))
+    if spec is None or spec.loader is None:
+        return
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.load_cloud_env()
+
+
+_apply_cloud_env()
+
 # Error markers BOTH transports treat as a scenario exception. push_error prints
 # "ERROR: <message>" (followed by an unmarked "at:" backtrace line), so the
 # "ERROR: " prefix captures every scripted failure reason the old
@@ -27,10 +41,12 @@ ERROR_MARKERS = ("SCRIPT ERROR", "Parse Error", "ERROR: ")
 # Scenarios that need a real resizable window (editor-managed DAP game windows
 # reject programmatic resize) — the playtest runner launches them as standalone
 # windowed subprocesses. Single-sourced here; run_playtests.py imports it.
-WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "visual_sweep", "visual_sweep_update",
+WINDOWED_SUBPROCESS_SCENARIOS = {"display_matrix", "ui_render_audit",
+                                 "visual_sweep", "visual_sweep_update",
                                  "visual_sweep_camping", "visual_sweep_camping_update",
                                  "visual_sweep_storage", "visual_sweep_storage_update",
                                  "visual_sweep_pokemon", "visual_sweep_pokemon_update",
+                                 "visual_sweep_overworld", "visual_sweep_overworld_update",
                                  "visual_sweep_fishing", "visual_sweep_fishing_update",
                                  "visual_sweep_world_depth", "visual_sweep_world_depth_update",
                                  "visual_sweep_farfield", "visual_sweep_farfield_update",

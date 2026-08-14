@@ -192,6 +192,7 @@ class Config:
             "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
+            "command_code_key_present": bool(os.environ.get("COMMAND_CODE_API_KEY")),
             "temperature": 0.2 if self.independent_vote else 0,
             "n": self.n,
             "vote": "both-passes-must-emit (unanimity)",
@@ -497,6 +498,33 @@ def build_system_prompt(public_ctx: dict, catalog: str, questions: list[dict], c
     )
 
 
+def ordered_review_entries(cfg: Config, public_ctx: dict, order: list[str]) -> list[tuple[str, str]]:
+    """(rel, kind) in the same order ``build_user_content`` encodes as images.
+
+    kind is som_before|som_after|raw_before|raw_after|crop. Command Code lists
+    these local paths; the HTTP backends encode the same files as base64.
+    """
+    paths = public_ctx.get("paths") or {}
+    entries: list[tuple[str, str]] = []
+    som_key = {"before": ("som_before", paths.get("som_before")),
+               "after": ("som_after", paths.get("som_after"))}
+    for which in order:
+        kind, rel = som_key[which]
+        if rel and _abs(cfg, rel).is_file():
+            entries.append((str(rel), kind))
+    if cfg.send_raw_frames:
+        raw_key = {"before": ("raw_before", paths.get("before")),
+                   "after": ("raw_after", paths.get("after"))}
+        for which in order:
+            kind, rel = raw_key[which]
+            if rel and _abs(cfg, rel).is_file():
+                entries.append((str(rel), kind))
+    for rel in (paths.get("crops") or [])[:MAX_CROPS]:
+        if rel and _abs(cfg, rel).is_file():
+            entries.append((str(rel), "crop"))
+    return entries
+
+
 def build_user_content(cfg: Config, public_ctx: dict, order: list[str]) -> tuple[str, list[str], list[str]]:
     """Returns (user_text, image_b64_list, image_labels). The before/after SoM
     frames are emitted in `order` (shuffled per pass) and LABELED correctly so
@@ -513,30 +541,23 @@ def build_user_content(cfg: Config, public_ctx: dict, order: list[str]) -> tuple
 
     images: list[str] = []
     labels: list[str] = []
-    role = {"before": "BASE (baseline/before)", "after": "FRESH (current/after)"}
-    som_key = {"before": paths.get("som_before"), "after": paths.get("som_after")}
-    for which in order:  # shuffled before/after order, correctly labeled
-        rel = som_key.get(which)
-        if rel:
-            b = _b64(_abs(cfg, rel))
-            if b:
-                images.append(b)
-                labels.append(f"Image {len(images)}: {role[which]} full-frame Set-of-Mark overlay "
-                              f"(regions outlined + numbered; see catalog for mark->region_id).")
-    if cfg.send_raw_frames:
-        raw_key = {"before": paths.get("before"), "after": paths.get("after")}
-        for which in order:
-            rel = raw_key.get(which)
-            if rel:
-                b = _b64(_abs(cfg, rel))
-                if b:
-                    images.append(b)
-                    labels.append(f"Image {len(images)}: {role[which]} raw full frame (no overlay).")
-    for rel in (paths.get("crops") or [])[:MAX_CROPS]:
-        b = _b64(_abs(cfg, rel))
-        if b:
-            images.append(b)
-            labels.append(f"Image {len(images)}: native-resolution base|fresh twin crop of a changed "
+    role = {
+        "som_before": "BASE (baseline/before)", "som_after": "FRESH (current/after)",
+        "raw_before": "BASE (baseline/before)", "raw_after": "FRESH (current/after)",
+    }
+    for rel, kind in ordered_review_entries(cfg, public_ctx, order):
+        encoded = _b64(_abs(cfg, rel))
+        if not encoded:
+            continue
+        images.append(encoded)
+        n = len(images)
+        if kind.startswith("som_"):
+            labels.append(f"Image {n}: {role[kind]} full-frame Set-of-Mark overlay "
+                          f"(regions outlined + numbered; see catalog for mark->region_id).")
+        elif kind.startswith("raw_"):
+            labels.append(f"Image {n}: {role[kind]} raw full frame (no overlay).")
+        else:
+            labels.append(f"Image {n}: native-resolution base|fresh twin crop of a changed "
                           f"region (BASE on the left, FRESH on the right).")
 
     cluster_txt = ""
@@ -565,10 +586,24 @@ def build_user_content(cfg: Config, public_ctx: dict, order: list[str]) -> tuple
 # --------------------------------------------------------------------------
 # Command Code headless dispatch
 # --------------------------------------------------------------------------
+def _cmd_executable() -> str | None:
+    """Resolve the Command Code CLI even when ~/.local/bin is not on PATH."""
+    found = shutil.which("cmd")
+    if found:
+        return found
+    candidate = Path.home() / ".local" / "bin" / "cmd"
+    if os.access(candidate, os.X_OK):
+        return str(candidate)
+    return None
+
+
 def _command_code_available() -> tuple[bool, str]:
-    cmd = shutil.which("cmd")
+    cmd = _cmd_executable()
     if not cmd:
         return False, "cmd CLI not found"
+    auth_file = Path.home() / ".commandcode" / "auth.json"
+    if not os.environ.get("COMMAND_CODE_API_KEY") and not auth_file.is_file():
+        return False, "COMMAND_CODE_API_KEY unset and no ~/.commandcode/auth.json"
     try:
         proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
                               timeout=PROBE_TIMEOUT, check=False)
@@ -579,10 +614,12 @@ def _command_code_available() -> tuple[bool, str]:
     return True, "cmd CLI available"
 
 
-def _command_code_prompt(cfg: Config, public_ctx: dict, system: str, user_text: str) -> str:
-    paths = public_ctx.get("paths") or {}
-    images = [paths.get("before"), paths.get("after"), paths.get("som_before"), paths.get("som_after")]
-    image_paths = [str((cfg.base_dir / p).resolve()) for p in images if p]
+def _command_code_prompt(cfg: Config, public_ctx: dict, system: str, user_text: str,
+                         order: list[str]) -> str:
+    image_paths = [
+        str(_abs(cfg, rel).resolve())
+        for rel, _kind in ordered_review_entries(cfg, public_ctx, order)
+    ]
     return (
         f"{system}\n\n{user_text}\n\n"
         "Use the file/image tools to inspect these local PNGs directly:\n" +
@@ -592,15 +629,23 @@ def _command_code_prompt(cfg: Config, public_ctx: dict, system: str, user_text: 
     )
 
 
-def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dict) -> str:
-    cmd = shutil.which("cmd")
+def command_code_argv(cmd: str, prompt: str, cfg: Config) -> list[str]:
+    """Headless inspect-only argv. Plan mode — never --auto-accept."""
+    return [
+        cmd, "-p", prompt, "--model", cfg.command_code_model, "--no-session",
+        "--skip-onboarding", "--permission-mode", "plan", "--max-turns", "8",
+        "--effort", "low", "--output-format", "text", "--add-dir", str(ROOT),
+    ]
+
+
+def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dict,
+                       order: list[str]) -> str:
+    cmd = _cmd_executable()
     if not cmd:
         raise RuntimeError("cmd CLI not found")
-    prompt = _command_code_prompt(cfg, public_ctx, system, user_text)
+    prompt = _command_code_prompt(cfg, public_ctx, system, user_text, order)
     proc = subprocess.run(
-        [cmd, "-p", prompt, "--model", cfg.command_code_model, "--no-session",
-         "--skip-onboarding", "--auto-accept", "--max-turns", "8",
-         "--effort", "low", "--output-format", "text", "--add-dir", str(ROOT)],
+        command_code_argv(cmd, prompt, cfg),
         capture_output=True, text=True, timeout=cfg.timeout, check=False,
     )
     if proc.returncode != 0:
@@ -688,9 +733,11 @@ def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,
-                 images: list[str], temperature: float, seed: int, public_ctx: dict) -> str:
+                 images: list[str], temperature: float, seed: int, public_ctx: dict,
+                 order: list[str] | None = None) -> str:
     if backend == "command_code":
-        return _call_command_code(cfg, system, user_text, public_ctx)
+        return _call_command_code(cfg, system, user_text, public_ctx,
+                                 list(order or ["before", "after"]))
     if backend == "ollama":
         return _call_ollama(cfg, system, user_text, images, temperature, seed)
     return _call_dashscope(cfg, system, user_text, images, temperature, seed)
@@ -717,7 +764,8 @@ def _extract_json(text: str):
 def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
                        images: list[str], temperature: float, seed: int,
                        public_ctx: dict, content: str,
-                       list_key: str = "answers") -> tuple[dict | None, str]:
+                       list_key: str = "answers",
+                       order: list[str] | None = None) -> tuple[dict | None, str]:
     # list_key: the required top-level list field. The review passes use
     # "answers"; the self-critique pass returns "refutations" — accepting only
     # "answers" there made every valid critique read as malformed (dead pass).
@@ -735,7 +783,8 @@ def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
     repair_system = (system + "\n\nYour last reply was not valid JSON matching the schema. "
                      "Return ONLY the JSON object now. Error: %s" % first_err)
     try:
-        content2 = _call_model(cfg, backend, repair_system, user_text, images, temperature, seed + 7919, public_ctx)
+        content2 = _call_model(cfg, backend, repair_system, user_text, images,
+                               temperature, seed + 7919, public_ctx, order)
         doc = _extract_json(content2)
         if _valid(doc):
             return doc, "repaired"
@@ -885,9 +934,11 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
         rng.shuffle(order)
         seed = (cfg.seed * 1000 + i * 17) if cfg.independent_vote else cfg.seed
         user_text, images, _labels = build_user_content(cfg, public_ctx, order)
-        content = _call_model(cfg, backend, system, user_text, images, temperature, seed, public_ctx)
+        content = _call_model(cfg, backend, system, user_text, images, temperature, seed,
+                             public_ctx, order)
         doc, parse_note = _parse_with_repair(cfg, backend, system, user_text, images,
-                                             temperature, seed, public_ctx, content)
+                                             temperature, seed, public_ctx, content,
+                                             order=order)
         if doc is None:
             per_pass.append({"pass": i, "order": order, "parse": parse_note, "answers": 0})
             # an unparseable pass votes ABSENT: it is never added to `passes`, and
@@ -958,10 +1009,10 @@ def _self_critique(public_ctx: dict, cfg: Config, backend: str, catalog: str,
     order = ["before", "after"]
     _ut, images, _labels = build_user_content(cfg, public_ctx, order)
     content = _call_model(cfg, backend, system, user_text + "\n\n" + _ut, images,
-                          temperature, cfg.seed + 99, public_ctx)
+                          temperature, cfg.seed + 99, public_ctx, order)
     doc, parse_note = _parse_with_repair(cfg, backend, system, user_text, images,
                                          temperature, cfg.seed + 99, public_ctx, content,
-                                         list_key="refutations")
+                                         list_key="refutations", order=order)
     if not isinstance(doc, dict):
         return answers, {"ran": False, "reason": f"critique unparseable: {parse_note}"}
     refuted_ids: set[str] = set()

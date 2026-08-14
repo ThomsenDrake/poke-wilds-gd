@@ -7,8 +7,8 @@
 # PokeAPI cache and importing the Godot resource tree. With environment builds
 # this runs once to create the baseline snapshot; a warm re-run is a fast no-op.
 #
-# End-to-end validation lives in tools/verify_all.py --skip-windowed (the honest
-# display-less path); this script only prepares the inputs that gate needs.
+# Windowed + Lane-4 validation needs a display (start.sh) and Command Code
+# (`cmd` + COMMAND_CODE_API_KEY). This script only prepares durable inputs.
 set -euo pipefail
 
 GODOT_VERSION="4.6.1-stable"
@@ -53,7 +53,55 @@ if ! grep -qxF "${GODOT_BIN_EXPORT}" "${BASHRC}"; then
   echo "${GODOT_BIN_EXPORT}" >> "${BASHRC}"
 fi
 
-# 3. Repo-native bootstrap: version checks, pinned PokeAPI cache fetch, and the
+# 3. Windowed Godot runtime libs + lavapipe (software Vulkan). Skip apt when
+#    the ICD, Xvfb, AND xdpyinfo are already present so a warm re-run stays a
+#    no-op. x11-utils is required: ensure_cloud_display.sh probes with xdpyinfo
+#    (xvfb does not depend on it). A warm image that has Xvfb but not
+#    xdpyinfo must still apt-get, or start.sh never sees a live display.
+LVP_ICD="/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+if [[ -f "${LVP_ICD}" ]] && command -v Xvfb >/dev/null && command -v xdpyinfo >/dev/null; then
+  echo "Xvfb + lavapipe + xdpyinfo already present: ${LVP_ICD}"
+else
+  echo "Installing Xvfb, x11-utils, lavapipe, and Godot X11 runtime libs..."
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    xvfb x11-utils mesa-vulkan-drivers vulkan-tools \
+    libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libxrender1 libgl1
+fi
+
+# 4. Command Code CLI (Lane-4 VLM backend). Auth is COMMAND_CODE_API_KEY from
+#    the environment secret — never written here. Node 22+ is required.
+#    Non-login install hooks omit ~/.local/bin; probe that prefix first so a
+#    warm re-run does not npm-install command-code@latest again.
+export PATH="${HOME}/.local/bin:${PATH}"
+if { command -v cmd >/dev/null || [[ -x "${HOME}/.local/bin/cmd" ]]; } \
+    && cmd --version >/dev/null 2>&1; then
+  echo "Command Code already present: $(cmd --version)"
+else
+  if ! command -v npm >/dev/null; then
+    echo "error: npm is required to install command-code (Node 22+)" >&2
+    exit 1
+  fi
+  echo "Installing Command Code CLI (command-code@latest) into ${HOME}/.local..."
+  mkdir -p "${HOME}/.local"
+  npm i -g --prefix "${HOME}/.local" command-code@latest
+  export PATH="${HOME}/.local/bin:${PATH}"
+  echo "Installed: $(cmd --version)"
+fi
+if ! grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' "${BASHRC}"; then
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${BASHRC}"
+fi
+if ! grep -qxF 'export COMMANDCODE_SKIP_UPDATES=1' "${BASHRC}"; then
+  echo 'export COMMANDCODE_SKIP_UPDATES=1' >> "${BASHRC}"
+fi
+# start.sh is a child process; later interactive shells source the env file
+# written at boot. Inert until ~/.pokewilds-cloud.env exists. No secrets.
+CLOUD_ENV_HOOK='[ -f "$HOME/.pokewilds-cloud.env" ] && . "$HOME/.pokewilds-cloud.env"'
+if ! grep -qxF "${CLOUD_ENV_HOOK}" "${BASHRC}"; then
+  echo "${CLOUD_ENV_HOOK}" >> "${BASHRC}"
+fi
+
+# 5. Repo-native bootstrap: version checks, pinned PokeAPI cache fetch, and the
 #    Godot resource import. setup_worktree.py is idempotent and never mutates
 #    tracked files (it aborts if it would). This deliberately uses the full
 #    default preparation for the reusable cloud environment snapshot; local
@@ -61,4 +109,7 @@ fi
 cd "${REPO_ROOT}"
 python3 tools/setup_worktree.py --godot-bin "${GODOT_BIN}"
 
-echo "== install complete: run 'python3 tools/verify_all.py --skip-windowed' to validate =="
+echo "== install complete =="
+echo "headless gate: python3 tools/verify_all.py --skip-windowed"
+echo "windowed + VLM: python3 tools/verify_all.py  # loads ~/.pokewilds-cloud.env when DISPLAY is unset or dead"
+echo "Command Code auth: COMMAND_CODE_API_KEY environment secret (never committed)"

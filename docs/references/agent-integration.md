@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-13
+Last verified: 2026-08-14
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -173,8 +173,10 @@ both harnesses and the gate. Where the envelopes live:
   deriver): `region_gate_failed` (RED-tier region diffs not retryable, tool
   crash/errors retryable — both transports), `sidecar_seed_mismatch` (not
   retryable), `contrast_failed` (graduated findings not retryable, tool
-  crash/errors retryable), `anchor_refused` (baseline-regeneration refusal not
-  retryable, gate load crash retryable), `anchor_drift_failed` (graduated
+  crash/errors retryable),   `anchor_refused` (baseline-regeneration refusal not
+  retryable, gate load crash retryable),   `adapter_baseline_refused` (Cloud/lavapipe
+  write of Apple M4 baselines — explicit `*_update` or a silent farfield copy —
+  not retryable; prior files restored), `anchor_drift_failed` (graduated
   drift; not retryable), `soak_tripwire` (corrupt pin / warning-count
   regression not retryable, pin-write IO failure retryable), and the Lane-4
   review codes `vision_review_failed` / `vision_review_stale` (retryable) /
@@ -185,7 +187,10 @@ both harnesses and the gate. Where the envelopes live:
   `code` / `retryable` / `hint` beside `check` / `ok` / `detail` / `level`
   (`null` for passing rows and envelope-less tool errors; the `detail` text and
   exit-code semantics are unchanged). Stable codes: `stale_head_sha` (R1),
-  `report_invalid` (R2), `stamp_mismatch` (R3), `windowed_lane_missing` (R4),
+  `report_invalid` (R2),   `stamp_mismatch` (R3), `adapter_mismatch` (R3 adapter-authority warn when
+  `capture_env.adapter_name` differs — PNG/region compare is not certified;
+  never a silent pass and never an exit-escalating refusal),
+  `windowed_lane_missing` (R4),
   `dap_endpoint_unreachable` (R5), `vision_review_stale` (R6, including its
   warn-tier degradation under `--skip-windowed`).
 
@@ -201,7 +206,11 @@ messages MUST stay imperative.
 
 Before pushing, run the local gate: `python3 tools/verify_all.py
 --skip-windowed` on a display-less machine, the full `python3
-tools/verify_all.py` otherwise. Semantics, exit codes, and refusals:
+tools/verify_all.py` otherwise. On Cursor Cloud, `environment.json` `start`
+runs `.cursor/start.sh` as a child — it writes `~/.pokewilds-cloud.env` (no
+secrets) and hooks bashrc/profile; `tools/cloud_env.py` then fills unset
+keys and replaces a dead inherited `DISPLAY` so a later `python3 tools/verify_all.py`
+does not need a manual `source`. Semantics, exit codes, and refusals:
 [docs/RELIABILITY.md](../RELIABILITY.md) § Local gate. Serialize gate runs —
 exactly one harness writer against a project at a time (the scenario request
 file and the appended trace log are shared state). If another checkout's Godot

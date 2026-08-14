@@ -80,7 +80,7 @@ func play_track_path(track_path: String) -> void:
 	# keeps the AudioServer mixer thread holding the stream past the
 	# ResourceCache sweep). Gate before create/play so the boot diagnostic and
 	# every headless scenario run stay leak-free.
-	if DisplayServer.get_name() == "headless":
+	if not _playback_allowed():
 		return
 	if not ResourceLoader.exists(track_path):
 		_warn("Music track is missing; skipping playback.", {"path": track_path})
@@ -100,6 +100,15 @@ func play_track_path(track_path: String) -> void:
 	player.volume_db = VOLUME_DB
 	if player.is_inside_tree():
 		player.play()
+
+
+static func _playback_allowed() -> bool:
+	# Headless has no device. Dummy is the playtest/Cloud driver: it still
+	# "plays" and holds the OGG chain at quit (the same leak class). The
+	# music_track_selected witness already emitted before this gate.
+	if DisplayServer.get_name() == "headless":
+		return false
+	return str(OS.get_environment("GODOT_AUDIO_DRIVER")).to_lower() != "dummy"
 
 
 func stop() -> void:

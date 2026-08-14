@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import re
+import socket
 import sys
+import tempfile
 import tomllib
 
 from legibility_lib import (
@@ -413,6 +417,10 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(world_depth_rng_issues(root))
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
+    issues.extend(adapter_authority_gate_issues(root))
+    issues.extend(command_code_reviewer_issues(root))
+    issues.extend(cloud_env_display_issues(root))
+    issues.extend(install_cmd_path_issues(root))
 
     return issues
 
@@ -907,6 +915,262 @@ def shot_numbering_issues(root: Path) -> list[str]:
     if biome_count < BIOME_SHOT_FLOOR:
         issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
+
+    return issues
+
+
+def install_cmd_path_issues(root: Path) -> list[str]:
+    """Warm install.sh must see ~/.local/bin/cmd without a login PATH."""
+    path = root / ".cursor" / "install.sh"
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f".cursor/install.sh is unreadable: {exc}"]
+    if 'export PATH="${HOME}/.local/bin:${PATH}"' not in text:
+        return [
+            ".cursor/install.sh must prepend $HOME/.local/bin to PATH before "
+            "the Command Code presence check"
+        ]
+    cmd_check = text.find("command -v cmd")
+    prepend = text.find('export PATH="${HOME}/.local/bin:${PATH}"')
+    if cmd_check == -1 or prepend == -1 or prepend > cmd_check:
+        return [
+            ".cursor/install.sh must export PATH=$HOME/.local/bin:$PATH before "
+            "command -v cmd so a warm non-login re-run does not npm-install again"
+        ]
+    return []
+
+
+def cloud_env_display_issues(root: Path) -> list[str]:
+    """Lock DISPLAY replace-if-dead so a stale Cloud desktop cannot block Xvfb."""
+    del root
+    tool_path = Path(__file__).resolve().with_name("cloud_env.py")
+    if not tool_path.exists():
+        return []
+    try:
+        cloud = _load_tool("cloud_env", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"cloud env display: cannot load cloud_env.py: {exc}"]
+
+    issues: list[str] = []
+    if cloud._display_num(":99") != "99" or cloud._display_num(":1.0") != "1":
+        issues.append("cloud_env._display_num must parse :99 and :1.0")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        x11 = Path(tmp) / "X11-unix"
+        x11.mkdir()
+        sock = x11 / "X99"
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        which = cloud.shutil.which
+        cloud.shutil.which = lambda _name: None
+        try:
+            listener.bind(str(sock))
+            if not cloud.display_alive(":99", x11_dir=x11):
+                issues.append("display_alive socket fallback missed a live X99 socket")
+            if cloud.display_alive(":1", x11_dir=x11):
+                issues.append("display_alive socket fallback must not treat a missing X1 as live")
+            (x11 / "X1").write_text("", encoding="utf-8")
+            if cloud.display_alive(":1", x11_dir=x11):
+                issues.append("display_alive must require an X11 unix socket, not a regular file")
+        finally:
+            cloud.shutil.which = which
+            listener.close()
+
+        env_file = Path(tmp) / "cloud.env"
+        env_file.write_text(
+            "export DISPLAY=:99\nexport GODOT_BIN=/persisted/godot\n",
+            encoding="utf-8",
+        )
+        dead = {"DISPLAY": ":1", "GODOT_BIN": "/inherited/godot"}
+        applied = cloud.load_cloud_env(
+            dead, path=env_file, display_probe=lambda _d: False)
+        if dead.get("DISPLAY") != ":99" or "DISPLAY" not in applied:
+            issues.append(
+                "load_cloud_env must replace a dead inherited DISPLAY with the persisted value"
+            )
+        if dead.get("GODOT_BIN") != "/inherited/godot":
+            issues.append("load_cloud_env must not overwrite a set non-DISPLAY key")
+        live = {"DISPLAY": ":1"}
+        applied_live = cloud.load_cloud_env(
+            live, path=env_file, display_probe=lambda d: d == ":1")
+        if live.get("DISPLAY") != ":1" or "DISPLAY" in applied_live:
+            issues.append("load_cloud_env must keep a live inherited DISPLAY")
+        unset: dict[str, str] = {}
+        applied_unset = cloud.load_cloud_env(
+            unset, path=env_file, display_probe=lambda _d: False)
+        if unset.get("DISPLAY") != ":99" or "DISPLAY" not in applied_unset:
+            issues.append("load_cloud_env must still fill an unset DISPLAY")
+    return issues
+
+
+def command_code_reviewer_issues(root: Path) -> list[str]:
+    """Lock Command Code reviewer to plan-only argv and ordered SoM+crop paths."""
+    del root
+    tool_path = Path(__file__).resolve().with_name("vlm_reviewer.py")
+    if not tool_path.exists():
+        return []
+    try:
+        reviewer = _load_tool("vlm_reviewer", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"command code reviewer: cannot load vlm_reviewer.py: {exc}"]
+
+    issues: list[str] = []
+    cfg = reviewer.Config(reviewer._parse_args([]))
+    argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    if "--auto-accept" in argv:
+        issues.append("vlm_reviewer Command Code argv must not use --auto-accept")
+    try:
+        mode_at = argv.index("--permission-mode")
+    except ValueError:
+        issues.append("vlm_reviewer Command Code argv must use --permission-mode plan")
+        mode_at = -1
+    if mode_at >= 0 and (mode_at + 1 >= len(argv) or argv[mode_at + 1] != "plan"):
+        issues.append("vlm_reviewer Command Code argv must set --permission-mode plan")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        for name in ("som_before.png", "som_after.png", "before.png", "after.png",
+                     "crop_a.png", "crop_b.png"):
+            (base / name).write_bytes(b"png")
+        cfg.base_dir = base
+        ctx = {"paths": {
+            "som_before": "som_before.png",
+            "som_after": "som_after.png",
+            "before": "before.png",
+            "after": "after.png",
+            "crops": ["crop_a.png", "crop_b.png"],
+        }}
+        rels = [rel for rel, _kind in reviewer.ordered_review_entries(
+            cfg, ctx, ["after", "before"])]
+        if rels != ["som_after.png", "som_before.png", "crop_a.png", "crop_b.png"]:
+            issues.append(
+                "ordered_review_entries must follow the shuffled SoM order and "
+                f"include crops; got {rels}"
+            )
+        prompt = reviewer._command_code_prompt(
+            cfg, ctx, "SYS", "USER", ["after", "before"])
+        after_at = prompt.find("som_after.png")
+        before_at = prompt.find("som_before.png")
+        crop_a_at = prompt.find("crop_a.png")
+        crop_b_at = prompt.find("crop_b.png")
+        if min(after_at, before_at, crop_a_at, crop_b_at) < 0:
+            issues.append("_command_code_prompt omitted shuffled SoM or crop paths")
+        elif not (after_at < before_at < crop_a_at < crop_b_at):
+            issues.append(
+                "_command_code_prompt path order must match shuffled SoM then crops"
+            )
+    return issues
+
+
+def adapter_authority_gate_issues(root: Path) -> list[str]:
+    """Lock Cloud adapter authority: satellite ``*_update`` names are snapshotted,
+    and a farfield-style silent copy (no ``auto_update``) still refuses/restores.
+    """
+    del root  # runner path is sibling-absolute; root is unused
+    tool_path = Path(__file__).resolve().with_name("run_playtests.py")
+    if not tool_path.exists():
+        return []
+    try:
+        runner = _load_tool("run_playtests", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"adapter authority gate: cannot load run_playtests.py: {exc}"]
+
+    issues: list[str] = []
+    gate = tuple(runner.SWEEP_GATE_SCENARIOS)
+    vision = tuple(runner.VISION_REVIEW_SCENARIOS)
+    if gate != vision:
+        issues.append(
+            "SWEEP_GATE_SCENARIOS must equal VISION_REVIEW_SCENARIOS so every "
+            f"satellite *_update name is snapshotted; gate={gate} vision={vision}"
+        )
+    satellite_updates = [
+        name for name in runner.SATELLITE_SWEEP_SCENARIOS
+        if str(name).endswith("_update")
+    ]
+    if satellite_updates:
+        issues.append(
+            "SATELLITE_SWEEP_SCENARIOS must stay compare-only (verify_all S9); "
+            f"found update names {satellite_updates}"
+        )
+
+    apple = b'{"capture_env":{"adapter_name":"Apple M4"}}'
+    lava = b'{"capture_env":{"adapter_name":"llvmpipe"}}'
+    shot = "42_far_landmark.png"
+
+    def write_pair(directory: Path, adapter: bytes) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / shot).write_bytes(b"png")
+        (directory / f"{shot}.sidecar.json").write_bytes(adapter)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        project = Path(tmp)
+        baseline_dir = project / "docs" / "generated" / "visual-baselines"
+        shots_dir = project / ".godot-smoke" / "shots"
+        write_pair(baseline_dir, apple)
+        snapshot = {
+            path.name: path.read_bytes()
+            for path in baseline_dir.iterdir() if path.is_file()
+        }
+        write_pair(shots_dir, lava)
+        write_pair(baseline_dir, lava)
+        sink = io.StringIO()
+        farfield = {
+            "scenario": "visual_sweep_farfield",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "compare", "shots": [shot]},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, farfield, snapshot)
+        if farfield.get("ok") is not False:
+            issues.append(
+                "adapter authority gate did not refuse a silent farfield baseline copy"
+            )
+        err = farfield.get("error") or {}
+        if not isinstance(err, dict) or err.get("code") != "adapter_baseline_refused":
+            issues.append(
+                f"silent farfield copy must set adapter_baseline_refused, got {err!r}"
+            )
+        if (baseline_dir / f"{shot}.sidecar.json").read_bytes() != apple:
+            issues.append("silent farfield copy did not restore the Apple M4 sidecar")
+
+        write_pair(baseline_dir, lava)
+        fishing = {
+            "scenario": "visual_sweep_fishing_update",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "update"},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, fishing, snapshot)
+        if fishing.get("ok") is not False:
+            issues.append(
+                "adapter authority gate did not refuse visual_sweep_fishing_update"
+            )
+        ferr = fishing.get("error") or {}
+        if not isinstance(ferr, dict) or ferr.get("code") != "adapter_baseline_refused":
+            issues.append(
+                f"fishing_update must set adapter_baseline_refused, got {ferr!r}"
+            )
+        if (baseline_dir / f"{shot}.sidecar.json").read_bytes() != apple:
+            issues.append("fishing_update did not restore the Apple M4 sidecar")
+
+        write_pair(baseline_dir, apple)
+        compare = {
+            "scenario": "visual_sweep_farfield",
+            "ok": True,
+            "error": None,
+            "transport": "windowed-subprocess",
+            "passed_payload": {"mode": "compare"},
+        }
+        with contextlib.redirect_stdout(sink):
+            runner.apply_adapter_authority_gate(project, compare, snapshot)
+        if compare.get("ok") is not True or compare.get("error") is not None:
+            issues.append("unmutated farfield compare must remain a no-op")
 
     return issues
 

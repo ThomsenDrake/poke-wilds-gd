@@ -12,6 +12,14 @@ Stdout carries a single JSON verdict consumed by
 scripts/app/visual_sweep_baselines.gd; human-readable lines go to stderr.
 Exit 0 = all shots within threshold, 1 = drift or missing files,
 2 = usage/decode error. CI can run this without Godot.
+
+When a fresh/baseline sidecar `capture_env.adapter_name` pair differs
+(Apple M4 vs lavapipe), PNG decode and percent-diff are skipped entirely
+(`pixel_compare: skipped_adapter_mismatch`). Paired shots still appear in
+`per_shot` (0.0, note skipped) so satellite coverage checks that require
+`per_shot.has(shot)` can emit `*_passed` and continue to VLM review.
+Missing/uncaptured names still fail. A below-threshold or decoder-error
+compare is never reported as `compared` on mismatched hardware.
 """
 
 from __future__ import annotations
@@ -177,6 +185,81 @@ def compare_pair(shot_path: Path, base_path: Path, tolerance: int) -> dict:
     return record
 
 
+def adapter_from_sidecar_bytes(data: bytes) -> str | None:
+    """capture_env.adapter_name from sidecar JSON bytes, or None if unreadable."""
+    try:
+        doc = json.loads(data.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    env = doc.get("capture_env") if isinstance(doc, dict) else None
+    if not isinstance(env, dict):
+        return None
+    name = env.get("adapter_name")
+    return str(name) if name else None
+
+
+def read_adapter_name(png_path: Path) -> str | None:
+    """Sidecar capture_env.adapter_name for a PNG, or None if unreadable."""
+    sidecar = Path(str(png_path) + ".sidecar.json")
+    try:
+        return adapter_from_sidecar_bytes(sidecar.read_bytes())
+    except OSError:
+        return None
+
+
+def paired_adapter_mismatch(shots_dir: Path, baseline_dir: Path) -> dict | None:
+    """First fresh/baseline adapter_name pair that differs, else None.
+
+    Pixel baselines are hardware-stamped (Apple M4 vs lavapipe, etc.). A
+    mismatch means PNG/region compare is not authority on this machine.
+    """
+    if not shots_dir.is_dir() or not baseline_dir.is_dir():
+        return None
+    for shot in sorted(shots_dir.glob("*.png")):
+        baseline = baseline_dir / shot.name
+        if not baseline.is_file():
+            continue
+        fresh = read_adapter_name(shot)
+        base = read_adapter_name(baseline)
+        if fresh and base and fresh != base:
+            return {"fresh": fresh, "baseline": base, "shot": shot.name}
+    return None
+
+
+def snapshot_adapter_mismatch(shots_dir: Path, snapshot: dict[str, bytes]) -> dict | None:
+    """First fresh/PRE-RUN-baseline adapter_name pair that differs.
+
+    Auto-update copies lavapipe sidecars onto the committed dir before
+    post-steps run, so paired_adapter_mismatch(live baseline dir) is blind.
+    Compare fresh shot sidecars to the snapshotted baseline sidecar bytes.
+    """
+    if not shots_dir.is_dir() or not snapshot:
+        return None
+    snap_adapters: dict[str, str] = {}
+    for name, data in snapshot.items():
+        if not name.endswith(".png.sidecar.json"):
+            continue
+        adapter = adapter_from_sidecar_bytes(data)
+        if adapter:
+            snap_adapters[name] = adapter
+    if not snap_adapters:
+        return None
+    for shot in sorted(shots_dir.glob("*.png")):
+        fresh = read_adapter_name(shot)
+        if not fresh:
+            continue
+        base = snap_adapters.get(f"{shot.name}.sidecar.json")
+        if base and fresh != base:
+            return {"fresh": fresh, "baseline": base, "shot": shot.name}
+    # New shot with no snapshotted sidecar: still refuse if the family stamp differs.
+    family = next(iter(snap_adapters.values()))
+    for shot in sorted(shots_dir.glob("*.png")):
+        fresh = read_adapter_name(shot)
+        if fresh and fresh != family:
+            return {"fresh": fresh, "baseline": family, "shot": shot.name}
+    return None
+
+
 def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, tolerance: int) -> dict:
     if not shots_dir.is_dir():
         return {"ok": False, "errors": [f"shots directory missing: {shots_dir}"]}
@@ -190,20 +273,47 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
     per_shot: dict[str, float] = {}
     records: dict[str, dict] = {}
     errors: list[str] = []
-    for name in shot_names:
-        if name in missing_baselines:
-            continue
-        try:
-            record = compare_pair(shots_dir / name, baseline_dir / name, tolerance)
-        except (PngError, OSError) as exc:
-            errors.append(f"{name}: {exc}")
-            continue
-        records[name] = record
-        per_shot[name] = record["pct_changed"]
-
-    mismatched = sorted(name for name, pct in per_shot.items() if pct > threshold_pct)
-    max_drift = max(per_shot.values(), default=0.0)
-    compared = len(per_shot)
+    skipped_mismatched: list[str] = []
+    adapter = paired_adapter_mismatch(shots_dir, baseline_dir)
+    if adapter:
+        # Sidecar adapter_name is enough: do not decode or percent-diff PNGs.
+        # Mac baselines are not authority on lavapipe (or any other mismatch),
+        # including the below-threshold and decoder-error cases.
+        pixel_compare = "skipped_adapter_mismatch"
+        print(
+            f"visual_diff: skipping pixel compare (adapter {adapter['fresh']} != "
+            f"{adapter['baseline']} on {adapter['shot']}); missing/uncaptured "
+            f"names still fail",
+            file=sys.stderr,
+        )
+        mismatched: list[str] = []
+        max_drift = 0.0
+        for name in shot_names:
+            if name in missing_baselines:
+                continue
+            per_shot[name] = 0.0
+            records[name] = {
+                "pct_changed": 0.0,
+                "changed_pixels": 0,
+                "pixels": 0,
+                "note": "skipped_adapter_mismatch",
+            }
+        compared = len(per_shot)
+    else:
+        pixel_compare = "compared"
+        for name in shot_names:
+            if name in missing_baselines:
+                continue
+            try:
+                record = compare_pair(shots_dir / name, baseline_dir / name, tolerance)
+            except (PngError, OSError) as exc:
+                errors.append(f"{name}: {exc}")
+                continue
+            records[name] = record
+            per_shot[name] = record["pct_changed"]
+        mismatched = sorted(name for name, pct in per_shot.items() if pct > threshold_pct)
+        max_drift = max(per_shot.values(), default=0.0)
+        compared = len(per_shot)
     ok = not errors and not missing_baselines and not uncaptured_baselines and not mismatched
     return {
         "ok": ok,
@@ -216,6 +326,9 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
         "errors": errors,
         "threshold_pct": threshold_pct,
         "tolerance": tolerance,
+        "adapter_mismatch": adapter,
+        "pixel_compare": pixel_compare,
+        "skipped_mismatched": skipped_mismatched,
         "_records": records,
     }
 
