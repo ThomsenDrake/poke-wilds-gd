@@ -420,6 +420,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(adapter_authority_gate_issues(root))
     issues.extend(command_code_reviewer_issues(root))
     issues.extend(cloud_env_display_issues(root))
+    issues.extend(install_cmd_path_issues(root))
 
     return issues
 
@@ -916,6 +917,30 @@ def shot_numbering_issues(root: Path) -> list[str]:
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
 
     return issues
+
+
+def install_cmd_path_issues(root: Path) -> list[str]:
+    """Warm install.sh must see ~/.local/bin/cmd without a login PATH."""
+    path = root / ".cursor" / "install.sh"
+    if not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return [f".cursor/install.sh is unreadable: {exc}"]
+    if 'export PATH="${HOME}/.local/bin:${PATH}"' not in text:
+        return [
+            ".cursor/install.sh must prepend $HOME/.local/bin to PATH before "
+            "the Command Code presence check"
+        ]
+    cmd_check = text.find("command -v cmd")
+    prepend = text.find('export PATH="${HOME}/.local/bin:${PATH}"')
+    if cmd_check == -1 or prepend == -1 or prepend > cmd_check:
+        return [
+            ".cursor/install.sh must export PATH=$HOME/.local/bin:$PATH before "
+            "command -v cmd so a warm non-login re-run does not npm-install again"
+        ]
+    return []
 
 
 def cloud_env_display_issues(root: Path) -> list[str]:

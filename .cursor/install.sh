@@ -71,7 +71,11 @@ fi
 
 # 4. Command Code CLI (Lane-4 VLM backend). Auth is COMMAND_CODE_API_KEY from
 #    the environment secret — never written here. Node 22+ is required.
-if command -v cmd >/dev/null && cmd --version >/dev/null 2>&1; then
+#    Non-login install hooks omit ~/.local/bin; probe that prefix first so a
+#    warm re-run does not npm-install command-code@latest again.
+export PATH="${HOME}/.local/bin:${PATH}"
+if { command -v cmd >/dev/null || [[ -x "${HOME}/.local/bin/cmd" ]]; } \
+    && cmd --version >/dev/null 2>&1; then
   echo "Command Code already present: $(cmd --version)"
 else
   if ! command -v npm >/dev/null; then
