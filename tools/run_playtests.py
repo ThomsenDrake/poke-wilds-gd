@@ -92,14 +92,14 @@ SATELLITE_SWEEP_SCENARIOS = ("visual_sweep_fishing", "visual_sweep_camping",
                               "visual_sweep_storage", "visual_sweep_pokemon",
                               "visual_sweep_overworld", "visual_sweep_world_depth",
                               "visual_sweep_farfield")
-# The full gate scope (R3): the RED-tier sidecar seed-equality gate + the source-art
-# anchor gate cover the main sweep AND every satellite family. Each sweep clears
-# .godot-smoke/shots at start (clear_shots), so the gate reads exactly THAT family's
-# fresh sidecar set — an un-stamped / re-seeded satellite sidecar now reds instead of
-# passing silently, and update-mode satellite baseline rewrites are anchor-policed.
-# The early-return in apply_region_gate / prepare_anchor_gate / apply_anchor_gate
-# fires only when a scenario is in NEITHER the main nor the satellite set.
-SWEEP_GATE_SCENARIOS = VISUAL_SWEEP_SCENARIOS + SATELLITE_SWEEP_SCENARIOS
+# The full gate scope (R3): seed-equality, adapter-authority, and the source-art
+# anchor gate cover the main sweep AND every satellite family, including each
+# family's *_update name. SATELLITE_SWEEP_SCENARIOS stays compare-only (verify_all
+# S9 must not run update lanes). VISION_REVIEW_SCENARIOS is the complete
+# compare+update set, so a Cloud visual_sweep_fishing_update still gets a
+# pre-run snapshot. Each sweep clears .godot-smoke/shots at start (clear_shots),
+# so the gate reads exactly THAT family's fresh sidecar set.
+SWEEP_GATE_SCENARIOS = VISION_REVIEW_SCENARIOS
 # R4 regional pixel-oracle scope (audit Major #2): the explainable per-region diff
 # (visual_region_diff.run_region_diff — RED-tier ink/canary/string/label, ~0 tolerance)
 # runs for the main sweep AND the world-depth satellite that carries the R4
@@ -1174,6 +1174,27 @@ def prepare_anchor_gate(project: Path, scenario: str) -> dict[str, bytes]:
     return snapshot
 
 
+def _baseline_dir_mutated(baseline_dir: Path, snapshot: dict[str, bytes]) -> bool:
+    """True when the baseline dir gained files or changed bytes vs the snapshot.
+
+    visual_sweep_farfield copies on a missing PNG, then reconciles in compare
+    mode and omits auto_update / mode=update from the passed payload. The
+    authority gate must not trust that payload alone.
+    """
+    if not baseline_dir.is_dir():
+        return False
+    current = {path.name: path for path in baseline_dir.iterdir() if path.is_file()}
+    if set(current) - set(snapshot):
+        return True
+    for name, path in current.items():
+        try:
+            if path.read_bytes() != snapshot.get(name, b""):
+                return True
+        except OSError:
+            return True
+    return False
+
+
 def _restore_baseline_snapshot(baseline_dir: Path, snapshot: dict[str, bytes]) -> int:
     """Revert the baseline dir to the pre-run snapshot. Returns files written."""
     restored = 0
@@ -1190,12 +1211,14 @@ def _restore_baseline_snapshot(baseline_dir: Path, snapshot: dict[str, bytes]) -
 
 def apply_adapter_authority_gate(project: Path, result: dict[str, Any],
                                  snapshot: dict[str, bytes]) -> None:
-    """Refuse/restore a sweep auto-update that rewrote Mac baselines on Cloud.
+    """Refuse/restore a sweep write that rewrote Mac baselines on Cloud.
 
     reconcile() / satellite _copy_baselines() copy EVERY shot in the family when
     any expected PNG is missing. After that copy, live baseline sidecars match
     the fresh lavapipe adapter, so paired_adapter_mismatch is blind. Compare
-    fresh shots to the PRE-RUN snapshot and restore if they differ.
+    fresh shots to the PRE-RUN snapshot. Fire on payload update/auto_update OR
+    when the baseline dir mutated (farfield copies then emits compare mode).
+    SWEEP_GATE_SCENARIOS includes every satellite *_update name.
     """
     scenario = str(result.get("scenario"))
     if scenario not in SWEEP_GATE_SCENARIOS:
@@ -1206,13 +1229,14 @@ def apply_adapter_authority_gate(project: Path, result: dict[str, Any],
     if not isinstance(payload, dict):
         payload = {}
     update_mode = payload.get("mode") == "update" or payload.get("auto_update")
-    if not update_mode:
+    baseline_dir = _baseline_dir(project)
+    mutated = _baseline_dir_mutated(baseline_dir, snapshot)
+    if not update_mode and not mutated:
         return
     mismatch = _load_tool_module("visual_diff").snapshot_adapter_mismatch(
         project / ".godot-smoke" / "shots", snapshot)
     if mismatch is None:
         return
-    baseline_dir = _baseline_dir(project)
     try:
         restored = _restore_baseline_snapshot(baseline_dir, snapshot)
     except OSError as exc:
