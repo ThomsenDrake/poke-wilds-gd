@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-14
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/codex_review_bridge.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -210,11 +210,7 @@ tools/verify_all.py` otherwise. On Cursor Cloud, `environment.json` `start`
 runs `.cursor/start.sh` as a child — it writes `~/.pokewilds-cloud.env` (no
 secrets) and hooks bashrc/profile; `tools/cloud_env.py` then fills unset
 keys and replaces a dead inherited `DISPLAY` so a later `python3 tools/verify_all.py`
-does not need a manual `source`. Cloud `gh` is the Cursor GitHub App, so
-`@codex review` from a Cloud Agent or a dashboard Automation comment tool
-is ignored. The Mac-side bridge is `python3 tools/codex_review_bridge.py --pr
-<n> --install-launchd` (human `gh` auth; one comment per new head SHA).
-Semantics, exit codes, and refusals:
+does not need a manual `source`. Semantics, exit codes, and refusals:
 [docs/RELIABILITY.md](../RELIABILITY.md) § Local gate. Serialize gate runs —
 exactly one harness writer against a project at a time (the scenario request
 file and the appended trace log are shared state). If another checkout's Godot

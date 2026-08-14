@@ -421,7 +421,6 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(command_code_reviewer_issues(root))
     issues.extend(cloud_env_display_issues(root))
     issues.extend(install_cmd_path_issues(root))
-    issues.extend(codex_review_bridge_issues(root))
 
     return issues
 
@@ -917,23 +916,6 @@ def shot_numbering_issues(root: Path) -> list[str]:
         issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
 
-    return issues
-
-
-def codex_review_bridge_issues(root: Path) -> list[str]:
-    """The Mac Codex bridge must refuse the Cursor GitHub App identity."""
-    path = root / "tools" / "codex_review_bridge.py"
-    if not path.is_file():
-        return []
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        return [f"tools/codex_review_bridge.py is unreadable: {exc}"]
-    issues: list[str] = []
-    if 'FORBIDDEN_LOGINS = frozenset({"cursor"})' not in text:
-        issues.append("codex_review_bridge must refuse gh login 'cursor'")
-    if 'COMMENT_BODY = "@codex review"' not in text:
-        issues.append("codex_review_bridge must post exactly '@codex review'")
     return issues
 
 
