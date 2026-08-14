@@ -15,9 +15,11 @@ Exit 0 = all shots within threshold, 1 = drift or missing files,
 
 When a fresh/baseline sidecar `capture_env.adapter_name` pair differs
 (Apple M4 vs lavapipe), PNG decode and percent-diff are skipped entirely
-(`pixel_compare: skipped_adapter_mismatch`). Missing/uncaptured names
-still fail. A below-threshold or decoder-error compare is never reported
-as `compared` on mismatched hardware.
+(`pixel_compare: skipped_adapter_mismatch`). Paired shots still appear in
+`per_shot` (0.0, note skipped) so satellite coverage checks that require
+`per_shot.has(shot)` can emit `*_passed` and continue to VLM review.
+Missing/uncaptured names still fail. A below-threshold or decoder-error
+compare is never reported as `compared` on mismatched hardware.
 """
 
 from __future__ import annotations
@@ -286,7 +288,17 @@ def run_diff(shots_dir: Path, baseline_dir: Path, threshold_pct: float, toleranc
         )
         mismatched: list[str] = []
         max_drift = 0.0
-        compared = 0
+        for name in shot_names:
+            if name in missing_baselines:
+                continue
+            per_shot[name] = 0.0
+            records[name] = {
+                "pct_changed": 0.0,
+                "changed_pixels": 0,
+                "pixels": 0,
+                "note": "skipped_adapter_mismatch",
+            }
+        compared = len(per_shot)
     else:
         pixel_compare = "compared"
         for name in shot_names:
