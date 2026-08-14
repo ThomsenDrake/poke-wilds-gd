@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import re
+import socket
 import sys
 import tempfile
 import tomllib
@@ -418,6 +419,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
     issues.extend(command_code_reviewer_issues(root))
+    issues.extend(cloud_env_display_issues(root))
 
     return issues
 
@@ -913,6 +915,68 @@ def shot_numbering_issues(root: Path) -> list[str]:
         issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
 
+    return issues
+
+
+def cloud_env_display_issues(root: Path) -> list[str]:
+    """Lock DISPLAY replace-if-dead so a stale Cloud desktop cannot block Xvfb."""
+    del root
+    tool_path = Path(__file__).resolve().with_name("cloud_env.py")
+    if not tool_path.exists():
+        return []
+    try:
+        cloud = _load_tool("cloud_env", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"cloud env display: cannot load cloud_env.py: {exc}"]
+
+    issues: list[str] = []
+    if cloud._display_num(":99") != "99" or cloud._display_num(":1.0") != "1":
+        issues.append("cloud_env._display_num must parse :99 and :1.0")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        x11 = Path(tmp) / "X11-unix"
+        x11.mkdir()
+        sock = x11 / "X99"
+        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        which = cloud.shutil.which
+        cloud.shutil.which = lambda _name: None
+        try:
+            listener.bind(str(sock))
+            if not cloud.display_alive(":99", x11_dir=x11):
+                issues.append("display_alive socket fallback missed a live X99 socket")
+            if cloud.display_alive(":1", x11_dir=x11):
+                issues.append("display_alive socket fallback must not treat a missing X1 as live")
+            (x11 / "X1").write_text("", encoding="utf-8")
+            if cloud.display_alive(":1", x11_dir=x11):
+                issues.append("display_alive must require an X11 unix socket, not a regular file")
+        finally:
+            cloud.shutil.which = which
+            listener.close()
+
+        env_file = Path(tmp) / "cloud.env"
+        env_file.write_text(
+            "export DISPLAY=:99\nexport GODOT_BIN=/persisted/godot\n",
+            encoding="utf-8",
+        )
+        dead = {"DISPLAY": ":1", "GODOT_BIN": "/inherited/godot"}
+        applied = cloud.load_cloud_env(
+            dead, path=env_file, display_probe=lambda _d: False)
+        if dead.get("DISPLAY") != ":99" or "DISPLAY" not in applied:
+            issues.append(
+                "load_cloud_env must replace a dead inherited DISPLAY with the persisted value"
+            )
+        if dead.get("GODOT_BIN") != "/inherited/godot":
+            issues.append("load_cloud_env must not overwrite a set non-DISPLAY key")
+        live = {"DISPLAY": ":1"}
+        applied_live = cloud.load_cloud_env(
+            live, path=env_file, display_probe=lambda d: d == ":1")
+        if live.get("DISPLAY") != ":1" or "DISPLAY" in applied_live:
+            issues.append("load_cloud_env must keep a live inherited DISPLAY")
+        unset: dict[str, str] = {}
+        applied_unset = cloud.load_cloud_env(
+            unset, path=env_file, display_probe=lambda _d: False)
+        if unset.get("DISPLAY") != ":99" or "DISPLAY" not in applied_unset:
+            issues.append("load_cloud_env must still fill an unset DISPLAY")
     return issues
 
 

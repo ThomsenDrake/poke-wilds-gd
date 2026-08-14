@@ -3,17 +3,21 @@
 
 `.cursor/start.sh` is a short-lived child of environment.json `start`, so
 sourcing ~/.pokewilds-cloud.env there does not reach later agent shells or
-`python3 tools/verify_all.py`. This helper fills only unset allowlisted keys
-from that file. It never applies secrets (COMMAND_CODE_API_KEY is refused
-even if someone added it) and never overwrites a key the current process
-already has.
+`python3 tools/verify_all.py`. This helper fills unset allowlisted keys from
+that file. A nonempty but dead inherited DISPLAY is replaced by the persisted
+live value (base Cloud images often export a stale desktop). It never applies
+secrets (COMMAND_CODE_API_KEY is refused even if someone added it) and never
+overwrites a live DISPLAY or any other key the current process already has.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import os
 import re
 from pathlib import Path
+import shutil
+import subprocess
 
 DEFAULT_ENV_FILE = Path.home() / ".pokewilds-cloud.env"
 DEFAULT_LOCAL_BIN = Path.home() / ".local" / "bin"
@@ -71,6 +75,40 @@ def _unquote(value: str) -> str:
     return value
 
 
+def _display_num(display: str) -> str:
+    """`:99`, `:1.0`, and `localhost:10.0` all yield the X11 socket number."""
+    text = (display or "").strip()
+    if ":" not in text:
+        return ""
+    return text.rsplit(":", 1)[-1].split(".", 1)[0]
+
+
+def display_alive(display: str, *, x11_dir: Path | None = None) -> bool:
+    """True when xdpyinfo or the X11 unix socket says this DISPLAY is live.
+
+    Mirrors tools/ensure_cloud_display.sh `_display_alive`: prefer xdpyinfo
+    when installed, else `/tmp/.X11-unix/X<n>`.
+    """
+    text = (display or "").strip()
+    if not text:
+        return False
+    xdpyinfo = shutil.which("xdpyinfo")
+    if xdpyinfo:
+        env = os.environ.copy()
+        env["DISPLAY"] = text
+        try:
+            proc = subprocess.run(
+                [xdpyinfo], env=env, capture_output=True, timeout=2, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return proc.returncode == 0
+    num = _display_num(text)
+    if not num.isdigit():
+        return False
+    return ((x11_dir or Path("/tmp/.X11-unix")) / f"X{num}").is_socket()
+
+
 def parse_export_line(line: str) -> tuple[str, str] | None:
     stripped = line.strip()
     if not stripped or stripped.startswith("#"):
@@ -85,10 +123,17 @@ def parse_export_line(line: str) -> tuple[str, str] | None:
 
 
 def load_cloud_env(environ: dict[str, str] | None = None,
-                   path: Path | None = None) -> list[str]:
-    """Fill unset allowlisted keys from the Cloud env file. Returns applied keys."""
+                   path: Path | None = None,
+                   display_probe: Callable[[str], bool] | None = None) -> list[str]:
+    """Fill unset allowlisted keys from the Cloud env file. Returns applied keys.
+
+    DISPLAY is the exception: a nonempty dead inherited value is replaced by
+    the persisted live display so later verify_all does not launch Godot
+    against a stale Cloud desktop.
+    """
     target = os.environ if environ is None else environ
     env_path = path if path is not None else env_file_path()
+    probe = display_probe if display_probe is not None else display_alive
     applied: list[str] = []
     try:
         text = env_path.read_text(encoding="utf-8")
@@ -104,7 +149,8 @@ def load_cloud_env(environ: dict[str, str] | None = None,
                 continue
             current = target.get(key, "")
             if current:
-                continue
+                if key != "DISPLAY" or current == value or probe(current):
+                    continue
             target[key] = value
             applied.append(key)
     if ensure_local_bin_on_path(target):

@@ -209,7 +209,7 @@ Before pushing, run the local gate: `python3 tools/verify_all.py
 tools/verify_all.py` otherwise. On Cursor Cloud, `environment.json` `start`
 runs `.cursor/start.sh` as a child — it writes `~/.pokewilds-cloud.env` (no
 secrets) and hooks bashrc/profile; `tools/cloud_env.py` then fills unset
-`DISPLAY` / lavapipe / Dummy keys so a later `python3 tools/verify_all.py`
+keys and replaces a dead inherited `DISPLAY` so a later `python3 tools/verify_all.py`
 does not need a manual `source`. Semantics, exit codes, and refusals:
 [docs/RELIABILITY.md](../RELIABILITY.md) § Local gate. Serialize gate runs —
 exactly one harness writer against a project at a time (the scenario request

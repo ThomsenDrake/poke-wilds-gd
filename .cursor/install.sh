@@ -107,5 +107,5 @@ python3 tools/setup_worktree.py --godot-bin "${GODOT_BIN}"
 
 echo "== install complete =="
 echo "headless gate: python3 tools/verify_all.py --skip-windowed"
-echo "windowed + VLM: python3 tools/verify_all.py  # loads ~/.pokewilds-cloud.env when DISPLAY is unset"
+echo "windowed + VLM: python3 tools/verify_all.py  # loads ~/.pokewilds-cloud.env when DISPLAY is unset or dead"
 echo "Command Code auth: COMMAND_CODE_API_KEY environment secret (never committed)"
