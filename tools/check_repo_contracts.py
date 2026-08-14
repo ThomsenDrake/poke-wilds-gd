@@ -417,6 +417,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
+    issues.extend(command_code_reviewer_issues(root))
 
     return issues
 
@@ -912,6 +913,65 @@ def shot_numbering_issues(root: Path) -> list[str]:
         issues.append(f"biome shot floor violated: {biome_count} committed 03_biome_* "
                       f"shot(s) < required {BIOME_SHOT_FLOOR}")
 
+    return issues
+
+
+def command_code_reviewer_issues(root: Path) -> list[str]:
+    """Lock Command Code reviewer to plan-only argv and ordered SoM+crop paths."""
+    del root
+    tool_path = Path(__file__).resolve().with_name("vlm_reviewer.py")
+    if not tool_path.exists():
+        return []
+    try:
+        reviewer = _load_tool("vlm_reviewer", tool_path)
+    except (OSError, RuntimeError) as exc:
+        return [f"command code reviewer: cannot load vlm_reviewer.py: {exc}"]
+
+    issues: list[str] = []
+    cfg = reviewer.Config(reviewer._parse_args([]))
+    argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    if "--auto-accept" in argv:
+        issues.append("vlm_reviewer Command Code argv must not use --auto-accept")
+    try:
+        mode_at = argv.index("--permission-mode")
+    except ValueError:
+        issues.append("vlm_reviewer Command Code argv must use --permission-mode plan")
+        mode_at = -1
+    if mode_at >= 0 and (mode_at + 1 >= len(argv) or argv[mode_at + 1] != "plan"):
+        issues.append("vlm_reviewer Command Code argv must set --permission-mode plan")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        for name in ("som_before.png", "som_after.png", "before.png", "after.png",
+                     "crop_a.png", "crop_b.png"):
+            (base / name).write_bytes(b"png")
+        cfg.base_dir = base
+        ctx = {"paths": {
+            "som_before": "som_before.png",
+            "som_after": "som_after.png",
+            "before": "before.png",
+            "after": "after.png",
+            "crops": ["crop_a.png", "crop_b.png"],
+        }}
+        rels = [rel for rel, _kind in reviewer.ordered_review_entries(
+            cfg, ctx, ["after", "before"])]
+        if rels != ["som_after.png", "som_before.png", "crop_a.png", "crop_b.png"]:
+            issues.append(
+                "ordered_review_entries must follow the shuffled SoM order and "
+                f"include crops; got {rels}"
+            )
+        prompt = reviewer._command_code_prompt(
+            cfg, ctx, "SYS", "USER", ["after", "before"])
+        after_at = prompt.find("som_after.png")
+        before_at = prompt.find("som_before.png")
+        crop_a_at = prompt.find("crop_a.png")
+        crop_b_at = prompt.find("crop_b.png")
+        if min(after_at, before_at, crop_a_at, crop_b_at) < 0:
+            issues.append("_command_code_prompt omitted shuffled SoM or crop paths")
+        elif not (after_at < before_at < crop_a_at < crop_b_at):
+            issues.append(
+                "_command_code_prompt path order must match shuffled SoM then crops"
+            )
     return issues
 
 
