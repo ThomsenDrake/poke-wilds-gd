@@ -24,7 +24,7 @@ extends Control
 #
 # LATCH CONTRACT: `closed` is ARGLESS and emits on EVERY hide — main.gd binds
 # it into input_router.bind_ui_consumers so the press that left the screen
-# cannot re-fire poll_menu_toggle/poll_context_action the same frame.
+# cannot re-fire poll the same frame.
 #
 # The save-wipe confirm reuses the MessageBox SIBLING (both screens are $UI
 # children — Main.tscn wiring guarantees it; start_menu precedent). MessageBox

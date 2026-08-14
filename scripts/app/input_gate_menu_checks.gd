@@ -21,6 +21,8 @@ extends Node
 #     BRAND-NEW world, superseding the "New game started." toast. Runs LAST:
 #     it resets the world (harmless — process-isolated per --scenario launch;
 #     the dispatcher's save guard restores the file).
+# (F) ENTER-CLOSE OVER-SUPPRESSION — hide_menu during poll (Enter-close) emits
+#     closed after the latch reset; a next-frame Enter must still open the menu.
 # Every tap is a REAL input-phase event through SmokeTap (press and release in
 # separate iterations — smoke _press can never fire a poll), each part carrying
 # injection witnesses so degraded delivery fails red, never vacuous green.
@@ -35,6 +37,7 @@ var _failures: Array = [] # shared with the parent scenario
 func run(ctx: Dictionary, runner, failures: Array) -> void:
 	_ctx = ctx; _runner = runner; _failures = failures
 	await _part_c_start_close_does_not_refire()
+	await _part_f_enter_close_does_not_over_suppress()
 	await _part_e_inert_field_move_leaves_the_tree()
 	await _part_d_new_game_confirm_resets_only() # LAST: it resets the world
 
@@ -65,6 +68,30 @@ func _part_c_start_close_does_not_refire() -> void:
 	_expect(not _structure_layer().is_active(), "C: build mode opened on the closing frame")
 	_expect(player.tile_position == tile_before, "C: the player moved")
 	_expect(player.input_enabled, "C: the avatar stayed disabled after the menu closed")
+
+
+# Part F — a latch raised during poll must not swallow the next frame's first press.
+# Wraps the menu toggle so hide_menu runs inside poll (Enter-close); `_tap` cannot
+# chord a fresh just_pressed onto the immediately next frame.
+func _part_f_enter_close_does_not_over_suppress() -> void:
+	var menu: Control = _start_menu()
+	var router = menu.get_parent().get_parent().get("_input_router")
+	var orig: Callable = router._on_menu_toggle
+	router._on_menu_toggle = func() -> void:
+		orig.call()
+		if menu.visible:
+			menu.hide_menu()
+	SmokeTap.inject_press("start")
+	await get_tree().process_frame
+	router._on_menu_toggle = orig
+	_expect(not menu.visible, "F: injection witness: poll start did not open-then-close")
+	SmokeTap.inject_release("start"); Input.action_release("start"); SmokeTap.inject_press("start")
+	await get_tree().process_frame
+	_expect(menu.visible, "F: next-frame Enter was swallowed (callback latch leaked into the next poll)")
+	if menu.visible:
+		menu.hide_menu()
+	SmokeTap.inject_release("start")
+	await get_tree().process_frame
 
 
 # Part E — an inert FIELD MOVE facing a cut-gated tree leaves the tree standing.

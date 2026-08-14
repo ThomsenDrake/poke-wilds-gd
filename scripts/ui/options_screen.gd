@@ -56,7 +56,7 @@ func _ready() -> void:
 	_title = built.title_label
 	_detail = built.detail_label
 	_hint = built.hint_label
-	_wire_input_latch() # an Enter/X close must set the same-frame latch, or poll_menu_toggle re-fires and shuts the whole StartMenu
+	_wire_input_latch() # an Enter/X close must set the same-frame latch, or poll re-fires and shuts the whole StartMenu
 
 # The same-frame latch reach (the WayStoneSelector precedent): this screen is a StartMenu child,
 # NOT in main.gd's frozen bind_ui_consumers array, so it self-wires `closed` (argless — the

@@ -17,8 +17,8 @@ const MainSmokeContext := preload("res://scripts/app/main_smoke_context.gd")
 
 var _smoke_runner = SmokeScenarioRunner.new()
 var _cry_player = CryPlayer.new()
-var _input_router = InputRouter.new(Callable(self, "_toggle_menu"), Callable(self, "_on_context_action"))
 var _field_router = FieldActionRouter.new()
+var _input_router = InputRouter.new(Callable(self, "_toggle_menu"), Callable(self, "_on_context_action"), Callable(_field_router, "toggle_build_mode"))
 var _structure_layer = StructureLayer.new()
 var _in_battle = false
 var _menu_open = false
@@ -46,7 +46,7 @@ func _ready() -> void:
 	add_child(_structure_layer)
 	_structure_layer.setup(_runtime(), _world, _player, Callable(_message_box, "show_message"))
 	_structure_layer.build_finished.connect(Callable(_field_router, "on_build_finished"))
-	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu, $UI/StorageScreen); _input_router.bind_build_toggle(Callable(_field_router, "toggle_build_mode"))
+	_field_router.setup(_runtime(), _world, _player, _structure_layer, Callable(_message_box, "show_message"), $UI/CampMenu, $UI/StorageScreen)
 	_connect_signals()
 	if not smoke_scenario.is_empty(): # SCENARIO BOOT: today's path exactly — world sync + toast at boot, dispatch below
 		_sync_world_from_runtime()
@@ -61,7 +61,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	var free: bool = not _in_battle and not _menu_open and not _player.is_moving() and not $UI/StorageScreen.visible and not $UI/TitleScreen.visible and not $UI/CreationScreen.visible and not $UI/WayStoneSelector.visible
-	_input_router.poll_menu_toggle(); _input_router.poll_build_toggle(free); _input_router.poll_context_action(free and not _structure_layer.is_active())
+	_input_router.poll(free, free and not _structure_layer.is_active())
 
 
 func _on_player_tile_changed(tile_position: Vector2i) -> void:

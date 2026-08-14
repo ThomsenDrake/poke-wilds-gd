@@ -8,17 +8,17 @@ extends Node
 # battle_view._unhandled_input (input phase) Z-on-RUN resolves run_from_battle
 # SYNCHRONOUSLY -> battle_finished -> main._on_battle_finished sets _in_battle
 # = false + re-enables the avatar WITHIN the input phase -> the same-frame
-# Main._process poll_context_action sees overworld_idle + action_a just_pressed
+# Main._process poll sees context_ok + action_a just_pressed
 # and harvests/builds the faced tile (the harvest toast supersedes "Got away
 # safely!"). A ball-select Z capture is the same class (use_pokeball resolving
 # synchronously). The fix sets the SAME latch from _on_battle_finished (every
 # end path: RUN, capture, victory, defeat), consumed + reset by
-# poll_context_action exactly like the menu paths. This scenario drives REAL
+# poll exactly like the menu paths. This scenario drives REAL
 # input-phase events — never direct runtime calls — like input_gate: (A) Z on
 # RUN facing a cut-harvestable tile escapes ONLY (no field_move_used /
 # structure_placed / materials_consumed, the tree stands, the escape toast
 # survives, the bag is unchanged); (B) a fresh DELIBERATE Z next frame still
-# harvests (poll_context_action resets the latch unconditionally, so the fix
+# harvests (poll resets the latch unconditionally, so the fix
 # never over-suppresses); (C) a ball-select Z on a guaranteed-capture mon
 # captures ONLY (the tree stands, the "Gotcha!" toast survives). Injection:
 # Input.use_accumulated_input buffers each parsed event for the NEXT
