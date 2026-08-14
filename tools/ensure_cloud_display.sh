@@ -74,3 +74,28 @@ umask 077
   printf 'export GODOT_AUDIO_DRIVER=Dummy\n'
 } > "${ENV_FILE}"
 echo "ensure_cloud_display: wrote ${ENV_FILE}"
+
+# environment.json `start` runs start.sh in a child. Persist the file into
+# later interactive/login shells. Non-interactive `python3 tools/verify_all.py`
+# still needs tools/cloud_env.py (bashrc is not sourced there).
+_CLOUD_ENV_HOOK='[ -f "$HOME/.pokewilds-cloud.env" ] && . "$HOME/.pokewilds-cloud.env"'
+_install_cloud_env_hook() {
+  local target="$1"
+  if [[ ! -e "${target}" ]]; then
+    printf '%s\n' "${_CLOUD_ENV_HOOK}" > "${target}"
+    echo "ensure_cloud_display: created ${target} hook"
+    return
+  fi
+  if grep -qxF "${_CLOUD_ENV_HOOK}" "${target}" 2>/dev/null; then
+    return
+  fi
+  printf '\n%s\n' "${_CLOUD_ENV_HOOK}" >> "${target}"
+  echo "ensure_cloud_display: appended hook to ${target}"
+}
+_install_cloud_env_hook "${HOME}/.bashrc"
+if [[ -f "${HOME}/.profile" ]]; then
+  _install_cloud_env_hook "${HOME}/.profile"
+fi
+if [[ -f "${HOME}/.bash_profile" ]]; then
+  _install_cloud_env_hook "${HOME}/.bash_profile"
+fi

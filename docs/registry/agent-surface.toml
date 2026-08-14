@@ -132,6 +132,7 @@ gate_tool_path = "tools/verify_all.py"
 display_less_command = "python3 tools/verify_all.py --skip-windowed"
 full_command = "python3 tools/verify_all.py"
 cloud_display_tool_path = "tools/ensure_cloud_display.sh"
+cloud_env_tool_path = "tools/cloud_env.py"
 cloud_install_tool_path = ".cursor/install.sh"
 cloud_start_tool_path = ".cursor/start.sh"
 

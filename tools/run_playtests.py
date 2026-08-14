@@ -53,6 +53,14 @@ if _spec is None or _spec.loader is None:
 smoketest = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(smoketest)
 
+# start.sh is a child of environment.json `start`; inherit DISPLAY here.
+_CLOUD_ENV_PATH = Path(__file__).resolve().with_name("cloud_env.py")
+_cloud_spec = importlib.util.spec_from_file_location("cloud_env", _CLOUD_ENV_PATH)
+if _cloud_spec is not None and _cloud_spec.loader is not None:
+    _cloud_env = importlib.util.module_from_spec(_cloud_spec)
+    _cloud_spec.loader.exec_module(_cloud_env)
+    _cloud_env.load_cloud_env()
+
 SCENARIO_REQUIREMENTS = smoketest.SCENARIO_REQUIREMENTS
 # The windowed scenario sets and the force-headless semantics are
 # single-sourced in the sibling smoke harness (see the note there).

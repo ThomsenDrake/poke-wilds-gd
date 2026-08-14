@@ -56,6 +56,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
+def _apply_cloud_env() -> None:
+    # start.sh is a child of environment.json `start`; inherit DISPLAY here.
+    spec = importlib.util.spec_from_file_location(
+        "cloud_env", Path(__file__).resolve().with_name("cloud_env.py"))
+    if spec is None or spec.loader is None:
+        return
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.load_cloud_env()
+
+
+_apply_cloud_env()
+
 EXIT_GREEN = 0
 EXIT_STEP_FAILURE = 1
 EXIT_REFUSAL = 2

@@ -803,7 +803,8 @@ validation_commands = [
   # REQUIRED model-reviewer lane (G2; Command Code gpt-5.6-luna first via `cmd` +
   # COMMAND_CODE_API_KEY, then hosted/local fallbacks; model findings remain
   # quarantine-forever; windowed acceptance fails closed on no model/coverage).
-  # Cursor Cloud: tools/ensure_cloud_display.sh + adapter-mismatch skip of PNG
+  # Cursor Cloud: tools/ensure_cloud_display.sh + tools/cloud_env.py persist
+  # DISPLAY after start.sh exits; adapter-mismatch skip of PNG
   # compare (Mac baselines stay local pixel authority):
   "VLM_RUNTIME=auto VLM_REQUIRED=1 python3 tools/vision_review.py --review-all --required --shots-dir .godot-smoke/shots --baseline-dir docs/generated/visual-baselines --reviewer-cmd \"python3 tools/vlm_reviewer.py\"",
   # OPTIONAL corroboration step (quarantine-tier, never a gate; needs `uv sync --extra vision`, skips cleanly without it):

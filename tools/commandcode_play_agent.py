@@ -118,6 +118,7 @@ def _load_module(name: str, path: Path):
 smoketest = _load_module("godot_dap_smoketest", TOOLS / "godot_dap_smoketest.py")
 playtests = _load_module("run_playtests", TOOLS / "run_playtests.py")
 review_context = _load_module("review_context", TOOLS / "review_context.py")
+_load_module("cloud_env", TOOLS / "cloud_env.py").load_cloud_env()
 
 # Reuse the trace primitives from the sibling harnesses (single-sourced).
 _parse_trace_lines = smoketest.parse_trace_lines

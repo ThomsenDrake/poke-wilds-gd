@@ -16,6 +16,20 @@ from typing import Any
 
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 
+
+def _apply_cloud_env() -> None:
+    # start.sh is a child of environment.json `start`; inherit DISPLAY here.
+    spec = importlib.util.spec_from_file_location(
+        "cloud_env", Path(__file__).resolve().with_name("cloud_env.py"))
+    if spec is None or spec.loader is None:
+        return
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.load_cloud_env()
+
+
+_apply_cloud_env()
+
 # Error markers BOTH transports treat as a scenario exception. push_error prints
 # "ERROR: <message>" (followed by an unmarked "at:" backtrace line), so the
 # "ERROR: " prefix captures every scripted failure reason the old

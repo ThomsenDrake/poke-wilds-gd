@@ -87,6 +87,12 @@ fi
 if ! grep -qxF 'export COMMANDCODE_SKIP_UPDATES=1' "${BASHRC}"; then
   echo 'export COMMANDCODE_SKIP_UPDATES=1' >> "${BASHRC}"
 fi
+# start.sh is a child process; later interactive shells source the env file
+# written at boot. Inert until ~/.pokewilds-cloud.env exists. No secrets.
+CLOUD_ENV_HOOK='[ -f "$HOME/.pokewilds-cloud.env" ] && . "$HOME/.pokewilds-cloud.env"'
+if ! grep -qxF "${CLOUD_ENV_HOOK}" "${BASHRC}"; then
+  echo "${CLOUD_ENV_HOOK}" >> "${BASHRC}"
+fi
 
 # 5. Repo-native bootstrap: version checks, pinned PokeAPI cache fetch, and the
 #    Godot resource import. setup_worktree.py is idempotent and never mutates
@@ -98,5 +104,5 @@ python3 tools/setup_worktree.py --godot-bin "${GODOT_BIN}"
 
 echo "== install complete =="
 echo "headless gate: python3 tools/verify_all.py --skip-windowed"
-echo "windowed + VLM: source ~/.pokewilds-cloud.env 2>/dev/null; python3 tools/verify_all.py"
+echo "windowed + VLM: python3 tools/verify_all.py  # loads ~/.pokewilds-cloud.env when DISPLAY is unset"
 echo "Command Code auth: COMMAND_CODE_API_KEY environment secret (never committed)"
