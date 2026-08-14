@@ -89,6 +89,9 @@ umask 077
   fi
   printf 'export COMMANDCODE_SKIP_UPDATES=1\n'
   printf 'export GODOT_AUDIO_DRIVER=Dummy\n'
+  # For bashrc-sourced shells. Python loaders prepend ~/.local/bin themselves
+  # because PATH is already set and must not be replaced wholesale.
+  printf 'export PATH="$HOME/.local/bin:$PATH"\n'
 } > "${ENV_FILE}"
 echo "ensure_cloud_display: wrote ${ENV_FILE}"
 

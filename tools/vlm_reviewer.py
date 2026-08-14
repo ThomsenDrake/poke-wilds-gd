@@ -566,8 +566,19 @@ def build_user_content(cfg: Config, public_ctx: dict, order: list[str]) -> tuple
 # --------------------------------------------------------------------------
 # Command Code headless dispatch
 # --------------------------------------------------------------------------
+def _cmd_executable() -> str | None:
+    """Resolve the Command Code CLI even when ~/.local/bin is not on PATH."""
+    found = shutil.which("cmd")
+    if found:
+        return found
+    candidate = Path.home() / ".local" / "bin" / "cmd"
+    if os.access(candidate, os.X_OK):
+        return str(candidate)
+    return None
+
+
 def _command_code_available() -> tuple[bool, str]:
-    cmd = shutil.which("cmd")
+    cmd = _cmd_executable()
     if not cmd:
         return False, "cmd CLI not found"
     auth_file = Path.home() / ".commandcode" / "auth.json"
@@ -597,7 +608,7 @@ def _command_code_prompt(cfg: Config, public_ctx: dict, system: str, user_text: 
 
 
 def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dict) -> str:
-    cmd = shutil.which("cmd")
+    cmd = _cmd_executable()
     if not cmd:
         raise RuntimeError("cmd CLI not found")
     prompt = _command_code_prompt(cfg, public_ctx, system, user_text)

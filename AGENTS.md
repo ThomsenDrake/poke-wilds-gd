@@ -64,7 +64,7 @@ python3 tools/verify_all.py --skip-windowed    # still the honest path if displa
 python3 tools/verify_all.py --windowed-timeout 1800   # full gate once DISPLAY + cmd + COMMAND_CODE_API_KEY are up
 ```
 
-`start.sh` is a short-lived child of `environment.json` `start`. It writes `~/.pokewilds-cloud.env` (no secrets). Later interactive shells source that file via a bashrc/profile hook; `tools/verify_all.py` / `tools/run_playtests.py` load it through `tools/cloud_env.py` when `DISPLAY` is unset. A manual `source ~/.pokewilds-cloud.env` is not required.
+`start.sh` is a short-lived child of `environment.json` `start`. It writes `~/.pokewilds-cloud.env` (no secrets). Later interactive shells source that file via a bashrc/profile hook; `tools/verify_all.py` / `tools/run_playtests.py` load it through `tools/cloud_env.py` when `DISPLAY` is unset, and prepend `$HOME/.local/bin` so `cmd` is found without a login PATH. A manual `source ~/.pokewilds-cloud.env` is not required.
 
 Required Cloud env (never commit values):
 
