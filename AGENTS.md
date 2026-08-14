@@ -56,7 +56,7 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 
 ## Cursor Cloud specific instructions
 
-Cursor Cloud VMs can run the windowed + Lane-4 path. They do **not** certify Mac PNG baselines (those are `forward_plus` + `Apple M4` hardware stamps). On adapter mismatch the pixel/region compare is skipped (warn, never a silent pass) and Command Code reviews the live frames.
+Cursor Cloud VMs can run the windowed + Lane-4 path. They do **not** certify Mac PNG baselines (those are `forward_plus` + `Apple M4` hardware stamps). On adapter mismatch the pixel/region compare is skipped (warn, never a silent pass) and Command Code reviews the live frames. A missing-shot `auto_update` that would copy lavapipe frames over committed Mac baselines is refused and the pre-run snapshot is restored.
 
 ```bash
 bash .cursor/start.sh                          # DISPLAY + lavapipe; reuses a live desktop

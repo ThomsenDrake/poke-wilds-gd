@@ -1152,10 +1152,12 @@ def prepare_anchor_gate(project: Path, scenario: str) -> dict[str, bytes]:
     the scenario that actually rewrites baselines (an empty snapshot would make
     a refusal unlink every baseline and restore nothing). The snapshot is the
     whole baseline dir (PNG + sidecar), so a refusal reverts the update
-    completely -- a wrong baseline is worse than a missing one. R3: the satellite
-    families share the gate (SWEEP_GATE_SCENARIOS) so a satellite update-mode
-    rewrite is anchor-policed too (satellites carry no art anchors, so the gate is
-    a no-op refusal-wise until one is registered — arming, never a false red).
+    completely -- a wrong baseline is worse than a missing one. Shared by
+    apply_anchor_gate AND apply_adapter_authority_gate (Cloud auto-update must
+    not overwrite Apple M4 PNGs with lavapipe). R3: the satellite families
+    share the gate (SWEEP_GATE_SCENARIOS) so a satellite update-mode rewrite is
+    anchor-policed too (satellites carry no art anchors, so the gate is a
+    no-op refusal-wise until one is registered — arming, never a false red).
     """
     if scenario not in SWEEP_GATE_SCENARIOS:
         return {}
@@ -1170,6 +1172,72 @@ def prepare_anchor_gate(project: Path, scenario: str) -> dict[str, bytes]:
             except OSError:
                 pass
     return snapshot
+
+
+def _restore_baseline_snapshot(baseline_dir: Path, snapshot: dict[str, bytes]) -> int:
+    """Revert the baseline dir to the pre-run snapshot. Returns files written."""
+    restored = 0
+    if not baseline_dir.is_dir():
+        return 0
+    for current in sorted(baseline_dir.iterdir()):
+        if current.is_file() and current.name not in snapshot:
+            current.unlink()
+    for name, data in snapshot.items():
+        (baseline_dir / name).write_bytes(data)
+        restored += 1
+    return restored
+
+
+def apply_adapter_authority_gate(project: Path, result: dict[str, Any],
+                                 snapshot: dict[str, bytes]) -> None:
+    """Refuse/restore a sweep auto-update that rewrote Mac baselines on Cloud.
+
+    reconcile() / satellite _copy_baselines() copy EVERY shot in the family when
+    any expected PNG is missing. After that copy, live baseline sidecars match
+    the fresh lavapipe adapter, so paired_adapter_mismatch is blind. Compare
+    fresh shots to the PRE-RUN snapshot and restore if they differ.
+    """
+    scenario = str(result.get("scenario"))
+    if scenario not in SWEEP_GATE_SCENARIOS:
+        return
+    if result.get("transport") == "skipped-headless":
+        return
+    payload = result.get("passed_payload")
+    if not isinstance(payload, dict):
+        payload = {}
+    update_mode = payload.get("mode") == "update" or payload.get("auto_update")
+    if not update_mode:
+        return
+    mismatch = _load_tool_module("visual_diff").snapshot_adapter_mismatch(
+        project / ".godot-smoke" / "shots", snapshot)
+    if mismatch is None:
+        return
+    baseline_dir = _baseline_dir(project)
+    try:
+        restored = _restore_baseline_snapshot(baseline_dir, snapshot)
+    except OSError as exc:
+        result.setdefault("exceptions", []).append(
+            f"adapter authority: baseline restore failed: {exc}")
+        restored = 0
+    result["pixel_compare"] = "skipped_adapter_mismatch"
+    result["adapter_fresh"] = mismatch["fresh"]
+    result["adapter_baseline"] = mismatch["baseline"]
+    result["adapter_restored_files"] = restored
+    print(
+        f"  {scenario}: baseline update REFUSED — fresh adapter "
+        f"{mismatch['fresh']} != committed {mismatch['baseline']} "
+        f"({mismatch['shot']}). Restored {restored} prior baseline file(s); "
+        f"Mac baselines stay pixel authority."
+    )
+    result["ok"] = False
+    if result.get("error") is None:
+        result["error"] = smoketest.error_envelope(
+            "adapter_baseline_refused", False,
+            "A lavapipe/Cloud sweep tried to rewrite Apple M4 baselines "
+            "(missing-shot auto_update copies the whole family). The prior "
+            "baseline files were restored. Capture or accept new shots on the "
+            "baseline machine (forward_plus + Apple M4), not on Cursor Cloud: "
+            f"python3 tools/run_playtests.py --scenario {scenario}.")
 
 
 def _anchor_sidecar_violations(checker, sidecar_dir: Path, project: Path) -> tuple[list[dict], list[dict]]:
@@ -1261,15 +1329,9 @@ def apply_anchor_gate(project: Path, result: dict[str, Any], snapshot: dict[str,
         if violations:
             # RESTORE the prior baseline bytes so the tree is never left with a
             # drifted baseline on disk (the exact 3-days-green fossilization).
-            baseline_dir = _baseline_dir(project)
             restored = 0
             try:
-                for current in sorted(baseline_dir.iterdir()):
-                    if current.is_file() and current.name not in snapshot:
-                        current.unlink()  # file the update added; remove to revert
-                for name, data in snapshot.items():
-                    (baseline_dir / name).write_bytes(data)
-                    restored += 1
+                restored = _restore_baseline_snapshot(_baseline_dir(project), snapshot)
             except OSError as exc:
                 result.setdefault("exceptions", []).append(f"anchor gate: baseline restore failed: {exc}")
             result["anchor_refusals"] = violations
@@ -1593,9 +1655,9 @@ def main() -> int:
     trace_dir = Path(args.trace_dir).expanduser() if args.trace_dir else None
 
     def run_one(scenario: str) -> dict[str, Any]:
-        # Snapshot committed baselines BEFORE the sweep so apply_anchor_gate can
-        # restore them if a regenerated baseline freezes an anchored misalignment
-        # (the ONLY post-step that also runs in update mode). {} for other shots.
+        # Snapshot committed baselines BEFORE the sweep so apply_anchor_gate and
+        # apply_adapter_authority_gate can restore them (anchor drift, or a
+        # Cloud auto-update overwriting Apple M4 PNGs). {} for other shots.
         anchor_snapshot = prepare_anchor_gate(project, scenario)
         # Ordered trace JSONL for the double-run determinism lane (only when asked).
         trace_out = trace_dir / f"{scenario}.jsonl" if trace_dir else None
@@ -1608,6 +1670,7 @@ def main() -> int:
         else:
             result = run_scenario_headless(project, scenario, args.timeout, args.godot_bin, trace_out=trace_out)
         apply_region_gate(project, result)
+        apply_adapter_authority_gate(project, result, anchor_snapshot)
         apply_contrast_cvd(project, result)
         apply_vision_review(project, result)
         apply_anchor_gate(project, result, anchor_snapshot)

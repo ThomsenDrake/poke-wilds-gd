@@ -183,18 +183,26 @@ def compare_pair(shot_path: Path, base_path: Path, tolerance: int) -> dict:
     return record
 
 
-def read_adapter_name(png_path: Path) -> str | None:
-    """Sidecar capture_env.adapter_name for a PNG, or None if unreadable."""
-    sidecar = Path(str(png_path) + ".sidecar.json")
+def adapter_from_sidecar_bytes(data: bytes) -> str | None:
+    """capture_env.adapter_name from sidecar JSON bytes, or None if unreadable."""
     try:
-        doc = json.loads(sidecar.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        doc = json.loads(data.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
         return None
     env = doc.get("capture_env") if isinstance(doc, dict) else None
     if not isinstance(env, dict):
         return None
     name = env.get("adapter_name")
     return str(name) if name else None
+
+
+def read_adapter_name(png_path: Path) -> str | None:
+    """Sidecar capture_env.adapter_name for a PNG, or None if unreadable."""
+    sidecar = Path(str(png_path) + ".sidecar.json")
+    try:
+        return adapter_from_sidecar_bytes(sidecar.read_bytes())
+    except OSError:
+        return None
 
 
 def paired_adapter_mismatch(shots_dir: Path, baseline_dir: Path) -> dict | None:
@@ -213,6 +221,40 @@ def paired_adapter_mismatch(shots_dir: Path, baseline_dir: Path) -> dict | None:
         base = read_adapter_name(baseline)
         if fresh and base and fresh != base:
             return {"fresh": fresh, "baseline": base, "shot": shot.name}
+    return None
+
+
+def snapshot_adapter_mismatch(shots_dir: Path, snapshot: dict[str, bytes]) -> dict | None:
+    """First fresh/PRE-RUN-baseline adapter_name pair that differs.
+
+    Auto-update copies lavapipe sidecars onto the committed dir before
+    post-steps run, so paired_adapter_mismatch(live baseline dir) is blind.
+    Compare fresh shot sidecars to the snapshotted baseline sidecar bytes.
+    """
+    if not shots_dir.is_dir() or not snapshot:
+        return None
+    snap_adapters: dict[str, str] = {}
+    for name, data in snapshot.items():
+        if not name.endswith(".png.sidecar.json"):
+            continue
+        adapter = adapter_from_sidecar_bytes(data)
+        if adapter:
+            snap_adapters[name] = adapter
+    if not snap_adapters:
+        return None
+    for shot in sorted(shots_dir.glob("*.png")):
+        fresh = read_adapter_name(shot)
+        if not fresh:
+            continue
+        base = snap_adapters.get(f"{shot.name}.sidecar.json")
+        if base and fresh != base:
+            return {"fresh": fresh, "baseline": base, "shot": shot.name}
+    # New shot with no snapshotted sidecar: still refuse if the family stamp differs.
+    family = next(iter(snap_adapters.values()))
+    for shot in sorted(shots_dir.glob("*.png")):
+        fresh = read_adapter_name(shot)
+        if fresh and fresh != family:
+            return {"fresh": fresh, "baseline": family, "shot": shot.name}
     return None
 
 

@@ -283,7 +283,7 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "da8ed8283c70b908a1836e2ea2df4b9b35e46ddb350621daa5e8f1bfb7911094",
           "scripts/app/nav_audit_battle.gd": "b3468cadbaaf368cf7f9e34fc5861b6ec03006a417118ed23b8217604a26f291",
-          "tools/run_playtests.py": "06773def9cd0593ba59a3492790bcc0a2ddb9f2f730ffc003b15d309ccd7aeea",
+          "tools/run_playtests.py": "e678f9b34356b8ee79f97feb7f1c181b76577ce0f3a357088b1ea6d89251bd03",
           "tools/godot_dap_smoketest.py": "f01c13ba4a28c4d77d77c9549d130f620f87275bdc560893a9708cb7fc544e1f",
           "tools/verify_all.py": "59924c1d2f890851eeaa9ef77d0208bc3a16eaafcfcf061d3e44adbf37a013f3"
         },
@@ -903,6 +903,13 @@
             "old_pin": "8ab89b6853c7",
             "new_pin": "59924c1d2f89",
             "reason": "legitimate edit (Cursor Cloud persist): load ~/.pokewilds-cloud.env via tools/cloud_env.py so later verify_all/run_playtests inherit DISPLAY after start.sh's child exits. Mechanisms intact: ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects *_failed reasons, run_playtests still single-sources both tables from the sibling harness."
+          },
+          {
+            "date": "2026-08-14",
+            "file": "tools/run_playtests.py",
+            "old_pin": "06773def9cd0",
+            "new_pin": "e678f9b34356",
+            "reason": "legitimate edit (Cursor Cloud persist): apply_adapter_authority_gate refuses/restores a missing-shot auto_update that would overwrite Apple M4 baselines with lavapipe (pre-run snapshot, not the already-copied live dir). Mechanisms intact: ERROR_MARKERS still carries 'ERROR: ', failed_event_entry still collects *_failed reasons, run_playtests still single-sources both tables from the sibling harness."
           }
         ]
       },
