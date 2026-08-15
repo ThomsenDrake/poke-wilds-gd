@@ -9,7 +9,12 @@ set -euo pipefail
 CANONICAL_W=1152
 CANONICAL_H=648
 DISPLAY_NUM="${POKEWILDS_XVFB_DISPLAY:-99}"
-ENV_FILE="${POKEWILDS_CLOUD_ENV_FILE:-${HOME}/.pokewilds-cloud.env}"
+USER_DIR="${POKEWILDS_CLOUD_USER_DIR:-${HOME}}"
+ENV_FILE="${POKEWILDS_CLOUD_ENV_FILE:-${USER_DIR}/.pokewilds-cloud.env}"
+X11_SOCKET_DIR="${POKEWILDS_X11_SOCKET_DIR:-/tmp/.X11-unix}"
+X11_LOCK_DIR="${POKEWILDS_X11_LOCK_DIR:-/tmp}"
+XVFB_LOG="${POKEWILDS_XVFB_LOG:-/tmp/pokewilds-xvfb.log}"
+XVFB_PID_FILE="${POKEWILDS_XVFB_PID_FILE:-/tmp/pokewilds-xvfb.pid}"
 LVP_ICD_CANDIDATES=(
   /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
   /usr/share/vulkan/icd.d/lvp_icd.json
@@ -30,7 +35,32 @@ _display_alive() {
     DISPLAY="$d" xdpyinfo >/dev/null 2>&1
     return
   fi
-  [[ -S "/tmp/.X11-unix/X$(_display_num "${d}")" ]]
+  [[ -S "${X11_SOCKET_DIR}/X$(_display_num "${d}")" ]]
+}
+
+_clear_stale_display_state() {
+  local display_num="$1"
+  local lock_file="${X11_LOCK_DIR}/.X${display_num}-lock"
+  local socket_file="${X11_SOCKET_DIR}/X${display_num}"
+  local owner_pid=""
+
+  if _display_alive ":${display_num}"; then
+    return 0
+  fi
+  if [[ -f "${lock_file}" ]]; then
+    owner_pid="$(<"${lock_file}")"
+    owner_pid="${owner_pid//[[:space:]]/}"
+    if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" 2>/dev/null; then
+      echo "ensure_cloud_display: DISPLAY=:${display_num} lock is owned by live PID ${owner_pid}, but xdpyinfo cannot reach it" >&2
+      return 1
+    fi
+    echo "ensure_cloud_display: removing stale ${lock_file}"
+    rm -f -- "${lock_file}"
+  fi
+  if [[ -e "${socket_file}" || -S "${socket_file}" ]]; then
+    echo "ensure_cloud_display: removing stale ${socket_file}"
+    rm -f -- "${socket_file}"
+  fi
 }
 
 _pick_lvp_icd() {
@@ -45,8 +75,13 @@ _pick_lvp_icd() {
 }
 
 if ! command -v xdpyinfo >/dev/null 2>&1; then
-  echo "ensure_cloud_display: xdpyinfo missing; probing /tmp/.X11-unix sockets (install x11-utils)"
+  echo "ensure_cloud_display: xdpyinfo missing; probing ${X11_SOCKET_DIR} sockets (install x11-utils)"
 fi
+
+[[ "${DISPLAY_NUM}" =~ ^[0-9]+$ ]] || {
+  echo "ensure_cloud_display: POKEWILDS_XVFB_DISPLAY must be numeric; found ${DISPLAY_NUM}" >&2
+  exit 1
+}
 
 if [[ -n "${DISPLAY:-}" ]] && _display_alive "${DISPLAY}"; then
   echo "ensure_cloud_display: reusing live DISPLAY=${DISPLAY}"
@@ -55,17 +90,22 @@ else
   if _display_alive "${DISPLAY}"; then
     echo "ensure_cloud_display: reusing Xvfb DISPLAY=${DISPLAY}"
   else
+    _clear_stale_display_state "${DISPLAY_NUM}" || exit 1
     echo "ensure_cloud_display: starting Xvfb ${DISPLAY} ${CANONICAL_W}x${CANONICAL_H}x24"
-    Xvfb "${DISPLAY}" -screen 0 "${CANONICAL_W}x${CANONICAL_H}x24" -ac +extension GLX +render -noreset >/tmp/pokewilds-xvfb.log 2>&1 &
-    echo $! > /tmp/pokewilds-xvfb.pid
-    for _i in 1 2 3 4 5 6 7 8 9 10; do
+    Xvfb "${DISPLAY}" -screen 0 "${CANONICAL_W}x${CANONICAL_H}x24" -ac +extension GLX +render -noreset >"${XVFB_LOG}" 2>&1 &
+    xvfb_pid=$!
+    printf '%s\n' "${xvfb_pid}" > "${XVFB_PID_FILE}"
+    for _i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
       if _display_alive "${DISPLAY}"; then
         break
       fi
       sleep 0.2
     done
     if ! _display_alive "${DISPLAY}"; then
-      echo "ensure_cloud_display: Xvfb failed to become ready; see /tmp/pokewilds-xvfb.log" >&2
+      echo "ensure_cloud_display: Xvfb failed to become ready; see ${XVFB_LOG}" >&2
+      if [[ -s "${XVFB_LOG}" ]]; then
+        tail -n 12 "${XVFB_LOG}" >&2
+      fi
       exit 1
     fi
   fi
@@ -112,10 +152,10 @@ _install_cloud_env_hook() {
   printf '\n%s\n' "${_CLOUD_ENV_HOOK}" >> "${target}"
   echo "ensure_cloud_display: appended hook to ${target}"
 }
-_install_cloud_env_hook "${HOME}/.bashrc"
-if [[ -f "${HOME}/.profile" ]]; then
-  _install_cloud_env_hook "${HOME}/.profile"
+_install_cloud_env_hook "${USER_DIR}/.bashrc"
+if [[ -f "${USER_DIR}/.profile" ]]; then
+  _install_cloud_env_hook "${USER_DIR}/.profile"
 fi
-if [[ -f "${HOME}/.bash_profile" ]]; then
-  _install_cloud_env_hook "${HOME}/.bash_profile"
+if [[ -f "${USER_DIR}/.bash_profile" ]]; then
+  _install_cloud_env_hook "${USER_DIR}/.bash_profile"
 fi

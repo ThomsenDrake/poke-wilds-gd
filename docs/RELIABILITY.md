@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-15
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -42,6 +42,10 @@ The launcher forces `VLM_RUNTIME=command_code` and `VLM_REQUIRED=1`, rejects
 when Godot, `cmd`, or runtime authentication is unavailable. Lavapipe captures
 remain non-authoritative against the committed Apple M4 renderer stamps: they
 can be reviewed live, but cannot certify or overwrite those pixel baselines.
+Each launcher invocation revalidates Xvfb. If a prior Cloud command killed the
+background server but left `.X<n>-lock` or its socket behind, the display helper
+removes them only after `xdpyinfo` fails and the recorded owner PID is absent.
+A lock owned by a live process is never deleted; that ambiguity fails closed.
 
 [Codex Cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environment.md)
 make ordinary environment variables available for the full task, while
