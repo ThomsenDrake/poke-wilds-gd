@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-15
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -39,7 +39,9 @@ bash tools/run_codex_cloud_visuals.sh            # full verify_all, windowed tim
 
 The launcher forces `VLM_RUNTIME=command_code` and `VLM_REQUIRED=1`, rejects
 `PLAYTEST_FORCE_HEADLESS`, checks the live display, and fails before rendering
-when Godot, `cmd`, or runtime authentication is unavailable. Lavapipe captures
+when Godot, `cmd`, runtime authentication, or a bounded inspect-only probe of
+the pinned Command Code model is unavailable. The probe never prints provider
+output or credentials; it emits only classified diagnostics. Lavapipe captures
 remain non-authoritative against the committed Apple M4 renderer stamps: they
 can be reviewed live, but cannot certify or overwrite those pixel baselines.
 After its successful `cmd --version` check, the launcher marks that exact child
@@ -66,6 +68,13 @@ secrets are setup-only and removed before the coding agent runs. Consequently:
   the latter only when the credential is scoped/revocable and agent visibility
   is acceptable. Otherwise the honest Cloud result is the `--skip-windowed`
   gate, with the visual lanes reported SKIP rather than PASS.
+- [Agent internet access](https://learn.chatgpt.com/docs/cloud/internet-access.md)
+  is separately blocked by default during the coding-agent phase even though
+  setup scripts have internet. Enable it per environment and allow HTTPS to
+  `api.commandcode.ai`, including `POST` (the read-only `GET`/`HEAD`/`OPTIONS`
+  restriction cannot run a model request). The visual launcher tests that real
+  API/model path before spending time on screenshots; the setup script cannot
+  grant it.
 
 ## Local gate (verify_all)
 

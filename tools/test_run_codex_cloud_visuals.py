@@ -8,12 +8,14 @@ from pathlib import Path
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools/run_codex_cloud_visuals.sh"
+PROBE = ROOT / "tools/probe_command_code.py"
 
 
 class CodexCloudVisualLauncherTests(unittest.TestCase):
@@ -28,6 +30,7 @@ class CodexCloudVisualLauncherTests(unittest.TestCase):
         self.user_dir.mkdir()
         self.fake_bin.mkdir()
         shutil.copy2(SCRIPT, self.repo / "tools/run_codex_cloud_visuals.sh")
+        shutil.copy2(PROBE, self.repo / "tools/probe_command_code.py")
 
         self.godot = self.user_dir / "godot"
         self._write_executable(
@@ -44,12 +47,21 @@ class CodexCloudVisualLauncherTests(unittest.TestCase):
         )
         self._write_executable(
             self.fake_bin / "cmd",
-            "#!/usr/bin/env bash\nprintf '1.26.0\\n'\n",
+            """#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  printf '1.26.0\n'
+else
+  printf 'COMMAND_CODE_CONNECTIVITY_OK\n'
+fi
+""",
         )
         self.python_log = self.base / "python.json"
         self._write_executable(
             self.fake_bin / "python3",
             """#!/usr/bin/env bash
+if [[ "${1:-}" == "tools/probe_command_code.py" ]]; then
+  exec "${FAKE_REAL_PYTHON}" "$@"
+fi
 python_args=("$@")
 printf '%s\n' "${VLM_RUNTIME:-}" "${VLM_REQUIRED:-}" "${POKEWILDS_COMMAND_CODE_PREFLIGHTED:-}" "${GODOT_AUDIO_DRIVER:-}" > "${FAKE_ENV_LOG}"
 printf '%s\n' "${python_args[@]}" > "${FAKE_PYTHON_LOG}"
@@ -87,6 +99,7 @@ printf 'export GODOT_AUDIO_DRIVER=Dummy\n' >> "${POKEWILDS_CLOUD_ENV_FILE}"
                 "POKEWILDS_CLOUD_ENV_FILE": str(runtime_env),
                 "FAKE_PYTHON_LOG": str(self.python_log),
                 "FAKE_ENV_LOG": str(self.env_log),
+                "FAKE_REAL_PYTHON": sys.executable,
             }
         )
         if auth:
@@ -147,6 +160,24 @@ printf 'export GODOT_AUDIO_DRIVER=Dummy\n' >> "${POKEWILDS_CLOUD_ENV_FILE}"
         result = self._run("--check", PLAYTEST_FORCE_HEADLESS="1")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("PLAYTEST_FORCE_HEADLESS is set", result.stderr)
+
+    def test_fails_before_capture_when_command_code_cannot_reach_api(self) -> None:
+        self._write_executable(
+            self.fake_bin / "cmd",
+            """#!/usr/bin/env bash
+if [[ "${1:-}" == "--version" ]]; then
+  printf '1.26.0\n'
+else
+  printf 'Error: Unable to connect to the API. secret-marker\n' >&2
+  exit 6
+fi
+""",
+        )
+        result = self._run("--focused")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must allow api.commandcode.ai over HTTPS, including POST", result.stderr)
+        self.assertNotIn("secret-marker", result.stderr)
+        self.assertFalse(self.python_log.exists())
 
 
 if __name__ == "__main__":

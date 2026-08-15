@@ -23,7 +23,7 @@ case "${1:-}" in
     cat <<'EOF'
 Usage: bash tools/run_codex_cloud_visuals.sh [--check|--focused|--full] [extra args]
 
-  --check    Start the display and verify Godot, Command Code, and runtime auth.
+  --check    Start the display and verify Godot, Command Code, auth, and API/model access.
   --focused  Run only the visual_sweep scenario and Command Code review.
   --full     Run verify_all with all windowed lanes (default).
 EOF
@@ -63,6 +63,9 @@ fi
 AUTH_FILE="${USER_DIR}/.commandcode/auth.json"
 if [[ -z "${COMMAND_CODE_API_KEY:-}" && ! -f "${AUTH_FILE}" ]]; then
   fail "Command Code runtime auth is unavailable. Codex Cloud secrets are setup-only; use an existing login or an explicitly agent-readable environment variable."
+fi
+if ! python3 tools/probe_command_code.py; then
+  fail "Command Code API/model connectivity preflight failed before visual capture."
 fi
 
 export VLM_RUNTIME=command_code

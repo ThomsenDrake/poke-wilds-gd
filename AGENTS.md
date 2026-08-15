@@ -26,7 +26,7 @@ Use this file as the table of contents, not the encyclopedia.
 python3 tools/setup_worktree.py --quick       # fast local Cursor/Codex hook: runtime checks only; no cache/import lock
 python3 tools/setup_worktree.py               # full preparation before runtime tests; add --seed-from /path/to/warm/worktree to clone missing caches
 bash tools/setup_codex_cloud.sh               # Codex Cloud only: install pinned Linux Godot + full cached preparation
-bash tools/run_codex_cloud_visuals.sh --check # Codex Cloud only: start display + verify Command Code visual readiness
+bash tools/run_codex_cloud_visuals.sh --check # Codex Cloud only: display + live Command Code API/model readiness
 python3 tools/verify_all.py                  # THE pre-push local gate: static + determinism + full suite + windowed pixel lanes + legibility + refuse-on-mismatch/freshness (details: docs/RELIABILITY.md § Local gate)
 python3 tools/verify_all.py --skip-windowed  # display-less environments: windowed lanes reported SKIP, never PASS (honest headless path)
 python3 tools/check_repo_contracts.py
@@ -75,6 +75,12 @@ Runtime Command Code review therefore needs either an existing `cmd` login or
 the latter is appropriate only for a scoped, revocable token whose exposure to
 the coding agent is acceptable. Without one of those explicit auth choices,
 use the honest headless gate: `python3 tools/verify_all.py --skip-windowed`.
+Codex Cloud also blocks agent-phase internet access by default. Enable it for
+this environment with HTTPS access to `api.commandcode.ai`, including `POST`;
+the read-only HTTP-method restriction is insufficient. Setup-script
+internet access does not carry into the visual task. The launcher performs a
+bounded, inspect-only model probe and fails before capture when that host,
+credential, or the pinned model is unavailable.
 
 Lavapipe captures are useful live visual evidence but do not certify or update
 the Apple M4 renderer-stamped pixel baselines.
