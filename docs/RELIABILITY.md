@@ -45,7 +45,8 @@ can be reviewed live, but cannot certify or overwrite those pixel baselines.
 Each launcher invocation revalidates Xvfb. If a prior Cloud command killed the
 background server but left `.X<n>-lock` or its socket behind, the display helper
 removes them only after `xdpyinfo` fails and the recorded owner PID is absent.
-A lock owned by a live process is never deleted; that ambiguity fails closed.
+A defunct/zombie owner counts as absent. A lock owned by a running process is
+never deleted; that ambiguity fails closed.
 
 [Codex Cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environment.md)
 make ordinary environment variables available for the full task, while

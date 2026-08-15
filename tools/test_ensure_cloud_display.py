@@ -8,6 +8,7 @@ from pathlib import Path
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -114,6 +115,19 @@ touch "${FAKE_DISPLAY_LIVE}"
         self.assertIn("lock is owned by live PID", result.stderr)
         self.assertTrue(lock_file.exists())
         self.assertFalse(self.live_marker.exists())
+
+    def test_removes_lock_owned_by_zombie_process(self) -> None:
+        owner = subprocess.Popen(["sh", "-c", "exit 0"])
+        try:
+            time.sleep(0.1)
+            lock_file = self.lock_dir / ".X99-lock"
+            lock_file.write_text(f"{owner.pid}\n", encoding="utf-8")
+            result = self._run()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f"removing stale {lock_file}", result.stdout)
+            self.assertTrue(self.live_marker.exists())
+        finally:
+            owner.wait(timeout=5)
 
     def test_refuses_non_numeric_display(self) -> None:
         result = self._run(POKEWILDS_XVFB_DISPLAY="../../bad")

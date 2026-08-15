@@ -38,6 +38,23 @@ _display_alive() {
   [[ -S "${X11_SOCKET_DIR}/X$(_display_num "${d}")" ]]
 }
 
+_pid_is_running() {
+  local pid="$1"
+  local proc_stat
+  local state=""
+  kill -0 "${pid}" 2>/dev/null || return 1
+  if [[ -r "/proc/${pid}/stat" ]]; then
+    proc_stat="$(<"/proc/${pid}/stat")"
+    proc_stat="${proc_stat##*) }"
+    state="${proc_stat%% *}"
+  else
+    state="$(ps -o stat= -p "${pid}" 2>/dev/null || true)"
+    state="${state//[[:space:]]/}"
+    state="${state:0:1}"
+  fi
+  [[ -n "${state}" && "${state}" != "Z" && "${state}" != "X" ]]
+}
+
 _clear_stale_display_state() {
   local display_num="$1"
   local lock_file="${X11_LOCK_DIR}/.X${display_num}-lock"
@@ -50,7 +67,7 @@ _clear_stale_display_state() {
   if [[ -f "${lock_file}" ]]; then
     owner_pid="$(<"${lock_file}")"
     owner_pid="${owner_pid//[[:space:]]/}"
-    if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" 2>/dev/null; then
+    if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && _pid_is_running "${owner_pid}"; then
       echo "ensure_cloud_display: DISPLAY=:${display_num} lock is owned by live PID ${owner_pid}, but xdpyinfo cannot reach it" >&2
       return 1
     fi
