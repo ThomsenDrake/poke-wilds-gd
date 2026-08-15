@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-15
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -18,11 +18,45 @@ python3 tools/setup_worktree.py --seed-from /absolute/path/to/a/warm/worktree
 python3 tools/setup_worktree.py --check        # add the four canonical static checks
 python3 tools/setup_worktree.py --dry-run      # inspect mutating commands without running them
 bash tools/setup_codex_cloud.sh                # Codex Cloud custom setup field only
+bash tools/run_codex_cloud_visuals.sh --check  # Codex Cloud per-task windowed/VLM preflight
 ```
 
 `--seed-from` accepts only another worktree of this Git repository and is incompatible with `--quick`. Full setup clones only missing `.godot/` and `tools/.cache/` trees; on macOS the copy uses APFS copy-on-write, and the target remains independently writable. The PokeAPI cache is copied only when both worktrees carry byte-identical committed pin files. Only full cache/import work is serialized across sibling worktrees to avoid duplicate cold imports competing for disk; quick hooks never enter that lock. Both modes compare tracked working-tree bytes before and after. If setup changes one, it reports the exact paths and exits nonzero without reverting anything. Use `--skip-cache` or `--skip-import` only when deliberately preparing another partial environment; `--import-timeout` defaults to the CI backstop of 3000 seconds.
 
-`tools/setup_codex_cloud.sh` is Linux-x86_64-specific and must not replace either local worktree hook. It ensures the minimal headless `libfontconfig1` runtime is present, downloads the pinned Godot 4.6.1 archive, verifies its committed SHA-512, installs it under `~/.local/share/poke-wilds-godot/`, writes the secret-free `~/.pokewilds-codex-cloud.env`, hooks that file from `.bashrc`/`.profile`, and passes the explicit binary to the full repo bootstrap. It is idempotent: a warm cached container skips apt and the Godot download, while the repo bootstrap repairs only missing or stale ignored inputs.
+`tools/setup_codex_cloud.sh` is Linux-x86_64-specific and must not replace either local worktree hook. It installs the Xvfb/X11/lavapipe runtime, downloads the pinned Godot 4.6.1 archive, verifies its committed SHA-512, installs it under `~/.local/share/poke-wilds-godot/`, ensures Node 22+, installs pinned Command Code, writes the secret-free `~/.pokewilds-codex-cloud.env`, hooks that file from `.bashrc`/`.profile`, and passes the explicit binary to the full repo bootstrap. It is idempotent: a warm cached container skips apt and both tool downloads, while the repo bootstrap repairs only missing or stale ignored inputs.
+
+### Codex Cloud windowed visual lane
+
+The setup field remains exactly `bash tools/setup_codex_cloud.sh`. A live X
+server is process state rather than a durable cached input, so run the visual
+launcher inside the coding-agent task:
+
+```bash
+bash tools/run_codex_cloud_visuals.sh --check    # start/reuse Xvfb and verify readiness
+bash tools/run_codex_cloud_visuals.sh --focused  # focused visual_sweep + Command Code review
+bash tools/run_codex_cloud_visuals.sh            # full verify_all, windowed timeout 1800
+```
+
+The launcher forces `VLM_RUNTIME=command_code` and `VLM_REQUIRED=1`, rejects
+`PLAYTEST_FORCE_HEADLESS`, checks the live display, and fails before rendering
+when Godot, `cmd`, or runtime authentication is unavailable. Lavapipe captures
+remain non-authoritative against the committed Apple M4 renderer stamps: they
+can be reviewed live, but cannot certify or overwrite those pixel baselines.
+
+[Codex Cloud environments](https://learn.chatgpt.com/docs/environments/cloud-environment.md)
+make ordinary environment variables available for the full task, while
+secrets are setup-only and removed before the coding agent runs. Consequently:
+
+- Do not configure `COMMAND_CODE_API_KEY` as a Codex Cloud secret and then
+  expect the later visual gate to inherit it.
+- Do not copy a setup secret into `~/.commandcode/auth.json` or another cached
+  file; that defeats the platform boundary and can expose credentials through
+  a reused or workspace-shared cache.
+- The supported runtime choices are an existing Command Code login or an
+  explicitly agent-readable `COMMAND_CODE_API_KEY` environment variable. Use
+  the latter only when the credential is scoped/revocable and agent visibility
+  is acceptable. Otherwise the honest Cloud result is the `--skip-windowed`
+  gate, with the visual lanes reported SKIP rather than PASS.
 
 ## Local gate (verify_all)
 
@@ -337,7 +371,7 @@ Endpoint / secret configuration (flags win over env):
 | Env | Flag | Default | Meaning |
 | --- | --- | --- | --- |
 | `VLM_RUNTIME` | `--runtime` | `auto` | Backend: `command_code` \| `dashscope` \| `ollama` \| `auto` (auto = headless Command Code `gpt-5.6-luna`, then hosted DashScope, then local Ollama) |
-| `COMMAND_CODE_API_KEY` | — | (unset) | SECRET — Command Code provider key; overrides `~/.commandcode/auth.json`. Presence-only in `reviewer_meta`. Required on Cursor Cloud (no interactive `cmd login`) |
+| `COMMAND_CODE_API_KEY` | — | (unset) | Command Code provider key; overrides `~/.commandcode/auth.json`. Presence-only in `reviewer_meta`. Use a platform secret on Cursor Cloud. Codex Cloud removes secrets after setup, so its runtime key must be an explicitly agent-readable environment variable, with the exposure tradeoff documented above. |
 | `GODOT_AUDIO_DRIVER` | — | `Dummy` (playtest subprocesses) | Godot `--audio-driver`. Cloud has no ALSA card; Dummy avoids the ALSA `ERR_CANT_OPEN` that miss-002 `ERROR:` capture would otherwise false-red. Set `-` to pass no flag |
 | `POKEWILDS_CLOUD_ENV_FILE` | — | `~/.pokewilds-cloud.env` | Display/Vulkan/Dummy exports written by `tools/ensure_cloud_display.sh` (no secrets). `start.sh` is a child process; later shells source this via a bashrc hook, and `tools/cloud_env.py` fills unset keys and replaces a dead inherited `DISPLAY` for `verify_all` / `run_playtests` |
 | `VLM_MODEL` | `--model` | `qwen3-vl:8b` | Ollama tag (explicit, never `latest`); `qwen3-vl:4b` is the lower-fidelity fallback; 30b/32b avoided on 24GB |

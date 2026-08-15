@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-boot virtual display + software Vulkan for windowed Godot on Cursor Cloud.
+# Per-task virtual display + software Vulkan for windowed Godot on Linux Cloud.
 #
 # Reuses an already-working DISPLAY (computer-use desktops often own :1).
 # Otherwise starts Xvfb at the canonical 1152x648 sweep window. Idempotent:

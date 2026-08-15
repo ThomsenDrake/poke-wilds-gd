@@ -26,6 +26,7 @@ Use this file as the table of contents, not the encyclopedia.
 python3 tools/setup_worktree.py --quick       # fast local Cursor/Codex hook: runtime checks only; no cache/import lock
 python3 tools/setup_worktree.py               # full preparation before runtime tests; add --seed-from /path/to/warm/worktree to clone missing caches
 bash tools/setup_codex_cloud.sh               # Codex Cloud only: install pinned Linux Godot + full cached preparation
+bash tools/run_codex_cloud_visuals.sh --check # Codex Cloud only: start display + verify Command Code visual readiness
 python3 tools/verify_all.py                  # THE pre-push local gate: static + determinism + full suite + windowed pixel lanes + legibility + refuse-on-mismatch/freshness (details: docs/RELIABILITY.md § Local gate)
 python3 tools/verify_all.py --skip-windowed  # display-less environments: windowed lanes reported SKIP, never PASS (honest headless path)
 python3 tools/check_repo_contracts.py
@@ -54,6 +55,29 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 - Families: smoke/boot probes (`boot`, `overworld_step`, `menu_save`, `wild_battle`, `biome_probe`, `biome_traverse`, `field_move`, `save_migration` + the five windowed sweep entries); journey/soak bots (`playtest_journey`, `playtest_soak`, `playtest_field_soak`, `playtest_breed_soak`, `playtest_entity_soak`); audits (`nav_audit`, `texture_audit`, `data_audit`, `layout_audit`, `world_consistency_audit`, `ui_render_audit`, `ui_tree_dump`) and presentation probes (`battle_anim`, `display_matrix`); gameplay flows (`harvest_flow` … `new_game_flow`, incl. `dig_silence`); the deterministic `visual_sweep` + satellite sweep families and their `_update` accept-new-baselines variants; `showcase_capture` (docs-only frames); `temporal_flow`; and the windowed-only `play_agent` reference driver.
 - `legibility_soak` gates the agent-legibility surfaces: it drives the five agent-facing screens and asserts the ui_tree dumps, the `game/*` Performance monitors, and the trace lifecycle agree (details: `docs/RELIABILITY.md` § Runtime smoke checks).
 - Lane 4 (VLM vision review): every windowed sweep run regenerates `.godot-smoke/vision-review.json` via `tools/vlm_reviewer.py` (quarantine-forever findings; `verify_all` R6 refuses a stale manifest) — see `docs/RELIABILITY.md` § Agent vision review.
+
+## Codex Cloud specific instructions
+
+The dedicated setup installs pinned Godot, Xvfb/lavapipe/X11 libraries, Node
+22 when the environment is pinned lower, and pinned Command Code. The display
+is process state, so start it in the task that runs the sweep:
+
+```bash
+bash tools/run_codex_cloud_visuals.sh --check    # display + binary + runtime-auth preflight
+bash tools/run_codex_cloud_visuals.sh --focused  # visual_sweep only
+bash tools/run_codex_cloud_visuals.sh            # complete verify_all windowed gate
+```
+
+Codex Cloud secrets exist only during setup and are removed before the coding
+agent runs. Never copy `COMMAND_CODE_API_KEY` from setup into a cached file.
+Runtime Command Code review therefore needs either an existing `cmd` login or
+`COMMAND_CODE_API_KEY` configured as an agent-readable environment variable;
+the latter is appropriate only for a scoped, revocable token whose exposure to
+the coding agent is acceptable. Without one of those explicit auth choices,
+use the honest headless gate: `python3 tools/verify_all.py --skip-windowed`.
+
+Lavapipe captures are useful live visual evidence but do not certify or update
+the Apple M4 renderer-stamped pixel baselines.
 
 ## Cursor Cloud specific instructions
 

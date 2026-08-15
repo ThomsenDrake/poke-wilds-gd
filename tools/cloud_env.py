@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load Cursor Cloud display/Vulkan exports written by ensure_cloud_display.sh.
+"""Load Linux Cloud display/Vulkan exports written by ensure_cloud_display.sh.
 
 `.cursor/start.sh` is a short-lived child of environment.json `start`, so
 sourcing ~/.pokewilds-cloud.env there does not reach later agent shells or

@@ -128,6 +128,10 @@ worktree_setup_command = "python3 tools/setup_worktree.py"
 worktree_quick_setup_command = "python3 tools/setup_worktree.py --quick"
 codex_cloud_setup_tool_path = "tools/setup_codex_cloud.sh"
 codex_cloud_setup_command = "bash tools/setup_codex_cloud.sh"
+codex_cloud_visual_tool_path = "tools/run_codex_cloud_visuals.sh"
+codex_cloud_visual_check_command = "bash tools/run_codex_cloud_visuals.sh --check"
+codex_cloud_visual_focused_command = "bash tools/run_codex_cloud_visuals.sh --focused"
+codex_cloud_visual_full_command = "bash tools/run_codex_cloud_visuals.sh"
 # The local pre-push gate. Display-less agents run the --skip-windowed form
 # (windowed lanes reported SKIP, never PASS); the full gate needs a display.
 gate_tool_path = "tools/verify_all.py"

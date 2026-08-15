@@ -37,7 +37,8 @@ This repository is a Godot reimplementation scaffold for a playable slice of Pok
 ```bash
 python3 tools/setup_worktree.py --quick # fast local Cursor/Codex hook (runtime checks; no cache/import lock)
 python3 tools/setup_worktree.py         # full test preparation (ignored caches + Godot import)
-bash tools/setup_codex_cloud.sh         # Codex Cloud Linux setup (pinned Godot + full cached preparation)
+bash tools/setup_codex_cloud.sh         # Codex Cloud Linux setup (Godot + visual runtime + full preparation)
+bash tools/run_codex_cloud_visuals.sh --check # Codex Cloud windowed/Command Code readiness
 python3 tools/verify_all.py            # the one-command local gate (static gates + determinism + headless suite + windowed lanes + legibility)
 python3 tools/check_repo_contracts.py
 python3 tools/check_architecture.py

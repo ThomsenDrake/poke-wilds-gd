@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-15
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/run_codex_cloud_visuals.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -221,8 +221,11 @@ foreign editor merely because its socket is open.
 Codex Cloud is a separate Linux environment surface. Set its custom setup
 script to `bash tools/setup_codex_cloud.sh`, not the local quick hook and not
 `.cursor/install.sh`. The dedicated script installs and SHA-512-verifies the
-pinned Linux Godot binary plus its minimal headless fontconfig runtime,
-persists `GODOT_BIN` through the secret-free
-`~/.pokewilds-codex-cloud.env`, and runs the full cache/import preparation that
-Codex snapshots with the container. Codex Cloud remains display-less by
-default, so its honest gate is `python3 tools/verify_all.py --skip-windowed`.
+pinned Linux Godot binary, Xvfb/lavapipe/X11, Node 22+, and pinned Command
+Code; persists only non-secret runtime configuration through
+`~/.pokewilds-codex-cloud.env`; and runs the full cache/import preparation that
+Codex snapshots with the container. For the windowed lane, run `bash
+tools/run_codex_cloud_visuals.sh --check`, then `--focused` or the default full
+gate. Codex Cloud secrets are setup-only, so the launcher intentionally refuses
+to persist them and requires explicit runtime Command Code auth. Without that
+auth, the honest gate remains `python3 tools/verify_all.py --skip-windowed`.
