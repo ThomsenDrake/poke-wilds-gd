@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-14
+Last verified: 2026-08-15
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/vlm_reviewer.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -9,7 +9,7 @@ Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/check
 
 Cursor and Codex each have a local worktree hook, and both deliberately invoke `python3 tools/setup_worktree.py --quick`. Quick setup verifies Python 3.12+, the pinned Godot 4.6.1 binary, Git worktree integrity, and cache-link safety. It does not copy or fetch caches, import Godot resources, or acquire the repository-wide setup lock, so the two apps cannot make each other's worktree creation wait on a cold import.
 
-Run the default full preparation once before the worktree's first runtime test. It repairs and stamps the ignored cache against the committed PokeAPI pin when missing or unverified and runs the same explicit headless resource import as CI. The import uses Godot's `--quiet` mode to suppress per-asset progress while retaining errors. Cursor Cloud's environment installer intentionally uses this full path because the resulting environment is snapshotted and reused. Neither mode creates or switches a worktree, refreshes the upstream PokeAPI pin, replaces a non-empty cache from another worktree, reverts a tracked file, or runs the full gate.
+Run the default full preparation once before the worktree's first runtime test. It repairs and stamps the ignored cache against the committed PokeAPI pin when missing or unverified and runs the same explicit headless resource import as CI. The import uses Godot's `--quiet` mode to suppress per-asset progress while retaining errors. Cursor Cloud and Codex Cloud each have a separate installer that intentionally uses this full path because their resulting environments are snapshotted and reused. Neither mode creates or switches a worktree, refreshes the upstream PokeAPI pin, replaces a non-empty cache from another worktree, reverts a tracked file, or runs the full gate.
 
 ```bash
 python3 tools/setup_worktree.py --quick       # local Cursor/Codex creation hook
@@ -17,9 +17,12 @@ python3 tools/setup_worktree.py
 python3 tools/setup_worktree.py --seed-from /absolute/path/to/a/warm/worktree
 python3 tools/setup_worktree.py --check        # add the four canonical static checks
 python3 tools/setup_worktree.py --dry-run      # inspect mutating commands without running them
+bash tools/setup_codex_cloud.sh                # Codex Cloud custom setup field only
 ```
 
 `--seed-from` accepts only another worktree of this Git repository and is incompatible with `--quick`. Full setup clones only missing `.godot/` and `tools/.cache/` trees; on macOS the copy uses APFS copy-on-write, and the target remains independently writable. The PokeAPI cache is copied only when both worktrees carry byte-identical committed pin files. Only full cache/import work is serialized across sibling worktrees to avoid duplicate cold imports competing for disk; quick hooks never enter that lock. Both modes compare tracked working-tree bytes before and after. If setup changes one, it reports the exact paths and exits nonzero without reverting anything. Use `--skip-cache` or `--skip-import` only when deliberately preparing another partial environment; `--import-timeout` defaults to the CI backstop of 3000 seconds.
+
+`tools/setup_codex_cloud.sh` is Linux-x86_64-specific and must not replace either local worktree hook. It ensures the minimal headless `libfontconfig1` runtime is present, downloads the pinned Godot 4.6.1 archive, verifies its committed SHA-512, installs it under `~/.local/share/poke-wilds-godot/`, writes the secret-free `~/.pokewilds-codex-cloud.env`, hooks that file from `.bashrc`/`.profile`, and passes the explicit binary to the full repo bootstrap. It is idempotent: a warm cached container skips apt and the Godot download, while the repo bootstrap repairs only missing or stale ignored inputs.
 
 ## Local gate (verify_all)
 

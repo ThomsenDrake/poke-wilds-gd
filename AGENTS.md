@@ -25,6 +25,7 @@ Use this file as the table of contents, not the encyclopedia.
 ```bash
 python3 tools/setup_worktree.py --quick       # fast local Cursor/Codex hook: runtime checks only; no cache/import lock
 python3 tools/setup_worktree.py               # full preparation before runtime tests; add --seed-from /path/to/warm/worktree to clone missing caches
+bash tools/setup_codex_cloud.sh               # Codex Cloud only: install pinned Linux Godot + full cached preparation
 python3 tools/verify_all.py                  # THE pre-push local gate: static + determinism + full suite + windowed pixel lanes + legibility + refuse-on-mismatch/freshness (details: docs/RELIABILITY.md § Local gate)
 python3 tools/verify_all.py --skip-windowed  # display-less environments: windowed lanes reported SKIP, never PASS (honest headless path)
 python3 tools/check_repo_contracts.py
