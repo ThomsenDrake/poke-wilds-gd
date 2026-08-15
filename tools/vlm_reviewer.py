@@ -869,6 +869,23 @@ def _normalize_pass(doc: dict, public_ctx: dict, question_ids: set[str],
     return answers, {"dropped": drops, "drop_reasons": reasons}
 
 
+def omitted_question_ids(answers: list[dict], question_ids: set[str]) -> list[str]:
+    """Sorted rubric ids the model pass did not answer. Used by the one-shot
+    incompleteness repair (Command Code on Cloud has omitted 1 of 7 menu
+    questions and failed the whole visual_sweep closed)."""
+    have = {a.get("question_id") for a in answers if isinstance(a, dict)}
+    return sorted(qid for qid in question_ids if qid not in have)
+
+
+def incomplete_answers_repair_system(system: str, missing: list[str]) -> str:
+    """JSON-repair analog: name the omitted ids and demand a complete answers[]."""
+    return (
+        f"{system}\n\nYour last reply omitted these question ids: "
+        f"{', '.join(missing)}. Return ONLY a JSON object whose answers[] "
+        "includes EVERY rubric question exactly once."
+    )
+
+
 def _unanimous(passes: list[list[dict]], required: int | None = None) -> tuple[list[dict], dict]:
     """Keep only answers the passes agree on (identity = question_id+verdict); the
     canonical copy is pass-1's. `required` is the CONFIGURED pass count (cfg.n): an
@@ -948,6 +965,36 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
             # silently degrades to n=1 for findings.
             continue
         answers, norm = _normalize_pass(doc, public_ctx, question_ids, valid)
+        missing = omitted_question_ids(answers, question_ids)
+        if missing:
+            # ONE incompleteness repair (same budget as the JSON-repair retry).
+            # Command Code gpt-5.6-luna has returned 6/7 menu answers on Cloud
+            # and failed the required 27-shot visual_sweep closed; a second
+            # call that names the omitted ids usually completes. Still
+            # fail-closed if this pass stays short.
+            try:
+                content2 = _call_model(
+                    cfg, backend,
+                    incomplete_answers_repair_system(system, missing),
+                    user_text, images, temperature, seed + 7919, public_ctx,
+                    order)
+                doc2, parse2 = _parse_with_repair(
+                    cfg, backend, system, user_text, images, temperature,
+                    seed + 7919, public_ctx, content2, order=order)
+            except (OSError, urllib.error.URLError, RuntimeError) as exc:
+                doc2, parse2 = None, f"incomplete-repair failed: {type(exc).__name__}"
+            if doc2 is not None:
+                answers2, norm2 = _normalize_pass(doc2, public_ctx, question_ids, valid)
+                if not omitted_question_ids(answers2, question_ids):
+                    answers, norm = answers2, {**norm2, "incomplete_repair": "completed"}
+                    parse_note = f"{parse_note}+incomplete_repair"
+                else:
+                    parse_note = f"{parse_note}+incomplete_repair_still_short"
+                    norm = {**norm, "incomplete_repair": "still_short",
+                            "omitted": omitted_question_ids(answers2, question_ids)}
+            else:
+                parse_note = f"{parse_note}+incomplete_repair:{parse2}"
+                norm = {**norm, "incomplete_repair": parse2, "omitted": missing}
         passes.append(answers)
         per_pass.append({"pass": i, "order": order, "parse": parse_note,
                          "answers": len(answers), **norm})
