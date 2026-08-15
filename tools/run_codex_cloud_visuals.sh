@@ -56,8 +56,9 @@ DISPLAY="${DISPLAY:-}" xdpyinfo >/dev/null 2>&1 \
   || fail "GODOT_BIN is not Godot 4.6.1."
 command -v cmd >/dev/null \
   || fail "Command Code is unavailable; rerun the Codex Cloud setup."
-cmd --version >/dev/null 2>&1 \
-  || fail "Command Code's version probe failed."
+if ! command_code_version="$(cmd --version 2>/dev/null)"; then
+  fail "Command Code's version probe failed."
+fi
 
 AUTH_FILE="${USER_DIR}/.commandcode/auth.json"
 if [[ -z "${COMMAND_CODE_API_KEY:-}" && ! -f "${AUTH_FILE}" ]]; then
@@ -66,10 +67,11 @@ fi
 
 export VLM_RUNTIME=command_code
 export VLM_REQUIRED=1
+export POKEWILDS_COMMAND_CODE_PREFLIGHTED=1
 export COMMANDCODE_SKIP_UPDATES=1
 export GODOT_AUDIO_DRIVER=Dummy
 
-echo "Codex Cloud visual preflight: ready (DISPLAY=${DISPLAY}, Godot=$("${GODOT_BIN}" --version), Command Code=$(cmd --version))"
+echo "Codex Cloud visual preflight: ready (DISPLAY=${DISPLAY}, Godot=$("${GODOT_BIN}" --version), Command Code=${command_code_version})"
 case "${MODE}" in
   check)
     [[ $# -eq 0 ]] || fail "--check does not accept extra arguments."

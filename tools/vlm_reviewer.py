@@ -82,7 +82,8 @@ dropped (full frames + SoM overlays always go). Ollama's grammar-constrained
 retry); the hosted path is prompt-instructed JSON so validate+repair is
 mandatory there. The per-call timeout (VLM_TIMEOUT, default 180) bounds each
 HTTP call; the pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
-invocation. The worst case (probe 5s + n=2 + a repair retry per pass) can
+invocation. The worst case (standalone Command Code probe 30s, or HTTP probe
+5s, plus n=2 + a repair retry per pass) can
 exceed the outer bound under a slow model -- the outer bound then kills the
 invocation and the pipeline records a TOOL ERROR (fail-closed, never a silent
 pass); for slow endpoints raise VLM_TIMEOUT and REVIEWER_TIMEOUT together.
@@ -119,11 +120,25 @@ DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/co
 DEFAULT_DASHSCOPE_MODEL = "qwen3.8-max-preview"
 DEFAULT_TIMEOUT = 180                   # per call; reasoning models spend tokens thinking (keep headroom; < REVIEWER_TIMEOUT=300)
 PROBE_TIMEOUT = 5
+DEFAULT_COMMAND_CODE_PROBE_TIMEOUT = 30
 MAX_CROPS = 6                           # bound image tokens; native-res crops carry the small-diff signal
 MAX_TEXT = 1600                         # cap embedded text blocks so a large bundle cannot blow the context
 RUBRIC_REF = "docs/references/vision-review-rubric.md"
 
 EXIT_OK, EXIT_ERROR = 0, 2
+
+
+def _command_code_probe_timeout() -> int:
+    try:
+        return max(
+            1,
+            int(os.environ.get(
+                "COMMAND_CODE_PROBE_TIMEOUT",
+                str(DEFAULT_COMMAND_CODE_PROBE_TIMEOUT),
+            )),
+        )
+    except ValueError:
+        return DEFAULT_COMMAND_CODE_PROBE_TIMEOUT
 
 # JSON schema the model must return (per-question answers). Grammar-constrained
 # on Ollama (guaranteed shape); prompt-instructed on DashScope (validated +
@@ -193,6 +208,10 @@ class Config:
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
             "command_code_key_present": bool(os.environ.get("COMMAND_CODE_API_KEY")),
+            "command_code_preflight_reused": (
+                os.environ.get("POKEWILDS_COMMAND_CODE_PREFLIGHTED") == "1"
+            ),
+            "command_code_probe_timeout_s": _command_code_probe_timeout(),
             "temperature": 0.2 if self.independent_vote else 0,
             "n": self.n,
             "vote": "both-passes-must-emit (unanimity)",
@@ -604,9 +623,11 @@ def _command_code_available() -> tuple[bool, str]:
     auth_file = Path.home() / ".commandcode" / "auth.json"
     if not os.environ.get("COMMAND_CODE_API_KEY") and not auth_file.is_file():
         return False, "COMMAND_CODE_API_KEY unset and no ~/.commandcode/auth.json"
+    if os.environ.get("POKEWILDS_COMMAND_CODE_PREFLIGHTED") == "1":
+        return True, "cmd CLI available (launcher preflight reused)"
     try:
         proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
-                              timeout=PROBE_TIMEOUT, check=False)
+                              timeout=_command_code_probe_timeout(), check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"cmd probe failed: {type(exc).__name__}"
     if proc.returncode != 0:

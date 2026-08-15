@@ -51,7 +51,7 @@ class CodexCloudVisualLauncherTests(unittest.TestCase):
             self.fake_bin / "python3",
             """#!/usr/bin/env bash
 python_args=("$@")
-printf '%s\n' "${VLM_RUNTIME:-}" "${VLM_REQUIRED:-}" "${GODOT_AUDIO_DRIVER:-}" > "${FAKE_ENV_LOG}"
+printf '%s\n' "${VLM_RUNTIME:-}" "${VLM_REQUIRED:-}" "${POKEWILDS_COMMAND_CODE_PREFLIGHTED:-}" "${GODOT_AUDIO_DRIVER:-}" > "${FAKE_ENV_LOG}"
 printf '%s\n' "${python_args[@]}" > "${FAKE_PYTHON_LOG}"
 """,
         )
@@ -118,7 +118,7 @@ printf 'export GODOT_AUDIO_DRIVER=Dummy\n' >> "${POKEWILDS_CLOUD_ENV_FILE}"
         )
         self.assertEqual(
             self.env_log.read_text(encoding="utf-8").splitlines(),
-            ["command_code", "1", "Dummy"],
+            ["command_code", "1", "1", "Dummy"],
         )
 
     def test_focused_runs_visual_sweep(self) -> None:
