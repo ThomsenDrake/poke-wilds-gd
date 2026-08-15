@@ -108,7 +108,9 @@ chmod +x "${prefix}/bin/cmd"
 printf 'install\n' >> "${FAKE_NPM_LOG}"
 """,
         )
-        self.lvp_icd = self.base / "lvp_icd.x86_64.json"
+        self.vulkan_icd_dir = self.base / "vulkan/icd.d"
+        self.vulkan_icd_dir.mkdir(parents=True)
+        self.lvp_icd = self.vulkan_icd_dir / "lvp_icd.x86_64.json"
         self.lvp_icd.write_text("{}\n", encoding="utf-8")
         self.apt_log = self.base / "apt.log"
         self._write_executable(
@@ -116,7 +118,7 @@ printf 'install\n' >> "${FAKE_NPM_LOG}"
             """#!/usr/bin/env bash
 printf '%s\n' "$*" >> "${FAKE_APT_LOG}"
 if [[ " $* " == *" install "* ]]; then
-  printf '{}\n' > "${CODEX_CLOUD_LVP_ICD}"
+  printf '{}\n' > "${FAKE_LVP_ICD}"
 fi
 """,
         )
@@ -165,10 +167,11 @@ printf 'download\n' >> "${FAKE_CURL_LOG}"
                 "CODEX_CLOUD_LOCAL_PREFIX": str(self.home / ".local"),
                 "CODEX_CLOUD_GODOT_DIR": str(self.home / "godot"),
                 "CODEX_CLOUD_GODOT_SHA512": self.fixture_sha,
-                "CODEX_CLOUD_LVP_ICD": str(self.lvp_icd),
+                "CODEX_CLOUD_VULKAN_ICD_DIR": str(self.vulkan_icd_dir),
                 "FAKE_GODOT_ZIP": str(self.fixture_zip),
                 "FAKE_CURL_LOG": str(self.curl_log),
                 "FAKE_LOCAL_PREFIX": str(self.home / ".local"),
+                "FAKE_LVP_ICD": str(self.lvp_icd),
                 "FAKE_NPM_LOG": str(self.npm_log),
                 "FAKE_APT_LOG": str(self.apt_log),
                 "SETUP_LOG": str(self.setup_log),
@@ -289,6 +292,14 @@ printf 'download\n' >> "${FAKE_CURL_LOG}"
         self.assertIn("xvfb", apt_calls)
         self.assertIn("mesa-vulkan-drivers", apt_calls)
         self.assertIn("libx11-6", apt_calls)
+
+    def test_accepts_generic_lavapipe_icd_name(self) -> None:
+        generic_icd = self.vulkan_icd_dir / "lvp_icd.json"
+        self.lvp_icd.rename(generic_icd)
+        result = self._run()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(str(generic_icd), result.stdout)
+        self.assertFalse(self.apt_log.exists())
 
 
 if __name__ == "__main__":

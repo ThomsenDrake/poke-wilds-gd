@@ -22,7 +22,11 @@ GODOT_BIN="${GODOT_DIR}/godot"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${CODEX_CLOUD_ENV_FILE:-${USER_DIR}/.pokewilds-codex-cloud.env}"
 ENV_HOOK='[ -f "$HOME/.pokewilds-codex-cloud.env" ] && . "$HOME/.pokewilds-codex-cloud.env"'
-LVP_ICD="${CODEX_CLOUD_LVP_ICD:-/usr/share/vulkan/icd.d/lvp_icd.x86_64.json}"
+VULKAN_ICD_DIR="${CODEX_CLOUD_VULKAN_ICD_DIR:-/usr/share/vulkan/icd.d}"
+LVP_ICD_CANDIDATES=(
+  "${VULKAN_ICD_DIR}/lvp_icd.x86_64.json"
+  "${VULKAN_ICD_DIR}/lvp_icd.json"
+)
 
 fail() {
   printf 'setup_codex_cloud: %s\n' "$1" >&2
@@ -41,19 +45,42 @@ command -v curl >/dev/null \
 # Godot's headless import needs fontconfig. Windowed visual sweeps additionally
 # need Xvfb, X11 client libraries, and Mesa lavapipe. Install the complete set in
 # one apt transaction; warm cached containers skip apt entirely.
-visual_runtime_ready() {
-  local linker_cache
-  command -v ldconfig >/dev/null || return 1
-  linker_cache="$(ldconfig -p 2>/dev/null)" || return 1
-  for runtime_lib in \
-    'libfontconfig\.so\.1' 'libX11\.so\.6' 'libXcursor\.so\.1' \
-    'libXi\.so\.6' 'libXinerama\.so\.1' 'libXrandr\.so\.2' \
-    'libXrender\.so\.1' 'libGL\.so\.1'; do
-    grep -q "${runtime_lib}" <<< "${linker_cache}" || return 1
+pick_lvp_icd() {
+  local candidate
+  for candidate in "${LVP_ICD_CANDIDATES[@]}"; do
+    if [[ -f "${candidate}" ]]; then
+      printf '%s' "${candidate}"
+      return 0
+    fi
   done
-  command -v Xvfb >/dev/null \
-    && command -v xdpyinfo >/dev/null \
-    && [[ -f "${LVP_ICD}" ]]
+  return 1
+}
+
+visual_runtime_missing() {
+  local linker_cache
+  local runtime_lib
+  local -a missing=()
+  if command -v ldconfig >/dev/null \
+    && linker_cache="$(ldconfig -p 2>/dev/null)"; then
+    for runtime_lib in \
+      'libfontconfig\.so\.1' 'libX11\.so\.6' 'libXcursor\.so\.1' \
+      'libXi\.so\.6' 'libXinerama\.so\.1' 'libXrandr\.so\.2' \
+      'libXrender\.so\.1' 'libGL\.so\.1'; do
+      if ! grep -q "${runtime_lib}" <<< "${linker_cache}"; then
+        missing+=("${runtime_lib//\\/}")
+      fi
+    done
+  else
+    missing+=("ldconfig")
+  fi
+  command -v Xvfb >/dev/null || missing+=("Xvfb")
+  command -v xdpyinfo >/dev/null || missing+=("xdpyinfo")
+  pick_lvp_icd >/dev/null || missing+=("lavapipe ICD")
+  printf '%s' "${missing[*]}"
+}
+
+visual_runtime_ready() {
+  [[ -z "$(visual_runtime_missing)" ]]
 }
 
 if ! visual_runtime_ready; then
@@ -74,10 +101,11 @@ if ! visual_runtime_ready; then
     sudo env DEBIAN_FRONTEND=noninteractive \
       apt-get install -y --no-install-recommends "${packages[@]}"
   fi
-  visual_runtime_ready \
-    || fail "The X11/lavapipe packages installed but the visual runtime is still incomplete."
+  if ! visual_runtime_ready; then
+    fail "The X11/lavapipe packages installed but the visual runtime is still incomplete; missing: $(visual_runtime_missing)."
+  fi
 else
-  echo "Godot X11/Xvfb/lavapipe runtime: ready"
+  echo "Godot X11/Xvfb/lavapipe runtime: ready ($(pick_lvp_icd))"
 fi
 
 echo "== PokeWilds-Godot Codex Cloud setup =="
