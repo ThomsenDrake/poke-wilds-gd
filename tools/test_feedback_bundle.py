@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import warnings
 import zipfile
 import stat
 import struct
@@ -117,7 +118,9 @@ class FeedbackBundleTests(unittest.TestCase):
             with zipfile.ZipFile(bundle) as source, zipfile.ZipFile(duplicate, "w") as target:
                 for name in source.namelist():
                     target.writestr(name, source.read(name))
-                target.writestr("README.txt", b"duplicate")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    target.writestr("README.txt", b"duplicate")
             with self.assertRaisesRegex(ValueError, "duplicate"):
                 inspect_bundle(duplicate)
             output = root / "existing"
@@ -230,6 +233,15 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertRegex(first, r"^PKMN-[A-Z]+-[A-F0-9]{6}$")
         self.assertLessEqual(len(first), 24)
         self.assertTrue(any(f"-{species}-" in first for species in package_playtest.POKEMON_HANDLE_SPECIES))
+
+    def test_private_registry_is_mode_0600_and_atomically_replaced(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            registry = Path(raw) / ".playtest" / "invites.json"
+            with mock.patch.object(package_playtest, "REGISTRY", registry):
+                package_playtest.save_registry({"schema_version": 1, "friends": {}})
+            self.assertEqual(stat.S_IMODE(registry.stat().st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            self.assertEqual(json.loads(registry.read_text(encoding="utf-8")), {"schema_version": 1, "friends": {}})
+            self.assertEqual(list(registry.parent.glob(".*.tmp")), [])
 
     def test_invite_registration_identifies_the_package_client(self) -> None:
         invite = {"tester_id": "PKMN-EEVEE-ABCDEF", "token": "private", "nickname": "Friend", "cohort_id": "friends-1"}

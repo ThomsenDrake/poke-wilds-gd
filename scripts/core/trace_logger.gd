@@ -1,5 +1,6 @@
 extends RefCounted
 
+const BoundedJsonl := preload("res://scripts/core/bounded_jsonl.gd")
 const LOG_DIR := "user://logs"
 const LOG_PATH := "%s/agent_trace.jsonl" % LOG_DIR
 
@@ -55,34 +56,17 @@ func session_log_slice(limit_bytes: int = 5 * 1024 * 1024) -> Dictionary:
 		file.close()
 		return {"bytes": complete, "source_bytes": source_bytes, "truncated": false}
 	var prefix_size := mini(256 * 1024, limit_bytes / 4)
-	var prefix := _complete_jsonl_prefix(file.get_buffer(prefix_size))
+	var prefix := BoundedJsonl.complete_prefix(file.get_buffer(prefix_size))
 	var gap := (JSON.stringify({"event": "feedback_trace_truncated", "source": "TraceLogger", "payload": {
 		"omitted_bytes": source_bytes - limit_bytes}}) + "\n").to_utf8_buffer()
 	var tail_size := maxi(0, limit_bytes - prefix.size() - gap.size())
 	file.seek(maxi(_session_start_offset + prefix.size(), end - tail_size))
-	var tail := _complete_jsonl_tail(file.get_buffer(tail_size))
+	var tail := BoundedJsonl.complete_tail(file.get_buffer(tail_size))
 	file.close()
 	var bytes := prefix
 	bytes.append_array(gap)
 	bytes.append_array(tail)
 	return {"bytes": bytes, "source_bytes": source_bytes, "truncated": true}
-
-
-func _complete_jsonl_prefix(bytes: PackedByteArray) -> PackedByteArray:
-	var last_newline := -1
-	for index in bytes.size():
-		if bytes[index] == 10:
-			last_newline = index
-	return bytes.slice(0, last_newline + 1) if last_newline >= 0 else PackedByteArray()
-
-
-func _complete_jsonl_tail(bytes: PackedByteArray) -> PackedByteArray:
-	var start := 0
-	while start < bytes.size() and bytes[start] != 10:
-		start += 1
-	if start < bytes.size():
-		start += 1
-	return _complete_jsonl_prefix(bytes.slice(start))
 
 
 # Editor-legibility mirror for addons/agent_trace: with no debugger attached

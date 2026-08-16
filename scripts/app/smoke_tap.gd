@@ -74,6 +74,23 @@ static func tap_digit(tree: SceneTree, digit: int) -> void:
 	await tree.process_frame
 
 
+static func tap_key(tree: SceneTree, keycode: Key, shifted: bool = false) -> void:
+	var press := InputEventKey.new()
+	press.keycode = keycode
+	press.physical_keycode = keycode
+	press.shift_pressed = shifted
+	press.pressed = true
+	Input.parse_input_event(press)
+	await tree.process_frame
+	var release := InputEventKey.new()
+	release.keycode = keycode
+	release.physical_keycode = keycode
+	release.shift_pressed = shifted
+	release.pressed = false
+	Input.parse_input_event(release)
+	await tree.process_frame
+
+
 static func key_template(action: String) -> InputEventKey:
 	for event in InputMap.action_get_events(action):
 		if event is InputEventKey:

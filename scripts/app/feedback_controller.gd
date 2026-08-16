@@ -5,6 +5,7 @@ const PerformanceMonitors := preload("res://scripts/runtime/performance_monitors
 const UiTreeDumpWriter := preload("res://scripts/app/ui_tree_dump_writer.gd")
 const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
+const FeedbackSnapshot := preload("res://scripts/runtime/feedback_snapshot.gd")
 
 @export var dialog_path: NodePath
 
@@ -43,10 +44,7 @@ func _begin_capture() -> void:
 		var image := texture.get_image() if texture != null else null
 		if image != null and not image.is_empty():
 			screenshot = image.save_png_to_buffer()
-	var feedback_runtime := runtime.get_node_or_null("FeedbackRuntime")
-	if feedback_runtime == null:
-		return
-	var snapshot: Dictionary = feedback_runtime.capture_snapshot(screen)
+	var snapshot := FeedbackSnapshot.capture(runtime, screen)
 	var ui_tree := _capture_ui_tree(screen)
 	runtime.emit_trace("feedback_capture_requested", "FeedbackController", {
 		"report_id": report_id, "screen": screen, "screenshot_available": not screenshot.is_empty()})
@@ -97,3 +95,22 @@ func _new_report_id() -> String:
 	var raw := Redactor.random_token(16)
 	return "%s-%s-%s-%s-%s" % [raw.substr(0, 8), raw.substr(8, 4), raw.substr(12, 4),
 		raw.substr(16, 4), raw.substr(20, 12)]
+
+
+# One explicit editor-only seam for feedback_flow; production behavior stays
+# observable through signals/traces instead of scenario access to private nodes.
+func smoke_state() -> Dictionary:
+	if not OS.has_feature("editor"):
+		return {}
+	return {"dialog_visible": _dialog.visible, "capture_screen": _capture.get("screen", ""),
+		"report_id": _capture.get("report_id", "")}
+
+
+func smoke_set_transport(transport: Callable) -> void:
+	if OS.has_feature("editor"):
+		_reporter.set_transport_for_smoke(transport)
+
+
+func smoke_retry(report_id: String) -> void:
+	if OS.has_feature("editor"):
+		await _reporter.retry_pending(report_id)

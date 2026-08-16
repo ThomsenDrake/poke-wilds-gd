@@ -1,5 +1,6 @@
 import type { Env, ReportMetadata } from "./types";
 import { issueTitle, sanitizePublicText } from "./security";
+import { upstreamUnavailable } from "./errors";
 
 let cachedToken = "";
 let cachedUntil = 0;
@@ -16,14 +17,14 @@ export async function findOrCreateIssue(env: Env, metadata: ReportMetadata, expi
       body: issueBody(metadata, expiresAt),
     }),
   });
-  if (!response.ok) throw new Error(`github_issue_${response.status}`);
+  if (!response.ok) throw upstreamUnavailable();
   return await response.json() as { number: number; html_url: string };
 }
 
 export function issueBody(metadata: ReportMetadata, expiresAt: string = new Date(Date.now() + 180 * 86400_000).toISOString()): string {
 	const expires = new Date(expiresAt).toISOString().slice(0, 10);
-	const screen = sanitizePublicText(String(metadata.game.current_screen ?? "unknown"));
-	const platform = sanitizePublicText(String(metadata.runtime.os_name ?? "unknown"));
+	const screen = sanitizePublicText(metadata.game.current_screen);
+	const platform = sanitizePublicText(metadata.runtime.os_name);
 	return `<!-- feedback-report-id:${metadata.report_id} -->\n` +
     `## Player report\n\n${sanitizePublicText(metadata.message)}\n\n` +
     `## Agent handoff\n\n` +
@@ -40,7 +41,7 @@ export function issueBody(metadata: ReportMetadata, expiresAt: string = new Date
 async function findIssue(env: Env, token: string, reportId: string): Promise<{ number: number; html_url: string } | null> {
   const query = encodeURIComponent(`repo:${env.GITHUB_REPOSITORY} in:body "feedback-report-id:${reportId}"`);
   const response = await githubFetch(env, `/search/issues?q=${query}`, token);
-  if (!response.ok) throw new Error(`github_search_${response.status}`);
+  if (!response.ok) throw upstreamUnavailable();
   const result = await response.json() as { items?: Array<{ number: number; html_url: string }> };
   return result.items?.[0] ?? null;
 }
@@ -49,7 +50,7 @@ async function installationToken(env: Env): Promise<string> {
   if (cachedToken && cachedUntil > Date.now() + 60_000) return cachedToken;
   const jwt = await appJwt(env.GITHUB_APP_ID, env.GITHUB_PRIVATE_KEY);
   const response = await githubFetch(env, `/app/installations/${env.GITHUB_INSTALLATION_ID}/access_tokens`, jwt, { method: "POST" });
-  if (!response.ok) throw new Error(`github_installation_token_${response.status}`);
+  if (!response.ok) throw upstreamUnavailable();
   const result = await response.json() as { token: string; expires_at: string };
   cachedToken = result.token;
   cachedUntil = Date.parse(result.expires_at);

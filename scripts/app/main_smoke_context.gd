@@ -26,6 +26,7 @@ static func build(main: Node) -> Dictionary:
 		"title_screen": main.get_node("UI/TitleScreen"),
 		"creation_screen": main.get_node("UI/CreationScreen"),
 		"feedback_controller": main.get_node("FeedbackController"),
+		"feedback_dialog": main.get_node("UI/FeedbackDialog"),
 		"toggle_menu": Callable(main, "_toggle_menu"),
 		"set_battle": Callable(main, "_smoke_set_battle"), "field_move": Callable(main, "_on_field_move_requested")
 	}

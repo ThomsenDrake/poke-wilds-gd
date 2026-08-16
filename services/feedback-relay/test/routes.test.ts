@@ -53,6 +53,37 @@ describe("feedback report route boundaries", () => {
     expect(await response.json()).toMatchObject({ error: "payload_too_large" });
   });
 
+  it("returns the typed status for malformed metadata", async () => {
+    const form = new FormData();
+    form.set("metadata", "[]");
+    form.set("bundle", new Blob([new Uint8Array([1])], { type: "application/zip" }), "report.zip");
+    const response = await worker.fetch(new Request("https://relay.test/v1/reports", {
+      method: "POST", headers: { Authorization: "Bearer invite" }, body: form,
+    }), env(true));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, error: "metadata_not_object" });
+  });
+
+  it("returns 413 for a ZIP whose declared uncompressed size exceeds the limit", async () => {
+    const payload = await uploadPayload();
+    const bomb = new Uint8Array(payload.bundle);
+    const view = new DataView(bomb.buffer, bomb.byteOffset, bomb.byteLength);
+    const central = centralOffset(bomb);
+    const local = view.getUint32(central + 42, true);
+    view.setUint32(central + 24, 0x02000000, true);
+    view.setUint32(local + 22, 0x02000000, true);
+    payload.metadata.bundle_sha256 = await sha256Hex(bomb);
+    payload.metadata.bundle_bytes = bomb.byteLength;
+    const form = new FormData();
+    form.set("metadata", JSON.stringify(payload.metadata));
+    form.set("bundle", new Blob([bomb], { type: "application/zip" }), "report.zip");
+    const response = await worker.fetch(new Request("https://relay.test/v1/reports", {
+      method: "POST", headers: { Authorization: "Bearer invite" }, body: form,
+    }), env(true));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ ok: false, error: "bundle_uncompressed_too_large" });
+  });
+
   it("never puts the invite token in the limiter key", async () => {
     const expectedHash = await sha256Hex("invite");
     const keys: string[] = [];
@@ -251,4 +282,12 @@ async function uploadPayload(): Promise<{ metadata: Record<string, unknown>; bun
     build: { version: "0.0.0", commit_sha: "b".repeat(40), build_id: "beta-1", channel: "friends" }, runtime, game, capture };
   const bundle = zipSync({ ...contents, "report.json": strToU8(JSON.stringify({ ...base, artifacts })) }, { level: 0 });
   return { bundle, metadata: { ...base, bundle_sha256: await sha256Hex(bundle), bundle_bytes: bundle.byteLength } };
+}
+
+function centralOffset(bytes: Uint8Array): number {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  for (let offset = bytes.byteLength - 22; offset >= 0; offset--) {
+    if (view.getUint32(offset, true) === 0x06054b50) return view.getUint32(offset + 16, true);
+  }
+  throw new Error("missing test EOCD");
 }

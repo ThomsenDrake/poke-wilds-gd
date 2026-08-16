@@ -2,6 +2,7 @@ import { zipSync, strToU8 } from "fflate";
 import { describe, expect, it } from "vitest";
 import { inspectBundle, issueTitle, sanitizePublicText, sha256Hex, validateMetadata } from "../src/security";
 import { issueBody } from "../src/github";
+import { RelayError } from "../src/errors";
 import type { ReportMetadata } from "../src/types";
 
 const reportId = "01234567-89ab-cdef-0123-456789abcdef";
@@ -81,7 +82,7 @@ describe("feedback relay contracts", () => {
     expect(issueBody(meta)).not.toContain("@maintainer");
     expect(issueBody(meta)).toContain(`feedback-report-id:${reportId}`);
     expect(issueBody(meta)).not.toContain("State");
-    expect(issueBody({ ...meta, game: { current_screen: "overworld", party: ["private"], player_tile: [1, 2] } })).not.toContain("private");
+    expect(issueBody({ ...meta, game: { ...meta.game, party: ["private"], player_tile: [1, 2] } })).not.toContain("private");
     expect(issueBody(meta, "2030-01-02T03:04:05.000Z")).toContain("expires 2030-01-02");
   });
 
@@ -93,6 +94,27 @@ describe("feedback relay contracts", () => {
     expect(() => validateMetadata({ ...metadata(), message: "" })).toThrow("invalid_message");
     expect(() => validateMetadata({ ...metadata(), bundle_bytes: 16 * 1024 * 1024 + 1 })).toThrow("invalid_bundle_size");
     expect(() => validateMetadata({ ...metadata(), capture: { screenshot_available: false, screen: "title" } })).toThrow("invalid_capture");
+  });
+
+  it("attaches explicit client statuses to metadata and bundle validation failures", async () => {
+    try {
+      validateMetadata([]);
+      throw new Error("metadata validation unexpectedly passed");
+    } catch (error) {
+      expect(error).toBeInstanceOf(RelayError);
+      expect(error).toMatchObject({ code: "metadata_not_object", status: 400 });
+    }
+    const meta = validateMetadata(metadata());
+    const valid = await bundle();
+    const bomb = new Uint8Array(valid);
+    const bombView = new DataView(bomb.buffer);
+    const central = bombView.getUint32(findEocd(bomb) + 16, true);
+    const local = bombView.getUint32(central + 42, true);
+    bombView.setUint32(central + 24, 0x02000000, true);
+    bombView.setUint32(local + 22, 0x02000000, true);
+    await expect(inspectBundle(bomb, meta)).rejects.toMatchObject({
+      code: "bundle_uncompressed_too_large", status: 413,
+    });
   });
 
   it("requires the complete v1 manifest and matching screenshot capture", async () => {

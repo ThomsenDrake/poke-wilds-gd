@@ -1,5 +1,7 @@
 extends Node
 
+const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+
 # Release-feedback journey: real F input across player-facing screens, text
 # focus suppression, pause restoration, and a fully parsed private ZIP through
 # the reporter's transport seam. No network or GitHub issue is touched.
@@ -46,7 +48,7 @@ func _screen_capture(screen: String, open: Callable, close: Callable) -> void:
 	await _press("feedback_report")
 	_check(_dialog().visible, "F did not open feedback from %s" % screen)
 	_check(get_tree().paused, "feedback did not pause from %s" % screen)
-	_check(str(_controller()._capture.get("screen", "")) == screen, "capture mislabeled %s" % screen)
+	_check(str(_controller().smoke_state().get("capture_screen", "")) == screen, "capture mislabeled %s" % screen)
 	await _key(Key.KEY_ESCAPE)
 	_check(not get_tree().paused and not _dialog().visible, "cancel did not restore %s" % screen)
 	close.call()
@@ -54,7 +56,7 @@ func _screen_capture(screen: String, open: Callable, close: Callable) -> void:
 
 
 func _submit_overworld() -> void:
-	_controller()._reporter.transport_override = Callable(self, "_offline_transport")
+	_controller().smoke_set_transport(Callable(self, "_offline_transport"))
 	await _press("feedback_report")
 	_check(_dialog().visible, "F did not open feedback from overworld")
 	if DisplayServer.get_name() != "headless":
@@ -62,25 +64,23 @@ func _submit_overworld() -> void:
 		var dialog_image := get_viewport().get_texture().get_image()
 		if dialog_image != null and not dialog_image.is_empty():
 			dialog_image.save_png(DIALOG_CAPTURE_PATH)
-	var report_id := str(_controller()._capture.get("report_id", ""))
-	_dialog()._editor.text = "a".repeat(1001)
-	_dialog()._on_text_changed()
-	_check(_dialog()._editor.text.length() == 1000, "report field did not enforce the 1000-character cap")
-	_dialog()._editor.text = "f"
-	_dialog()._editor.set_caret_column(1)
+	var report_id := str(_controller().smoke_state().get("report_id", ""))
+	_dialog().smoke_set_message("a".repeat(1001))
+	_check(_dialog().smoke_message().length() == 1000, "report field did not enforce the 1000-character cap")
+	_dialog().smoke_set_message("f", 1)
 	await _key(Key.KEY_ENTER, true)
-	_check(_dialog()._editor.text == "f\n", "lowercase f or Shift+Enter was not preserved: %s" % JSON.stringify(_dialog()._editor.text))
-	_dialog()._editor.text = "I walked into a tree and got stuck."
+	_check(_dialog().smoke_message() == "f\n", "lowercase f or Shift+Enter was not preserved: %s" % JSON.stringify(_dialog().smoke_message()))
+	_dialog().smoke_set_message("I walked into a tree and got stuck.")
 	await _key(Key.KEY_ENTER)
 	await get_tree().create_timer(2.1, true, false, true).timeout
 	_check(FileAccess.file_exists(_prepared_path), "offline report was not retained")
 	_check(not _dialog().visible and not get_tree().paused, "offline queue did not resume play")
-	_controller()._reporter.transport_override = Callable(self, "_fake_transport")
-	await _controller()._reporter._retry_pending(report_id)
+	_controller().smoke_set_transport(Callable(self, "_fake_transport"))
+	await _controller().smoke_retry(report_id)
 	_check(_transport_checks, "transport did not receive a valid agent bundle")
 	_check(_prepared_path.is_empty() or not FileAccess.file_exists(_prepared_path), "sent bundle remained in outbox")
 	var calls_after_send := _transport_calls
-	await _controller()._reporter._retry_pending(report_id)
+	await _controller().smoke_retry(report_id)
 	_check(_transport_calls == calls_after_send, "completed report was uploaded twice")
 
 
@@ -115,30 +115,11 @@ func _is_canonical_utc_timestamp(value: String) -> bool:
 
 
 func _press(action: String) -> void:
-	for template in InputMap.action_get_events(action):
-		if template is InputEventKey:
-			var event := InputEventKey.new()
-			event.physical_keycode = template.physical_keycode
-			event.pressed = true
-			Input.parse_input_event(event)
-			var release := event.duplicate()
-			release.pressed = false
-			Input.parse_input_event(release)
-			break
-	await get_tree().process_frame
+	await SmokeTap.tap(get_tree(), action)
 
 
 func _key(keycode: Key, shifted: bool = false) -> void:
-	var event := InputEventKey.new()
-	event.keycode = keycode
-	event.physical_keycode = keycode
-	event.shift_pressed = shifted
-	event.pressed = true
-	Input.parse_input_event(event)
-	var release := event.duplicate()
-	release.pressed = false
-	Input.parse_input_event(release)
-	await get_tree().process_frame
+	await SmokeTap.tap_key(get_tree(), keycode, shifted)
 
 
 func _check(ok: bool, message: String) -> void:
@@ -146,4 +127,4 @@ func _check(ok: bool, message: String) -> void:
 
 
 func _controller() -> Node: return _ctx.feedback_controller
-func _dialog() -> Control: return _controller()._dialog
+func _dialog() -> Control: return _ctx.feedback_dialog

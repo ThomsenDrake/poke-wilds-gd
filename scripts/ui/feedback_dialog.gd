@@ -43,6 +43,19 @@ func close_dialog() -> void:
 	_editor.release_focus()
 
 
+func smoke_set_message(text: String, caret_column: int = -1) -> void:
+	if not OS.has_feature("editor"):
+		return
+	_editor.text = text
+	_on_text_changed()
+	if caret_column >= 0:
+		_editor.set_caret_column(caret_column)
+
+
+func smoke_message() -> String:
+	return _editor.text if OS.has_feature("editor") else ""
+
+
 func _input(event: InputEvent) -> void:
 	if not visible or _in_flight:
 		return

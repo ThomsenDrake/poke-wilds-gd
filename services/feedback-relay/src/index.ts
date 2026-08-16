@@ -1,4 +1,5 @@
 import { findOrCreateIssue } from "./github";
+import { badRequest, payloadTooLarge, RelayError } from "./errors";
 import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex, validateMetadata } from "./security";
 import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
 
@@ -15,8 +16,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/v1/reports") return await createReport(request, env);
       return json({ ok: false, error: "not_found" }, 404);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "internal_error";
-      const classified = classifyError(reason);
+      const classified = classifyError(error);
       console.error(JSON.stringify({ event: "feedback_relay_error", error_class: classified.error }));
       return json({ ok: false, error: classified.error }, classified.status);
     }
@@ -42,19 +42,19 @@ async function createReport(request: Request, env: Env): Promise<Response> {
   const form = await boundedFormData(request);
   const metadataField = form.get("metadata");
   const bundleField = form.get("bundle");
-  if (typeof metadataField !== "string" || new TextEncoder().encode(metadataField).byteLength > MAX_METADATA_BYTES) throw new Error("invalid_metadata_part");
+  if (typeof metadataField !== "string" || new TextEncoder().encode(metadataField).byteLength > MAX_METADATA_BYTES) throw badRequest("invalid_metadata_part");
   if (!(bundleField instanceof File) || bundleField.size > MAX_COMPRESSED_BYTES) return json({ ok: false, error: "bundle_too_large" }, 413);
   let metadata: ReportMetadata;
   try {
     metadata = validateMetadata(JSON.parse(metadataField));
   } catch (error) {
-    if (error instanceof SyntaxError) throw new Error("invalid_metadata_json");
+    if (error instanceof SyntaxError) throw badRequest("invalid_metadata_json");
     throw error;
   }
-  if (metadata.tester_id !== authorized.invite.tester_id) throw new Error("tester_mismatch");
-  if (metadata.build.channel !== authorized.invite.cohort_id) throw new Error("cohort_mismatch");
+  if (metadata.tester_id !== authorized.invite.tester_id) throw badRequest("tester_mismatch");
+  if (metadata.build.channel !== authorized.invite.cohort_id) throw badRequest("cohort_mismatch");
   const bytes = new Uint8Array(await bundleField.arrayBuffer());
-  if (bytes.byteLength !== metadata.bundle_bytes || await sha256Hex(bytes) !== metadata.bundle_sha256) throw new Error("bundle_hash_mismatch");
+  if (bytes.byteLength !== metadata.bundle_bytes || await sha256Hex(bytes) !== metadata.bundle_sha256) throw badRequest("bundle_hash_mismatch");
   await inspectBundle(bytes, metadata);
   const existing = await env.DB.prepare(
     "SELECT report_id,status,bundle_key,bundle_sha256,issue_number,issue_url,updated_at,expires_at FROM reports WHERE report_id=?",
@@ -112,21 +112,21 @@ async function createReport(request: Request, env: Env): Promise<Response> {
 
 async function authorizeInvite(request: Request, env: Env): Promise<{ invite: InviteRow; tokenHash: string }> {
   const auth = request.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) throw new Error("missing_invite_token");
+  if (!auth.startsWith("Bearer ")) throw new RelayError("missing_invite_token", 401);
   const tokenHash = await sha256Hex(auth.slice(7));
   const invite = await env.DB.prepare(
     "SELECT tester_id,nickname,token_hash,cohort_id FROM invites WHERE token_hash=? AND revoked_at IS NULL",
   ).bind(tokenHash).first<InviteRow>();
-  if (!invite) throw new Error("invalid_invite_token");
+  if (!invite) throw new RelayError("invalid_invite_token", 401);
   return { invite, tokenHash };
 }
 
 async function boundedFormData(request: Request): Promise<FormData> {
   const declared = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(declared) && declared > MAX_MULTIPART_BYTES) throw new Error("payload_too_large");
+  if (Number.isFinite(declared) && declared > MAX_MULTIPART_BYTES) throw payloadTooLarge("payload_too_large");
   const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.startsWith("multipart/form-data")) throw new Error("invalid_multipart");
-  if (!request.body) throw new Error("invalid_multipart");
+  if (!contentType.startsWith("multipart/form-data")) throw badRequest("invalid_multipart");
+  if (!request.body) throw badRequest("invalid_multipart");
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -136,7 +136,7 @@ async function boundedFormData(request: Request): Promise<FormData> {
     total += next.value.byteLength;
     if (total > MAX_MULTIPART_BYTES) {
       await reader.cancel();
-      throw new Error("payload_too_large");
+      throw payloadTooLarge("payload_too_large");
     }
     chunks.push(next.value);
   }
@@ -190,13 +190,7 @@ function json(value: unknown, status = 200, extra: Record<string, string> = {}):
   return Response.json(value, { status, headers: { "Cache-Control": "no-store", ...extra } });
 }
 
-function classifyError(reason: string): { error: string; status: number } {
-  if (["missing_invite_token", "invalid_invite_token", "unauthorized"].includes(reason)) return { error: reason, status: 401 };
-  if (reason === "payload_too_large" || reason === "bundle_too_large") return { error: reason, status: 413 };
-  if (reason === "rate_limited" || reason === "daily_limit") return { error: reason, status: 429 };
-  if (reason.startsWith("github_")) return { error: "github_unavailable", status: 502 };
-  if (/^(invalid_|unsupported_|missing_|tester_mismatch|cohort_mismatch|bundle_hash_mismatch|manifest_mismatch|artifact_|zip_|local_header_|duplicate_|unsafe_|capture_|report_id_conflict)/.test(reason)) {
-    return { error: reason, status: 400 };
-  }
+function classifyError(error: unknown): { error: string; status: number } {
+  if (error instanceof RelayError) return { error: error.code, status: error.status };
   return { error: "internal_error", status: 500 };
 }

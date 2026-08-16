@@ -7,7 +7,11 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
 
 ## Supported behavior
 
-- The playtest-feedback snapshot reads the current in-memory save payload through a narrow diagnostics child; it never calls the save store and never overwrites the player's live save. See [playtest-feedback.md](playtest-feedback.md).
+- The playtest-feedback snapshot reads the current in-memory save payload through a
+  read-only service invoked by the app controller; it adds no runtime child, never
+  calls the save store, and never overwrites the player's live save. Its separate
+  outbox owner atomically publishes the ZIP before the metadata commit marker, so
+  retry cannot observe a torn pair. See [playtest-feedback.md](playtest-feedback.md).
 
 - Pressing `Enter` opens the start menu while the player is not in battle.
 - The start menu lists `POKEMON`, `BAG`, `SAVE`, `OPTIONS`, `NEW GAME`, and `CLOSE` (the `OPTIONS` entry, index 3, opens the Options submenu below).

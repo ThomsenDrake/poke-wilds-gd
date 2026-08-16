@@ -7,6 +7,14 @@ Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, doc
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Feedback maintainability hardening (2026-08-16): scores remain unchanged. The
+capture snapshot is now a plain read-only service instead of a marker child on
+`GameRuntime`; one outbox owner atomically commits and recovers paired artifacts;
+trace and bundle truncation share one complete-record JSONL primitive; the relay's
+exact v1 TypeScript schema and typed HTTP errors prevent permanent validation
+failures from entering the retryable 5xx class; and `feedback_flow` drives explicit
+editor-only seams through the canonical `SmokeTap` helper.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

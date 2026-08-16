@@ -1981,9 +1981,11 @@ code_paths = [
   "scripts/app/feedback_controller.gd",
   "scripts/app/feedback_flow_scenario.gd",
   "scripts/ui/feedback_dialog.gd",
-  "scripts/runtime/feedback_runtime.gd",
+  "scripts/runtime/feedback_snapshot.gd",
   "scripts/runtime/feedback_bundle.gd",
+  "scripts/runtime/feedback_outbox.gd",
   "scripts/runtime/feedback_reporter.gd",
+  "scripts/core/bounded_jsonl.gd",
   "scripts/core/feedback_redactor.gd",
 ]
 scene_paths = ["scenes/ui/FeedbackDialog.tscn"]

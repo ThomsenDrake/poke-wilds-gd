@@ -12,22 +12,52 @@ export interface Env {
 }
 
 export interface BuildMetadata {
-  version?: string;
+  version: string;
   commit_sha: string;
   build_id: string;
   channel: string;
 }
 
+export interface RuntimeMetadata {
+  godot_version: string;
+  os_name: string;
+  os_version: string;
+  architecture: string;
+  locale: string;
+  renderer: string;
+  adapter: string;
+  window_size: [number, number];
+}
+
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
+export interface GameMetadata {
+  current_screen: string;
+  world_seed: number;
+  player_tile: [number, number];
+  active_area: string;
+  time_of_day_minutes: number;
+  total_steps: number;
+  party: JsonValue[];
+  bag: { [key: string]: JsonValue };
+  battle_active: boolean;
+}
+
+export interface CaptureMetadata {
+  screenshot_available: boolean;
+  screen: string;
+}
+
 export interface ReportMetadata {
-  schema_version: number;
+  schema_version: 1;
   report_id: string;
   message: string;
   tester_id: string;
   install_id: string;
   build: BuildMetadata;
-  runtime: Record<string, unknown>;
-  game: Record<string, unknown>;
-  capture: { screenshot_available: boolean; screen: string };
+  runtime: RuntimeMetadata;
+  game: GameMetadata;
+  capture: CaptureMetadata;
   bundle_sha256: string;
   bundle_bytes: number;
 }
@@ -41,7 +71,7 @@ export interface InviteRow {
 
 export interface ReportRow {
   report_id: string;
-  status: string;
+  status: "received" | "stored" | "issuing" | "completed" | "expired";
   bundle_key: string;
   bundle_sha256: string;
   issue_number: number | null;

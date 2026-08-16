@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-16
 Review cadence days: 14
-Source paths: scripts/runtime/feedback_bundle.gd, scripts/core/feedback_redactor.gd, services/feedback-relay/src/security.ts, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py
+Source paths: scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py
 
 # Feedback Report Schema
 

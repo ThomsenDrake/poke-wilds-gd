@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-16
 Review cadence days: 14
-Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/feedback_runtime.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_reporter.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/migrations/0001_initial.sql, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
+Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
 
 # Playtest Feedback
 
@@ -20,7 +20,9 @@ private, using the exact disclosure text shown in the dialog.
 
 The exact prior `SceneTree.paused` value is restored after cancel, success, or
 queueing. A network/429/5xx failure leaves the ZIP and metadata in
-`user://feedback_outbox`; retry runs on a bounded 30s/2m/10m/1h schedule and at
+`user://feedback_outbox`; an atomic metadata commit makes only complete ZIP/sidecar
+pairs retry-visible, while malformed or incomplete prior entries are preserved out
+of the retry queue. Retry runs on a bounded 30s/2m/10m/1h schedule and at
 the next launch. A permanent 4xx keeps the local artifact without a retry loop.
 Success deletes both outbox files and shows only the issue number. A tester
 never sees raw logs, tokens, repository plumbing, or a GitHub login.
@@ -59,7 +61,9 @@ to the public handle and remains solely in the ignored mode-0600 registry and
 the relay's private D1 invite row.
 
 `POST /v1/reports` authorizes the invite and applies the five-per-minute
-tester/token edge limit before consuming the bounded multipart body. It verifies the
+tester/token edge limit before consuming the bounded multipart body. Typed relay
+errors carry their public status from the validation source, so permanent schema/ZIP
+failures cannot fall into the retryable 5xx class. The relay verifies the
 client hash, EOCD-declared ZIP central directory with matching local headers and CRCs,
 exact entry allowlist, v1 manifest, tester identity, and full bundle/manifest agreement
 before private R2 storage. Idempotent report lookup occurs before an atomic D1 daily

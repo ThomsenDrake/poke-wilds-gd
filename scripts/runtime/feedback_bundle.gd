@@ -1,14 +1,14 @@
 extends RefCounted
 
 const Redactor := preload("res://scripts/core/feedback_redactor.gd")
+const BoundedJsonl := preload("res://scripts/core/bounded_jsonl.gd")
 
 const BUILD_INFO_PATH := "res://generated/playtest_build.json"
-const OUTBOX_DIR := "user://feedback_outbox"
 const MAX_BUNDLE_BYTES := 16 * 1024 * 1024
 const ENGINE_LOG_LIMIT := 2 * 1024 * 1024
 
 
-func prepare(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
+func build(message: String, capture: Dictionary, bundle_path: String) -> Dictionary:
 	var report_id := str(capture.get("report_id", ""))
 	if report_id.is_empty():
 		return {"ok": false, "error": "missing_report_id"}
@@ -48,14 +48,12 @@ func prepare(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 		"artifacts": _artifact_manifest(artifacts, truncated_paths),
 	}
 	artifacts["report.json"] = _json_bytes(manifest)
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTBOX_DIR))
-	var bundle_path := "%s/%s.zip" % [OUTBOX_DIR, report_id]
 	var zip_error := _write_zip(bundle_path, artifacts)
 	if not zip_error.is_empty():
 		return {"ok": false, "error": zip_error}
 	var reduction_error := _reduce_to_limit(bundle_path, artifacts, manifest, truncated_paths)
 	if not reduction_error.is_empty():
-		return {"ok": false, "error": reduction_error, "bundle_path": bundle_path}
+		return {"ok": false, "error": reduction_error}
 	var bundle_bytes := FileAccess.get_file_as_bytes(bundle_path)
 	var metadata := {
 		"schema_version": 1, "report_id": report_id,
@@ -64,14 +62,7 @@ func prepare(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 		"runtime": manifest["runtime"], "game": manifest["game"], "capture": manifest["capture"],
 		"bundle_sha256": Redactor.sha256_hex(bundle_bytes), "bundle_bytes": bundle_bytes.size(),
 	}
-	var metadata_path := "%s/%s.json" % [OUTBOX_DIR, report_id]
-	var sidecar := FileAccess.open(metadata_path, FileAccess.WRITE)
-	if sidecar == null:
-		return {"ok": false, "error": "metadata_write_failed"}
-	sidecar.store_string(JSON.stringify(metadata, "  ") + "\n")
-	sidecar.close()
-	return {"ok": true, "bundle_path": bundle_path, "metadata_path": metadata_path,
-		"metadata": metadata, "build": build}
+	return {"ok": true, "metadata": metadata, "build": build}
 
 
 func load_build_info() -> Dictionary:
@@ -138,30 +129,10 @@ func _reduce_trace_middle(bytes: PackedByteArray, limit: int) -> PackedByteArray
 	var marker := (JSON.stringify({"event": "feedback_trace_truncated", "source": "FeedbackBundle",
 		"payload": {"reason": "bundle_size_limit"}}) + "\n").to_utf8_buffer()
 	var prefix_size := mini(bytes.size(), maxi(16 * 1024, limit / 4))
-	var prefix := _complete_jsonl_prefix(bytes.slice(0, prefix_size))
+	var prefix := BoundedJsonl.complete_prefix(bytes.slice(0, prefix_size))
 	var tail_size := maxi(0, limit - prefix.size() - marker.size())
-	var tail := _complete_jsonl_tail(bytes.slice(maxi(prefix_size, bytes.size() - tail_size)))
-	var result := prefix
-	result.append_array(marker)
-	result.append_array(tail)
-	return result
-
-
-static func _complete_jsonl_prefix(bytes: PackedByteArray) -> PackedByteArray:
-	var last_newline := -1
-	for index in bytes.size():
-		if bytes[index] == 10:
-			last_newline = index
-	return bytes.slice(0, last_newline + 1) if last_newline >= 0 else PackedByteArray()
-
-
-static func _complete_jsonl_tail(bytes: PackedByteArray) -> PackedByteArray:
-	var start := 0
-	while start < bytes.size() and bytes[start] != 10:
-		start += 1
-	if start < bytes.size():
-		start += 1
-	return _complete_jsonl_prefix(bytes.slice(start))
+	return BoundedJsonl.join(prefix, marker,
+		bytes.slice(maxi(prefix_size, bytes.size() - tail_size)))
 
 
 func _artifact_manifest(artifacts: Dictionary, truncated_paths: Dictionary) -> Array:

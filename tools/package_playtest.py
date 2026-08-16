@@ -50,8 +50,20 @@ def load_registry() -> dict:
 
 def save_registry(registry: dict) -> None:
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    REGISTRY.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
-    REGISTRY.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    temporary = REGISTRY.with_name(f".{REGISTRY.name}.{os.getpid()}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            json.dump(registry, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, REGISTRY)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
 
 
 def public_tester_id(token: str) -> str:

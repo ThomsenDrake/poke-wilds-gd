@@ -1,29 +1,23 @@
-extends Node
+extends RefCounted
 
 const PerformanceMonitors := preload("res://scripts/runtime/performance_monitors.gd")
 
-# Read-only diagnostics child of GameRuntime. It owns the one intentional read
-# of the runtime's world generator needed to serialize the current in-memory
-# state without writing or replacing the player's live save.
-
-func _ready() -> void:
-	name = "FeedbackRuntime"
+# Read-only diagnostics service. The controller passes GameRuntime explicitly,
+# so capture does not require a marker Node or expand the autoload tree.
 
 
-func save_payload() -> Dictionary:
-	var runtime := get_parent()
+static func capture(runtime: Node, screen: String) -> Dictionary:
+	var game := state_summary(runtime)
+	game["current_screen"] = screen
+	return {"save": save_payload(runtime), "runtime": environment_summary(runtime), "game": game}
+
+
+static func save_payload(runtime: Node) -> Dictionary:
 	return runtime.session.to_save_payload(
 		runtime._world_gen.overrides_for_save(), runtime._world_gen.placements_for_save())
 
 
-func capture_snapshot(screen: String) -> Dictionary:
-	var game := state_summary()
-	game["current_screen"] = screen
-	return {"save": save_payload(), "runtime": environment_summary(), "game": game}
-
-
-func state_summary() -> Dictionary:
-	var runtime := get_parent()
+static func state_summary(runtime: Node) -> Dictionary:
 	var session = runtime.session
 	var party: Array = []
 	for mon_variant in session.party:
@@ -50,8 +44,8 @@ func state_summary() -> Dictionary:
 	}
 
 
-func environment_summary() -> Dictionary:
-	var window := get_viewport().get_visible_rect().size
+static func environment_summary(runtime: Node) -> Dictionary:
+	var window := runtime.get_viewport().get_visible_rect().size
 	return {
 		"godot_version": Engine.get_version_info().get("string", "unknown"),
 		"os_name": OS.get_name(),

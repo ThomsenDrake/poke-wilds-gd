@@ -219,7 +219,10 @@ Run `feedback_flow` after touching the `F` binding, feedback dialog, capture,
 redaction, bundle, outbox, or upload path. It drives real `F` events with the
 actual title/menu/battle/overworld screen state, proves an existing text field
 keeps the key, checks exact pause restoration, and parses the generated ZIP
-through an injected transport. Relay changes additionally require
+through one editor-only controller seam and the shared `SmokeTap` input helper.
+The outbox publishes metadata last as an atomic commit marker, so retry sees only
+complete pairs and preserves malformed/incomplete entries outside the active queue.
+Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from
 `services/feedback-relay`; dry-run verification never deploys.
