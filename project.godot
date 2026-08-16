@@ -23,8 +23,17 @@ GameRuntime="*res://scripts/runtime/game_runtime.gd"
 
 3d/physics_engine="Jolt Physics"
 
+[debug]
+
+file_logging/enable_file_logging=true
+file_logging/enable_file_logging.pc=true
+file_logging/log_path="user://logs/godot.log"
+file_logging/max_log_files=5
+settings/gdscript/always_track_call_stacks=true
+
 [rendering]
 
 2d/snap/snap_2d_transforms_to_pixel=true
 anti_aliasing/quality/msaa_2d=0
 rendering_device/driver.windows="d3d12"
+textures/vram_compression/import_etc2_astc=true

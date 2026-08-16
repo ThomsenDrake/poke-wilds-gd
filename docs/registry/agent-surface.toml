@@ -86,6 +86,17 @@ producer_path = "scripts/runtime/performance_monitors.gd"
 names = ["game/party_size", "game/world_seed", "game/current_screen"]
 query_api = "Performance.get_custom_monitor"
 
+[feedback_reports]
+# Public issues carry only a sanitized handoff and report id. Raw release-build
+# reproduction artifacts remain private and require the maintainer credential.
+schema_doc = "docs/references/feedback-report-schema.md"
+fetch_tool_path = "tools/fetch_feedback_report.py"
+validator_tool_path = "tools/inspect_feedback_bundle.py"
+product_spec_doc = "docs/product-specs/playtest-feedback.md"
+issue_repository = "ThomsenDrake/poke-wilds-gd"
+bundle_entrypoint = "report.json"
+fetch_command = "python3 tools/fetch_feedback_report.py <report-id>"
+
 [visual_baselines]
 # Committed golden screenshots plus metadata sidecars (<shot>.png.sidecar.json).
 # visual_sweep_update (and the satellite *_update scenarios) regenerate them;

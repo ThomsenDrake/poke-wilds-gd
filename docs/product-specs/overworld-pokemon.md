@@ -11,6 +11,8 @@ The subsystem splits into PURE-DOMAIN rules — `scripts/domain/overworld_mons.g
 
 ## Supported behavior
 
+- Playtest reports include a concise party and current-screen summary plus the private in-memory save payload; reporting does not consume encounter RNG or alter overworld entities. See [playtest-feedback.md](playtest-feedback.md).
+
 ### Spawn model — roaming entities on a slot grid, stationary guardians, one biome truth
 
 - **Two entity classes (faithful, `wiki-overworld-encounters.md:222-224`).** (1) ROAMING — "The vast majority of overworld Pokemon wander around freely and can end up in entirely different Biomes" (:224); roamers cross biome boundaries freely (no biome lock — a roamer's cell biome is read where it stands, never pinned at spawn). (2) STATIONARY — "reserved for special encounters such as Legendary Pokemon, revived Fossils, or other unique instances," and unlike roamers "are often capable of being rematched after being KO'd" (:224). Phase 6 ships the stationary class as ONE occupant: the nest guardian Alpha (§ Nests); legendaries stay Phase 7 (the dormant `PKMNMANSION`/`RUINS_*` tokens, `biome_encounters.gd:34-56`). "Eggs are not considered stationary encounters" (:224) — wild eggs are their own entity kind, below.

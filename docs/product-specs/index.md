@@ -18,3 +18,4 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - World depth — landmarks, legendaries & world chaining (Phase 7): [world-depth.md](world-depth.md)
 - Infinite world — the seamless infinite plane (successor to world chaining; climate-field biomes, chunk-hash scattering, save v6, seed choice): [infinite-world.md](infinite-world.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)
+- Packaged-playtest bug reporting: [playtest-feedback.md](playtest-feedback.md)

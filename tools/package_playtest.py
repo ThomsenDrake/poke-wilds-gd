@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""Create one friend-specific release package without printing its invite token."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import secrets
+import shutil
+import stat
+import subprocess
+import sys
+from datetime import datetime, timezone
+import urllib.error
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+REGISTRY = ROOT / ".playtest" / "invites.json"
+BUILD_INFO = ROOT / "generated" / "playtest_build.json"
+TARGETS = {
+    "macos": ("macOS", ".zip"),
+    "windows": ("Windows Desktop", ".exe"),
+    "linux": ("Linux", ".x86_64"),
+}
+USER_AGENT = "poke-wilds-playtest-package/1.0"
+
+# Public handles are derived only from the opaque invite token. Friend names remain
+# confined to the ignored private registry and the relay's private D1 record.
+POKEMON_HANDLE_SPECIES = (
+    "BULBASAUR", "CHARMANDER", "SQUIRTLE", "CATERPIE", "PIKACHU", "SANDSHREW",
+    "VULPIX", "ODDISH", "MEOWTH", "PSYDUCK", "GROWLITHE", "ABRA", "MACHOP",
+    "GEODUDE", "PONYTA", "SLOWPOKE", "MAGNEMITE", "FARFETCHD", "DODUO",
+    "SEEL", "SHELLDER", "GASTLY", "DROWZEE", "KRABBY", "CUBONE", "HORSEA",
+    "GOLDEEN", "STARYU", "SCYTHER", "EEVEE", "PORYGON", "SNORLAX",
+)
+
+
+def run(*args: str) -> str:
+    return subprocess.check_output(args, cwd=ROOT, text=True).strip()
+
+
+def load_registry() -> dict:
+    if not REGISTRY.exists():
+        return {"schema_version": 1, "friends": {}}
+    return json.loads(REGISTRY.read_text(encoding="utf-8"))
+
+
+def save_registry(registry: dict) -> None:
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(registry, indent=2) + "\n", encoding="utf-8")
+    REGISTRY.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+
+def public_tester_id(token: str) -> str:
+    """Return a stable Pokemon-themed handle without incorporating private names."""
+    digest = hashlib.sha256(f"pokemon-handle-v1:{token}".encode()).hexdigest().upper()
+    species = POKEMON_HANDLE_SPECIES[int(digest[:8], 16) % len(POKEMON_HANDLE_SPECIES)]
+    return f"PKMN-{species}-{digest[8:14]}"
+
+
+def invite_for(friend: str, cohort: str) -> dict:
+    registry = load_registry()
+    key = friend.casefold().strip()
+    invite = registry["friends"].get(key)
+    if invite and invite.get("cohort_id") == cohort:
+        tester_id = public_tester_id(invite["token"])
+        if invite.get("tester_id") != tester_id:
+            invite["tester_id"] = tester_id
+            save_registry(registry)
+        return invite
+    token = secrets.token_urlsafe(32)
+    invite = {"nickname": friend.strip(), "tester_id": public_tester_id(token),
+              "token": token, "cohort_id": cohort}
+    registry["friends"][key] = invite
+    save_registry(registry)
+    return invite
+
+
+def register_invite(endpoint: str, admin_token: str, invite: dict) -> None:
+    payload = json.dumps({"tester_id": invite["tester_id"], "nickname": invite["nickname"],
+                          "cohort_id": invite["cohort_id"],
+                          "token_hash": hashlib.sha256(invite["token"].encode()).hexdigest()}).encode()
+    request = urllib.request.Request(
+        f"{endpoint.rstrip('/')}/v1/admin/invites", data=payload, method="POST",
+        headers={"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json",
+                 "User-Agent": USER_AGENT},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status not in (200, 201):
+                raise RuntimeError(f"invite registration returned HTTP {response.status}")
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f"invite registration returned HTTP {exc.code}") from exc
+
+
+def godot_binary() -> str:
+    configured = os.environ.get("GODOT_BIN", "")
+    if configured:
+        return configured
+    found = shutil.which("godot") or shutil.which("godot4")
+    if found:
+        return found
+    mac = Path("/Applications/Godot.app/Contents/MacOS/Godot")
+    if mac.exists():
+        return str(mac)
+    raise RuntimeError("Godot binary not found; set GODOT_BIN")
+
+
+def build_package(args: argparse.Namespace, admin_token: str) -> tuple[Path, str]:
+    """Create an export while guaranteeing generated token metadata is removed."""
+    try:
+        invite = invite_for(args.friend, args.channel)
+        register_invite(args.endpoint, admin_token, invite)
+        commit = run("git", "rev-parse", "HEAD")
+        version = run("git", "describe", "--tags", "--always")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        build_id = f"{args.channel}-{commit[:10]}-{timestamp}"
+        BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
+        BUILD_INFO.write_text(json.dumps({
+            "schema_version": 1, "version": version, "commit_sha": commit,
+            "build_id": build_id, "channel": args.channel, "endpoint": args.endpoint,
+            "tester_id": invite["tester_id"], "invite_token": invite["token"],
+        }, indent=2) + "\n", encoding="utf-8")
+        output_dir = ROOT / "dist" / "playtest" / invite["tester_id"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        preset, extension = TARGETS[args.target]
+        output = output_dir / f"PokeWilds-{build_id}-{args.target}{extension}"
+        subprocess.run([godot_binary(), "--headless", "--path", str(ROOT),
+                        "--export-release", preset, str(output)], check=True, cwd=ROOT)
+        return output, invite["tester_id"]
+    finally:
+        BUILD_INFO.unlink(missing_ok=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--friend", required=True)
+    parser.add_argument("--target", choices=TARGETS, required=True)
+    parser.add_argument("--channel", default="friends-1")
+    parser.add_argument("--endpoint", default=os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""))
+    parser.add_argument("--allow-dirty", action="store_true", help="Local validation only; never use for distributed builds")
+    args = parser.parse_args()
+    admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
+    if not args.endpoint or not admin_token:
+        parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
+    if not args.allow_dirty and run("git", "status", "--porcelain", "--untracked-files=no"):
+        parser.error("tracked worktree is dirty; commit the release candidate first")
+    output, tester_id = build_package(args, admin_token)
+    print(f"created {tester_id} {args.target} package: {output}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        print(f"playtest packaging failed: {exc}", file=sys.stderr)
+        raise SystemExit(1)

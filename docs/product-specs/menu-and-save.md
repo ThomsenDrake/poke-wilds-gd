@@ -7,6 +7,8 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
 
 ## Supported behavior
 
+- The playtest-feedback snapshot reads the current in-memory save payload through a narrow diagnostics child; it never calls the save store and never overwrites the player's live save. See [playtest-feedback.md](playtest-feedback.md).
+
 - Pressing `Enter` opens the start menu while the player is not in battle.
 - The start menu lists `POKEMON`, `BAG`, `SAVE`, `OPTIONS`, `NEW GAME`, and `CLOSE` (the `OPTIONS` entry, index 3, opens the Options submenu below).
 - The start menu's `OPTIONS` entry opens the Options submenu (`scripts/ui/options_screen.gd` + `scenes/ui/OptionsScreen.tscn`, a StartMenu child instance like the party/bag screens — `main.gd` gets zero lines). It configures the random-encounter opt-in ([overworld-pokemon.md](overworld-pokemon.md) § Configurable encounters): a `WILD ENCOUNTERS` row cycles `OFF (contact only)` → `CLASSIC (encounter tiles)` → `ANYWHERE (any tile)` (Z or ←/→), an `ENCOUNTER RATE` row nudges the per-step chance along the 0.02–0.50 ladder (←/→; greyed while encounters are off), and `BACK`. The session is the single source (`get/set_encounter_settings`; the mode/rate constants ride `SessionState`, single-sourced); every change writes through to the session at once (effective immediately) and is persisted by ONE save when the submenu closes (a save-per-nudge would write a full save per 2% step while scrubbing the rate), so the choice outlives the menu and the session. Default is `OFF` — wild battles come only from a shared-tile sprite collision until the player opts in.

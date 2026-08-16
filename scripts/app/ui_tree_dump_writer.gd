@@ -23,6 +23,22 @@ const OUT_DIR := "res://.godot-smoke/ui_tree" # the one canonical artifact dir; 
 # returns the dumped node count; -1 when the artifact cannot be written (the
 # callers pin their own failure label).
 static func write_screen(screen_id: String, root: Control, cursor: Dictionary) -> int:
+	var snapshot := snapshot_screen(screen_id, root, cursor)
+	var nodes: Array = snapshot["nodes"]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
+	var path := "%s/%s.json" % [OUT_DIR, screen_id]
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return -1
+	file.store_string(JSON.stringify(snapshot, "  ") + "\n")
+	file.close()
+	return nodes.size()
+
+
+# Pure snapshot seam reused by release feedback capture. write_screen remains
+# byte-identical because it serializes this exact dictionary with the original
+# indentation and trailing newline.
+static func snapshot_screen(screen_id: String, root: Control, cursor: Dictionary = {}) -> Dictionary:
 	var all: Array = [root]
 	all.append_array(root.find_children("*", "Control", true, false))
 	var nodes: Array = []
@@ -50,14 +66,7 @@ static func write_screen(screen_id: String, root: Control, cursor: Dictionary) -
 			entry["a11y_live"] = a11y_live
 		nodes.append(entry)
 	nodes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a["path"]) < str(b["path"]))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
-	var path := "%s/%s.json" % [OUT_DIR, screen_id]
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		return -1
-	file.store_string(JSON.stringify({"screen": screen_id, "cursor": cursor, "node_count": nodes.size(), "nodes": nodes}, "  ") + "\n")
-	file.close()
-	return nodes.size()
+	return {"screen": screen_id, "cursor": cursor, "node_count": nodes.size(), "nodes": nodes}
 
 # Full-chain visibility to the window root (the accessibility-snapshot semantic):
 # unlike layout_audit._shown — which stops at the owning Viewport so it can audit

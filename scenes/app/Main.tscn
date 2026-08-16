@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/app/main.gd" id="1_t2ieu"]
 [ext_resource type="Script" path="res://scripts/runtime/world_view.gd" id="2_g5d62"]
@@ -6,13 +6,15 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/MessageBox.tscn" id="4_i3c7e"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleView.tscn" id="5_o6ff5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/StartMenu.tscn" id="6_r56t4"]
-[ext_resource type="Script" path="res://scripts/app/smoke_scenarios.gd" id="7_smoke"]
+[ext_resource type="Script" path="res://scripts/app/smoke_scenario_loader.gd" id="7_smoke"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CampMenu.tscn" id="8_cmenu"]
 [ext_resource type="PackedScene" path="res://scenes/ui/StorageScreen.tscn" id="9_sbox"]
 [ext_resource type="Script" path="res://scripts/runtime/entity_layer.gd" id="10_elayer"]
 [ext_resource type="PackedScene" path="res://scenes/ui/WayStoneSelector.tscn" id="11_bsel"]
 [ext_resource type="PackedScene" path="res://scenes/ui/TitleScreen.tscn" id="12_tscr"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CreationScreen.tscn" id="13_cscr"]
+[ext_resource type="PackedScene" path="res://scenes/ui/FeedbackDialog.tscn" id="14_feedback"]
+[ext_resource type="Script" path="res://scripts/app/feedback_controller.gd" id="15_feedback_controller"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_t2ieu")
@@ -56,6 +58,13 @@ script = ExtResource("10_elayer")
 [node name="CampMenu" parent="UI" instance=ExtResource("8_cmenu")]
 
 [node name="WayStoneSelector" parent="UI" instance=ExtResource("11_bsel")]
+
+[node name="FeedbackDialog" parent="UI" instance=ExtResource("14_feedback")]
+
+[node name="FeedbackController" type="Node" parent="."]
+process_mode = 3
+script = ExtResource("15_feedback_controller")
+dialog_path = NodePath("../UI/FeedbackDialog")
 
 [node name="SmokeScenarios" type="Node" parent="."]
 script = ExtResource("7_smoke")

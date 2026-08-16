@@ -58,6 +58,8 @@ static func screen_label_for(runtime: Node) -> String:
 	var battle := ui.get_node_or_null("BattleView")
 	var menu := ui.get_node_or_null("StartMenu")
 	if title == null or creation == null or battle == null or menu == null: return "unknown"
+	var feedback := ui.get_node_or_null("FeedbackDialog")
+	if feedback != null and feedback.visible: return "feedback"
 	if title.visible: return "title"
 	if creation.visible: return "creation"
 	if battle.visible: return "battle"

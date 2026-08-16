@@ -4,7 +4,7 @@ schema_version = 1
 name = "app_bootstrap"
 status = "active"
 layer = "app"
-code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd", "scripts/app/ui_tree_dump_scenario.gd", "scripts/app/legibility_soak_scenario.gd", "scripts/app/legibility_soak_checks.gd", "scripts/app/battle_scenario_fixtures.gd", "scripts/app/ui_tree_dump_writer.gd"]
+code_paths = ["scripts/app/main.gd", "scripts/app/input_router.gd", "scripts/app/input_gate_scenario.gd", "scripts/app/input_gate_menu_checks.gd", "scripts/app/battle_end_input_scenario.gd", "scripts/app/smoke_tap.gd", "scripts/app/smoke_scenario_loader.gd", "scripts/app/smoke_scenarios.gd", "scripts/app/phase0_scenarios.gd", "scripts/app/wild_battle_scenario.gd", "scripts/app/qa_scenarios.gd", "scripts/app/nav_audit.gd", "scripts/app/nav_audit_battle.gd", "scripts/app/qa_audits.gd", "scripts/app/qa_data_checks.gd", "scripts/app/layout_audit.gd", "scripts/app/world_consistency_audit.gd", "scripts/app/world_draw_order.gd", "scripts/app/world_spatial_audit.gd", "scripts/app/ui_render_art.gd", "scripts/app/ui_render_model.gd", "scripts/app/ui_render_audit.gd", "scripts/app/battle_anim_scenario.gd", "scripts/app/display_matrix.gd", "scripts/app/harvest_flow_scenario.gd", "scripts/app/playtest_scenarios.gd", "scripts/app/visual_sweep.gd", "scripts/app/visual_sweep_baselines.gd", "scripts/app/visual_sweep_registry_support.gd", "scripts/runtime/playtest_bot.gd", "scripts/app/rng_joint_pin_scenario.gd", "scripts/app/save_stability_scenario.gd", "scripts/app/save_stability_support.gd", "scripts/app/visual_sweep_battle.gd", "scripts/app/visual_sweep_day_menu.gd", "scripts/app/visual_sweep_report.gd", "scripts/app/ui_render_fixtures.gd", "scripts/app/smoke_biome_scenarios.gd", "scripts/app/encounter_config_scenario.gd", "scripts/app/save_migration_scenario.gd", "scripts/app/new_game_flow_scenario.gd", "scripts/app/new_game_flow_checks.gd", "scripts/app/new_game_flow_geo.gd", "scripts/app/visual_sweep_title.gd", "scripts/app/main_smoke_context.gd", "scripts/app/play_agent_scenario.gd", "scripts/app/ui_tree_dump_scenario.gd", "scripts/app/legibility_soak_scenario.gd", "scripts/app/legibility_soak_checks.gd", "scripts/app/battle_scenario_fixtures.gd", "scripts/app/ui_tree_dump_writer.gd"]
 scene_paths = ["scenes/app/Main.tscn"]
 spec_doc = "docs/product-specs/bootstrap-and-overworld.md"
 validation_commands = [
@@ -1972,3 +1972,36 @@ quality_bucket = "world"
 # beyond-core content_density advisory + instance-keyed landmark reachability; origin-core
 # preservation is the audit's pinning discipline. See docs/product-specs/infinite-world.md
 # § Smoke validation.
+
+[[subsystems]]
+name = "feedback_reporting"
+status = "active"
+layer = "app"
+code_paths = [
+  "scripts/app/feedback_controller.gd",
+  "scripts/app/feedback_flow_scenario.gd",
+  "scripts/ui/feedback_dialog.gd",
+  "scripts/runtime/feedback_runtime.gd",
+  "scripts/runtime/feedback_bundle.gd",
+  "scripts/runtime/feedback_reporter.gd",
+  "scripts/core/feedback_redactor.gd",
+]
+scene_paths = ["scenes/ui/FeedbackDialog.tscn"]
+spec_doc = "docs/product-specs/playtest-feedback.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario feedback_flow",
+  "python3 tools/test_feedback_bundle.py",
+  "cd services/feedback-relay && npm ci && npm run check",
+  "cd services/feedback-relay && npx wrangler deploy --dry-run",
+  "cd services/feedback-relay && npx wrangler deploy --env staging --dry-run",
+]
+required_trace_events = ["feedback_capture_requested", "feedback_report_queued", "feedback_report_sent", "feedback_report_failed", "feedback_flow_passed", "feedback_flow_failed"]
+quality_bucket = "feedback"
+# Packaged-player diagnostics: real F input captures before the pause-modal,
+# current-launch trace slicing prevents historical-log leakage, full save/UI/
+# screenshot state is checksummed into a private bundle, and a revocable
+# friend-specific token reaches the R2/D1/GitHub-App relay without shipping any
+# GitHub credential. feedback_flow drives the player-facing contexts and parses
+# the ZIP through an injected transport; Worker tests + both dry-runs gate the relay.

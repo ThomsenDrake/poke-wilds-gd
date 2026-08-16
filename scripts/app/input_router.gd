@@ -32,6 +32,7 @@ const ACTION_BINDINGS := {
 	"action_b": [Key.KEY_X],
 	"run": [Key.KEY_X],
 	"start": [Key.KEY_ENTER],
+	"feedback_report": [Key.KEY_F],
 	# Port binding: C toggles the tile-locked build overlay. Original C/V is
 	# the dev-mode paint tool's tile cycle, a different feature.
 	"build_toggle": [Key.KEY_C],

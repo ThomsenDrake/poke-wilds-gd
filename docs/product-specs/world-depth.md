@@ -31,6 +31,8 @@ The subsystem splits into PURE-DOMAIN modules — `scripts/domain/landmarks.gd` 
 
 ## Supported behavior
 
+- Playtest reports record the current active area and private in-memory landmark/dungeon save state without entering, exiting, or rewriting any area. See [playtest-feedback.md](playtest-feedback.md).
+
 ### Landmarks — a world-seed + chain parametric multi-tile footprint generator
 
 - **The current world places ONLY single-tile props.** `biome_defs.gd:64-94`'s `_prop` shape is `{path, region, block, chance, reason, field_move, key_color}` — one tile + a chance, chosen by `_pick_prop` (`world_generator.gd:287-292`) beating the pure integer `_coord_noise(x, y, salt)` (:314-318). There is NO footprint/structure concept in world-gen; player structures (`structures.gd`) are one placement per tile under the shared 10k cap (`world_overrides.gd:21 MAX_OVERRIDES`). Phase 7 adds the FIRST multi-tile coherent structure, and it is DETERMINISTIC-FROM-SEED like props (reborn from noise, never saved as a mutation) — NOT a placement, so it never competes with the player's 10k cap and demolition's revert-to-cleared semantics never touch it.

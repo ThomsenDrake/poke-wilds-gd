@@ -11,6 +11,7 @@ const PlaytestScenarios := preload("res://scripts/app/playtest_scenarios.gd")
 const QaScenarios := preload("res://scripts/app/qa_scenarios.gd")
 const Phase0Scenarios := preload("res://scripts/app/phase0_scenarios.gd")
 const SmokeBiomeScenarios := preload("res://scripts/app/smoke_biome_scenarios.gd")
+const FeedbackFlowScenario := preload("res://scripts/app/feedback_flow_scenario.gd")
 
 # Determinism pin for the three inline smokes (the house convention: seed BEFORE any
 # draw — boot/overworld_step steps ride the avatar trigger stream, menu_save the save).
@@ -42,6 +43,7 @@ func run(scenario: String, ctx: Dictionary) -> void:
 			"biome_probe": await _biome_scenarios().run("biome_probe", _ctx)
 			"biome_traverse": await _biome_scenarios().run("biome_traverse", _ctx)
 			"field_move": await _scenario_field_move()
+			"feedback_flow": await _feedback_flow().run(_ctx)
 			"playtest_journey": await _playtest_scenarios().run_journey(_ctx)
 			"playtest_soak": await _playtest_scenarios().run_soak(_ctx)
 			"playtest_field_soak": await _playtest_scenarios().run_field_soak(_ctx)
@@ -168,3 +170,8 @@ func _battle_view() -> Node: return _ctx["battle_view"]
 func _start_menu() -> Node: return _ctx["start_menu"]
 func _message_box() -> Node: return _ctx["message_box"]
 func _music_router() -> Object: return _ctx["music_router"]
+
+func _feedback_flow() -> Node:
+	var scenario := FeedbackFlowScenario.new()
+	add_child(scenario)
+	return scenario

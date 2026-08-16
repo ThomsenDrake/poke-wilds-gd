@@ -20,6 +20,19 @@ __pycache__/
 .claude/settings.local.json
 .commandcode/
 
+# Friend-specific feedback build data and exported packages. Invite tokens are
+# revocable but still never belong in source control.
+.playtest/
+.feedback-reports/
+generated/playtest_build.json
+dist/
+
+# Cloudflare local state/dependencies.
+.wrangler/
+services/feedback-relay/node_modules/
+services/feedback-relay/.wrangler/
+services/feedback-relay/.dev.vars
+
 # PokeAPI api-data cache (270MB dump; re-fetch via tools/import_pokeapi.py --refresh)
 tools/.cache/
 

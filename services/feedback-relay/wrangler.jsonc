@@ -1,0 +1,77 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "poke-wilds-feedback-relay",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-08-12",
+	"workers_dev": true,
+	"vars": {
+		"ENVIRONMENT": "production",
+		"GITHUB_REPOSITORY": "ThomsenDrake/poke-wilds-gd"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "poke-wilds-feedback",
+			"database_id": "f217a532-40a9-4d96-8102-4e8cf38e365c",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "REPORTS",
+			"bucket_name": "poke-wilds-feedback-private"
+		}
+	],
+	"ratelimits": [
+		{
+			"name": "REPORT_RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
+		}
+	],
+	"triggers": {
+		"crons": [
+			"17 4 * * *"
+		]
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1.0
+	},
+	"env": {
+		"staging": {
+			"name": "poke-wilds-feedback-relay-staging",
+			"vars": {
+				"ENVIRONMENT": "staging",
+				"GITHUB_REPOSITORY": "ThomsenDrake/poke-wilds-gd"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "poke-wilds-feedback-staging",
+					"database_id": "2a15bb84-2e00-4ec2-8b80-40c02357dd71",
+					"migrations_dir": "migrations"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "REPORTS",
+					"bucket_name": "poke-wilds-feedback-private-staging"
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "REPORT_RATE_LIMITER",
+					"namespace_id": "1002",
+					"simple": {
+						"limit": 5,
+						"period": 60
+					}
+				}
+			]
+		}
+	}
+}
