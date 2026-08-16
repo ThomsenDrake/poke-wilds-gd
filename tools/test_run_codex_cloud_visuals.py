@@ -51,10 +51,12 @@ class CodexCloudVisualLauncherTests(unittest.TestCase):
 if [[ "${1:-}" == "--version" ]]; then
   printf '1.26.0\n'
 else
+  printf '%s\n' "${NODE_USE_ENV_PROXY:-}" "${NODE_USE_SYSTEM_CA:-}" > "${FAKE_CMD_ENV_LOG}"
   printf 'COMMAND_CODE_CONNECTIVITY_OK\n'
 fi
 """,
         )
+        self.cmd_env_log = self.base / "cmd-env.log"
         self.python_log = self.base / "python.json"
         self._write_executable(
             self.fake_bin / "python3",
@@ -100,6 +102,7 @@ printf 'export GODOT_AUDIO_DRIVER=Dummy\n' >> "${POKEWILDS_CLOUD_ENV_FILE}"
                 "FAKE_PYTHON_LOG": str(self.python_log),
                 "FAKE_ENV_LOG": str(self.env_log),
                 "FAKE_REAL_PYTHON": sys.executable,
+                "FAKE_CMD_ENV_LOG": str(self.cmd_env_log),
             }
         )
         if auth:
@@ -120,6 +123,10 @@ printf 'export GODOT_AUDIO_DRIVER=Dummy\n' >> "${POKEWILDS_CLOUD_ENV_FILE}"
         result = self._run("--check")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("visual preflight: ready", result.stdout)
+        self.assertEqual(
+            self.cmd_env_log.read_text(encoding="utf-8").splitlines(),
+            ["1", "1"],
+        )
         self.assertFalse(self.python_log.exists())
 
     def test_full_runs_windowed_gate_with_command_code(self) -> None:
@@ -175,7 +182,7 @@ fi
         )
         result = self._run("--focused")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("must allow api.commandcode.ai over HTTPS, including POST", result.stderr)
+        self.assertIn("check Node proxy/system-CA support", result.stderr)
         self.assertNotIn("secret-marker", result.stderr)
         self.assertFalse(self.python_log.exists())
 

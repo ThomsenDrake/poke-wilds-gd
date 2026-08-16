@@ -37,6 +37,12 @@ esac
 # shellcheck disable=SC1090
 . "${SETUP_ENV_FILE}"
 
+# Command Code uses Node fetch(). Explicitly opt it into Codex Cloud's proxy
+# variables and system trust store. These are safe fallbacks for cached setup
+# environments created before the bootstrap persisted them.
+export NODE_USE_ENV_PROXY=1
+export NODE_USE_SYSTEM_CA=1
+
 cd "${REPO_ROOT}"
 bash tools/ensure_cloud_display.sh
 [[ -f "${RUNTIME_ENV_FILE}" ]] \

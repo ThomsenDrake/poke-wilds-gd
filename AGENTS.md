@@ -81,6 +81,9 @@ the read-only HTTP-method restriction is insufficient. Setup-script
 internet access does not carry into the visual task. The launcher performs a
 bounded, inspect-only model probe and fails before capture when that host,
 credential, or the pinned model is unavailable.
+When access is enabled, the launcher also sets `NODE_USE_ENV_PROXY=1` and
+`NODE_USE_SYSTEM_CA=1` so Command Code's Node `fetch()` follows the Cloud proxy
+and trusts the platform system CA without disabling certificate validation.
 
 Lavapipe captures are useful live visual evidence but do not certify or update
 the Apple M4 renderer-stamped pixel baselines.

@@ -48,7 +48,7 @@ class CommandCodeProbeTests(unittest.TestCase):
         )
         code, _stdout, stderr = self._main()
         self.assertEqual(code, 1)
-        self.assertIn("must allow api.commandcode.ai over HTTPS, including POST", stderr)
+        self.assertIn("check Node proxy/system-CA support", stderr)
         self.assertNotIn("secret-marker", stderr)
 
     def test_auth_failure_is_classified_without_raw_output(self) -> None:

@@ -201,6 +201,8 @@ printf 'download\n' >> "${FAKE_CURL_LOG}"
         )
         self.assertIn(f"export GODOT_BIN={godot_bin}", env_text)
         self.assertIn("COMMANDCODE_SKIP_UPDATES=1", env_text)
+        self.assertIn("NODE_USE_ENV_PROXY=1", env_text)
+        self.assertIn("NODE_USE_SYSTEM_CA=1", env_text)
         self.assertTrue((self.home / ".local/bin/cmd").is_file())
         hook = '[ -f "$HOME/.pokewilds-codex-cloud.env" ] && . "$HOME/.pokewilds-codex-cloud.env"'
         self.assertEqual((self.home / ".bashrc").read_text().count(hook), 1)
@@ -246,7 +248,17 @@ printf 'download\n' >> "${FAKE_CURL_LOG}"
         )
         result = self._run(CODEX_CLOUD_NVM_DIR=str(self.base / "missing-nvm"))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("requires Node 22+", result.stderr)
+        self.assertIn("requires Node 22.21+ or 24+", result.stderr)
+        self.assertFalse(self.setup_log.exists())
+
+    def test_refuses_node_without_proxy_fetch_support(self) -> None:
+        self._write_executable(
+            self.fake_bin / "node",
+            "#!/usr/bin/env bash\nprintf 'v22.20.0\\n'\n",
+        )
+        result = self._run(CODEX_CLOUD_NVM_DIR=str(self.base / "missing-nvm"))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires Node 22.21+ or 24+", result.stderr)
         self.assertFalse(self.setup_log.exists())
 
     def test_upgrades_old_node_through_nvm(self) -> None:

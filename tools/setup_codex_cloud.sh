@@ -146,31 +146,46 @@ PY
   echo "Installed: $("${GODOT_BIN}" --version)"
 fi
 
-# command-code currently requires Node 22+. Codex Cloud can pin Node 22 in its
-# package-version UI; if it is pinned lower, use the universal image's nvm
-# installation without touching the repository's .nvmrc.
+# command-code requires Node 22+. Its Cloud transport also needs Node's built-in
+# environment-proxy support (22.21+ or 24+) so fetch() follows Codex Cloud's
+# HTTP_PROXY/HTTPS_PROXY without disabling TLS verification.
 node_major=""
+node_minor=""
 if command -v node >/dev/null 2>&1; then
-  node_major="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
+  node_version="$(node --version 2>/dev/null)"
+  if [[ "${node_version}" =~ ^v([0-9]+)\.([0-9]+)\. ]]; then
+    node_major="${BASH_REMATCH[1]}"
+    node_minor="${BASH_REMATCH[2]}"
+  fi
 fi
-if [[ ! "${node_major}" =~ ^[0-9]+$ ]] || (( node_major < 22 )); then
+if [[ ! "${node_major}" =~ ^[0-9]+$ ]] \
+  || (( node_major < 22 )) \
+  || (( node_major == 22 && node_minor < 21 )) \
+  || (( node_major == 23 )); then
   nvm_dir="${CODEX_CLOUD_NVM_DIR:-${NVM_DIR:-${USER_DIR}/.nvm}}"
   [[ -s "${nvm_dir}/nvm.sh" ]] \
-    || fail "Command Code ${COMMAND_CODE_VERSION} requires Node 22+; pin Node 22 in Codex Cloud or provide nvm."
+    || fail "Command Code on Codex Cloud requires Node 22.21+ or 24+ for proxy-aware fetch; pin a supported version or provide nvm."
   # shellcheck disable=SC1090
   . "${nvm_dir}/nvm.sh"
   nvm install 22
   nvm use 22
   hash -r
 fi
-node_major="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
-[[ "${node_major}" =~ ^[0-9]+$ ]] && (( node_major >= 22 )) \
-  || fail "Command Code ${COMMAND_CODE_VERSION} requires Node 22+; found $(node --version 2>/dev/null || echo missing)."
+node_version="$(node --version 2>/dev/null)"
+if [[ "${node_version}" =~ ^v([0-9]+)\.([0-9]+)\. ]]; then
+  node_major="${BASH_REMATCH[1]}"
+  node_minor="${BASH_REMATCH[2]}"
+else
+  fail "Could not parse Node version: ${node_version:-missing}."
+fi
+(( node_major >= 24 || (node_major == 22 && node_minor >= 21) )) \
+  || fail "Command Code on Codex Cloud requires Node 22.21+ or 24+ for proxy-aware fetch; found ${node_version}."
 command -v npm >/dev/null \
   || fail "npm is required to install Command Code ${COMMAND_CODE_VERSION}."
 NODE_BIN_DIR="$(dirname "$(command -v node)")"
 
 export GODOT_BIN COMMANDCODE_SKIP_UPDATES=1 GODOT_AUDIO_DRIVER=Dummy
+export NODE_USE_ENV_PROXY=1 NODE_USE_SYSTEM_CA=1
 export PATH="${LOCAL_PREFIX}/bin:${NODE_BIN_DIR}:${GODOT_DIR}:${PATH}"
 
 if command -v cmd >/dev/null 2>&1 \
@@ -198,6 +213,8 @@ umask 077
   printf 'export PATH=%q:%q:%q:"$PATH"\n' "${LOCAL_PREFIX}/bin" "${NODE_BIN_DIR}" "${GODOT_DIR}"
   printf 'export COMMANDCODE_SKIP_UPDATES=1\n'
   printf 'export GODOT_AUDIO_DRIVER=Dummy\n'
+  printf 'export NODE_USE_ENV_PROXY=1\n'
+  printf 'export NODE_USE_SYSTEM_CA=1\n'
 } > "${ENV_FILE}"
 for shell_file in "${USER_DIR}/.bashrc" "${USER_DIR}/.profile"; do
   touch "${shell_file}"

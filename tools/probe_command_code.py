@@ -33,8 +33,9 @@ def _diagnostic(returncode: int, stderr: str) -> str:
         "enetwork", "enetunreach", "dns", "getaddrinfo",
     )):
         return (
-            f"API connectivity failed (cmd exit {returncode}). Codex Cloud agent "
-            f"internet access must allow {API_HOST} over HTTPS, including POST."
+            f"Command Code transport could not reach {API_HOST} (cmd exit {returncode}). "
+            "Confirm agent internet access, then check Node proxy/system-CA support "
+            "or provider availability."
         )
     if any(marker in lowered for marker in (
         "not authenticated", "unauthorized", "invalid api key", "authentication",

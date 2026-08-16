@@ -75,6 +75,11 @@ secrets are setup-only and removed before the coding agent runs. Consequently:
   restriction cannot run a model request). The visual launcher tests that real
   API/model path before spending time on screenshots; the setup script cannot
   grant it.
+- Command Code runs on Node and Codex Cloud routes outbound traffic through a
+  proxy. Setup requires Node 22.21+ (or 24+) and persists
+  `NODE_USE_ENV_PROXY=1` plus `NODE_USE_SYSTEM_CA=1`; the launcher repeats both
+  exports for warm cached environments. This makes Node `fetch()` honor the
+  platform proxy and system trust store without weakening TLS verification.
 
 ## Local gate (verify_all)
 
