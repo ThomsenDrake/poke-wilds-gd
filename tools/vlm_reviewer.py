@@ -907,6 +907,35 @@ def incomplete_answers_repair_system(system: str, missing: list[str]) -> str:
     )
 
 
+def merge_incomplete_repair_answers(
+    answers: list[dict], repair_answers: list[dict], question_ids: set[str]
+) -> tuple[list[dict], list[str], list[str]]:
+    """Add only answers omitted by the original pass.
+
+    A targeted repair commonly returns just the named missing question instead
+    of repeating the complete rubric. Preserve every original verdict, ignore
+    conflicting repeats, and append only newly covered ids. Returns
+    (merged_answers, added_ids, still_missing_ids).
+    """
+    merged = list(answers)
+    have = {
+        answer.get("question_id")
+        for answer in merged
+        if isinstance(answer, dict)
+    }
+    added: list[str] = []
+    for answer in repair_answers:
+        if not isinstance(answer, dict):
+            continue
+        qid = answer.get("question_id")
+        if not isinstance(qid, str) or qid not in question_ids or qid in have:
+            continue
+        merged.append(answer)
+        have.add(qid)
+        added.append(qid)
+    return merged, sorted(added), sorted(qid for qid in question_ids if qid not in have)
+
+
 def _unanimous(passes: list[list[dict]], required: int | None = None) -> tuple[list[dict], dict]:
     """Keep only answers the passes agree on (identity = question_id+verdict); the
     canonical copy is pass-1's. `required` is the CONFIGURED pass count (cfg.n): an
@@ -1006,13 +1035,26 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
                 doc2, parse2 = None, f"incomplete-repair failed: {type(exc).__name__}"
             if doc2 is not None:
                 answers2, norm2 = _normalize_pass(doc2, public_ctx, question_ids, valid)
-                if not omitted_question_ids(answers2, question_ids):
-                    answers, norm = answers2, {**norm2, "incomplete_repair": "completed"}
+                answers, added, still_missing = merge_incomplete_repair_answers(
+                    answers, answers2, question_ids
+                )
+                if not still_missing:
+                    norm = {
+                        **norm,
+                        "incomplete_repair": "completed",
+                        "repair_added": added,
+                        "repair_normalization": norm2,
+                    }
                     parse_note = f"{parse_note}+incomplete_repair"
                 else:
                     parse_note = f"{parse_note}+incomplete_repair_still_short"
-                    norm = {**norm, "incomplete_repair": "still_short",
-                            "omitted": omitted_question_ids(answers2, question_ids)}
+                    norm = {
+                        **norm,
+                        "incomplete_repair": "still_short",
+                        "repair_added": added,
+                        "repair_normalization": norm2,
+                        "omitted": still_missing,
+                    }
             else:
                 parse_note = f"{parse_note}+incomplete_repair:{parse2}"
                 norm = {**norm, "incomplete_repair": parse2, "omitted": missing}

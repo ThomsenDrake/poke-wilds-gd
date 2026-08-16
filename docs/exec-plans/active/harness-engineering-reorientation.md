@@ -1,5 +1,5 @@
 Status: active
-Last verified: 2026-08-01
+Last verified: 2026-08-16
 Review cadence days: 14
 Source paths: README.md, AGENTS.md, ARCHITECTURE.md, scripts, scenes, tools
 

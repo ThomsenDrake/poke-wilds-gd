@@ -9,6 +9,7 @@ from pathlib import Path
 import stat
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -97,6 +98,59 @@ printf '1.26.0\n'
             available, reason = VLM._command_code_available()
         self.assertFalse(available)
         self.assertIn("COMMAND_CODE_API_KEY unset", reason)
+
+
+class CommandCodeIncompleteRepairTests(unittest.TestCase):
+    def test_targeted_repair_adds_missing_answer_without_overwriting_original(self) -> None:
+        questions = [
+            {"id": "menu.layout", "text": "Layout readable?"},
+            {"id": "menu.cursor", "text": "Cursor aligned?"},
+        ]
+        original = {
+            "answers": [
+                {"question_id": "menu.layout", "verdict": "yes", "note": "ok"}
+            ]
+        }
+        targeted_repair = {
+            "answers": [
+                # A repeated conflicting verdict must not overwrite pass one.
+                {"question_id": "menu.layout", "verdict": "no", "note": "repeat"},
+                {"question_id": "menu.cursor", "verdict": "yes", "note": "ok"},
+            ]
+        }
+        cfg = SimpleNamespace(
+            seed=7,
+            independent_vote=False,
+            n=2,
+            command_code_model="gpt-5.6-luna",
+            dashscope_model="unused",
+            model="unused",
+        )
+        review_context = SimpleNamespace(specialist_block=lambda _group: "")
+        with mock.patch.object(VLM, "load_questions", return_value=("menu", questions)), \
+                mock.patch.object(VLM, "_region_catalog", return_value=("catalog", [])), \
+                mock.patch.object(VLM, "build_system_prompt", return_value="system"), \
+                mock.patch.object(VLM, "build_user_content", return_value=("user", [], [])), \
+                mock.patch.object(
+                    VLM,
+                    "_call_model",
+                    side_effect=[
+                        VLM.json.dumps(original),
+                        VLM.json.dumps(targeted_repair),
+                    ],
+                ) as call_model, \
+                mock.patch.object(VLM, "_review_context", return_value=review_context):
+            answers, meta = VLM.run_model({}, cfg, "command_code")
+
+        self.assertEqual(call_model.call_count, 2)
+        self.assertEqual(
+            [(answer["question_id"], answer["verdict"]) for answer in answers],
+            [("menu.layout", "yes"), ("menu.cursor", "yes")],
+        )
+        self.assertEqual(meta["passes_completed"], 1)
+        self.assertEqual(meta["per_pass"][0]["answers"], 2)
+        self.assertEqual(meta["per_pass"][0]["incomplete_repair"], "completed")
+        self.assertEqual(meta["per_pass"][0]["repair_added"], ["menu.cursor"])
 
 
 if __name__ == "__main__":

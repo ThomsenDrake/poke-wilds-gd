@@ -1080,6 +1080,25 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append(
             "run_model must call incomplete_answers_repair_system on a short pass"
         )
+    merged, added, remaining = reviewer.merge_incomplete_repair_answers(
+        [{"question_id": "q1-aaa", "verdict": "yes"}],
+        [
+            {"question_id": "q1-aaa", "verdict": "no"},
+            {"question_id": "q1-bbb", "verdict": "yes"},
+        ],
+        {"q1-aaa", "q1-bbb"},
+    )
+    identities = [(answer.get("question_id"), answer.get("verdict")) for answer in merged]
+    if identities != [("q1-aaa", "yes"), ("q1-bbb", "yes")]:
+        issues.append(
+            "incomplete repair must add omitted answers without overwriting original verdicts; "
+            f"got {identities}"
+        )
+    if added != ["q1-bbb"] or remaining:
+        issues.append(
+            "incomplete repair must report newly added and still-missing ids; "
+            f"added={added}, remaining={remaining}"
+        )
     return issues
 
 
