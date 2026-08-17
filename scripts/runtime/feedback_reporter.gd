@@ -98,7 +98,7 @@ func _upload(prepared: Dictionary) -> Dictionary:
 				and int(parsed.get("issue_number", 0)) > 0:
 			return {"status": "sent", "issue_number": int(parsed["issue_number"])}
 		return {"status": "queued", "reason": "invalid_success_response"}
-	if code == 202 or code == 429 or code >= 500 or code == 0:
+	if code == 202 or code == 408 or code == 429 or code >= 500 or code == 0:
 		return {"status": "queued", "reason": "http_%d" % code}
 	return {"status": "blocked", "reason": "http_%d" % code}
 
@@ -153,6 +153,11 @@ func set_transport_for_smoke(transport: Callable) -> void:
 func set_install_id_path_for_smoke(path: String) -> void:
 	if OS.has_feature("editor"):
 		_bundle.set_install_id_path_for_smoke(path)
+
+
+func set_build_info_for_smoke(build: Dictionary) -> void:
+	if OS.has_feature("editor"):
+		_bundle.set_build_info_for_smoke(build)
 
 
 func state_for_smoke() -> Dictionary:

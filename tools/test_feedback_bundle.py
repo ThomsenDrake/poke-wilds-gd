@@ -256,6 +256,20 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn("func _reconcile_retry_schedule()", reporter)
         self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)
 
+    def test_private_retry_route_is_committed_last_and_never_uploaded(self) -> None:
+        outbox = (package_playtest.ROOT / "scripts/runtime/feedback_outbox.gd").read_text(encoding="utf-8")
+        reporter = (package_playtest.ROOT / "scripts/runtime/feedback_reporter.gd").read_text(encoding="utf-8")
+        commit = outbox[outbox.index("func commit("):outbox.index("func pending(")]
+        self.assertLess(commit.index("_atomic_write_json(route_path"), commit.index("_atomic_write_json(metadata_path"))
+        self.assertIn('"route_path": route_path', outbox)
+        self.assertIn('_remove(str(prepared.get("route_path", "")))', outbox)
+        self.assertIn('var metadata_json := JSON.stringify(prepared["metadata"])', reporter)
+        self.assertNotIn('JSON.stringify(prepared["build"])', reporter)
+
+    def test_explicit_request_timeout_remains_retryable(self) -> None:
+        reporter = (package_playtest.ROOT / "scripts/runtime/feedback_reporter.gd").read_text(encoding="utf-8")
+        self.assertIn("code == 202 or code == 408 or code == 429", reporter)
+
     def test_public_tester_id_is_stable_pokemon_themed_and_token_only(self) -> None:
         first = package_playtest.public_tester_id("opaque-token-one")
         self.assertEqual(first, package_playtest.public_tester_id("opaque-token-one"))

@@ -116,7 +116,7 @@ function validateReportFields(data: Record<string, unknown>): ReportFields {
   const testerId = String(data.tester_id ?? "");
   const installId = String(data.install_id ?? "");
   if (!REPORT_ID.test(reportId)) throw badRequest("invalid_report_id");
-  if (typeof data.message !== "string" || data.message.trim().length < 1 || data.message.length > 1000) {
+  if (typeof data.message !== "string" || data.message.trim().length < 1 || Array.from(data.message).length > 1000) {
     throw badRequest("invalid_message");
   }
   if (!/^[A-Z0-9-]{3,24}$/.test(testerId)) throw badRequest("invalid_tester_id");

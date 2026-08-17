@@ -1,11 +1,11 @@
 extends RefCounted
 
-# Durable ownership for paired feedback ZIP/metadata entries. The metadata
-# sidecar is the commit marker: it is renamed into place only after the ZIP is
-# complete, so retry never observes a torn pair.
+# Durable ownership for feedback ZIP/private-route/metadata entries. Metadata
+# is the final commit marker, so retry never observes a torn set.
 
 const OUTBOX_DIR := "user://feedback_outbox"
 const TMP_SUFFIX := ".tmp"
+const ROUTE_SUFFIX := ".route"
 
 
 func staging_bundle_path(report_id: String) -> String:
@@ -21,13 +21,18 @@ func commit(staging_path: String, metadata: Dictionary, build: Dictionary) -> Di
 		return {"ok": false, "error": "outbox_staging_missing"}
 	var bundle_path := _bundle_path(report_id)
 	var metadata_path := _metadata_path(report_id)
+	var route_path := _route_path(report_id)
 	if not _rename(staging_path, bundle_path):
 		return {"ok": false, "error": "outbox_bundle_commit_failed"}
+	if not _atomic_write_json(route_path, _private_route(metadata, build)):
+		_preserve(bundle_path, "%s/%s.orphan.zip" % [OUTBOX_DIR, report_id])
+		return {"ok": false, "error": "outbox_route_commit_failed"}
 	if not _atomic_write_json(metadata_path, metadata):
 		_preserve(bundle_path, "%s/%s.orphan.zip" % [OUTBOX_DIR, report_id])
+		_remove(route_path)
 		return {"ok": false, "error": "outbox_metadata_commit_failed"}
 	return {"ok": true, "bundle_path": bundle_path, "metadata_path": metadata_path,
-		"metadata": metadata, "build": build}
+		"route_path": route_path, "metadata": metadata, "build": build}
 
 
 func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary]:
@@ -55,9 +60,21 @@ func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary
 		var bundle_path := _bundle_path(report_id)
 		if not FileAccess.file_exists(bundle_path):
 			_preserve(metadata_path, "%s/%s.orphan.json" % [OUTBOX_DIR, report_id])
+			_remove(_route_path(report_id))
+			continue
+		var prepared_build := build
+		var route_path := _route_path(report_id)
+		if FileAccess.file_exists(route_path):
+			prepared_build = _read_json(route_path)
+			if not _route_matches(prepared_build, parsed):
+				_quarantine(report_id, "corrupt")
+				continue
+		elif not _route_matches(build, parsed):
+			# Legacy entries have no private route. Never try or block one under a
+			# different tester/cohort; a matching older package can still recover it.
 			continue
 		result.append({"ok": true, "metadata": parsed, "metadata_path": metadata_path,
-			"bundle_path": bundle_path, "build": build})
+			"route_path": route_path, "bundle_path": bundle_path, "build": prepared_build})
 	return result
 
 
@@ -68,12 +85,16 @@ func mark_blocked(prepared: Dictionary, reason: String) -> bool:
 	var metadata: Dictionary = prepared.get("metadata", {}).duplicate(true)
 	metadata["upload_status"] = "blocked"
 	metadata["upload_error"] = reason
-	return _atomic_write_json(path, metadata)
+	var marked := _atomic_write_json(path, metadata)
+	if marked:
+		_remove(str(prepared.get("route_path", "")))
+	return marked
 
 
 func remove(prepared: Dictionary) -> void:
 	_remove(str(prepared.get("bundle_path", "")))
 	_remove(str(prepared.get("metadata_path", "")))
+	_remove(str(prepared.get("route_path", "")))
 
 
 func discard_staging(path: String) -> void:
@@ -109,6 +130,7 @@ func _read_json(path: String) -> Dictionary:
 func _quarantine(report_id: String, suffix: String) -> void:
 	_preserve(_metadata_path(report_id), "%s/%s.%s.json" % [OUTBOX_DIR, report_id, suffix])
 	_preserve(_bundle_path(report_id), "%s/%s.%s.zip" % [OUTBOX_DIR, report_id, suffix])
+	_remove(_route_path(report_id))
 
 
 func _recover_incomplete(filenames: PackedStringArray) -> void:
@@ -123,6 +145,15 @@ func _recover_incomplete(filenames: PackedStringArray) -> void:
 			if _is_report_id(report_id):
 				_preserve("%s/%s" % [OUTBOX_DIR, filename],
 					"%s/%s.incomplete.json" % [OUTBOX_DIR, report_id])
+		elif filename.ends_with(ROUTE_SUFFIX + TMP_SUFFIX):
+			var report_id := filename.trim_suffix(ROUTE_SUFFIX + TMP_SUFFIX)
+			if _is_report_id(report_id):
+				_remove("%s/%s" % [OUTBOX_DIR, filename])
+		elif filename.ends_with(ROUTE_SUFFIX):
+			var report_id := filename.trim_suffix(ROUTE_SUFFIX)
+			if _is_report_id(report_id) and (not FileAccess.file_exists(_metadata_path(report_id)) \
+					or not FileAccess.file_exists(_bundle_path(report_id))):
+				_remove(_route_path(report_id))
 	for filename in filenames:
 		if not filename.ends_with(".zip") or filename.ends_with(".orphan.zip") \
 				or filename.ends_with(".corrupt.zip") or filename.ends_with(".incomplete.zip"):
@@ -130,6 +161,22 @@ func _recover_incomplete(filenames: PackedStringArray) -> void:
 		var report_id := filename.trim_suffix(".zip")
 		if _is_report_id(report_id) and not FileAccess.file_exists(_metadata_path(report_id)):
 			_preserve(_bundle_path(report_id), "%s/%s.orphan.zip" % [OUTBOX_DIR, report_id])
+			_remove(_route_path(report_id))
+
+
+func _private_route(metadata: Dictionary, build: Dictionary) -> Dictionary:
+	return {"endpoint": str(build.get("endpoint", "")),
+		"invite_token": str(build.get("invite_token", "")),
+		"tester_id": str(metadata.get("tester_id", "")),
+		"channel": str(metadata.get("build", {}).get("channel", ""))}
+
+
+func _route_matches(route: Dictionary, metadata: Dictionary) -> bool:
+	return route.has_all(["endpoint", "invite_token", "tester_id", "channel"]) \
+		and route.get("endpoint") is String and route.get("invite_token") is String \
+		and route.get("tester_id") is String and route.get("channel") is String \
+		and str(route.get("tester_id", "")) == str(metadata.get("tester_id", "")) \
+		and str(route.get("channel", "")) == str(metadata.get("build", {}).get("channel", ""))
 
 
 func _is_report_id(value: String) -> bool:
@@ -144,6 +191,10 @@ func _bundle_path(report_id: String) -> String:
 
 func _metadata_path(report_id: String) -> String:
 	return "%s/%s.json" % [OUTBOX_DIR, report_id]
+
+
+func _route_path(report_id: String) -> String:
+	return "%s/%s%s" % [OUTBOX_DIR, report_id, ROUTE_SUFFIX]
 
 
 func _rename(source: String, destination: String) -> bool:

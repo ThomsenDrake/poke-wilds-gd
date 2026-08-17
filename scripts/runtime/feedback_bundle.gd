@@ -10,6 +10,7 @@ const MAX_BUNDLE_BYTES := 16 * 1024 * 1024
 const ENGINE_LOG_LIMIT := 2 * 1024 * 1024
 
 var _install_id_path := INSTALL_ID_PATH
+var _build_info_override: Dictionary = {}
 
 
 func build(message: String, capture: Dictionary, bundle_path: String) -> Dictionary:
@@ -73,6 +74,8 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 
 
 func load_build_info() -> Dictionary:
+	if OS.has_feature("editor") and not _build_info_override.is_empty():
+		return _build_info_override.duplicate(true)
 	if not FileAccess.file_exists(BUILD_INFO_PATH):
 		return {"channel": "development", "build_id": "local", "commit_sha": "unknown",
 			"endpoint": "", "invite_token": "", "tester_id": "UNASSIGNED"}
@@ -201,6 +204,11 @@ func _is_install_id(value: String) -> bool:
 func set_install_id_path_for_smoke(path: String) -> void:
 	if OS.has_feature("editor"):
 		_install_id_path = INSTALL_ID_PATH if path.is_empty() else path
+
+
+func set_build_info_for_smoke(build: Dictionary) -> void:
+	if OS.has_feature("editor"):
+		_build_info_override = build.duplicate(true)
 
 
 static func _canonical_utc_timestamp() -> String:

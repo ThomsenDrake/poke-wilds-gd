@@ -39,6 +39,15 @@ outbox before stopping its timer, and atomic sidecar publication refuses short w
 `feedback_flow` suspends one retry, submits a second report, and proves the second
 bundle stays scheduled and later sends.
 
+Feedback routing/retention follow-up (2026-08-17): scores remain unchanged. A
+local-only private route preserves each queued report's original package authorization
+without placing it in its ZIP, upload metadata, trace, or logs; the real journey changes
+synthetic package identity between queue and retry and proves route cleanup on success.
+The relay cleanup now drains up to ten deterministic 100-row pages with one bulk R2
+delete and guarded D1 update per page, with failure-order and bounded-cap tests. Relay
+message validation now shares Godot's Unicode-code-point unit, and explicit HTTP 408
+responses remain retryable.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

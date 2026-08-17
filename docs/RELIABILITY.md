@@ -228,9 +228,12 @@ failures, and the journey seeds a malformed isolated install-ID file and proves 
 atomically replaced with the relay's exact 32-lowercase-hex identity format.
 It also suspends an active retry transport, submits another report, and proves the
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
-entry. Sidecar publication checks the write and flush result before its atomic rename.
-The outbox publishes metadata last as an atomic commit marker, so retry sees only
-complete pairs and preserves malformed/incomplete entries outside the active queue.
+entry. The first report is queued under one synthetic package identity, the active
+package is changed, and retry proves the persisted private route still supplies the
+original endpoint/invite; both reports prove that route is removed after success.
+Sidecar publication checks the write and flush result before its atomic rename. The
+outbox publishes metadata last as an atomic commit marker, so retry sees only complete
+ZIP/route/metadata sets and preserves malformed/incomplete entries outside the active queue.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from

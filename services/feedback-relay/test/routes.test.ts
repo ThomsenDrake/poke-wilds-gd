@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { strToU8, zipSync } from "fflate";
-import worker from "../src/index";
+import worker, { cleanupExpiredReports } from "../src/index";
 import { MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex } from "../src/security";
 import type { Env } from "../src/types";
 
@@ -215,7 +215,94 @@ describe("feedback report route boundaries", () => {
   });
 });
 
+describe("expired report cleanup", () => {
+  it("drains more than one deterministic page with bulk storage operations", async () => {
+    const harness = cleanupHarness([cleanupRows(100, 0), cleanupRows(55, 100)]);
+    const result = await cleanupExpiredReports(harness.env);
+    expect(result).toEqual({ batches: 2, processed: 155, limited: false });
+    expect(harness.deleted).toHaveBeenCalledTimes(2);
+    expect(harness.updated).toEqual([cleanupIds(100, 0), cleanupIds(55, 100)]);
+    expect(harness.queries[0]).toContain("ORDER BY expires_at, report_id LIMIT ?");
+  });
+
+  it("stops immediately on an empty page", async () => {
+    const harness = cleanupHarness([[]]);
+    await expect(cleanupExpiredReports(harness.env)).resolves.toEqual({ batches: 0, processed: 0, limited: false });
+    expect(harness.deleted).not.toHaveBeenCalled();
+    expect(harness.updated).toEqual([]);
+  });
+
+  it("stops at the batch cap and emits aggregate-only telemetry", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const harness = cleanupHarness(Array.from({ length: 10 }, (_, page) => cleanupRows(100, page * 100)));
+    await expect(cleanupExpiredReports(harness.env)).resolves.toEqual({ batches: 10, processed: 1000, limited: true });
+    expect(harness.deleted).toHaveBeenCalledTimes(10);
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning.mock.calls[0][0]).toBe('{"event":"feedback_cleanup_batch_limit","batches":10,"processed":1000}');
+    warning.mockRestore();
+  });
+
+  it("does not mark rows expired when bulk R2 deletion fails", async () => {
+    const harness = cleanupHarness([cleanupRows(1, 0)], { deleteFailures: 1 });
+    await expect(cleanupExpiredReports(harness.env)).rejects.toThrow("storage delete failed");
+    expect(harness.updated).toEqual([]);
+  });
+
+  it("retries an idempotent R2 delete after a D1 update failure", async () => {
+    const rows = cleanupRows(1, 0);
+    const harness = cleanupHarness([rows, rows], { updateFailures: 1 });
+    await expect(cleanupExpiredReports(harness.env)).rejects.toThrow("database update failed");
+    await expect(cleanupExpiredReports(harness.env)).resolves.toEqual({ batches: 1, processed: 1, limited: false });
+    expect(harness.deleted).toHaveBeenCalledTimes(2);
+    expect(harness.updated).toEqual([cleanupIds(1, 0)]);
+  });
+});
+
 type HarnessOptions = { existing?: ReturnType<typeof reportRow>; admissionChanges?: number; put?: ReturnType<typeof vi.fn>; completionError?: Error };
+
+function cleanupHarness(pages: Array<Array<{ report_id: string; bundle_key: string }>>,
+  failures: { deleteFailures?: number; updateFailures?: number } = {}) {
+  let page = 0;
+  let deleteFailures = failures.deleteFailures ?? 0;
+  let updateFailures = failures.updateFailures ?? 0;
+  const updated: string[][] = [];
+  const queries: string[] = [];
+  const deleted = vi.fn(async () => {
+    if (deleteFailures > 0) {
+      deleteFailures -= 1;
+      throw new Error("storage delete failed");
+    }
+  });
+  const envValue = env(true);
+  envValue.REPORTS = { delete: deleted } as unknown as R2Bucket;
+  envValue.DB = {
+    prepare: (query: string) => {
+      queries.push(query);
+      return {
+        bind: (value: number | string) => ({
+          all: async () => ({ results: pages[page++] ?? [] }),
+          run: async () => {
+            if (updateFailures > 0) {
+              updateFailures -= 1;
+              throw new Error("database update failed");
+            }
+            updated.push(JSON.parse(String(value)) as string[]);
+            return { meta: { changes: updated.at(-1)?.length ?? 0 } };
+          },
+        }),
+      };
+    },
+  } as unknown as D1Database;
+  return { env: envValue, deleted, updated, queries };
+}
+
+function cleanupRows(count: number, offset: number): Array<{ report_id: string; bundle_key: string }> {
+  return cleanupIds(count, offset).map((report_id) => ({ report_id, bundle_key: `private/${report_id}` }));
+}
+
+function cleanupIds(count: number, offset: number): string[] {
+  return Array.from({ length: count }, (_, index) => `report-${offset + index}`);
+}
 
 function routeHarness(options: HarnessOptions = {}) {
   const queries: string[] = [];

@@ -92,6 +92,8 @@ describe("feedback relay contracts", () => {
 
   it("rejects malformed metadata bounds", () => {
     expect(() => validateMetadata({ ...metadata(), message: "" })).toThrow("invalid_message");
+    expect(() => validateMetadata({ ...metadata(), message: "😀".repeat(1000) })).not.toThrow();
+    expect(() => validateMetadata({ ...metadata(), message: "😀".repeat(1001) })).toThrow("invalid_message");
     expect(() => validateMetadata({ ...metadata(), bundle_bytes: 16 * 1024 * 1024 + 1 })).toThrow("invalid_bundle_size");
     expect(() => validateMetadata({ ...metadata(), capture: { screenshot_available: false, screen: "title" } })).toThrow("invalid_capture");
   });

@@ -35,8 +35,13 @@ npx wrangler r2 bucket lifecycle add poke-wilds-feedback-private feedback-artifa
 npx wrangler r2 bucket lifecycle add poke-wilds-feedback-private-staging feedback-artifacts-180d reports/ --expire-days 180 --abort-multipart-days 1
 ```
 
-The scheduled handler deletes private bundles after their 180-day expiry.
-Worker logs contain identifiers, sizes, status, and issue numbers only.
+The daily scheduled handler deletes private bundles after their 180-day expiry in
+deterministic 100-row pages, up to 1,000 objects per run. Each page bulk-deletes R2
+before its guarded D1 status update; failures remain eligible for the next run. A full
+tenth page emits aggregate-only capacity telemetry. The provisioned R2 lifecycle is the
+authoritative backstop if future global intake exceeds that bounded Worker capacity.
+Worker logs contain identifiers, sizes, status, issue numbers, and aggregate cleanup
+counts only.
 
 Report uploads are invite-authorized and rate-limited before their multipart bodies
 are read. The relay streams a hard body cap, validates only the EOCD-declared ZIP

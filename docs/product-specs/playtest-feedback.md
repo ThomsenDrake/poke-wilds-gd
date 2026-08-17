@@ -19,10 +19,14 @@ that the message is public while the screenshot, save, and diagnostics stay
 private, using the exact disclosure text shown in the dialog.
 
 The exact prior `SceneTree.paused` value is restored after cancel, success, or
-queueing. A network/429/5xx failure leaves the ZIP and metadata in
-`user://feedback_outbox`; an atomic metadata commit makes only complete ZIP/sidecar
-pairs retry-visible, while malformed or incomplete prior entries are preserved out
-of the retry queue. Retry runs on a bounded 30s/2m/10m/1h schedule and at
+queueing. A network/429/5xx failure leaves the ZIP, public metadata, and a local-only
+private route in `user://feedback_outbox`; the route retains that report's original
+endpoint/invite across a later package change and is never uploaded. An atomic metadata
+commit makes only complete ZIP/route/metadata sets retry-visible, while malformed or
+incomplete prior entries are preserved out of the retry queue and their orphaned route
+is removed. The relay counts the same Unicode code points as the Godot field, so up to
+1,000 astral characters remain valid. Network/408/429/5xx failures retry on a bounded
+30s/2m/10m/1h schedule and at
 the next launch. Direct submissions and retries serialize access to the shared
 transport; after each upload owner finishes, a fresh outbox scan stops the timer only
 when no retryable entry remains. Sidecar writes must complete and flush before their
@@ -33,7 +37,7 @@ Bundle creation checks the result of each ZIP entry write, entry close, and fina
 close before the outbox can commit it. The stable install ID must be exactly 32 lowercase
 hexadecimal characters; a missing or malformed persisted value is regenerated into a
 same-directory temporary file and atomically renamed into place before bundle creation.
-Success deletes both outbox files and shows only the issue number. A tester
+Success deletes all three outbox files and shows only the issue number. A tester
 never sees raw logs, tokens, repository plumbing, or a GitHub login.
 
 ## Capture and privacy contract
@@ -53,7 +57,8 @@ Redaction replaces home/user-data/application paths and credential-shaped log
 material. It never records an OS username, hostname, or device
 identifier. Gameplay state and the in-game player name are retained because
 they are necessary for reproduction and covered by the disclosure. Every
-artifact named by `report.json` carries an exact byte count and SHA-256.
+artifact named by `report.json` carries an exact byte count and SHA-256. The private
+route is neither an artifact nor upload metadata and never enters the ZIP, trace, or log.
 
 ## Identity, relay, and issue contract
 
@@ -90,8 +95,11 @@ The public issue contains only the sanitized player sentence, tester handle,
 report/build/commit/platform/captured-screen fields, artifact expiry, and the authenticated
 `tools/fetch_feedback_report.py` command. It never links raw artifacts publicly.
 R2 objects expire after 180 days through the scheduled cleanup; the issue and D1
-receipt remain. Relay logs contain only report/build identifiers, byte counts,
-status, and issue number.
+receipt remain. Each daily invocation drains deterministic 100-row pages, bulk-deleting
+R2 before marking D1, up to 1,000 objects, and emits aggregate-only cap telemetry if a
+full tenth page suggests more work. The provisioned R2 lifecycle is the authoritative
+backstop if future global intake ever exceeds that bounded daily capacity. Relay logs
+contain only report/build identifiers, byte counts, status, and issue number.
 
 ## Release and agent workflow
 

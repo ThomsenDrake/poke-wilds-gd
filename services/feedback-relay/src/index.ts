@@ -4,6 +4,8 @@ import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BY
 import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
 
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
+const CLEANUP_PAGE_SIZE = 100;
+const CLEANUP_MAX_BATCHES = 10;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -23,16 +25,31 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
-    const expired = await env.DB.prepare(
-      "SELECT report_id, bundle_key FROM reports WHERE expires_at <= CURRENT_TIMESTAMP AND status != 'expired' LIMIT 100",
-    ).all<{ report_id: string; bundle_key: string }>();
-    for (const row of expired.results) {
-      await env.REPORTS.delete(row.bundle_key);
-      await env.DB.prepare("UPDATE reports SET status='expired', updated_at=CURRENT_TIMESTAMP WHERE report_id=?")
-        .bind(row.report_id).run();
-    }
+    await cleanupExpiredReports(env);
   },
 } satisfies ExportedHandler<Env>;
+
+export async function cleanupExpiredReports(env: Env): Promise<{ batches: number; processed: number; limited: boolean }> {
+  let processed = 0;
+  for (let batch = 0; batch < CLEANUP_MAX_BATCHES; batch += 1) {
+    const expired = await env.DB.prepare(
+      "SELECT report_id, bundle_key FROM reports WHERE expires_at <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      "ORDER BY expires_at, report_id LIMIT ?",
+    ).bind(CLEANUP_PAGE_SIZE).all<{ report_id: string; bundle_key: string }>();
+    const rows = expired.results;
+    if (rows.length === 0) return { batches: batch, processed, limited: false };
+    await env.REPORTS.delete(rows.map((row) => row.bundle_key));
+    await env.DB.prepare(
+      "UPDATE reports SET status='expired', updated_at=CURRENT_TIMESTAMP " +
+      "WHERE expires_at <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      "AND report_id IN (SELECT value FROM json_each(?))",
+    ).bind(JSON.stringify(rows.map((row) => row.report_id))).run();
+    processed += rows.length;
+    if (rows.length < CLEANUP_PAGE_SIZE) return { batches: batch + 1, processed, limited: false };
+  }
+  console.warn(JSON.stringify({ event: "feedback_cleanup_batch_limit", batches: CLEANUP_MAX_BATCHES, processed }));
+  return { batches: CLEANUP_MAX_BATCHES, processed, limited: true };
+}
 
 async function createReport(request: Request, env: Env): Promise<Response> {
   const started = Date.now();
