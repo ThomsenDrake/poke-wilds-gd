@@ -122,6 +122,10 @@ func smoke_set_install_id_path(path: String) -> void:
 		_reporter.set_install_id_path_for_smoke(path)
 
 
+func smoke_reporter_state() -> Dictionary:
+	return _reporter.state_for_smoke() if OS.has_feature("editor") else {}
+
+
 func smoke_result_message(result: Dictionary) -> String:
 	return _result_message(result) if OS.has_feature("editor") else ""
 

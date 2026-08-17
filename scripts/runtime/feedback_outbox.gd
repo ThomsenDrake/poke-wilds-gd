@@ -86,9 +86,13 @@ func _atomic_write_json(path: String, value: Dictionary) -> bool:
 	var file := FileAccess.open(temporary, FileAccess.WRITE)
 	if file == null:
 		return false
-	file.store_string(JSON.stringify(value, "  ") + "\n")
+	var wrote := file.store_string(JSON.stringify(value, "  ") + "\n")
 	file.flush()
+	var write_error := file.get_error()
 	file.close()
+	if not wrote or write_error != OK:
+		_remove(temporary)
+		return false
 	if not _rename(temporary, path):
 		_remove(temporary)
 		return false

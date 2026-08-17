@@ -226,6 +226,9 @@ permanent-upload `blocked` bundles, so the player is never told a missing bundle
 The bundle writer treats entry-write, entry-close, and final-close errors as build
 failures, and the journey seeds a malformed isolated install-ID file and proves it is
 atomically replaced with the relay's exact 32-lowercase-hex identity format.
+It also suspends an active retry transport, submits another report, and proves the
+shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
+entry. Sidecar publication checks the write and flush result before its atomic rename.
 The outbox publishes metadata last as an atomic commit marker, so retry sees only
 complete pairs and preserves malformed/incomplete entries outside the active queue.
 Relay changes additionally require

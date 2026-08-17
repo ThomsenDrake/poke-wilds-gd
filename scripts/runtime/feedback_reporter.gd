@@ -43,7 +43,13 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 		runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
 			"report_id": report_id, "reason": prepared.get("error", "outbox_failed")})
 		return {"status": "unsaved", "reason": prepared.get("error", "outbox_failed")}
-	var result: Dictionary = await _upload(prepared)
+	var owns_upload := not _busy
+	var result: Dictionary
+	if owns_upload:
+		_busy = true
+		result = await _upload(prepared)
+	else:
+		result = {"status": "queued", "reason": "upload_in_progress"}
 	if result.get("status") == "sent":
 		_outbox.remove(prepared)
 		runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
@@ -51,16 +57,17 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 	else:
 		runtime.emit_trace("feedback_report_queued" if result.get("status") == "queued" else "feedback_report_failed",
 			"FeedbackReporter", {"report_id": capture["report_id"], "reason": result.get("reason", "upload_failed")})
-		if result.get("status") == "queued":
-			_schedule_retry()
-		else:
+		if result.get("status") != "queued":
 			_outbox.mark_blocked(prepared, str(result.get("reason", "upload_failed")))
+	if owns_upload:
+		_busy = false
+		_reconcile_retry_schedule()
 	return result
 
 
 func _upload(prepared: Dictionary) -> Dictionary:
 	if _transport_override.is_valid():
-		return _transport_override.call(prepared)
+		return await _transport_override.call(prepared)
 	var build: Dictionary = prepared.get("build", {})
 	var endpoint := str(build.get("endpoint", "")).strip_edges()
 	var token := str(build.get("invite_token", ""))
@@ -98,25 +105,37 @@ func _upload(prepared: Dictionary) -> Dictionary:
 
 func retry_pending(only_report_id: String = "") -> void:
 	if _busy:
+		# A one-shot timer is already stopped when its timeout callback runs.
+		# Re-arm it so the active upload owner cannot strand queued work.
+		_schedule_retry()
 		return
 	_busy = true
-	for prepared in _outbox.pending(_bundle.load_build_info(), only_report_id):
+	var build := _bundle.load_build_info()
+	for prepared in _outbox.pending(build, only_report_id):
 		var report_id := str(prepared["metadata"].get("report_id", ""))
 		var result: Dictionary = await _upload(prepared)
 		if result.get("status") == "sent":
 			_outbox.remove(prepared)
-			_retry_index = 0
-			_retry_timer.stop()
 			var runtime := get_node_or_null("/root/GameRuntime")
 			if runtime != null:
 				runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
 					"report_id": report_id, "issue_number": result.get("issue_number", 0), "retried": true})
 		elif result.get("status") == "queued":
-			_schedule_retry()
 			break
 		else:
 			_outbox.mark_blocked(prepared, str(result.get("reason", "upload_failed")))
 	_busy = false
+	_reconcile_retry_schedule()
+
+
+func _reconcile_retry_schedule() -> void:
+	# Freshly rescan after the final await. A submit may have committed another
+	# report while this upload owned the shared HTTPRequest.
+	if _outbox.pending(_bundle.load_build_info()).is_empty():
+		_retry_index = 0
+		_retry_timer.stop()
+	else:
+		_schedule_retry()
 
 
 func _schedule_retry() -> void:
@@ -134,6 +153,12 @@ func set_transport_for_smoke(transport: Callable) -> void:
 func set_install_id_path_for_smoke(path: String) -> void:
 	if OS.has_feature("editor"):
 		_bundle.set_install_id_path_for_smoke(path)
+
+
+func state_for_smoke() -> Dictionary:
+	if not OS.has_feature("editor"):
+		return {}
+	return {"busy": _busy, "retry_scheduled": _retry_timer != null and not _retry_timer.is_stopped()}
 
 
 func _append_text(bytes: PackedByteArray, value: String) -> void:

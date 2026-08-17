@@ -11,6 +11,7 @@ var _failures: Array[String] = []
 var _transport_checks := false
 var _prepared_path := ""
 var _transport_calls := 0
+var _hold_retry_upload := true
 const DIALOG_CAPTURE_PATH := "user://feedback-dialog.png"
 const INSTALL_ID_TEST_PATH := "user://feedback-flow-install-id.txt"
 
@@ -102,12 +103,31 @@ func _submit_overworld() -> void:
 	await get_tree().create_timer(2.1, true, false, true).timeout
 	_check(FileAccess.file_exists(_prepared_path), "offline report was not retained")
 	_check(not _dialog().visible and not get_tree().paused, "offline queue did not resume play")
-	_controller().smoke_set_transport(Callable(self, "_fake_transport"))
-	await _controller().smoke_retry(report_id)
+	var first_path := _prepared_path
+	_controller().smoke_set_transport(Callable(self, "_race_transport"))
+	_controller().smoke_retry(report_id)
+	await get_tree().process_frame
+	_check(_transport_calls == 1, "queued retry did not begin")
+	await _press("feedback_report")
+	var second_report_id := str(_controller().smoke_state().get("report_id", ""))
+	_dialog().smoke_set_message("I walked into a tree and got stuck.")
+	await _key(Key.KEY_ENTER)
+	await get_tree().create_timer(2.1, true, false, true).timeout
+	var second_path := "user://feedback_outbox/%s.zip" % second_report_id
+	_check(_transport_calls == 1, "concurrent submit reused the active HTTP transport")
+	_check(FileAccess.file_exists(second_path), "concurrent report was not retained")
+	_hold_retry_upload = false
+	await _wait_for_reporter_idle()
 	_check(_transport_checks, "transport did not receive a valid agent bundle")
-	_check(_prepared_path.is_empty() or not FileAccess.file_exists(_prepared_path), "sent bundle remained in outbox")
+	_check(not FileAccess.file_exists(first_path), "sent retry bundle remained in outbox")
+	_check(FileAccess.file_exists(second_path), "concurrent report disappeared after older retry succeeded")
+	_check(bool(_controller().smoke_reporter_state().get("retry_scheduled", false)),
+		"concurrent report was left without a retry timer")
+	await _controller().smoke_retry(second_report_id)
+	_check(_transport_calls == 2, "concurrent report did not retry after serialization")
+	_check(not FileAccess.file_exists(second_path), "concurrent report remained after successful retry")
 	var calls_after_send := _transport_calls
-	await _controller().smoke_retry(report_id)
+	await _controller().smoke_retry(second_report_id)
 	_check(_transport_calls == calls_after_send, "completed report was uploaded twice")
 	_check(FileAccess.file_exists(INSTALL_ID_TEST_PATH) \
 		and _is_install_id(FileAccess.get_file_as_string(INSTALL_ID_TEST_PATH).strip_edges()),
@@ -120,7 +140,7 @@ func _offline_transport(prepared: Dictionary) -> Dictionary:
 	return {"status": "queued", "reason": "scenario_offline"}
 
 
-func _fake_transport(prepared: Dictionary) -> Dictionary:
+func _race_transport(prepared: Dictionary) -> Dictionary:
 	_transport_calls += 1
 	_prepared_path = str(prepared.get("bundle_path", ""))
 	var reader := ZIPReader.new()
@@ -138,8 +158,18 @@ func _fake_transport(prepared: Dictionary) -> Dictionary:
 		and (DisplayServer.get_name() == "headless" or names.has("screenshot.png")) \
 		and report.get("capture", {}).get("screen") == "overworld" \
 		and trace.contains("feedback_capture_requested")
+	if _transport_calls == 1:
+		while _hold_retry_upload:
+			await get_tree().process_frame
 	return {"status": "sent", "issue_number": 4321} if _transport_checks else {"status": "blocked", "reason": "scenario_bundle_invalid"}
 
+
+func _wait_for_reporter_idle() -> void:
+	for _frame in 120:
+		if not bool(_controller().smoke_reporter_state().get("busy", false)):
+			return
+		await get_tree().process_frame
+	_check(false, "retry upload did not release its owner lock")
 
 func _is_canonical_utc_timestamp(value: String) -> bool:
 	var pattern := RegEx.new()

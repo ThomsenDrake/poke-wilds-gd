@@ -23,7 +23,10 @@ queueing. A network/429/5xx failure leaves the ZIP and metadata in
 `user://feedback_outbox`; an atomic metadata commit makes only complete ZIP/sidecar
 pairs retry-visible, while malformed or incomplete prior entries are preserved out
 of the retry queue. Retry runs on a bounded 30s/2m/10m/1h schedule and at
-the next launch. A permanent 4xx keeps the local artifact without a retry loop and
+the next launch. Direct submissions and retries serialize access to the shared
+transport; after each upload owner finishes, a fresh outbox scan stops the timer only
+when no retryable entry remains. Sidecar writes must complete and flush before their
+atomic rename can publish the commit marker. A permanent 4xx keeps the local artifact without a retry loop and
 reports that retained copy to the player. Bundle-build or outbox-commit failure returns
 `unsaved` and instead says the report could not be saved; it never claims a local artifact.
 Bundle creation checks the result of each ZIP entry write, entry close, and final archive

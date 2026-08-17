@@ -2010,4 +2010,6 @@ quality_bucket = "feedback"
 # every visible UI sibling. Desktop preset tests pin self-contained Linux/Windows
 # executables and untracked-resource cleanliness; the scenario also pins truthful
 # unsaved-vs-retained player copy, malformed install-ID atomic repair, and exact
-# ZIP write/close result handling. Worker tests + both dry-runs gate the relay.
+# ZIP write/close result handling. Its concurrent-submit case pins single-owner
+# transport access, fresh outbox/timer reconciliation, and checked sidecar writes.
+# Worker tests + both dry-runs gate the relay.

@@ -246,6 +246,16 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn('pattern.compile("^[0-9a-f]{32}$")', source)
         self.assertIn("DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary)", source)
 
+    def test_runtime_outbox_checks_sidecar_write_and_retry_scheduler_rescans(self) -> None:
+        outbox = (package_playtest.ROOT / "scripts/runtime/feedback_outbox.gd").read_text(encoding="utf-8")
+        reporter = (package_playtest.ROOT / "scripts/runtime/feedback_reporter.gd").read_text(encoding="utf-8")
+        self.assertIn("var wrote := file.store_string", outbox)
+        self.assertIn("var write_error := file.get_error()", outbox)
+        self.assertIn("if not wrote or write_error != OK:", outbox)
+        self.assertIn('result = {"status": "queued", "reason": "upload_in_progress"}', reporter)
+        self.assertIn("func _reconcile_retry_schedule()", reporter)
+        self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)
+
     def test_public_tester_id_is_stable_pokemon_themed_and_token_only(self) -> None:
         first = package_playtest.public_tester_id("opaque-token-one")
         self.assertEqual(first, package_playtest.public_tester_id("opaque-token-one"))
