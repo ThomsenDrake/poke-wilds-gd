@@ -71,13 +71,7 @@ func _capture_ui_tree(screen: String) -> Dictionary:
 func _on_submitted(message: String) -> void:
 	_dialog.show_sending()
 	var result: Dictionary = await _reporter.submit(message, _capture, get_node("/root/GameRuntime"))
-	match str(result.get("status", "blocked")):
-		"sent":
-			_dialog.show_result("Report #%d sent. Thank you!" % int(result.get("issue_number", 0)))
-		"queued":
-			_dialog.show_result("Saved — it will send when you're online.")
-		_:
-			_dialog.show_result("Saved on this computer—please let Drake know.")
+	_dialog.show_result(_result_message(result))
 	await get_tree().create_timer(1.8, true, false, true).timeout
 	_close_and_resume()
 
@@ -98,6 +92,14 @@ func _new_report_id() -> String:
 		raw.substr(16, 4), raw.substr(20, 12)]
 
 
+func _result_message(result: Dictionary) -> String:
+	match str(result.get("status", "unsaved")):
+		"sent": return "Report #%d sent. Thank you!" % int(result.get("issue_number", 0))
+		"queued": return "Saved — it will send when you're online."
+		"blocked": return "Saved on this computer—please let Drake know."
+		_: return "Report could not be saved—please try again or tell Drake."
+
+
 # One explicit editor-only seam for feedback_flow; production behavior stays
 # observable through signals/traces instead of scenario access to private nodes.
 func smoke_state() -> Dictionary:
@@ -113,6 +115,10 @@ func smoke_state() -> Dictionary:
 func smoke_set_transport(transport: Callable) -> void:
 	if OS.has_feature("editor"):
 		_reporter.set_transport_for_smoke(transport)
+
+
+func smoke_result_message(result: Dictionary) -> String:
+	return _result_message(result) if OS.has_feature("editor") else ""
 
 
 func smoke_retry(report_id: String) -> void:

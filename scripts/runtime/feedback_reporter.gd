@@ -37,12 +37,12 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 		_outbox.discard_staging(staging_path)
 		runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
 			"report_id": report_id, "reason": built.get("error", "bundle_failed")})
-		return {"status": "blocked", "reason": built.get("error", "bundle_failed")}
+		return {"status": "unsaved", "reason": built.get("error", "bundle_failed")}
 	var prepared := _outbox.commit(staging_path, built["metadata"], built["build"])
 	if not bool(prepared.get("ok", false)):
 		runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
 			"report_id": report_id, "reason": prepared.get("error", "outbox_failed")})
-		return {"status": "blocked", "reason": prepared.get("error", "outbox_failed")}
+		return {"status": "unsaved", "reason": prepared.get("error", "outbox_failed")}
 	var result: Dictionary = await _upload(prepared)
 	if result.get("status") == "sent":
 		_outbox.remove(prepared)

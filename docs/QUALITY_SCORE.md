@@ -21,6 +21,12 @@ complete, and pre-dialog UI capture snapshots the common UI parent so simultaneo
 visible siblings are preserved. `feedback_flow` pins a MessageBox-over-menu capture,
 and the Python suite pins both desktop export options.
 
+Feedback review follow-up (2026-08-17): scores remain unchanged. Distributed-build
+cleanliness now includes untracked exportable resources while `.gitignore` continues
+to exclude private/generated state, and pre-outbox failures return an explicit
+`unsaved` result whose player copy never claims a local artifact exists. Python and
+`feedback_flow` regression checks pin both distinctions.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

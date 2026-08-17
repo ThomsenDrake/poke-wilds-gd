@@ -227,6 +227,11 @@ class FeedbackBundleTests(unittest.TestCase):
                     package_playtest.build_package(args, "admin-token-not-printed")
             self.assertFalse(build_info.exists())
 
+    def test_release_cleanliness_check_includes_untracked_files(self) -> None:
+        with mock.patch.object(package_playtest, "run", return_value="?? scenes/untracked.tscn") as status:
+            self.assertTrue(package_playtest.worktree_is_dirty())
+        status.assert_called_once_with("git", "status", "--porcelain")
+
     def test_desktop_export_presets_embed_project_data(self) -> None:
         parser = configparser.ConfigParser()
         parser.read(package_playtest.ROOT / "export_presets.cfg", encoding="utf-8")

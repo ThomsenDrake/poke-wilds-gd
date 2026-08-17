@@ -23,7 +23,9 @@ queueing. A network/429/5xx failure leaves the ZIP and metadata in
 `user://feedback_outbox`; an atomic metadata commit makes only complete ZIP/sidecar
 pairs retry-visible, while malformed or incomplete prior entries are preserved out
 of the retry queue. Retry runs on a bounded 30s/2m/10m/1h schedule and at
-the next launch. A permanent 4xx keeps the local artifact without a retry loop.
+the next launch. A permanent 4xx keeps the local artifact without a retry loop and
+reports that retained copy to the player. Bundle-build or outbox-commit failure returns
+`unsaved` and instead says the report could not be saved; it never claims a local artifact.
 Success deletes both outbox files and shows only the issue number. A tester
 never sees raw logs, tokens, repository plumbing, or a GitHub login.
 
@@ -93,12 +95,15 @@ replacement canary issues.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable
-is the complete distributable; macOS exports one ZIP. The packaging command refuses dirty tracked source unless
+is the complete distributable; macOS exports one ZIP. The packaging command refuses
+tracked or untracked worktree changes unless
 `--allow-dirty` is deliberately supplied for local validation. It registers an
 invite through the admin API, creates temporary build metadata, exports the
 release, and removes the generated metadata in a `finally` block. Raw invite
 tokens remain only in the ignored mode-0600 `.playtest/invites.json` and inside
-their revocable packages; commands never print them.
+their revocable packages; commands never print them. Private/generated/output paths
+remain excluded through `.gitignore`, while an untracked exportable resource blocks
+distribution so the embedded commit SHA describes every packaged input.
 
 An authorized agent reads the public issue, runs the supplied fetch command,
 and starts at `report.json`. The fetcher streams through the private admin route,

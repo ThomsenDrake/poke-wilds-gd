@@ -42,6 +42,11 @@ def run(*args: str) -> str:
     return subprocess.check_output(args, cwd=ROOT, text=True).strip()
 
 
+def worktree_is_dirty() -> bool:
+    """Include untracked exportable resources; ignored private/output paths stay hidden."""
+    return bool(run("git", "status", "--porcelain"))
+
+
 def load_registry() -> dict:
     if not REGISTRY.exists():
         return {"schema_version": 1, "friends": {}}
@@ -158,8 +163,8 @@ def main() -> int:
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
-    if not args.allow_dirty and run("git", "status", "--porcelain", "--untracked-files=no"):
-        parser.error("tracked worktree is dirty; commit the release candidate first")
+    if not args.allow_dirty and worktree_is_dirty():
+        parser.error("worktree is dirty; commit or ignore every release input first")
     output, tester_id = build_package(args, admin_token)
     print(f"created {tester_id} {args.target} package: {output}")
     return 0

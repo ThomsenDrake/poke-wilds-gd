@@ -2008,4 +2008,5 @@ quality_bucket = "feedback"
 # GitHub credential. feedback_flow drives the player-facing contexts and parses
 # the ZIP through an injected transport; its overlay/menu case pins aggregation of
 # every visible UI sibling. Desktop preset tests pin self-contained Linux/Windows
-# executables; Worker tests + both dry-runs gate the relay.
+# executables and untracked-resource cleanliness; the scenario also pins truthful
+# unsaved-vs-retained player copy. Worker tests + both dry-runs gate the relay.

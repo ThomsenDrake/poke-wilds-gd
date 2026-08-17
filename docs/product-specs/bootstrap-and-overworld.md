@@ -12,7 +12,8 @@ Source paths: scenes/app/Main.tscn, scenes/ui/TitleScreen.tscn, scenes/ui/Creati
   read-only snapshot service directly. The editor-only `feedback_flow` context uses
   the canonical `SmokeTap` helper and explicit controller/dialog smoke seams, and
   its pre-dialog UI capture starts at the common UI parent so simultaneous visible
-  siblings are retained; player boot and input routing remain unchanged.
+  siblings are retained. Its editor-only result seam pins truthful saved/unsaved
+  player copy; player boot and input routing remain unchanged.
 - The autoload runtime initializes source data, session state, and save state before the main scene starts normal play. On a player boot the initialization is LOAD-ONLY (`ensure_initialized(false)` — never `new_game`, never a save write); the silent-new-game behavior survives for scenario boots only.
 - The overworld is rebuilt from the saved seed and centered on the saved player tile. On a player boot this happens only when CONTINUE or a confirmed creation enters the world (`_enter_world`); until then the title flow owns the screen and the player input stays disabled.
 - The player moves on a 16x16 tile grid with continuous hold-to-move stepping and a faster run modifier on `X`, rendered from the source `ben-walking.png` / `ben-running.png` sprite sheets with direction-correct frames. Draw order is y-sorted: the player renders behind tall prop canopies when standing north of them and in front when standing south.
