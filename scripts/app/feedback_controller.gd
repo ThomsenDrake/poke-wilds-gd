@@ -61,10 +61,11 @@ func _capture_ui_tree(screen: String) -> Dictionary:
 	var ui := get_node_or_null("../UI")
 	if ui == null:
 		return {"screen": screen, "cursor": {}, "node_count": 0, "nodes": []}
-	for child in ui.get_children():
-		if child is Control and child.visible and child != _dialog:
-			return UiTreeDumpWriter.snapshot_screen(screen, child, {})
-	return {"screen": screen, "cursor": {}, "node_count": 0, "nodes": []}
+	# UI is the common CanvasLayer parent. Snapshotting it includes every visible
+	# sibling root (for example a MessageBox over a still-visible menu) while the
+	# writer's full-chain visibility filter excludes hidden screens and the
+	# not-yet-open feedback dialog.
+	return UiTreeDumpWriter.snapshot_screen(screen, ui, {})
 
 
 func _on_submitted(message: String) -> void:
@@ -102,8 +103,11 @@ func _new_report_id() -> String:
 func smoke_state() -> Dictionary:
 	if not OS.has_feature("editor"):
 		return {}
+	var paths: Array = []
+	for entry in _capture.get("ui_tree", {}).get("nodes", []):
+		paths.append(str(entry.get("path", "")))
 	return {"dialog_visible": _dialog.visible, "capture_screen": _capture.get("screen", ""),
-		"report_id": _capture.get("report_id", "")}
+		"report_id": _capture.get("report_id", ""), "capture_ui_paths": paths}
 
 
 func smoke_set_transport(transport: Callable) -> void:

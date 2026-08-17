@@ -19,7 +19,8 @@ func run(ctx: Dictionary) -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	await _text_focus_guard()
 	await _screen_capture("title", func() -> void: _ctx.title_screen.show_title(), func() -> void: _ctx.title_screen.visible = false)
-	await _screen_capture("menu", func() -> void: _ctx.start_menu.show_menu(), func() -> void: _ctx.start_menu.hide_menu())
+	await _screen_capture("menu", Callable(self, "_open_menu_with_overlay"),
+		Callable(self, "_close_menu_with_overlay"), ["StartMenu", "MessageBox"])
 	await _screen_capture("battle", func() -> void: _ctx.battle_view.visible = true, func() -> void: _ctx.battle_view.visible = false)
 	await _submit_overworld()
 	if _failures.is_empty():
@@ -42,17 +43,30 @@ func _text_focus_guard() -> void:
 	await get_tree().process_frame
 
 
-func _screen_capture(screen: String, open: Callable, close: Callable) -> void:
+func _screen_capture(screen: String, open: Callable, close: Callable, expected_ui_roots: Array[String] = []) -> void:
 	open.call()
 	await get_tree().process_frame
 	await _press("feedback_report")
 	_check(_dialog().visible, "F did not open feedback from %s" % screen)
 	_check(get_tree().paused, "feedback did not pause from %s" % screen)
 	_check(str(_controller().smoke_state().get("capture_screen", "")) == screen, "capture mislabeled %s" % screen)
+	var paths: Array = _controller().smoke_state().get("capture_ui_paths", [])
+	for expected_root in expected_ui_roots:
+		_check(_has_ui_root(paths, expected_root), "capture omitted visible %s root from %s" % [expected_root, screen])
 	await _key(Key.KEY_ESCAPE)
 	_check(not get_tree().paused and not _dialog().visible, "cancel did not restore %s" % screen)
 	close.call()
 	await get_tree().process_frame
+
+
+func _open_menu_with_overlay() -> void:
+	_ctx.start_menu.show_menu()
+	_ctx.message_box.show_message("Visible overlay", 10.0)
+
+
+func _close_menu_with_overlay() -> void:
+	_ctx.message_box.hide_message()
+	_ctx.start_menu.hide_menu()
 
 
 func _submit_overworld() -> void:
@@ -112,6 +126,13 @@ func _fake_transport(prepared: Dictionary) -> Dictionary:
 func _is_canonical_utc_timestamp(value: String) -> bool:
 	var pattern := RegEx.new()
 	return pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$") == OK and pattern.search(value) != null
+
+
+func _has_ui_root(paths: Array, root: String) -> bool:
+	for path in paths:
+		if str(path) == root or str(path).begins_with(root + "/"):
+			return true
+	return false
 
 
 func _press(action: String) -> void:

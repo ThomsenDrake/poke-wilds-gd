@@ -38,8 +38,10 @@ static func write_screen(screen_id: String, root: Control, cursor: Dictionary) -
 # Pure snapshot seam reused by release feedback capture. write_screen remains
 # byte-identical because it serializes this exact dictionary with the original
 # indentation and trailing newline.
-static func snapshot_screen(screen_id: String, root: Control, cursor: Dictionary = {}) -> Dictionary:
-	var all: Array = [root]
+static func snapshot_screen(screen_id: String, root: Node, cursor: Dictionary = {}) -> Dictionary:
+	var all: Array = []
+	if root is Control:
+		all.append(root)
 	all.append_array(root.find_children("*", "Control", true, false))
 	var nodes: Array = []
 	for node in all:

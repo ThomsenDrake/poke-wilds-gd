@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-16
+Last verified: 2026-08-17
 Review cadence days: 14
 Source paths: scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py
 
@@ -13,7 +13,7 @@ Bundle v1 is a ZIP with this exact entry allowlist:
 | `trace.jsonl` | yes | Current process only; explicit gap record if truncated. |
 | `engine.log` | yes | Sanitized newest 2 MiB of the release log. |
 | `save.json` | yes | Read-only in-memory save payload at capture time. |
-| `ui-tree.json` | yes | Visible pre-dialog Control-tree snapshot. |
+| `ui-tree.json` | yes | Every visible pre-dialog Control subtree under the common UI parent. |
 | `screenshot.png` | no | Pre-dialog root viewport; omitted when unavailable. |
 | `README.txt` | yes | One-paragraph agent handoff. |
 

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import configparser
 import hashlib
 import json
 from pathlib import Path
@@ -225,6 +226,12 @@ class FeedbackBundleTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "export failed"):
                     package_playtest.build_package(args, "admin-token-not-printed")
             self.assertFalse(build_info.exists())
+
+    def test_desktop_export_presets_embed_project_data(self) -> None:
+        parser = configparser.ConfigParser()
+        parser.read(package_playtest.ROOT / "export_presets.cfg", encoding="utf-8")
+        self.assertTrue(parser.getboolean("preset.0.options", "binary_format/embed_pck"))
+        self.assertTrue(parser.getboolean("preset.1.options", "binary_format/embed_pck"))
 
     def test_public_tester_id_is_stable_pokemon_themed_and_token_only(self) -> None:
         first = package_playtest.public_tester_id("opaque-token-one")

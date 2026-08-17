@@ -2006,4 +2006,6 @@ quality_bucket = "feedback"
 # screenshot state is checksummed into a private bundle, and a revocable
 # friend-specific token reaches the R2/D1/GitHub-App relay without shipping any
 # GitHub credential. feedback_flow drives the player-facing contexts and parses
-# the ZIP through an injected transport; Worker tests + both dry-runs gate the relay.
+# the ZIP through an injected transport; its overlay/menu case pins aggregation of
+# every visible UI sibling. Desktop preset tests pin self-contained Linux/Windows
+# executables; Worker tests + both dry-runs gate the relay.

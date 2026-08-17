@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-26
+Last verified: 2026-08-17
 Review cadence days: 21
 Source paths: scripts/domain/world_overrides.gd, scripts/domain/field_moves.gd, scripts/runtime/harvest_resolver.gd, scripts/runtime/harvest_runtime.gd, scripts/runtime/game_runtime.gd, scripts/app/harvest_flow_scenario.gd
 

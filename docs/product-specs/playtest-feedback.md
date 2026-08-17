@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-16
+Last verified: 2026-08-17
 Review cadence days: 14
 Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
 
@@ -31,7 +31,8 @@ never sees raw logs, tokens, repository plumbing, or a GitHub login.
 
 The v1 ZIP contract is [feedback-report-schema.md](../references/feedback-report-schema.md).
 It contains `report.json`, current-launch `trace.jsonl`, the sanitized engine-log
-tail, an in-memory save snapshot, the pre-dialog visible UI tree, an optional
+tail, an in-memory save snapshot, the pre-dialog visible UI tree aggregated from
+every visible sibling under the common UI parent, an optional
 pre-dialog screenshot, and `README.txt`. Trace capture begins at the first event
 written by this process even though `agent_trace.jsonl` remains append-only
 across launches. Trace and engine logs are capped at 5 MiB and 2 MiB; the bundle
@@ -91,7 +92,8 @@ successful verification; routine source validation must not redeploy or create
 replacement canary issues.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
-Universal 2. The packaging command refuses dirty tracked source unless
+Universal 2. Linux and Windows embed the PCK so the single reported executable
+is the complete distributable; macOS exports one ZIP. The packaging command refuses dirty tracked source unless
 `--allow-dirty` is deliberately supplied for local validation. It registers an
 invite through the admin API, creates temporary build metadata, exports the
 release, and removes the generated metadata in a `finally` block. Raw invite

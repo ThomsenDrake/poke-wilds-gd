@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-16
+Last verified: 2026-08-17
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/TitleScreen.tscn, scenes/ui/CreationScreen.tscn, scripts/app/main.gd, scripts/app/main_smoke_context.gd, scripts/app/input_router.gd, scripts/app/input_gate_scenario.gd, scripts/app/input_gate_menu_checks.gd, scripts/app/battle_end_input_scenario.gd, scripts/app/smoke_tap.gd, scripts/app/smoke_scenario_loader.gd, scripts/app/smoke_scenarios.gd, scripts/app/phase0_scenarios.gd, scripts/app/new_game_flow_scenario.gd, scripts/app/new_game_flow_checks.gd, scripts/app/new_game_flow_geo.gd, scripts/app/snapshot_capture.gd, scripts/app/visual_sweep.gd, scripts/app/visual_sweep_baselines.gd, scripts/app/visual_sweep_title.gd, scripts/app/render_introspection.gd, scripts/app/ui_tree_dump_scenario.gd, scripts/app/legibility_soak_scenario.gd, scripts/app/legibility_soak_checks.gd, scripts/app/dig_silence_scenario.gd, scripts/ui/title_screen.gd, scripts/ui/creation_screen.gd, scripts/ui/name_entry.gd, scripts/ui/avatar_picker.gd, scripts/ui/gbc_stage.gd, scripts/ui/gbc_widgets.gd, scripts/ui/gbc_digit_row.gd, scripts/ui/title_screen_stage.gd, scripts/ui/creation_screen_stage.gd, scripts/ui/creation_screen_render.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/runtime/player_sprite_frames.gd, scripts/runtime/music_router.gd, scripts/runtime/structure_layer.gd, scripts/domain/world_generator.gd, scripts/domain/world_overrides.gd, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd, scripts/domain/day_phase.gd
 
@@ -10,8 +10,9 @@ Source paths: scenes/app/Main.tscn, scenes/ui/TitleScreen.tscn, scenes/ui/Creati
 - The app boots into `res://scenes/app/Main.tscn`. Since the new-game flow slice the boot is SPLIT by who is booting: a scenario boot (a `.godot-smoke/scenario.json` request present) keeps the pre-slice path exactly and boots straight into the world; a PLAYER boot shows the startup splash, then the title screen, and never auto-starts a game or writes a save (§ Boot, splash, title, and creation below).
 - Feedback diagnostics add no child to `GameRuntime`: the app controller invokes a
   read-only snapshot service directly. The editor-only `feedback_flow` context uses
-  the canonical `SmokeTap` helper and explicit controller/dialog smoke seams; player
-  boot and input routing remain unchanged.
+  the canonical `SmokeTap` helper and explicit controller/dialog smoke seams, and
+  its pre-dialog UI capture starts at the common UI parent so simultaneous visible
+  siblings are retained; player boot and input routing remain unchanged.
 - The autoload runtime initializes source data, session state, and save state before the main scene starts normal play. On a player boot the initialization is LOAD-ONLY (`ensure_initialized(false)` — never `new_game`, never a save write); the silent-new-game behavior survives for scenario boots only.
 - The overworld is rebuilt from the saved seed and centered on the saved player tile. On a player boot this happens only when CONTINUE or a confirmed creation enters the world (`_enter_world`); until then the title flow owns the screen and the player input stays disabled.
 - The player moves on a 16x16 tile grid with continuous hold-to-move stepping and a faster run modifier on `X`, rendered from the source `ben-walking.png` / `ben-running.png` sprite sheets with direction-correct frames. Draw order is y-sorted: the player renders behind tall prop canopies when standing north of them and in front when standing south.
