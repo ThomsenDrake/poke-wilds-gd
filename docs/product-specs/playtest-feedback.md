@@ -26,6 +26,10 @@ of the retry queue. Retry runs on a bounded 30s/2m/10m/1h schedule and at
 the next launch. A permanent 4xx keeps the local artifact without a retry loop and
 reports that retained copy to the player. Bundle-build or outbox-commit failure returns
 `unsaved` and instead says the report could not be saved; it never claims a local artifact.
+Bundle creation checks the result of each ZIP entry write, entry close, and final archive
+close before the outbox can commit it. The stable install ID must be exactly 32 lowercase
+hexadecimal characters; a missing or malformed persisted value is regenerated into a
+same-directory temporary file and atomically renamed into place before bundle creation.
 Success deletes both outbox files and shows only the issue number. A tester
 never sees raw logs, tokens, repository plumbing, or a GitHub login.
 

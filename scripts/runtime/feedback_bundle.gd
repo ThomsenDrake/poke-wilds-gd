@@ -4,8 +4,12 @@ const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const BoundedJsonl := preload("res://scripts/core/bounded_jsonl.gd")
 
 const BUILD_INFO_PATH := "res://generated/playtest_build.json"
+const INSTALL_ID_PATH := "user://feedback_install_id.txt"
+const INSTALL_ID_TMP_SUFFIX := ".tmp"
 const MAX_BUNDLE_BYTES := 16 * 1024 * 1024
 const ENGINE_LOG_LIMIT := 2 * 1024 * 1024
+
+var _install_id_path := INSTALL_ID_PATH
 
 
 func build(message: String, capture: Dictionary, bundle_path: String) -> Dictionary:
@@ -19,6 +23,9 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 		if not capture.has(field):
 			return {"ok": false, "error": "missing_capture_%s" % field}
 	var build := load_build_info()
+	var install := _install_id()
+	if not bool(install.get("ok", false)):
+		return {"ok": false, "error": install.get("error", "install_id_write_failed")}
 	var trace_slice: Dictionary = capture["trace_slice"]
 	var engine_slice: Dictionary = capture["engine_slice"]
 	var artifacts: Dictionary = {}
@@ -39,7 +46,7 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 		"created_at_utc": _canonical_utc_timestamp(),
 		"message": safe_message,
 		"tester_id": str(build.get("tester_id", "UNASSIGNED")),
-		"install_id": _install_id(),
+		"install_id": install["value"],
 		"build": _public_build(build),
 		"runtime": capture["runtime"],
 		"game": capture["game"],
@@ -94,12 +101,23 @@ func _write_zip(path: String, artifacts: Dictionary) -> String:
 	paths.sort()
 	for artifact_path in paths:
 		if packer.start_file(str(artifact_path)) != OK:
-			packer.close()
-			return "zip_entry_failed"
-		packer.write_file(artifacts[artifact_path])
-		packer.close_file()
-	packer.close()
+			return _close_zip_after_error(packer, "zip_entry_failed")
+		var write_error := packer.write_file(artifacts[artifact_path])
+		var entry_close_error := packer.close_file()
+		if write_error != OK:
+			var reason := "zip_write_failed"
+			if entry_close_error != OK:
+				reason = "zip_write_and_entry_close_failed"
+			return _close_zip_after_error(packer, reason)
+		if entry_close_error != OK:
+			return _close_zip_after_error(packer, "zip_entry_close_failed")
+	if packer.close() != OK:
+		return "zip_close_failed"
 	return ""
+
+
+func _close_zip_after_error(packer: ZIPPacker, reason: String) -> String:
+	return reason if packer.close() == OK else reason + "_and_zip_close_failed"
 
 
 func _reduce_to_limit(path: String, artifacts: Dictionary, manifest: Dictionary,
@@ -148,16 +166,41 @@ func _artifact_manifest(artifacts: Dictionary, truncated_paths: Dictionary) -> A
 	return result
 
 
-func _install_id() -> String:
-	const PATH := "user://feedback_install_id.txt"
-	if FileAccess.file_exists(PATH):
-		return FileAccess.get_file_as_string(PATH).strip_edges()
+func _install_id() -> Dictionary:
+	if FileAccess.file_exists(_install_id_path):
+		var stored := FileAccess.get_file_as_string(_install_id_path).strip_edges()
+		if _is_install_id(stored):
+			return {"ok": true, "value": stored}
 	var value := Redactor.random_token(16)
-	var file := FileAccess.open(PATH, FileAccess.WRITE)
-	if file != null:
-		file.store_string(value + "\n")
-		file.close()
-	return value
+	var temporary := _install_id_path + INSTALL_ID_TMP_SUFFIX
+	if FileAccess.file_exists(temporary):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
+	var file := FileAccess.open(temporary, FileAccess.WRITE)
+	if file == null:
+		return {"ok": false, "error": "install_id_write_failed"}
+	var wrote := file.store_string(value + "\n")
+	file.flush()
+	var write_error := file.get_error()
+	file.close()
+	if not wrote or write_error != OK:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
+		return {"ok": false, "error": "install_id_write_failed"}
+	var rename_error := DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary),
+		ProjectSettings.globalize_path(_install_id_path))
+	if rename_error != OK:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary))
+		return {"ok": false, "error": "install_id_replace_failed"}
+	return {"ok": true, "value": value}
+
+
+func _is_install_id(value: String) -> bool:
+	var pattern := RegEx.new()
+	return pattern.compile("^[0-9a-f]{32}$") == OK and pattern.search(value) != null
+
+
+func set_install_id_path_for_smoke(path: String) -> void:
+	if OS.has_feature("editor"):
+		_install_id_path = INSTALL_ID_PATH if path.is_empty() else path
 
 
 static func _canonical_utc_timestamp() -> String:

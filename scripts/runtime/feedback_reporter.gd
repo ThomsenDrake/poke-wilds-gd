@@ -131,5 +131,10 @@ func set_transport_for_smoke(transport: Callable) -> void:
 		_transport_override = transport
 
 
+func set_install_id_path_for_smoke(path: String) -> void:
+	if OS.has_feature("editor"):
+		_bundle.set_install_id_path_for_smoke(path)
+
+
 func _append_text(bytes: PackedByteArray, value: String) -> void:
 	bytes.append_array(value.to_utf8_buffer())

@@ -12,6 +12,7 @@ var _transport_checks := false
 var _prepared_path := ""
 var _transport_calls := 0
 const DIALOG_CAPTURE_PATH := "user://feedback-dialog.png"
+const INSTALL_ID_TEST_PATH := "user://feedback-flow-install-id.txt"
 
 
 func run(ctx: Dictionary) -> void:
@@ -80,6 +81,8 @@ func _result_copy_contract() -> void:
 
 
 func _submit_overworld() -> void:
+	_seed_malformed_install_id()
+	_controller().smoke_set_install_id_path(INSTALL_ID_TEST_PATH)
 	_controller().smoke_set_transport(Callable(self, "_offline_transport"))
 	await _press("feedback_report")
 	_check(_dialog().visible, "F did not open feedback from overworld")
@@ -106,6 +109,10 @@ func _submit_overworld() -> void:
 	var calls_after_send := _transport_calls
 	await _controller().smoke_retry(report_id)
 	_check(_transport_calls == calls_after_send, "completed report was uploaded twice")
+	_check(FileAccess.file_exists(INSTALL_ID_TEST_PATH) \
+		and _is_install_id(FileAccess.get_file_as_string(INSTALL_ID_TEST_PATH).strip_edges()),
+		"malformed persisted install ID was not regenerated")
+	_cleanup_install_id_test()
 
 
 func _offline_transport(prepared: Dictionary) -> Dictionary:
@@ -125,6 +132,7 @@ func _fake_transport(prepared: Dictionary) -> Dictionary:
 	reader.close()
 	_transport_checks = report is Dictionary and report.get("schema_version") == 1 \
 		and report.get("message") == "I walked into a tree and got stuck." \
+		and _is_install_id(str(report.get("install_id", ""))) \
 		and _is_canonical_utc_timestamp(str(report.get("created_at_utc", ""))) \
 		and names.has("save.json") and names.has("ui-tree.json") and names.has("README.txt") \
 		and (DisplayServer.get_name() == "headless" or names.has("screenshot.png")) \
@@ -136,6 +144,27 @@ func _fake_transport(prepared: Dictionary) -> Dictionary:
 func _is_canonical_utc_timestamp(value: String) -> bool:
 	var pattern := RegEx.new()
 	return pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$") == OK and pattern.search(value) != null
+
+
+func _is_install_id(value: String) -> bool:
+	var pattern := RegEx.new()
+	return pattern.compile("^[0-9a-f]{32}$") == OK and pattern.search(value) != null
+
+
+func _seed_malformed_install_id() -> void:
+	_cleanup_install_id_test()
+	var file := FileAccess.open(INSTALL_ID_TEST_PATH, FileAccess.WRITE)
+	_check(file != null, "could not seed malformed install ID")
+	if file != null:
+		_check(file.store_string("truncated\n"), "could not write malformed install ID")
+		file.close()
+
+
+func _cleanup_install_id_test() -> void:
+	_controller().smoke_set_install_id_path("")
+	for path in [INSTALL_ID_TEST_PATH, INSTALL_ID_TEST_PATH + ".tmp"]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _has_ui_root(paths: Array, root: String) -> bool:

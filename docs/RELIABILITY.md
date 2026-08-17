@@ -223,6 +223,9 @@ the pre-dialog UI tree, checks exact pause restoration, and parses the generated
 through one editor-only controller seam and the shared `SmokeTap` input helper. Its
 result-copy contract distinguishes pre-outbox `unsaved` failures from retained
 permanent-upload `blocked` bundles, so the player is never told a missing bundle exists.
+The bundle writer treats entry-write, entry-close, and final-close errors as build
+failures, and the journey seeds a malformed isolated install-ID file and proves it is
+atomically replaced with the relay's exact 32-lowercase-hex identity format.
 The outbox publishes metadata last as an atomic commit marker, so retry sees only
 complete pairs and preserves malformed/incomplete entries outside the active queue.
 Relay changes additionally require

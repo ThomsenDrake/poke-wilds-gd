@@ -238,6 +238,14 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertTrue(parser.getboolean("preset.0.options", "binary_format/embed_pck"))
         self.assertTrue(parser.getboolean("preset.1.options", "binary_format/embed_pck"))
 
+    def test_runtime_bundle_checks_zip_results_and_atomically_repairs_install_id(self) -> None:
+        source = (package_playtest.ROOT / "scripts/runtime/feedback_bundle.gd").read_text(encoding="utf-8")
+        self.assertIn("var write_error := packer.write_file", source)
+        self.assertIn("var entry_close_error := packer.close_file()", source)
+        self.assertIn('if packer.close() != OK:', source)
+        self.assertIn('pattern.compile("^[0-9a-f]{32}$")', source)
+        self.assertIn("DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary)", source)
+
     def test_public_tester_id_is_stable_pokemon_themed_and_token_only(self) -> None:
         first = package_playtest.public_tester_id("opaque-token-one")
         self.assertEqual(first, package_playtest.public_tester_id("opaque-token-one"))

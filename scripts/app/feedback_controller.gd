@@ -117,6 +117,11 @@ func smoke_set_transport(transport: Callable) -> void:
 		_reporter.set_transport_for_smoke(transport)
 
 
+func smoke_set_install_id_path(path: String) -> void:
+	if OS.has_feature("editor"):
+		_reporter.set_install_id_path_for_smoke(path)
+
+
 func smoke_result_message(result: Dictionary) -> String:
 	return _result_message(result) if OS.has_feature("editor") else ""
 
