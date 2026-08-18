@@ -210,6 +210,15 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertEqual(request.get_header("User-agent"), "poke-wilds-feedback-fetch/1.0")
         self.assertEqual(request.get_header("Authorization"), "Bearer private")
 
+    def test_fetch_rejects_insecure_endpoints_before_constructing_admin_auth(self) -> None:
+        report_id = "01234567-89ab-cdef-0123-456789abcdef"
+        for endpoint in ("http://relay.test", "//relay.test", "https://user:pass@relay.test",
+                         "https://@relay.test", "https://relay.test?", "https://relay.test#fragment",
+                         "https://relay.test:notaport", "https://relay.test/path with space",
+                         "https://relay.test\\unsafe"):
+            with self.subTest(endpoint=endpoint), self.assertRaisesRegex(ValueError, "HTTPS"):
+                bundle_request(endpoint, report_id, "private")
+
     def test_packaging_cleanup_runs_when_export_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -290,6 +299,12 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn("if not wrote or write_error != OK:", outbox)
         self.assertIn('result = {"status": "queued", "reason": "upload_in_progress"}', reporter)
         self.assertIn("func _reconcile_retry_schedule()", reporter)
+        self.assertIn("if not _outbox.mark_blocked(prepared, reason):", reporter)
+        self.assertIn("_outbox.quarantine_blocked(prepared)", reporter)
+        self.assertIn("_session_quarantined[report_id] = true", outbox)
+        self.assertIn('return {"status": "blocked", "reason": "feedback_endpoint_invalid"}', reporter)
+        upload = reporter[reporter.index("func _upload("):reporter.index("func retry_pending(")]
+        self.assertLess(upload.index("_validated_endpoint(raw_endpoint)"), upload.index("_http.request_raw"))
         self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)
 
     def test_private_retry_route_is_committed_last_and_never_uploaded(self) -> None:

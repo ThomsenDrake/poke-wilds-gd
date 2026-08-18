@@ -1980,6 +1980,7 @@ layer = "app"
 code_paths = [
   "scripts/app/feedback_controller.gd",
   "scripts/app/feedback_flow_scenario.gd",
+  "scripts/app/feedback_flow_resilience_checks.gd",
   "scripts/ui/feedback_dialog.gd",
   "scripts/runtime/feedback_snapshot.gd",
   "scripts/runtime/feedback_bundle.gd",
@@ -2010,12 +2011,14 @@ quality_bucket = "feedback"
 # their distinct capture labels, and parses the ZIP through an injected transport;
 # its overlay/menu case pins aggregation of every visible UI sibling. display_matrix
 # opens the responsive dialog at all six sizes. Desktop preset tests pin self-contained Linux/Windows
-# executables, untracked-resource cleanliness, HTTPS endpoint validation, and
-# single-owner build-metadata export locking; the scenario also pins truthful
+# executables, untracked-resource cleanliness, shared package/fetch HTTPS endpoint
+# validation, and single-owner build-metadata export locking; the scenario also pins truthful
 # unsaved-vs-retained player copy, malformed install-ID atomic repair, and exact
 # ZIP write/close result handling plus both compressed/uncompressed caps. Its
 # concurrent-submit case pins single-owner
 # transport access, fresh outbox/timer reconciliation, checked sidecar writes,
-# original-package private-route retry, and route cleanup. Worker tests pin bounded
+# original-package private-route retry, route cleanup, failed-block-marker quarantine,
+# retry suppression, runtime HTTPS revalidation, and semantic machine-identity
+# redaction. Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
 # public truncation, and R2-before-D1 failure ordering; both dry-runs gate the relay.

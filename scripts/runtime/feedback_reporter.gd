@@ -58,7 +58,7 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 		runtime.emit_trace("feedback_report_queued" if result.get("status") == "queued" else "feedback_report_failed",
 			"FeedbackReporter", {"report_id": capture["report_id"], "reason": result.get("reason", "upload_failed")})
 		if result.get("status") != "queued":
-			_outbox.mark_blocked(prepared, str(result.get("reason", "upload_failed")))
+			_persist_blocked(prepared, str(result.get("reason", "upload_failed")))
 	if owns_upload:
 		_busy = false
 		_reconcile_retry_schedule()
@@ -69,10 +69,13 @@ func _upload(prepared: Dictionary) -> Dictionary:
 	if _transport_override.is_valid():
 		return await _transport_override.call(prepared)
 	var build: Dictionary = prepared.get("build", {})
-	var endpoint := str(build.get("endpoint", "")).strip_edges()
+	var raw_endpoint := str(build.get("endpoint", ""))
 	var token := str(build.get("invite_token", ""))
-	if endpoint.is_empty() or token.is_empty():
+	if raw_endpoint.strip_edges().is_empty() or token.is_empty():
 		return {"status": "queued", "reason": "feedback_not_configured"}
+	var endpoint := _validated_endpoint(raw_endpoint)
+	if endpoint.is_empty():
+		return {"status": "blocked", "reason": "feedback_endpoint_invalid"}
 	var metadata_json := JSON.stringify(prepared["metadata"])
 	var bundle_bytes := FileAccess.get_file_as_bytes(prepared["bundle_path"])
 	var boundary := "----PokeWildsFeedback" + str(prepared["metadata"]["report_id"]).replace("-", "")
@@ -123,9 +126,28 @@ func retry_pending(only_report_id: String = "") -> void:
 		elif result.get("status") == "queued":
 			break
 		else:
-			_outbox.mark_blocked(prepared, str(result.get("reason", "upload_failed")))
+			_persist_blocked(prepared, str(result.get("reason", "upload_failed")))
 	_busy = false
 	_reconcile_retry_schedule()
+
+
+func _persist_blocked(prepared: Dictionary, reason: String) -> void:
+	if not _outbox.mark_blocked(prepared, reason):
+		_outbox.quarantine_blocked(prepared)
+
+
+func _validated_endpoint(value: String) -> String:
+	var endpoint := value.strip_edges().trim_suffix("/")
+	if not endpoint.to_lower().begins_with("https://") or endpoint.contains("@") \
+			or endpoint.contains("?") or endpoint.contains("#") or endpoint.contains("\\"):
+		return ""
+	var authority := endpoint.substr(8).get_slice("/", 0)
+	if authority.is_empty():
+		return ""
+	for byte in endpoint.to_utf8_buffer():
+		if int(byte) <= 32:
+			return ""
+	return endpoint
 
 
 func _reconcile_retry_schedule() -> void:
@@ -164,6 +186,10 @@ func state_for_smoke() -> Dictionary:
 	if not OS.has_feature("editor"):
 		return {}
 	return {"busy": _busy, "retry_scheduled": _retry_timer != null and not _retry_timer.is_stopped()}
+
+
+func validated_endpoint_for_smoke(value: String) -> String:
+	return _validated_endpoint(value) if OS.has_feature("editor") else ""
 
 
 func _append_text(bytes: PackedByteArray, value: String) -> void:

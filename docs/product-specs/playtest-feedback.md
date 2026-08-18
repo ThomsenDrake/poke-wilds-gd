@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-17
 Review cadence days: 14
-Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
+Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
 
 # Playtest Feedback
 
@@ -55,8 +55,10 @@ the trace while preserving its beginning, newest complete records, and an explic
 truncation marker. If irreducible save/UI/screenshot data still exceeds either cap,
 bundle creation fails locally instead of committing an artifact the relay will reject.
 
-Redaction replaces home/user-data/application paths and credential-shaped log
-material. It never records an OS username, hostname, or device
+Redaction replaces home/user-data/application paths, semantically labeled machine
+identity fields, and credential-shaped log material. It never performs unbounded
+replacement of raw environment values, so short/common usernames cannot corrupt
+ordinary report text. It never records an OS username, hostname, or device
 identifier. Gameplay state and the in-game player name are retained because
 they are necessary for reproduction and covered by the disclosure. Every
 artifact named by `report.json` carries an exact byte count and SHA-256. The private
@@ -72,9 +74,10 @@ extractable and is protected by revocation, cohort scoping, per-minute edge
 limiting, and D1 daily limits—not as a durable secret. GitHub App and maintainer
 credentials exist only as Worker secrets.
 The relay endpoint must be HTTPS without embedded credentials, a query, or a fragment;
-validation happens before the admin invite request and the normalized endpoint is the
-one embedded into the package. A cross-platform advisory lock covers the shared
-`generated/playtest_build.json` write/export/delete sequence, so a concurrent invocation
+one shared validator runs before both the admin invite request and the maintainer bundle
+fetch, the game revalidates the embedded route at its HTTP sink, and the normalized
+endpoint is the one embedded into the package. A cross-platform advisory lock covers
+the shared `generated/playtest_build.json` write/export/delete sequence, so a concurrent invocation
 refuses without overwriting or deleting the active export's tester metadata.
 
 Public tester handles use the `PKMN-<SPECIES>-<SUFFIX>` scheme and are derived
@@ -128,7 +131,8 @@ remain excluded through `.gitignore`, while an untracked exportable resource blo
 distribution so the embedded commit SHA describes every packaged input.
 
 An authorized agent reads the public issue, runs the supplied fetch command,
-and starts at `report.json`. The fetcher streams through the private admin route,
+and starts at `report.json`. The fetcher refuses an unsafe endpoint before constructing
+the admin-authenticated request, streams through the private admin route,
 checks the transport hash, safely extracts the allowlisted files into a temporary sibling
 and atomically publishes them only after success, and verifies
 every manifest checksum. The focused `feedback_flow` scenario drives real `F`

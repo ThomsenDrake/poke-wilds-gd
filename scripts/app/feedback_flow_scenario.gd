@@ -1,6 +1,7 @@
 extends Node
 
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+const ResilienceChecks := preload("res://scripts/app/feedback_flow_resilience_checks.gd")
 
 # Release-feedback journey: real F input across player-facing screens, text
 # focus suppression, pause restoration, and a fully parsed private ZIP through
@@ -15,6 +16,8 @@ var _hold_retry_upload := true
 var _expected_routes := {}
 const DIALOG_CAPTURE_PATH := "user://feedback-dialog.png"
 const INSTALL_ID_TEST_PATH := "user://feedback-flow-install-id.txt"
+
+
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -26,8 +29,8 @@ func run(ctx: Dictionary) -> void:
 		await _screen_capture(overlay[0], func() -> void: _set_overlay(overlay[1], true),
 			func() -> void: _set_overlay(overlay[1], false), [overlay[1]])
 	await _screen_capture("battle", func() -> void: _ctx.battle_view.visible = true, func() -> void: _ctx.battle_view.visible = false)
-	_result_copy_contract()
 	await _submit_overworld()
+	_failures.append_array(await ResilienceChecks.new().run(_controller(), _dialog(), get_tree()))
 	if _failures.is_empty():
 		_ctx.runtime.emit_trace("feedback_flow_passed", "FeedbackFlowScenario", {
 			"screens": ["title", "menu", "storage", "camp", "waystone", "battle", "overworld"], "bundle_verified": _transport_checks,
@@ -66,14 +69,6 @@ func _close_menu_with_overlay() -> void:
 	_ctx.start_menu.hide_menu()
 func _set_overlay(node_name: String, shown: bool) -> void:
 	_controller().get_node("../UI/" + node_name).visible = shown
-func _result_copy_contract() -> void:
-	_check(_controller().smoke_result_message({"status": "unsaved"}) ==
-		"Report could not be saved—please try again or tell Drake.",
-		"unsaved bundle failure claimed a local copy existed")
-	_check(_controller().smoke_result_message({"status": "blocked"}) ==
-		"Saved on this computer—please let Drake know.",
-		"retained blocked bundle did not identify the local copy")
-
 func _submit_overworld() -> void:
 	_seed_malformed_install_id()
 	_controller().smoke_set_install_id_path(INSTALL_ID_TEST_PATH)

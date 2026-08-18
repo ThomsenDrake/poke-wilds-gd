@@ -131,6 +131,10 @@ func smoke_reporter_state() -> Dictionary:
 	return _reporter.state_for_smoke() if OS.has_feature("editor") else {}
 
 
+func smoke_validated_endpoint(value: String) -> String:
+	return _reporter.validated_endpoint_for_smoke(value) if OS.has_feature("editor") else ""
+
+
 func smoke_result_message(result: Dictionary) -> String:
 	return _result_message(result) if OS.has_feature("editor") else ""
 

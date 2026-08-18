@@ -15,10 +15,6 @@ static func sanitize_text(value: String) -> String:
 	if not app_dir.is_empty():
 		text = text.replace(app_dir, "$APP")
 	text = text.replace(ProjectSettings.globalize_path("user://"), "$USER_DATA/")
-	for variable in ["USER", "USERNAME", "HOSTNAME", "COMPUTERNAME"]:
-		var machine_value := OS.get_environment(variable)
-		if not machine_value.is_empty():
-			text = text.replace(machine_value, "[REDACTED_MACHINE]")
 	text = _redact_pattern(text, "(?i)authorization\\s*:\\s*(?:bearer\\s+)?[^\\s]+",
 		"Authorization: [REDACTED]")
 	text = _redact_pattern(text,

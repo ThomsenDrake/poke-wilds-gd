@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-16
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -235,10 +235,16 @@ shared upload-owner lock plus fresh outbox reconciliation retain and schedule th
 entry. The first report is queued under one synthetic package identity, the active
 package is changed, and retry proves the persisted private route still supplies the
 original endpoint/invite; both reports prove that route is removed after success.
+The resilience half forces a permanent rejection plus a failed blocked-sidecar write,
+then proves the active pair is quarantined, its private route is removed, and explicit
+retry cannot upload it again. It also pins that a one-character machine username does
+not rewrite ordinary prose while labeled identity fields and user paths remain redacted.
+The editor-only endpoint probe rejects HTTP and normalizes HTTPS, while the Python
+source contract pins that this same guard returns blocked before `HTTPRequest.request_raw`.
 Sidecar publication checks the write and flush result before its atomic rename. The
 outbox publishes metadata last as an atomic commit marker, so retry sees only complete
 ZIP/route/metadata sets and preserves malformed/incomplete entries outside the active queue.
-Packaging tests reject non-HTTPS endpoints before any admin request and hold a
+Packaging/fetch tests reject non-HTTPS endpoints before either admin request and hold a
 cross-platform advisory lock across the shared build-metadata write/export/cleanup
 sequence; a concurrent exporter must refuse without deleting the active owner's metadata.
 Relay changes additionally require

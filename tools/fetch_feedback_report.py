@@ -14,6 +14,7 @@ import tempfile
 import urllib.error
 import urllib.request
 
+from feedback_endpoint import validated_endpoint
 from inspect_feedback_bundle import extract_bundle
 
 REPORT_ID = re.compile(
@@ -59,6 +60,7 @@ def transport_hash_matches(payload: bytes, expected: str) -> bool:
 
 
 def bundle_request(endpoint: str, report_id: str, token: str) -> urllib.request.Request:
+    endpoint = validated_endpoint(endpoint)
     return urllib.request.Request(
         f"{endpoint.rstrip('/')}/v1/admin/reports/{report_id}/bundle",
         headers={
@@ -82,7 +84,10 @@ def main() -> int:
     token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
-    request = bundle_request(args.endpoint, report_id, token)
+    try:
+        request = bundle_request(args.endpoint, report_id, token)
+    except ValueError as exc:
+        parser.error(str(exc))
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             payload = response.read(17 * 1024 * 1024)

@@ -7,6 +7,8 @@ const OUTBOX_DIR := "user://feedback_outbox"
 const TMP_SUFFIX := ".tmp"
 const ROUTE_SUFFIX := ".route"
 
+var _session_quarantined := {}
+
 
 func staging_bundle_path(report_id: String) -> String:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTBOX_DIR))
@@ -47,6 +49,8 @@ func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary
 			continue
 		var report_id := filename.trim_suffix(".json")
 		if not _is_report_id(report_id):
+			continue
+		if _session_quarantined.has(report_id):
 			continue
 		if not only_report_id.is_empty() and report_id != only_report_id:
 			continue
@@ -89,6 +93,16 @@ func mark_blocked(prepared: Dictionary, reason: String) -> bool:
 	if marked:
 		_remove(str(prepared.get("route_path", "")))
 	return marked
+
+
+func quarantine_blocked(prepared: Dictionary) -> void:
+	var report_id := str(prepared.get("metadata", {}).get("report_id", ""))
+	if not _is_report_id(report_id):
+		return
+	# Suppress immediately even if the filesystem cannot rename either active
+	# sidecar. On a writable filesystem the renamed pair persists that decision.
+	_session_quarantined[report_id] = true
+	_quarantine(report_id, "blocked-write-failed")
 
 
 func remove(prepared: Dictionary) -> void:

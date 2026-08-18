@@ -65,6 +65,12 @@ creation validates an HTTPS-only credential-free relay endpoint before sending a
 authorization or embedding it, and a cross-platform advisory lock prevents concurrent
 exports from overwriting or deleting shared tester build metadata.
 
+Feedback retry/redaction/fetch follow-up (2026-08-17): scores remain unchanged. The
+same HTTPS boundary now protects maintainer bundle fetches and the game upload sink;
+failed permanent-rejection sidecar writes quarantine and suppress the retry pair, and
+machine redaction targets semantic identity fields and paths without rewriting common
+substrings in player prose.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

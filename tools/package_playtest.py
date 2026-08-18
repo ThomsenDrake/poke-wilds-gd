@@ -16,8 +16,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 import urllib.error
-import urllib.parse
 import urllib.request
+
+from feedback_endpoint import validated_endpoint as _validated_endpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / ".playtest" / "invites.json"
@@ -51,15 +52,10 @@ def worktree_is_dirty() -> bool:
 
 
 def validated_endpoint(endpoint: str) -> str:
-    candidate = endpoint.strip().rstrip("/")
     try:
-        parsed = urllib.parse.urlsplit(candidate)
+        return _validated_endpoint(endpoint)
     except ValueError as exc:
-        raise RuntimeError("feedback endpoint must be a valid HTTPS URL") from exc
-    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or
-            parsed.query or parsed.fragment or any(char.isspace() for char in candidate)):
-        raise RuntimeError("feedback endpoint must be an HTTPS URL without credentials, query, or fragment")
-    return candidate
+        raise RuntimeError(str(exc)) from exc
 
 
 @contextmanager
