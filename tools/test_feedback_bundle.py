@@ -305,6 +305,8 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn('return {"status": "blocked", "reason": "feedback_endpoint_invalid"}', reporter)
         upload = reporter[reporter.index("func _upload("):reporter.index("func retry_pending(")]
         self.assertLess(upload.index("_validated_endpoint(raw_endpoint)"), upload.index("_http.request_raw"))
+        retry = reporter[reporter.index("func retry_pending("):reporter.index("func _persist_blocked(")]
+        self.assertNotIn('elif result.get("status") == "queued":\n\t\t\tbreak', retry)
         self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)
 
     def test_private_retry_route_is_committed_last_and_never_uploaded(self) -> None:

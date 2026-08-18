@@ -2018,7 +2018,8 @@ quality_bucket = "feedback"
 # concurrent-submit case pins single-owner
 # transport access, fresh outbox/timer reconciliation, checked sidecar writes,
 # original-package private-route retry, route cleanup, failed-block-marker quarantine,
-# retry suppression, runtime HTTPS revalidation, and semantic machine-identity
-# redaction. Worker tests pin bounded
+# cross-route retry isolation, retry suppression, runtime HTTPS revalidation, and
+# semantic machine-identity redaction. Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
-# public truncation, and R2-before-D1 failure ordering; both dry-runs gate the relay.
+# public truncation, terminal expired-row retries, and R2-before-D1 failure ordering;
+# both dry-runs gate the relay.

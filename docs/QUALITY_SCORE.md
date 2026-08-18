@@ -71,6 +71,10 @@ failed permanent-rejection sidecar writes quarantine and suppress the retry pair
 machine redaction targets semantic identity fields and paths without rewriting common
 substrings in player prose.
 
+Feedback retry-isolation/expiry follow-up (2026-08-17): scores remain unchanged.
+Queued failures no longer stop later independently routed reports in the same scan, and
+the relay rejects expired report IDs before R2 so private bundles cannot be resurrected.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

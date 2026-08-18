@@ -125,6 +125,15 @@ describe("feedback report route boundaries", () => {
     expect(queries.some((query) => query.startsWith("INSERT OR IGNORE INTO reports"))).toBe(false);
   });
 
+  it("rejects an expired report before restoring its private bundle", async () => {
+    const harness = routeHarness({ existing: reportRow("expired") });
+    const response = await submit(harness.env);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ error: "report_expired" });
+    expect(harness.put).not.toHaveBeenCalled();
+    expect(findOrCreateIssue).not.toHaveBeenCalled();
+  });
+
   it("keeps a fresh issuing report in progress without touching R2 or issue creation", async () => {
     const { metadata, bundle } = await uploadPayload();
     const scoped = env(true);

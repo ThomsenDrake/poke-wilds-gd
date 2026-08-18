@@ -41,6 +41,8 @@ before its guarded D1 status update; stored ISO timestamps are normalized throug
 SQLite `datetime()` before comparison, and failures remain eligible for the next run.
 A full tenth page emits aggregate-only capacity telemetry. The provisioned R2 lifecycle is the
 authoritative backstop if future global intake exceeds that bounded Worker capacity.
+Expired report IDs are terminal and return HTTP 410 before any R2 write, so a late
+client retry cannot recreate an object that cleanup will no longer revisit.
 Worker logs contain identifiers, sizes, status, issue numbers, and aggregate cleanup
 counts only.
 

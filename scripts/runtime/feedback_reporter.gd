@@ -124,7 +124,7 @@ func retry_pending(only_report_id: String = "") -> void:
 				runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
 					"report_id": report_id, "issue_number": result.get("issue_number", 0), "retried": true})
 		elif result.get("status") == "queued":
-			break
+			continue
 		else:
 			_persist_blocked(prepared, str(result.get("reason", "upload_failed")))
 	_busy = false

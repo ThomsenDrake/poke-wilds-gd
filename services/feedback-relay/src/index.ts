@@ -77,6 +77,7 @@ async function createReport(request: Request, env: Env): Promise<Response> {
     "SELECT report_id,status,bundle_key,bundle_sha256,issue_number,issue_url,updated_at,expires_at FROM reports WHERE report_id=?",
   ).bind(metadata.report_id).first<ReportRow>();
   if (existing && existing.bundle_sha256 !== metadata.bundle_sha256) return json({ ok: false, error: "report_id_conflict" }, 409);
+  if (existing?.status === "expired") return json({ ok: false, report_id: metadata.report_id, error: "report_expired" }, 410);
   if (existing?.status === "completed") return json({ ok: true, report_id: metadata.report_id, issue_number: existing.issue_number, issue_url: existing.issue_url }, 200);
   if (existing?.status === "issuing") {
     const updatedAt = Date.parse(existing.updated_at.endsWith("Z") ? existing.updated_at : `${existing.updated_at}Z`);

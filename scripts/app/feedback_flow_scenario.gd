@@ -1,5 +1,4 @@
 extends Node
-
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const ResilienceChecks := preload("res://scripts/app/feedback_flow_resilience_checks.gd")
 
@@ -115,17 +114,21 @@ func _submit_overworld() -> void:
 	_hold_retry_upload = false
 	await _wait_for_reporter_idle()
 	_check(_transport_checks, "transport did not receive a valid agent bundle")
-	_check(not FileAccess.file_exists(first_path), "sent retry bundle remained in outbox")
-	_check(not FileAccess.file_exists(first_route), "sent retry retained its private route")
-	_check(FileAccess.file_exists(second_path), "concurrent report disappeared after older retry succeeded")
+	_check(FileAccess.file_exists(first_path) and FileAccess.file_exists(second_path),
+		"queued retry or concurrent report disappeared before the fresh scan")
 	_check(bool(_controller().smoke_reporter_state().get("retry_scheduled", false)),
 		"concurrent report was left without a retry timer")
-	await _controller().smoke_retry(second_report_id)
-	_check(_transport_calls == 2, "concurrent report did not retry after serialization")
-	_check(not FileAccess.file_exists(second_path), "concurrent report remained after successful retry")
+	await _controller().smoke_retry("")
+	_check(_transport_calls == 3, "queued old route stranded a later independent report")
+	_check(FileAccess.file_exists(first_path) and not FileAccess.file_exists(second_path),
+		"fresh scan did not retain queued A and send independent B")
 	_check(not FileAccess.file_exists(second_route), "concurrent report retained its private route")
+	await _controller().smoke_retry(report_id)
+	_check(_transport_calls == 4 and not FileAccess.file_exists(first_path),
+		"older queued report did not send on its later retry")
+	_check(not FileAccess.file_exists(first_route), "sent retry retained its private route")
 	var calls_after_send := _transport_calls
-	await _controller().smoke_retry(second_report_id)
+	await _controller().smoke_retry(report_id)
 	_check(_transport_calls == calls_after_send, "completed report was uploaded twice")
 	_check(FileAccess.file_exists(INSTALL_ID_TEST_PATH) \
 		and _is_install_id(FileAccess.get_file_as_string(INSTALL_ID_TEST_PATH).strip_edges()),
@@ -165,6 +168,8 @@ func _race_transport(prepared: Dictionary) -> Dictionary:
 	if _transport_calls == 1:
 		while _hold_retry_upload:
 			await get_tree().process_frame
+	if _transport_calls <= 2:
+		return {"status": "queued", "reason": "scenario_route_wait"}
 	return {"status": "sent", "issue_number": 4321} if _transport_checks else {"status": "blocked", "reason": "scenario_bundle_invalid"}
 
 func _scenario_build(suffix: String) -> Dictionary:

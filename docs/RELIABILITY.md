@@ -234,7 +234,9 @@ It also suspends an active retry transport, submits another report, and proves t
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
 entry. The first report is queued under one synthetic package identity, the active
 package is changed, and retry proves the persisted private route still supplies the
-original endpoint/invite; both reports prove that route is removed after success.
+original endpoint/invite. A fresh retry scan leaves that old route queued, continues to
+send the later independent route, then sends the old route on a later pass; both reports
+prove their private route is removed after success.
 The resilience half forces a permanent rejection plus a failed blocked-sidecar write,
 then proves the active pair is quarantined, its private route is removed, and explicit
 retry cannot upload it again. It also pins that a one-character machine username does

@@ -96,6 +96,8 @@ quota admission, so retries are never rejected solely because the quota filled l
 owns idempotency and the received→stored→issuing→completed lifecycle. A
 conditional issuing claim plus the hidden `feedback-report-id` GitHub marker
 prevents retries or crash recovery from opening a second issue.
+An `expired` receipt is terminal: a matching late retry receives HTTP 410 before R2
+or GitHub work, so cleanup cannot be undone by a retained local bundle.
 
 An `issuing` report remains issuing across ambiguous GitHub/R2/D1 failures, so an
 immediate retry receives in-progress rather than risking a second issue. Stale issuing
@@ -141,3 +143,5 @@ asserts the capture label for every surface, and parses the resulting ZIP throug
 injected transport; it never contacts the relay. `display_matrix` opens the report at
 all six supported window sizes, including 438x383, and asserts the panel and editor stay
 inside the viewport before continuing its battle-pixel checks.
+One retry pass also leaves an unavailable old route queued while sending a later
+independently routed report, so cross-package outbox entries cannot starve each other.
