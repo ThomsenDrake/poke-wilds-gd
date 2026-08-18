@@ -484,6 +484,13 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not use quoted YAML mapping keys"
         )
+    explicit_mapping_key = re.compile(
+        r"(?m)^\s*(?:-\s*)?\?(?:[ \t]|$)"
+    )
+    if explicit_mapping_key.search(active_text):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not use explicit YAML mapping keys"
+        )
     spaced_mapping_colon = re.compile(
         r"(?m)^\s*(?:-\s*)?[A-Za-z0-9_-]+[ \t]+:"
     )
