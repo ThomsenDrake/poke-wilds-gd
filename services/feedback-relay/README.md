@@ -37,8 +37,9 @@ npx wrangler r2 bucket lifecycle add poke-wilds-feedback-private-staging feedbac
 
 The daily scheduled handler deletes private bundles after their 180-day expiry in
 deterministic 100-row pages, up to 1,000 objects per run. Each page bulk-deletes R2
-before its guarded D1 status update; failures remain eligible for the next run. A full
-tenth page emits aggregate-only capacity telemetry. The provisioned R2 lifecycle is the
+before its guarded D1 status update; stored ISO timestamps are normalized through
+SQLite `datetime()` before comparison, and failures remain eligible for the next run.
+A full tenth page emits aggregate-only capacity telemetry. The provisioned R2 lifecycle is the
 authoritative backstop if future global intake exceeds that bounded Worker capacity.
 Worker logs contain identifiers, sizes, status, issue numbers, and aggregate cleanup
 counts only.

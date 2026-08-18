@@ -222,7 +222,9 @@ describe("expired report cleanup", () => {
     expect(result).toEqual({ batches: 2, processed: 155, limited: false });
     expect(harness.deleted).toHaveBeenCalledTimes(2);
     expect(harness.updated).toEqual([cleanupIds(100, 0), cleanupIds(55, 100)]);
-    expect(harness.queries[0]).toContain("ORDER BY expires_at, report_id LIMIT ?");
+    expect(harness.queries[0]).toContain("datetime(expires_at) <= CURRENT_TIMESTAMP");
+    expect(harness.queries[0]).toContain("ORDER BY datetime(expires_at), report_id LIMIT ?");
+    expect(harness.queries[1]).toContain("datetime(expires_at) <= CURRENT_TIMESTAMP");
   });
 
   it("stops immediately on an empty page", async () => {

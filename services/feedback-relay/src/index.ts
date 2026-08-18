@@ -33,15 +33,15 @@ export async function cleanupExpiredReports(env: Env): Promise<{ batches: number
   let processed = 0;
   for (let batch = 0; batch < CLEANUP_MAX_BATCHES; batch += 1) {
     const expired = await env.DB.prepare(
-      "SELECT report_id, bundle_key FROM reports WHERE expires_at <= CURRENT_TIMESTAMP AND status != 'expired' " +
-      "ORDER BY expires_at, report_id LIMIT ?",
+      "SELECT report_id, bundle_key FROM reports WHERE datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      "ORDER BY datetime(expires_at), report_id LIMIT ?",
     ).bind(CLEANUP_PAGE_SIZE).all<{ report_id: string; bundle_key: string }>();
     const rows = expired.results;
     if (rows.length === 0) return { batches: batch, processed, limited: false };
     await env.REPORTS.delete(rows.map((row) => row.bundle_key));
     await env.DB.prepare(
       "UPDATE reports SET status='expired', updated_at=CURRENT_TIMESTAMP " +
-      "WHERE expires_at <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      "WHERE datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
       "AND report_id IN (SELECT value FROM json_each(?))",
     ).bind(JSON.stringify(rows.map((row) => row.report_id))).run();
     processed += rows.length;

@@ -94,7 +94,7 @@ FROZEN by the rebuild: every public API, entry list, trace name/payload, latch s
 
 ## Custom Performance monitors (agent-neutral integration Phase 2 co-modification note)
 
-`scripts/runtime/performance_monitors.gd` (NEW) registers the `game/party_size`, `game/world_seed`, and `game/current_screen` custom monitors — ONE self-registering child node (`game_runtime.gd` spends exactly one `add_child` line): plain method Callables with values read off `get_parent()`, and `_exit_tree` unregisters because both lambda forms segfault at engine teardown on the pinned 4.6.1 binary. Queryable via `Performance.get_custom_monitor` even in release builds — the live-probe complement to the JSONL trace artifact. No behavior change.
+`scripts/runtime/performance_monitors.gd` (NEW) registers the `game/party_size`, `game/world_seed`, and `game/current_screen` custom monitors — ONE self-registering child node (`game_runtime.gd` spends exactly one `add_child` line): plain method Callables with values read off `get_parent()`, and `_exit_tree` unregisters because both lambda forms segfault at engine teardown on the pinned 4.6.1 binary. Queryable via `Performance.get_custom_monitor` even in release builds — the live-probe complement to the JSONL trace artifact. `game/current_screen` distinguishes the storage, camp, and waystone overlays before falling back to the underlying menu/overworld label, matching feedback capture metadata. No behavior change.
 
 ## Editor trace plugin (agent-neutral integration Phase 3 co-modification note)
 

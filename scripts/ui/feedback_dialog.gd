@@ -1,12 +1,16 @@
 extends Control
 
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
+const PANEL_MAX_SIZE := Vector2(600, 420)
+const PANEL_EDGE_MARGIN := 12.0
 
 signal submitted(message: String)
 signal cancelled
 
 var _editor: TextEdit
+var _disclosure: Label
 var _status: Label
+var _panel: PanelContainer
 var _in_flight := false
 
 
@@ -17,6 +21,11 @@ func _ready() -> void:
 	_build()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_node_ready():
+		_layout_panel()
+
+
 func open_dialog() -> void:
 	if _in_flight:
 		return
@@ -24,6 +33,7 @@ func open_dialog() -> void:
 	_editor.editable = true
 	_status.text = "Enter: Send   Shift+Enter: New line   Esc/X: Cancel"
 	visible = true
+	_layout_panel()
 	_editor.grab_focus()
 
 
@@ -54,6 +64,12 @@ func smoke_set_message(text: String, caret_column: int = -1) -> void:
 
 func smoke_message() -> String:
 	return _editor.text if OS.has_feature("editor") else ""
+
+
+func layout_fits_viewport() -> bool:
+	return _panel != null and _editor != null and get_global_rect().encloses(_panel.get_global_rect()) \
+		and _panel.get_global_rect().encloses(_editor.get_global_rect()) \
+		and _editor.size.x > 0.0 and _editor.size.y > 0.0
 
 
 func _input(event: InputEvent) -> void:
@@ -110,9 +126,8 @@ func _build() -> void:
 	dim.color = Color(0, 0, 0, 0.72)
 	add_child(dim)
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var panel := PanelContainer.new()
-	panel.name = "ReportPanel"
-	panel.custom_minimum_size = Vector2(600, 420)
+	_panel = PanelContainer.new()
+	_panel.name = "ReportPanel"
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color.WHITE
 	style.border_color = Color.BLACK
@@ -122,24 +137,16 @@ func _build() -> void:
 	style.content_margin_right = 20
 	style.content_margin_top = 16
 	style.content_margin_bottom = 16
-	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
-	panel.anchor_left = 0.5
-	panel.anchor_top = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_bottom = 0.5
-	panel.offset_left = -300
-	panel.offset_top = -210
-	panel.offset_right = 300
-	panel.offset_bottom = 210
+	_panel.add_theme_stylebox_override("panel", style)
+	add_child(_panel)
 	var rows := VBoxContainer.new()
 	rows.add_theme_constant_override("separation", 10)
-	panel.add_child(rows)
+	_panel.add_child(rows)
 	rows.add_child(_label("Report a bug", 20))
 	rows.add_child(_label("What went wrong?", 15))
 	_editor = TextEdit.new()
 	_editor.name = "Description"
-	_editor.custom_minimum_size = Vector2(550, 190)
+	_editor.custom_minimum_size = Vector2(0, 190)
 	_editor.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	_editor.accessibility_name = "Bug description"
 	_editor.gui_input.connect(_on_editor_gui_input)
@@ -147,12 +154,28 @@ func _build() -> void:
 	_editor.add_theme_font_override("font", GbcStage.font())
 	_editor.add_theme_font_size_override("font_size", 14)
 	rows.add_child(_editor)
-	var disclosure := _label("Your message is posted publicly; screenshot, save, and diagnostics stay private.", 11)
-	disclosure.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rows.add_child(disclosure)
+	_disclosure = _label("Your message is posted publicly; screenshot, save, and diagnostics stay private.", 11)
+	_disclosure.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rows.add_child(_disclosure)
 	_status = _label("", 11)
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status.accessibility_live = DisplayServer.AccessibilityLiveMode.LIVE_POLITE
 	rows.add_child(_status)
+	_layout_panel()
+
+
+func _layout_panel() -> void:
+	if _panel == null or _editor == null:
+		return
+	var available := Vector2(maxf(1.0, size.x - PANEL_EDGE_MARGIN * 2.0),
+		maxf(1.0, size.y - PANEL_EDGE_MARGIN * 2.0))
+	var target := Vector2(minf(PANEL_MAX_SIZE.x, available.x), minf(PANEL_MAX_SIZE.y, available.y))
+	_editor.custom_minimum_size.x = maxf(1.0, target.x - 40.0)
+	_disclosure.custom_minimum_size.x = _editor.custom_minimum_size.x
+	_status.custom_minimum_size.x = _editor.custom_minimum_size.x
+	_editor.custom_minimum_size.y = minf(190.0, maxf(96.0, target.y - 230.0))
+	_panel.position = ((size - target) * 0.5).floor()
+	_panel.size = target
 
 
 func _label(text: String, size: int) -> Label:

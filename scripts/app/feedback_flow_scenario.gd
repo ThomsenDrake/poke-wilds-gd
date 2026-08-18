@@ -22,17 +22,19 @@ func run(ctx: Dictionary) -> void:
 	await _screen_capture("title", func() -> void: _ctx.title_screen.show_title(), func() -> void: _ctx.title_screen.visible = false)
 	await _screen_capture("menu", Callable(self, "_open_menu_with_overlay"),
 		Callable(self, "_close_menu_with_overlay"), ["StartMenu", "MessageBox"])
+	for overlay in [["storage", "StorageScreen"], ["camp", "CampMenu"], ["waystone", "WayStoneSelector"]]:
+		await _screen_capture(overlay[0], func() -> void: _set_overlay(overlay[1], true),
+			func() -> void: _set_overlay(overlay[1], false), [overlay[1]])
 	await _screen_capture("battle", func() -> void: _ctx.battle_view.visible = true, func() -> void: _ctx.battle_view.visible = false)
 	_result_copy_contract()
 	await _submit_overworld()
 	if _failures.is_empty():
 		_ctx.runtime.emit_trace("feedback_flow_passed", "FeedbackFlowScenario", {
-			"screens": ["title", "menu", "battle", "overworld"], "bundle_verified": _transport_checks,
+			"screens": ["title", "menu", "storage", "camp", "waystone", "battle", "overworld"], "bundle_verified": _transport_checks,
 			"dialog_capture": ProjectSettings.globalize_path(DIALOG_CAPTURE_PATH)})
 	else:
 		_ctx.runtime.emit_trace("feedback_flow_failed", "FeedbackFlowScenario", {"failures": _failures})
 		push_error("Feedback flow failed: %s" % "; ".join(_failures))
-
 func _text_focus_guard() -> void:
 	var entry := LineEdit.new()
 	_ctx.feedback_controller.get_parent().add_child(entry)
@@ -42,7 +44,6 @@ func _text_focus_guard() -> void:
 	_check(not _dialog().visible, "F opened feedback while another text field had focus")
 	entry.queue_free()
 	await get_tree().process_frame
-
 func _screen_capture(screen: String, open: Callable, close: Callable, expected_ui_roots: Array[String] = []) -> void:
 	open.call()
 	await get_tree().process_frame
@@ -57,15 +58,14 @@ func _screen_capture(screen: String, open: Callable, close: Callable, expected_u
 	_check(not get_tree().paused and not _dialog().visible, "cancel did not restore %s" % screen)
 	close.call()
 	await get_tree().process_frame
-
 func _open_menu_with_overlay() -> void:
 	_ctx.start_menu.show_menu()
 	_ctx.message_box.show_message("Visible overlay", 10.0)
-
 func _close_menu_with_overlay() -> void:
 	_ctx.message_box.hide_message()
 	_ctx.start_menu.hide_menu()
-
+func _set_overlay(node_name: String, shown: bool) -> void:
+	_controller().get_node("../UI/" + node_name).visible = shown
 func _result_copy_contract() -> void:
 	_check(_controller().smoke_result_message({"status": "unsaved"}) ==
 		"Report could not be saved—please try again or tell Drake.",

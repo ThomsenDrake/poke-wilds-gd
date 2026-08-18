@@ -62,6 +62,12 @@ static func screen_label_for(runtime: Node) -> String:
 	if feedback != null and feedback.visible: return "feedback"
 	if title.visible: return "title"
 	if creation.visible: return "creation"
+	var storage := ui.get_node_or_null("StorageScreen")
+	var camp := ui.get_node_or_null("CampMenu")
+	var waystone := ui.get_node_or_null("WayStoneSelector")
+	if storage != null and storage.visible: return "storage"
+	if camp != null and camp.visible: return "camp"
+	if waystone != null and waystone.visible: return "waystone"
 	if battle.visible: return "battle"
 	var party := menu.get_node_or_null("PartyScreen")
 	var bag := menu.get_node_or_null("BagScreen")
