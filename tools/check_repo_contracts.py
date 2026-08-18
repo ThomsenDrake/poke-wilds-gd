@@ -111,6 +111,38 @@ def _workflow_step_blocks(text: str) -> list[list[str]]:
     return blocks
 
 
+def _active_yaml_text(text: str) -> str:
+    """Remove YAML comments without treating hashes inside quotes as comments."""
+    active_lines: list[str] = []
+    for original_line in text.splitlines():
+        line = original_line
+        quote = ""
+        escaped = False
+        index = 0
+        while index < len(line):
+            char = line[index]
+            if quote == '"':
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    quote = ""
+            elif quote == "'":
+                if char == "'" and index + 1 < len(line) and line[index + 1] == "'":
+                    index += 1
+                elif char == "'":
+                    quote = ""
+            elif char in ('"', "'"):
+                quote = char
+            elif char == "#" and (index == 0 or line[index - 1].isspace()):
+                line = line[:index]
+                break
+            index += 1
+        active_lines.append(line.rstrip())
+    return "\n".join(active_lines)
+
+
 def pokeapi_ci_cache_issues(root: Path) -> list[str]:
     """Keep CI freshness checks tied to the committed PokeAPI pin.
 
@@ -163,7 +195,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     path = root / FEEDBACK_RELAY_DEPLOY_WORKFLOW
     if not path.exists():
         return [f"Missing feedback relay deployment workflow: {FEEDBACK_RELAY_DEPLOY_WORKFLOW}"]
-    text = path.read_text(encoding="utf-8")
+    text = _active_yaml_text(path.read_text(encoding="utf-8"))
     issues: list[str] = []
     required = (
         "branches:\n      - main",
@@ -284,9 +316,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
             )
-    active_text = "\n".join(
-        line for line in text.splitlines() if not line.lstrip().startswith("#")
-    )
+    active_text = text
     yaml_anchor_or_alias = re.compile(
         r"(?m)(?:^|[\s:\-\[\{,])[&*](?![&*])[^ \t\r\n\[\]\{\},]+"
     )
