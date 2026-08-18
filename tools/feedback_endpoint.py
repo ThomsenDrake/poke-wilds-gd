@@ -30,7 +30,8 @@ def validated_endpoint(endpoint: str) -> str:
         parsed.port  # Force validation of a malformed explicit port.
     except ValueError as exc:
         raise ValueError("feedback endpoint must be a valid HTTPS URL") from exc
-    if (parsed.scheme != "https" or not parsed.hostname or parsed.username is not None or
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.netloc.endswith(":") or
+            parsed.username is not None or
             parsed.password is not None or "?" in candidate or "#" in candidate or "\\" in candidate or
             any(char.isspace() for char in candidate)):
         raise ValueError("feedback endpoint must be an HTTPS URL without credentials, query, or fragment")

@@ -85,7 +85,8 @@ stores only the token hash and private nickname. The package token is treated as
 extractable and is protected by revocation, cohort scoping, per-minute edge
 limiting, and D1 daily limits—not as a durable secret. GitHub App and maintainer
 credentials exist only as Worker secrets.
-The relay endpoint must be HTTPS without embedded credentials, a query, or a fragment;
+The relay endpoint must be HTTPS without embedded credentials, a query, a fragment, or
+an empty/malformed explicit port;
 one shared validator runs before both the admin invite request and the maintainer bundle
 fetch, the game revalidates the embedded route at its HTTP sink, and the normalized
 endpoint is the one embedded into the package. A cross-platform advisory lock covers

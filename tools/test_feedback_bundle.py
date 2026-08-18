@@ -217,7 +217,8 @@ class FeedbackBundleTests(unittest.TestCase):
         report_id = "01234567-89ab-cdef-0123-456789abcdef"
         for endpoint in ("http://relay.test", "//relay.test", "https://user:pass@relay.test",
                          "https://@relay.test", "https://relay.test?", "https://relay.test#fragment",
-                         "https://relay.test:notaport", "https://relay.test/path with space",
+                         "https://relay.test:", "https://relay.test:notaport",
+                         "https://relay.test/path with space",
                          "https://relay.test\\unsafe"):
             with self.subTest(endpoint=endpoint), self.assertRaisesRegex(ValueError, "HTTPS"):
                 bundle_request(endpoint, report_id, "private")
@@ -259,7 +260,8 @@ class FeedbackBundleTests(unittest.TestCase):
         args = SimpleNamespace(friend="Friend", channel="friends-1", endpoint="", target="linux")
         with mock.patch.object(package_playtest, "invite_for") as invite_for, \
                 mock.patch.object(package_playtest, "register_invite") as register_invite:
-            for endpoint in ("http://relay.test", "//relay.test", "https://user:pass@relay.test"):
+            for endpoint in ("http://relay.test", "//relay.test", "https://user:pass@relay.test",
+                             "https://relay.test:"):
                 args.endpoint = endpoint
                 with self.subTest(endpoint=endpoint), self.assertRaisesRegex(RuntimeError, "HTTPS"):
                     package_playtest.build_package(args, "admin")

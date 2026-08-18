@@ -102,7 +102,8 @@ route/bundle/metadata deletion. Any failed cleanup is quarantined and reported a
 distinct remote-success/local-cleanup result that retains the issue number rather than
 emitting the normal sent trace; the focused journey injects a ZIP-delete failure and
 proves the report cannot upload twice. Runtime endpoint validation now parses DNS/IP
-host and bounded numeric port before any bundle or outbox creation.
+host and bounded numeric port before any bundle or outbox creation; the shared Python
+validator rejects the same empty explicit-port form before packaging or admin fetch.
 
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
