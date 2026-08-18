@@ -95,6 +95,7 @@ func _new_report_id() -> String:
 func _result_message(result: Dictionary) -> String:
 	match str(result.get("status", "unsaved")):
 		"sent": return "Report #%d sent. Thank you!" % int(result.get("issue_number", 0))
+		"sent_cleanup_failed": return "Report #%d sent, but local cleanup failed—please tell Drake." % int(result.get("issue_number", 0))
 		"queued": return "Saved — it will send when you're online."
 		"blocked": return "Saved on this computer—please let Drake know."
 		_: return "Report could not be saved—please try again or tell Drake."

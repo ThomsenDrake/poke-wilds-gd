@@ -89,7 +89,7 @@ func _sent_cleanup_contract() -> void:
 	await SmokeTap.tap_key(_tree, Key.KEY_ESCAPE)
 	_controller.smoke_set_remove_failure(Callable())
 	var stem := "%s/%s" % [OUTBOX_DIR, report_id]
-	_check(result.get("status") == "blocked" and result.get("reason") == "sent_cleanup_failed",
+	_check(result.get("status") == "sent_cleanup_failed" and result.get("reason") == "sent_cleanup_failed",
 		"failed sent cleanup was declared successful")
 	_check(FileAccess.file_exists(stem + ".sent-cleanup-failed.json") \
 		and FileAccess.file_exists(stem + ".sent-cleanup-failed.zip") \
@@ -145,6 +145,8 @@ func _redaction_contract() -> void:
 		"runtime accepted an unsafe embedded endpoint")
 	_check(_controller.smoke_validated_endpoint("https://feedback.invalid/") == "https://feedback.invalid",
 		"runtime rejected or failed to normalize a legitimate HTTPS endpoint")
+	for malformed in ["https://relay.invalid:bogus", "https://:443", "https://relay.invalid:"]:
+		_check(_controller.smoke_validated_endpoint(malformed).is_empty(), "runtime accepted malformed relay authority")
 
 
 func _trace_truncation_contract() -> void:
@@ -200,6 +202,8 @@ func _result_copy_contract() -> void:
 	_check(_controller.smoke_result_message({"status": "blocked"}) ==
 		"Saved on this computer—please let Drake know.",
 		"retained blocked bundle did not identify the local copy")
+	_check(_controller.smoke_result_message({"status": "sent_cleanup_failed", "issue_number": 4321}).begins_with("Report #4321 sent"),
+		"remote success with local cleanup failure hid the issue number")
 
 
 func _remove(path: String) -> void:

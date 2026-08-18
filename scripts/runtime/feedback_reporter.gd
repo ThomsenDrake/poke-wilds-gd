@@ -61,7 +61,7 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 			runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
 				"report_id": capture["report_id"], "issue_number": result.get("issue_number", 0)})
 		else:
-			result = {"status": "blocked", "reason": "sent_cleanup_failed",
+			result = {"status": "sent_cleanup_failed", "reason": "sent_cleanup_failed",
 				"issue_number": result.get("issue_number", 0)}
 			runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
 				"report_id": capture["report_id"], "reason": result["reason"]})
@@ -166,12 +166,62 @@ func _validated_endpoint(value: String) -> String:
 			or endpoint.contains("?") or endpoint.contains("#") or endpoint.contains("\\"):
 		return ""
 	var authority := endpoint.substr(8).get_slice("/", 0)
-	if authority.is_empty():
+	if authority.is_empty() or not _endpoint_authority_valid(authority):
 		return ""
 	for byte in endpoint.to_utf8_buffer():
 		if int(byte) <= 32:
 			return ""
 	return endpoint
+
+
+func _endpoint_authority_valid(authority: String) -> bool:
+	var host := authority
+	var port := ""
+	var has_port := false
+	if authority.begins_with("["):
+		var closing := authority.find("]")
+		if closing <= 1:
+			return false
+		host = authority.substr(1, closing - 1)
+		if not host.contains(":") or not host.is_valid_ip_address():
+			return false
+		var suffix := authority.substr(closing + 1)
+		if not suffix.is_empty():
+			if not suffix.begins_with(":"):
+				return false
+			has_port = true
+			port = suffix.substr(1)
+	else:
+		if authority.count(":") > 1:
+			return false
+		var colon := authority.rfind(":")
+		if colon >= 0:
+			host = authority.left(colon)
+			port = authority.substr(colon + 1)
+			has_port = true
+		if not _valid_hostname(host):
+			return false
+	return not has_port or _valid_port(port)
+
+
+func _valid_hostname(host: String) -> bool:
+	if host.is_valid_ip_address():
+		return true
+	if host.is_empty() or host.length() > 253:
+		return false
+	var label_pattern := RegEx.new()
+	if label_pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$") != OK:
+		return false
+	for label in host.split("."):
+		if str(label).length() > 63 or label_pattern.search(str(label)) == null:
+			return false
+	return true
+
+
+func _valid_port(port: String) -> bool:
+	var digits := RegEx.new()
+	return digits.compile("^[0-9]{1,5}$") == OK and digits.search(port) != null \
+		and port.to_int() >= 1 and port.to_int() <= 65535
 
 
 func _reconcile_retry_schedule() -> void:

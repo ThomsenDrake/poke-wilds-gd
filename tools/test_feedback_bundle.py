@@ -341,6 +341,8 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertLess(upload.index("_configuration_error"), upload.index("_http.request_raw"))
         self.assertIn("_http.max_redirects = 0", reporter)
         self.assertIn("HTTPRequest.RESULT_REDIRECT_LIMIT_REACHED", upload)
+        self.assertIn("_endpoint_authority_valid(authority)", reporter)
+        self.assertIn('result = {"status": "sent_cleanup_failed"', reporter)
         retry = reporter[reporter.index("func retry_pending("):reporter.index("func _persist_blocked(")]
         self.assertNotIn('elif result.get("status") == "queued":\n\t\t\tbreak', retry)
         self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)

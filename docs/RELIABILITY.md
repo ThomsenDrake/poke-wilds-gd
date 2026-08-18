@@ -251,7 +251,9 @@ retry cannot upload it again. It also pins that a one-character machine username
 not rewrite ordinary prose while labeled identity fields and user paths remain redacted.
 It separately forces deletion failure after a successful relay response: the outbox
 must persist `sent` before cleanup, quarantine the retained pair, suppress every retry,
-and emit no `feedback_report_sent` trace until all three active paths are gone.
+emit no `feedback_report_sent` trace until all three active paths are gone, and show a
+distinct message that preserves the remote issue number. Endpoint probes also reject
+empty hosts, malformed/empty ports, and unsafe schemes before outbox creation.
 An unconfigured-build submission returns `unsaved` before bundle/outbox creation, reaches
 no transport, and leaves no ZIP/metadata/route set; legacy malformed routes block rather
 than entering the bounded retry schedule. The runtime request node permits zero redirects

@@ -36,6 +36,8 @@ reports that retained copy to the player. Bundle-build or outbox-commit failure 
 Missing or invalid embedded relay configuration is refused before bundle creation or
 outbox commit, so a non-personalized export cannot create a permanently unsendable
 private route; a legacy malformed route is terminally blocked rather than retried forever.
+Runtime parsing requires a nonempty DNS/IP host and an optional numeric port in the
+1–65535 range, matching the package-time boundary for malformed authorities.
 Runtime uploads also reject redirects instead of forwarding the invite credential.
 Bundle creation checks the result of each ZIP entry write, entry close, and final archive
 close before the outbox can commit it. The stable install ID must be exactly 32 lowercase
@@ -47,6 +49,8 @@ Before success is announced, the outbox atomically changes its metadata commit m
 to terminal `sent`, then checks private-route, ZIP, and metadata deletion in that order.
 A deletion failure quarantines the retained files and returns a local cleanup failure;
 the terminal marker or quarantine prevents a subsequent launch from uploading again.
+The player sees that the numbered remote issue succeeded while local cleanup needs
+attention, rather than the normal success copy or the local-only blocked copy.
 
 ## Capture and privacy contract
 
