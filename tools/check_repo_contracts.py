@@ -253,6 +253,13 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must path-filter relay changes on push and pull_request"
         )
+    push_branches = re.findall(
+        r"(?m)^  push:\n    branches:\n((?:      - [^\n]+\n?)+)", text
+    )
+    if len(push_branches) != 1 or push_branches[0].splitlines() != ["      - main"]:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must deploy pushes from main only"
+        )
     deploy_if = (
         "if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' "
         "&& github.ref == 'refs/heads/main')"
