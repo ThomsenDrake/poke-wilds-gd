@@ -214,10 +214,12 @@ class FeedbackBundleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             build_info = root / "generated" / "playtest_build.json"
+            build_lock = root / "generated" / ".playtest-package.lock"
             args = SimpleNamespace(friend="Friend", channel="friends-1", endpoint="https://relay.test", target="linux")
             invite = {"tester_id": "T-TEST", "token": "never-print", "nickname": "Friend", "cohort_id": "friends-1"}
             with mock.patch.object(package_playtest, "ROOT", root), \
                     mock.patch.object(package_playtest, "BUILD_INFO", build_info), \
+                    mock.patch.object(package_playtest, "BUILD_LOCK", build_lock), \
                     mock.patch.object(package_playtest, "invite_for", return_value=invite), \
                     mock.patch.object(package_playtest, "register_invite"), \
                     mock.patch.object(package_playtest, "run", side_effect=["a" * 40, "v1"]), \
@@ -226,6 +228,36 @@ class FeedbackBundleTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "export failed"):
                     package_playtest.build_package(args, "admin-token-not-printed")
             self.assertFalse(build_info.exists())
+
+    def test_packaging_rejects_insecure_endpoints_before_sending_admin_auth(self) -> None:
+        args = SimpleNamespace(friend="Friend", channel="friends-1", endpoint="", target="linux")
+        with mock.patch.object(package_playtest, "invite_for") as invite_for, \
+                mock.patch.object(package_playtest, "register_invite") as register_invite:
+            for endpoint in ("http://relay.test", "//relay.test", "https://user:pass@relay.test"):
+                args.endpoint = endpoint
+                with self.subTest(endpoint=endpoint), self.assertRaisesRegex(RuntimeError, "HTTPS"):
+                    package_playtest.build_package(args, "admin")
+        invite_for.assert_not_called()
+        register_invite.assert_not_called()
+
+    def test_packaging_lock_preserves_active_build_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            build_info = root / "generated" / "playtest_build.json"
+            build_lock = root / "generated" / ".playtest-package.lock"
+            args = SimpleNamespace(friend="Friend", channel="friends-1", endpoint="https://relay.test", target="linux")
+            invite = {"tester_id": "T-TEST", "token": "private", "nickname": "Friend", "cohort_id": "friends-1"}
+            with mock.patch.object(package_playtest, "ROOT", root), \
+                    mock.patch.object(package_playtest, "BUILD_INFO", build_info), \
+                    mock.patch.object(package_playtest, "BUILD_LOCK", build_lock), \
+                    mock.patch.object(package_playtest, "invite_for", return_value=invite), \
+                    mock.patch.object(package_playtest, "register_invite"), \
+                    mock.patch.object(package_playtest, "run", side_effect=["a" * 40, "v1"]), \
+                    package_playtest.build_metadata_lock():
+                build_info.write_text("active-owner\n", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, "already running"):
+                    package_playtest.build_package(args, "admin")
+                self.assertEqual(build_info.read_text(encoding="utf-8"), "active-owner\n")
 
     def test_release_cleanliness_check_includes_untracked_files(self) -> None:
         with mock.patch.object(package_playtest, "run", return_value="?? scenes/untracked.tscn") as status:

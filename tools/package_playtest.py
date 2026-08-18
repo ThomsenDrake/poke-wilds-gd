@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import os
@@ -15,11 +16,13 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 import urllib.error
+import urllib.parse
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / ".playtest" / "invites.json"
 BUILD_INFO = ROOT / "generated" / "playtest_build.json"
+BUILD_LOCK = ROOT / "generated" / ".playtest-package.lock"
 TARGETS = {
     "macos": ("macOS", ".zip"),
     "windows": ("Windows Desktop", ".exe"),
@@ -45,6 +48,43 @@ def run(*args: str) -> str:
 def worktree_is_dirty() -> bool:
     """Include untracked exportable resources; ignored private/output paths stay hidden."""
     return bool(run("git", "status", "--porcelain"))
+
+
+def validated_endpoint(endpoint: str) -> str:
+    candidate = endpoint.strip().rstrip("/")
+    try:
+        parsed = urllib.parse.urlsplit(candidate)
+    except ValueError as exc:
+        raise RuntimeError("feedback endpoint must be a valid HTTPS URL") from exc
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or
+            parsed.query or parsed.fragment or any(char.isspace() for char in candidate)):
+        raise RuntimeError("feedback endpoint must be an HTTPS URL without credentials, query, or fragment")
+    return candidate
+
+
+@contextmanager
+def build_metadata_lock():
+    """Refuse concurrent exports before either process can touch shared metadata."""
+    BUILD_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    handle = BUILD_LOCK.open("a+b")
+    try:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                handle.seek(0)
+                if not handle.read(1):
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise RuntimeError("another playtest package export is already running") from exc
+        yield
+    finally:
+        handle.close()
 
 
 def load_registry() -> dict:
@@ -97,6 +137,7 @@ def invite_for(friend: str, cohort: str) -> dict:
 
 
 def register_invite(endpoint: str, admin_token: str, invite: dict) -> None:
+    endpoint = validated_endpoint(endpoint)
     payload = json.dumps({"tester_id": invite["tester_id"], "nickname": invite["nickname"],
                           "cohort_id": invite["cohort_id"],
                           "token_hash": hashlib.sha256(invite["token"].encode()).hexdigest()}).encode()
@@ -128,28 +169,30 @@ def godot_binary() -> str:
 
 def build_package(args: argparse.Namespace, admin_token: str) -> tuple[Path, str]:
     """Create an export while guaranteeing generated token metadata is removed."""
-    try:
-        invite = invite_for(args.friend, args.channel)
-        register_invite(args.endpoint, admin_token, invite)
-        commit = run("git", "rev-parse", "HEAD")
-        version = run("git", "describe", "--tags", "--always")
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        build_id = f"{args.channel}-{commit[:10]}-{timestamp}"
-        BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
-        BUILD_INFO.write_text(json.dumps({
-            "schema_version": 1, "version": version, "commit_sha": commit,
-            "build_id": build_id, "channel": args.channel, "endpoint": args.endpoint,
-            "tester_id": invite["tester_id"], "invite_token": invite["token"],
-        }, indent=2) + "\n", encoding="utf-8")
-        output_dir = ROOT / "dist" / "playtest" / invite["tester_id"]
-        output_dir.mkdir(parents=True, exist_ok=True)
-        preset, extension = TARGETS[args.target]
-        output = output_dir / f"PokeWilds-{build_id}-{args.target}{extension}"
-        subprocess.run([godot_binary(), "--headless", "--path", str(ROOT),
-                        "--export-release", preset, str(output)], check=True, cwd=ROOT)
-        return output, invite["tester_id"]
-    finally:
-        BUILD_INFO.unlink(missing_ok=True)
+    endpoint = validated_endpoint(args.endpoint)
+    with build_metadata_lock():
+        try:
+            invite = invite_for(args.friend, args.channel)
+            register_invite(endpoint, admin_token, invite)
+            commit = run("git", "rev-parse", "HEAD")
+            version = run("git", "describe", "--tags", "--always")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            build_id = f"{args.channel}-{commit[:10]}-{timestamp}"
+            BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
+            BUILD_INFO.write_text(json.dumps({
+                "schema_version": 1, "version": version, "commit_sha": commit,
+                "build_id": build_id, "channel": args.channel, "endpoint": endpoint,
+                "tester_id": invite["tester_id"], "invite_token": invite["token"],
+            }, indent=2) + "\n", encoding="utf-8")
+            output_dir = ROOT / "dist" / "playtest" / invite["tester_id"]
+            output_dir.mkdir(parents=True, exist_ok=True)
+            preset, extension = TARGETS[args.target]
+            output = output_dir / f"PokeWilds-{build_id}-{args.target}{extension}"
+            subprocess.run([godot_binary(), "--headless", "--path", str(ROOT),
+                            "--export-release", preset, str(output)], check=True, cwd=ROOT)
+            return output, invite["tester_id"]
+        finally:
+            BUILD_INFO.unlink(missing_ok=True)
 
 
 def main() -> int:

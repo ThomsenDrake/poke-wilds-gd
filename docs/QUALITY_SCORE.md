@@ -60,6 +60,11 @@ reduction now enforces the relay's 16 MiB compressed and 24 MiB uncompressed cap
 outbox commit, while public issue body and title truncation count Unicode code points and
 cannot split astral characters.
 
+Feedback packaging-safety follow-up (2026-08-17): scores remain unchanged. Package
+creation validates an HTTPS-only credential-free relay endpoint before sending admin
+authorization or embedding it, and a cross-platform advisory lock prevents concurrent
+exports from overwriting or deleting shared tester build metadata.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

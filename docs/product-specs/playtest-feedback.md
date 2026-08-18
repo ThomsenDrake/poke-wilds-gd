@@ -71,6 +71,11 @@ stores only the token hash and private nickname. The package token is treated as
 extractable and is protected by revocation, cohort scoping, per-minute edge
 limiting, and D1 daily limits—not as a durable secret. GitHub App and maintainer
 credentials exist only as Worker secrets.
+The relay endpoint must be HTTPS without embedded credentials, a query, or a fragment;
+validation happens before the admin invite request and the normalized endpoint is the
+one embedded into the package. A cross-platform advisory lock covers the shared
+`generated/playtest_build.json` write/export/delete sequence, so a concurrent invocation
+refuses without overwriting or deleting the active export's tester metadata.
 
 Public tester handles use the `PKMN-<SPECIES>-<SUFFIX>` scheme and are derived
 only from the opaque invite token. A friend's private nickname is never an input
@@ -116,7 +121,7 @@ is the complete distributable; macOS exports one ZIP. The packaging command refu
 tracked or untracked worktree changes unless
 `--allow-dirty` is deliberately supplied for local validation. It registers an
 invite through the admin API, creates temporary build metadata, exports the
-release, and removes the generated metadata in a `finally` block. Raw invite
+release, and removes the generated metadata in a lock-owned `finally` block. Raw invite
 tokens remain only in the ignored mode-0600 `.playtest/invites.json` and inside
 their revocable packages; commands never print them. Private/generated/output paths
 remain excluded through `.gitignore`, while an untracked exportable resource blocks

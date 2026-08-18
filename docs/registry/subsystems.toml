@@ -2010,7 +2010,8 @@ quality_bucket = "feedback"
 # their distinct capture labels, and parses the ZIP through an injected transport;
 # its overlay/menu case pins aggregation of every visible UI sibling. display_matrix
 # opens the responsive dialog at all six sizes. Desktop preset tests pin self-contained Linux/Windows
-# executables and untracked-resource cleanliness; the scenario also pins truthful
+# executables, untracked-resource cleanliness, HTTPS endpoint validation, and
+# single-owner build-metadata export locking; the scenario also pins truthful
 # unsaved-vs-retained player copy, malformed install-ID atomic repair, and exact
 # ZIP write/close result handling plus both compressed/uncompressed caps. Its
 # concurrent-submit case pins single-owner

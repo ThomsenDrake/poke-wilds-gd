@@ -25,6 +25,7 @@ __pycache__/
 .playtest/
 .feedback-reports/
 generated/playtest_build.json
+generated/.playtest-package.lock
 dist/
 
 # Cloudflare local state/dependencies.
