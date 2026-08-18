@@ -1,5 +1,5 @@
 Status: approved
-Last verified: 2026-07-18
+Last verified: 2026-08-18
 Review cadence days: 30
 Date: 2026-07-18
 Source paths: scripts/app/qa_scenarios.gd, scripts/app/nav_audit.gd, scripts/app/qa_audits.gd, scripts/app/layout_audit.gd, scripts/app/visual_sweep.gd, scripts/runtime/playtest_bot.gd, tools/run_playtests.py, tools/visual_diff.py
