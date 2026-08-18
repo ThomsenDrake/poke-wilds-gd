@@ -143,6 +143,20 @@ def _active_yaml_text(text: str) -> str:
     return "\n".join(active_lines)
 
 
+def _workflow_job_blocks(text: str) -> dict[str, list[str]]:
+    """Return top-level job blocks keyed by job name, retaining duplicates."""
+    jobs_at = text.find("\njobs:\n")
+    if jobs_at < 0:
+        return {}
+    jobs_text = text[jobs_at + len("\njobs:\n"):]
+    starts = list(re.finditer(r"(?m)^  ([A-Za-z0-9_-]+):(?:\n|$)", jobs_text))
+    blocks: dict[str, list[str]] = {}
+    for index, match in enumerate(starts):
+        end = starts[index + 1].start() if index + 1 < len(starts) else len(jobs_text)
+        blocks.setdefault(match.group(1), []).append(jobs_text[match.start():end])
+    return blocks
+
+
 def pokeapi_ci_cache_issues(root: Path) -> list[str]:
     """Keep CI freshness checks tied to the committed PokeAPI pin.
 
@@ -247,6 +261,104 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must deploy only a push or manual dispatch of main"
         )
+    job_step_contracts = {
+        "validate": {
+            "Install from the lockfile": ("run: npm ci",),
+            "Type-check and test the Worker": ("run: npm run check",),
+            "Validate the staging deployment bundle": (
+                "run: npx wrangler deploy --dry-run --strict --keep-vars --env staging",
+            ),
+            "Validate the production deployment bundle": (
+                'run: npx wrangler deploy --dry-run --strict --keep-vars --env=""',
+            ),
+        },
+        "deploy-staging": {
+            "Install from the lockfile": ("run: npm ci",),
+            "Apply staging D1 migrations": (
+                "run: npx wrangler d1 migrations apply DB --remote --env staging",
+            ),
+            "Deploy staging Worker": (
+                'run: npx wrangler deploy --strict --keep-vars --env staging --message "GitHub Actions ${GITHUB_SHA}"',
+            ),
+            "Verify staging health": (
+                "run: |",
+                'response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://poke-wilds-feedback-relay-staging.drake-t.workers.dev/healthz)"',
+                'RESPONSE="$response" node -e \'const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1) process.exit(1)\'',
+            ),
+        },
+        "deploy-production": {
+            "Install from the lockfile": ("run: npm ci",),
+            "Apply production D1 migrations": (
+                'run: npx wrangler d1 migrations apply DB --remote --env=""',
+            ),
+            "Deploy production Worker": (
+                'run: npx wrangler deploy --strict --keep-vars --env="" --message "GitHub Actions ${GITHUB_SHA}"',
+            ),
+            "Verify production health": (
+                "run: |",
+                'response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://poke-wilds-feedback-relay.drake-t.workers.dev/healthz)"',
+                'RESPONSE="$response" node -e \'const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1) process.exit(1)\'',
+            ),
+        },
+    }
+    job_blocks = _workflow_job_blocks(text)
+    if set(job_blocks) != set(job_step_contracts):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain only validate, deploy-staging, and deploy-production jobs"
+        )
+    job_metadata = {
+        "validate": (),
+        "deploy-staging": (deploy_if, "needs: validate", "environment: feedback-staging"),
+        "deploy-production": (
+            deploy_if,
+            "needs: deploy-staging",
+            "environment: feedback-production",
+        ),
+    }
+    for job_name, step_contracts in job_step_contracts.items():
+        blocks = job_blocks.get(job_name, [])
+        if len(blocks) != 1:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain exactly one {job_name!r} job"
+            )
+            continue
+        job = blocks[0]
+        job_lines = [line.strip() for line in job.splitlines() if line.strip()]
+        for metadata_line in job_metadata[job_name]:
+            if metadata_line not in job_lines:
+                issues.append(
+                    f"feedback relay job {job_name!r} is missing {metadata_line!r}"
+                )
+        for action_ref in (
+            "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        ):
+            if sum(action_ref in line for line in job_lines) != 1:
+                issues.append(
+                    f"feedback relay job {job_name!r} must use {action_ref} exactly once"
+                )
+        step_blocks = _workflow_step_blocks(job)
+        named_steps: dict[str, list[list[str]]] = {}
+        for lines in step_blocks:
+            first_line = lines[0] if lines else ""
+            if first_line.startswith("- name: "):
+                named_steps.setdefault(first_line.removeprefix("- name: "), []).append(lines)
+        if len(step_blocks) != len(step_contracts) + 2 or set(named_steps) != set(step_contracts):
+            issues.append(
+                f"feedback relay job {job_name!r} must contain only its contracted steps"
+            )
+        for step_name, required_lines in step_contracts.items():
+            matches = named_steps.get(step_name, [])
+            if len(matches) != 1:
+                issues.append(
+                    f"feedback relay job {job_name!r} must contain exactly one {step_name!r} step"
+                )
+                continue
+            missing_lines = [line for line in required_lines if line not in matches[0]]
+            if missing_lines:
+                issues.append(
+                    f"feedback relay step {step_name!r} is missing its contracted command"
+                )
     if re.search(r"(?m)^    env:\n      CLOUDFLARE_", text):
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must scope Cloudflare credentials to individual steps"
