@@ -11,11 +11,10 @@ var _failures: Array[String] = []
 var _transport_checks := false
 var _prepared_path := ""
 var _transport_calls := 0
-var _hold_retry_upload := true
+var _first_route_stage := 0 # 0=held, 1=queued, 2=send
 var _expected_routes := {}
 const DIALOG_CAPTURE_PATH := "user://feedback-dialog.png"
 const INSTALL_ID_TEST_PATH := "user://feedback-flow-install-id.txt"
-
 
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
@@ -111,7 +110,7 @@ func _submit_overworld() -> void:
 	var second_route := second_path.trim_suffix(".zip") + ".route"
 	_check(_transport_calls == 1, "concurrent submit reused the active HTTP transport")
 	_check(FileAccess.file_exists(second_path), "concurrent report was not retained")
-	_hold_retry_upload = false
+	_first_route_stage = 1
 	await _wait_for_reporter_idle()
 	_check(_transport_checks, "transport did not receive a valid agent bundle")
 	_check(FileAccess.file_exists(first_path) and FileAccess.file_exists(second_path),
@@ -123,6 +122,7 @@ func _submit_overworld() -> void:
 	_check(FileAccess.file_exists(first_path) and not FileAccess.file_exists(second_path),
 		"fresh scan did not retain queued A and send independent B")
 	_check(not FileAccess.file_exists(second_route), "concurrent report retained its private route")
+	_first_route_stage = 2
 	await _controller().smoke_retry(report_id)
 	_check(_transport_calls == 4 and not FileAccess.file_exists(first_path),
 		"older queued report did not send on its later retry")
@@ -141,6 +141,9 @@ func _offline_transport(prepared: Dictionary) -> Dictionary:
 	return {"status": "queued", "reason": "scenario_offline"}
 
 func _race_transport(prepared: Dictionary) -> Dictionary:
+	var report_id := str(prepared.get("metadata", {}).get("report_id", ""))
+	var expected: Dictionary = _expected_routes.get(report_id, {})
+	if expected.is_empty(): return {"status": "queued", "reason": "scenario_foreign_report"}
 	_transport_calls += 1
 	_prepared_path = str(prepared.get("bundle_path", ""))
 	var reader := ZIPReader.new()
@@ -150,7 +153,6 @@ func _race_transport(prepared: Dictionary) -> Dictionary:
 	var report = JSON.parse_string(reader.read_file("report.json").get_string_from_utf8())
 	var trace := reader.read_file("trace.jsonl").get_string_from_utf8()
 	reader.close()
-	var expected: Dictionary = _expected_routes.get(str(prepared.get("metadata", {}).get("report_id", "")), {})
 	var build: Dictionary = prepared.get("build", {})
 	var valid: bool = report is Dictionary and report.get("schema_version") == 1 \
 		and report.get("message") == "I walked into a tree and got stuck." \
@@ -165,11 +167,10 @@ func _race_transport(prepared: Dictionary) -> Dictionary:
 		and build.get("tester_id") == expected.get("tester_id") \
 		and build.get("channel") == expected.get("channel")
 	_transport_checks = valid if _transport_calls == 1 else _transport_checks and valid
-	if _transport_calls == 1:
-		while _hold_retry_upload:
+	if str(build.get("channel", "")) == "scenario-a":
+		while _first_route_stage == 0:
 			await get_tree().process_frame
-	if _transport_calls <= 2:
-		return {"status": "queued", "reason": "scenario_route_wait"}
+		if _first_route_stage == 1: return {"status": "queued", "reason": "scenario_route_wait"}
 	return {"status": "sent", "issue_number": 4321} if _transport_checks else {"status": "blocked", "reason": "scenario_bundle_invalid"}
 
 func _scenario_build(suffix: String) -> Dictionary:

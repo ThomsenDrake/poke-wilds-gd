@@ -74,6 +74,8 @@ substrings in player prose.
 Feedback retry-isolation/expiry follow-up (2026-08-17): scores remain unchanged.
 Queued failures no longer stop later independently routed reports in the same scan, and
 the relay rejects expired report IDs before R2 so private bundles cannot be resurrected.
+The concurrency journey ignores pre-existing outbox entries, leaving them queued and
+untouched while it verifies only the two reports created by that run.
 
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 

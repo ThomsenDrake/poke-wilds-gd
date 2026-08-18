@@ -236,7 +236,9 @@ entry. The first report is queued under one synthetic package identity, the acti
 package is changed, and retry proves the persisted private route still supplies the
 original endpoint/invite. A fresh retry scan leaves that old route queued, continues to
 send the later independent route, then sends the old route on a later pass; both reports
-prove their private route is removed after success.
+prove their private route is removed after success. The injected transport returns any
+pre-existing outbox entry as queued without reading, counting, blocking, or deleting it,
+so repeated verification cannot consume private player reports or depend on directory order.
 The resilience half forces a permanent rejection plus a failed blocked-sidecar write,
 then proves the active pair is quarantined, its private route is removed, and explicit
 retry cannot upload it again. It also pins that a one-character machine username does

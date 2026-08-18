@@ -145,3 +145,5 @@ all six supported window sizes, including 438x383, and asserts the panel and edi
 inside the viewport before continuing its battle-pixel checks.
 One retry pass also leaves an unavailable old route queued while sending a later
 independently routed report, so cross-package outbox entries cannot starve each other.
+The injected scenario transport leaves reports from prior runs queued and untouched;
+only report IDs created by the current journey affect its counters or assertions.
