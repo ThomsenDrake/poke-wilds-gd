@@ -21,21 +21,24 @@ changing this directory runs the same validation, then:
 3. applies pending D1 migrations and deploys through `feedback-production`; and
 4. verifies the corresponding production health contract.
 
-The workflow has one non-cancelling concurrency group, so migration/deploy runs do
-not overlap. It passes `--strict` and `--keep-vars`: risky configuration drift
-refuses deployment, while dashboard-managed non-secret vars remain intact. Worker
-secrets are not replaced or copied into GitHub. The Cloudflare CI credential is
-scoped to the four migration/deploy steps; lockfile installation, checks, dry-runs,
-and health probes cannot read it.
+Pushes and dispatches of `main` share one non-cancelling deployment concurrency
+group, so migration/deploy runs do not overlap. Pull-request and non-main dispatch
+validation use separate PR/ref groups and cannot replace a queued deployment. The
+workflow passes `--strict` and `--keep-vars`: risky configuration drift refuses
+deployment, while dashboard-managed non-secret vars remain intact. Worker secrets
+are not replaced or copied into GitHub. The Cloudflare CI credential is scoped to
+the four migration/deploy steps; lockfile installation, checks, dry-runs, and health
+probes cannot read it.
 Third-party GitHub Actions are pinned to full commit SHAs; dependency installation
 continues to use the committed npm lockfile.
 
 Each GitHub environment defines `CLOUDFLARE_ACCOUNT_ID` and a least-privilege
-`CLOUDFLARE_API_TOKEN` restricted to this Cloudflare account with Workers Scripts
-Edit and D1 Edit access. Never add `GITHUB_PRIVATE_KEY`, `ADMIN_TOKEN`, invite
-tokens, or build metadata to GitHub Actions. A `workflow_dispatch` of `main`
-provides the same staging-first recovery path when a deployment must be rerun
-without a source change; dispatches of any other ref validate but cannot deploy.
+`CLOUDFLARE_API_TOKEN` restricted to this Cloudflare account with Account Settings
+Read plus Workers Scripts, D1, Workers R2 Storage, and Workers Observability Edit
+access. Never add `GITHUB_PRIVATE_KEY`, `ADMIN_TOKEN`, invite tokens, or build
+metadata to GitHub Actions. A `workflow_dispatch` of `main` provides the same
+staging-first recovery path when a deployment must be rerun without a source
+change; dispatches of any other ref validate but cannot deploy.
 
 D1 migrations in this service must use expand/contract sequencing: a migration
 applied before a Worker deployment remains compatible with the currently running

@@ -283,7 +283,9 @@ D1 migrations and deploys through the `feedback-staging` GitHub environment,
 requires the typed staging `/healthz` response, then repeats that sequence through
 `feedback-production`. Production is therefore unreachable from this workflow
 until validation and staging health both pass. Its single non-cancelling concurrency
-group prevents two migration/deployment sequences from overlapping.
+group for pushes and dispatches of `main` prevents two migration/deployment
+sequences from overlapping. Pull requests and non-main dispatches use separate
+PR/ref validation groups, so they cannot replace a queued deployment.
 The Worker issue-body test feeds HTML comments, headings, code fences, and table
 separators through every untrusted display field and asserts the escaped player text
 cannot hide the fixed agent-handoff heading or private-bundle fetch command.

@@ -169,7 +169,10 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         "branches:\n      - main",
         '      - "services/feedback-relay/**"',
         "permissions:\n  contents: read",
-        "group: feedback-relay-deploy",
+        (
+            "group: feedback-relay-${{ github.event_name == 'pull_request' && "
+            "format('pr-{0}', github.event.pull_request.number) || github.ref }}"
+        ),
         "cancel-in-progress: false",
         "run: npm ci",
         "run: npm run check",
