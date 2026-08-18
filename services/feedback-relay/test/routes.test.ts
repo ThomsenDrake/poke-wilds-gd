@@ -17,6 +17,7 @@ function env(rateAllowed: boolean): Env {
     } as unknown as D1Database,
     REPORTS: {} as R2Bucket,
     REPORT_RATE_LIMITER: { limit: async () => ({ success: rateAllowed }) } as RateLimit,
+    WORKER_VERSION: { id: "version-test", tag: "commit-test", timestamp: "2026-08-18T00:00:00Z" },
     ENVIRONMENT: "test", GITHUB_REPOSITORY: "owner/repo", GITHUB_APP_ID: "", GITHUB_INSTALLATION_ID: "",
     GITHUB_PRIVATE_KEY: "", ADMIN_TOKEN: "",
   };
@@ -24,6 +25,17 @@ function env(rateAllowed: boolean): Env {
 
 describe("feedback report route boundaries", () => {
 	beforeEach(() => findOrCreateIssue.mockReset());
+  it("identifies the exact Worker version in health responses", async () => {
+    const response = await worker.fetch(new Request("https://relay.test/healthz"), env(true));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      environment: "test",
+      report_schema: 1,
+      version_id: "version-test",
+    });
+  });
+
   it("fails closed for missing, short, or empty admin credentials", async () => {
     for (const [secret, header] of [["", "Bearer x"], ["short", "Bearer short"], ["a".repeat(32), "Bearer "]] as const) {
       const scoped = env(true);

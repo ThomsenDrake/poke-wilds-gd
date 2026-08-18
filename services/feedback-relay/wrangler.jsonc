@@ -4,6 +4,9 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2026-08-12",
 	"workers_dev": true,
+	"version_metadata": {
+		"binding": "WORKER_VERSION"
+	},
 	"vars": {
 		"ENVIRONMENT": "production",
 		"GITHUB_REPOSITORY": "ThomsenDrake/poke-wilds-gd"
@@ -44,6 +47,9 @@
 	"env": {
 		"staging": {
 			"name": "poke-wilds-feedback-relay-staging",
+			"version_metadata": {
+				"binding": "WORKER_VERSION"
+			},
 			"vars": {
 				"ENVIRONMENT": "staging",
 				"GITHUB_REPOSITORY": "ThomsenDrake/poke-wilds-gd"

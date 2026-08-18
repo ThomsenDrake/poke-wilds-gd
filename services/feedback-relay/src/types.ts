@@ -2,6 +2,11 @@ export interface Env {
   DB: D1Database;
   REPORTS: R2Bucket;
   REPORT_RATE_LIMITER: RateLimit;
+  WORKER_VERSION: {
+    id: string;
+    tag: string;
+    timestamp: string;
+  };
   ENVIRONMENT: string;
   GITHUB_REPOSITORY: string;
   GITHUB_APP_ID: string;

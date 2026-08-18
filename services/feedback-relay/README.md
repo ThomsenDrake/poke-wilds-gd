@@ -17,7 +17,9 @@ production Wrangler dry-runs without Cloudflare credentials. A push to `main`
 changing this directory runs the same validation, then:
 
 1. applies pending D1 migrations and deploys through `feedback-staging`;
-2. verifies staging `/healthz` reports `ok`, environment `staging`, and schema 1;
+2. reads Wrangler's structured deployment output, probes the target Wrangler
+   actually deployed, and verifies `/healthz` reports that exact Worker version,
+   environment `staging`, and schema 1;
 3. applies pending D1 migrations and deploys through `feedback-production`; and
 4. verifies the corresponding production health contract.
 
@@ -28,7 +30,9 @@ workflow passes `--strict` and `--keep-vars`: risky configuration drift refuses
 deployment, while dashboard-managed non-secret vars remain intact. Worker secrets
 are not replaced or copied into GitHub. The Cloudflare CI credential is scoped to
 the four migration/deploy steps; lockfile installation, checks, dry-runs, and health
-probes cannot read it.
+probes cannot read it. Each deploy tags the Worker version with `GITHUB_SHA`;
+the health probe requires the structured deploy record to carry that tag and the
+Worker's version-metadata binding to return the same deployed version ID.
 Third-party GitHub Actions are pinned to full commit SHAs; dependency installation
 continues to use the committed npm lockfile.
 

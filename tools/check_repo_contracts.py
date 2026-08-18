@@ -211,6 +211,19 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         return [f"Missing feedback relay deployment workflow: {FEEDBACK_RELAY_DEPLOY_WORKFLOW}"]
     text = _active_yaml_text(path.read_text(encoding="utf-8"))
     issues: list[str] = []
+    wrangler_path = root / "services/feedback-relay/wrangler.jsonc"
+    worker_path = root / "services/feedback-relay/src/index.ts"
+    if not wrangler_path.exists() or not worker_path.exists():
+        issues.append("feedback relay deployment requires Wrangler config and Worker source")
+    else:
+        wrangler_text = wrangler_path.read_text(encoding="utf-8")
+        worker_text = worker_path.read_text(encoding="utf-8")
+        if wrangler_text.count('"binding": "WORKER_VERSION"') != 2:
+            issues.append(
+                "feedback relay must bind Worker version metadata in production and staging"
+            )
+        if "version_id: env.WORKER_VERSION.id" not in worker_text:
+            issues.append("feedback relay health must report the executing Worker version ID")
     required = (
         "branches:\n      - main",
         '      - "services/feedback-relay/**"',
@@ -232,8 +245,10 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
         "npx wrangler d1 migrations apply DB --remote --env staging",
         'npx wrangler d1 migrations apply DB --remote --env=""',
-        "https://poke-wilds-feedback-relay-staging.drake-t.workers.dev/healthz",
-        "https://poke-wilds-feedback-relay.drake-t.workers.dev/healthz",
+        '--tag "${GITHUB_SHA}"',
+        "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-staging-deploy.jsonl",
+        "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-production-deploy.jsonl",
+        'h.version_id !== d.version_id',
     )
     for fragment in required:
         if fragment not in text:
@@ -274,6 +289,24 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         "Apply production D1 migrations",
         "Deploy production Worker",
     }
+    deployment_record_line = (
+        'deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/%s" node -e \'const fs=require("node:fs"); '
+        'const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\\r?\\n/).filter(Boolean).map(JSON.parse); '
+        'const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; '
+        'if (deploys.length !== 1 || d.worker_tag !== process.env.GITHUB_SHA || '
+        'typeof d.version_id !== "string" || d.version_id.length === 0 || '
+        '!Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); '
+        'process.stdout.write(JSON.stringify(d))\')"'
+    )
+    health_url_line = (
+        'health_url="$(DEPLOYMENT="$deployment" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); '
+        'const u=new URL(d.targets[0]); if (u.protocol !== "https:") process.exit(1); '
+        'u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)\')"'
+    )
+    health_request_line = (
+        'response="$(curl --fail-with-body --silent --show-error --retry 5 '
+        '--retry-all-errors --retry-delay 2 "$health_url")"'
+    )
     job_step_contracts = {
         "validate": {
             "Install from the lockfile": ("run: npm ci",),
@@ -291,12 +324,15 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 "run: npx wrangler d1 migrations apply DB --remote --env staging",
             ),
             "Deploy staging Worker": (
-                'run: npx wrangler deploy --strict --keep-vars --env staging --message "GitHub Actions ${GITHUB_SHA}"',
+                'run: npx wrangler deploy --strict --keep-vars --env staging --tag "${GITHUB_SHA}" --message "GitHub Actions ${GITHUB_SHA}"',
+                "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-staging-deploy.jsonl",
             ),
             "Verify staging health": (
                 "run: |",
-                'response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://poke-wilds-feedback-relay-staging.drake-t.workers.dev/healthz)"',
-                'RESPONSE="$response" node -e \'const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1) process.exit(1)\'',
+                deployment_record_line % "feedback-staging-deploy.jsonl",
+                health_url_line,
+                health_request_line,
+                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)\'',
             ),
         },
         "deploy-production": {
@@ -305,12 +341,15 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 'run: npx wrangler d1 migrations apply DB --remote --env=""',
             ),
             "Deploy production Worker": (
-                'run: npx wrangler deploy --strict --keep-vars --env="" --message "GitHub Actions ${GITHUB_SHA}"',
+                'run: npx wrangler deploy --strict --keep-vars --env="" --tag "${GITHUB_SHA}" --message "GitHub Actions ${GITHUB_SHA}"',
+                "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-production-deploy.jsonl",
             ),
             "Verify production health": (
                 "run: |",
-                'response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 https://poke-wilds-feedback-relay.drake-t.workers.dev/healthz)"',
-                'RESPONSE="$response" node -e \'const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1) process.exit(1)\'',
+                deployment_record_line % "feedback-production-deploy.jsonl",
+                health_url_line,
+                health_request_line,
+                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)\'',
             ),
         },
     }
@@ -348,6 +387,10 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         if any(re.match(r"^    continue-on-error:", line) for line in job.splitlines()):
             issues.append(
                 f"feedback relay job {job_name!r} must not continue on error"
+            )
+        if any(re.match(r"^    permissions:", line) for line in job.splitlines()):
+            issues.append(
+                f"feedback relay job {job_name!r} must not override workflow permissions"
             )
         for metadata_line in job_metadata[job_name]:
             if metadata_line not in job_lines:
