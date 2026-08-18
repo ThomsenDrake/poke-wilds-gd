@@ -261,6 +261,12 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must deploy only a push or manual dispatch of main"
         )
+    credential_step_names = {
+        "Apply staging D1 migrations",
+        "Deploy staging Worker",
+        "Apply production D1 migrations",
+        "Deploy production Worker",
+    }
     job_step_contracts = {
         "validate": {
             "Install from the lockfile": ("run: npm ci",),
@@ -324,6 +330,18 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             continue
         job = blocks[0]
         job_lines = [line.strip() for line in job.splitlines() if line.strip()]
+        job_if_lines = [
+            line.strip() for line in job.splitlines() if re.match(r"^    if:", line)
+        ]
+        expected_job_if = [] if job_name == "validate" else [deploy_if]
+        if job_if_lines != expected_job_if:
+            issues.append(
+                f"feedback relay job {job_name!r} must use only its contracted if guard"
+            )
+        if any(re.match(r"^    continue-on-error:", line) for line in job.splitlines()):
+            issues.append(
+                f"feedback relay job {job_name!r} must not continue on error"
+            )
         for metadata_line in job_metadata[job_name]:
             if metadata_line not in job_lines:
                 issues.append(
@@ -341,8 +359,37 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         named_steps: dict[str, list[list[str]]] = {}
         for lines in step_blocks:
             first_line = lines[0] if lines else ""
+            step_name = (
+                first_line.removeprefix("- name: ")
+                if first_line.startswith("- name: ")
+                else ""
+            )
+            if any(
+                line.startswith("if:") or line.startswith("continue-on-error:")
+                for line in lines
+            ):
+                label = step_name or first_line or "unnamed step"
+                issues.append(
+                    f"feedback relay step {label!r} must not use if or continue-on-error"
+                )
+            run_count = sum(line.startswith("run:") for line in lines)
+            uses_count = sum(
+                line.startswith("uses:") or line.startswith("- uses:") for line in lines
+            )
+            env_count = sum(line == "env:" or line.startswith("env: ") for line in lines)
+            expected_env_count = 1 if step_name in credential_step_names else 0
+            if (
+                (step_name and (run_count != 1 or uses_count != 0))
+                or (not step_name and (run_count != 0 or uses_count != 1))
+                or env_count != expected_env_count
+                or any(line.startswith("name:") for line in lines[1:])
+            ):
+                label = step_name or first_line or "unnamed step"
+                issues.append(
+                    f"feedback relay step {label!r} must use only its contracted structure"
+                )
             if first_line.startswith("- name: "):
-                named_steps.setdefault(first_line.removeprefix("- name: "), []).append(lines)
+                named_steps.setdefault(step_name, []).append(lines)
         if len(step_blocks) != len(step_contracts) + 2 or set(named_steps) != set(step_contracts):
             issues.append(
                 f"feedback relay job {job_name!r} must contain only its contracted steps"
@@ -379,12 +426,6 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         credential_assignments[secret_name] = re.compile(
             rf"^{escaped_name}\s*:\s*['\"]?\$\{{\{{\s*{secret_access}\s*\}}\}}['\"]?$"
         )
-    credential_step_names = {
-        "Apply staging D1 migrations",
-        "Deploy staging Worker",
-        "Apply production D1 migrations",
-        "Deploy production Worker",
-    }
     credential_step_counts = {name: 0 for name in credential_step_names}
     for lines in _workflow_step_blocks(text):
         first_line = lines[0] if lines else ""
