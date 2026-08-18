@@ -219,10 +219,21 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must scope Cloudflare credentials to individual steps"
         )
-    credential_references = {
-        secret_name: f"{secret_name}: ${{{{ secrets.{secret_name} }}}}"
-        for secret_name in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID")
-    }
+    credential_names = ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID")
+    credential_references = {}
+    credential_assignments = {}
+    for secret_name in credential_names:
+        escaped_name = re.escape(secret_name)
+        secret_access = (
+            rf"secrets\s*(?:\.\s*{escaped_name}|"
+            rf"\[\s*['\"]{escaped_name}['\"]\s*\])"
+        )
+        credential_references[secret_name] = re.compile(
+            rf"\$\{{\{{\s*{secret_access}\s*\}}\}}"
+        )
+        credential_assignments[secret_name] = re.compile(
+            rf"^{escaped_name}\s*:\s*['\"]?\$\{{\{{\s*{secret_access}\s*\}}\}}['\"]?$"
+        )
     credential_step_names = {
         "Apply staging D1 migrations",
         "Deploy staging Worker",
@@ -239,12 +250,17 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         )
         present = {
             secret_name
-            for secret_name, reference in credential_references.items()
-            if reference in lines
+            for secret_name, pattern in credential_references.items()
+            if any(pattern.search(line) for line in lines)
+        }
+        assigned = {
+            secret_name
+            for secret_name, pattern in credential_assignments.items()
+            if any(pattern.fullmatch(line) for line in lines)
         }
         if step_name in credential_step_names:
             credential_step_counts[step_name] += 1
-            missing = sorted(set(credential_references) - present)
+            missing = sorted(set(credential_names) - assigned)
             if missing:
                 issues.append(
                     f"feedback relay step {step_name!r} must receive both Cloudflare credentials; "
@@ -261,8 +277,8 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain exactly one {step_name!r} step"
             )
-    for secret_name, reference in credential_references.items():
-        if text.count(reference) != 4:
+    for secret_name, pattern in credential_references.items():
+        if len(pattern.findall(text)) != 4:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
             )
