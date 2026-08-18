@@ -220,6 +220,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must scope Cloudflare credentials to individual steps"
         )
     credential_names = ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID")
+    secrets_context = re.compile(r"\bsecrets\b")
     credential_references = {}
     credential_assignments = {}
     for secret_name in credential_names:
@@ -253,6 +254,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             for secret_name, pattern in credential_references.items()
             if any(pattern.search(line) for line in lines)
         }
+        uses_secrets_context = any(secrets_context.search(line) for line in lines)
         assigned = {
             secret_name
             for secret_name, pattern in credential_assignments.items()
@@ -266,11 +268,11 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                     f"feedback relay step {step_name!r} must receive both Cloudflare credentials; "
                     f"missing {', '.join(missing)}"
                 )
-        elif present:
+        elif uses_secrets_context:
             label = step_name or first_line or "unnamed step"
+            details = f": {', '.join(sorted(present))}" if present else ""
             issues.append(
-                f"feedback relay step {label!r} must not receive Cloudflare credentials: "
-                f"{', '.join(sorted(present))}"
+                f"feedback relay step {label!r} must not receive GitHub secrets{details}"
             )
     for step_name, count in sorted(credential_step_counts.items()):
         if count != 1:
@@ -282,6 +284,15 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
             )
+    active_text = "\n".join(
+        line for line in text.splitlines() if not line.lstrip().startswith("#")
+    )
+    for pattern in credential_references.values():
+        active_text = pattern.sub("", active_text)
+    if secrets_context.search(active_text):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not expose any other GitHub secrets context"
+        )
 
     staging_at = text.find("  deploy-staging:")
     production_at = text.find("  deploy-production:")
