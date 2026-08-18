@@ -84,6 +84,12 @@ func _check_size(width: int, height: int) -> void:
 	if frame == null or frame.is_empty() or native == null or native.is_empty():
 		_failures.append("Display matrix at %s: viewport capture unavailable." % label)
 		return
+	var feedback := _battle_view().get_node_or_null("../FeedbackDialog")
+	if feedback != null: feedback.open_dialog()
+	await _settle(2)
+	if feedback == null or not feedback.layout_fits_viewport():
+		_failures.append("Feedback dialog escaped the viewport at %s." % label)
+	if feedback != null: feedback.close_dialog()
 	frame.save_png("%s/%s_battle.png" % [MATRIX_DIR, label])
 	var drift := _display_drift(frame, native)
 	_max_drift = maxf(_max_drift, drift["total"])

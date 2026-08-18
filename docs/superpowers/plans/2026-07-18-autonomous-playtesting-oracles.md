@@ -1,5 +1,5 @@
 Status: draft
-Last verified: 2026-07-18
+Last verified: 2026-08-18
 Review cadence days: 30
 Source paths: docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md, scripts/app/qa_scenarios.gd, scripts/runtime/playtest_bot.gd, tools/run_playtests.py
 

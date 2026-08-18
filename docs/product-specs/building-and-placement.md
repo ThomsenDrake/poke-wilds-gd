@@ -9,6 +9,8 @@ Building is the keystone slice: the later campfire/bed/pen/storage behaviors (Ph
 
 ## Supported behavior
 
+- Playtest reports include the current in-memory placements and overrides as part of the private save snapshot without mutating either collection; see [playtest-feedback.md](playtest-feedback.md).
+
 - The player places structures on bare or already-cleared tiles: walls, roofs, doors, interior partitions, fences, a campfire pad, a bed, and a storage box. A small, fully enclosed house with a door is buildable from harvested materials (the Phase-1 exit object).
 - Placement is tile-based and permanent. A structure occupies one tile; the placed sprite renders through the world view's existing prop pipeline (y-sorted against the player's feet), so a placed tile reads exactly like a world prop.
 - Placing requires a clear tile: the harvest→build loop is enforced because a structure can only go on a walkable tile with no prop — cut a tree, then build on the cleared tile, or build on open ground.

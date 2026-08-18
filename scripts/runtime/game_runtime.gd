@@ -89,7 +89,7 @@ func _ready() -> void:
 	build_runtime.structure_removed.connect(func(tile: Vector2i) -> void: breeding_runtime.note_structures_changed(); world_overridden.emit(tile))
 	music_router.setup(trace) # under this autoload so its lazy player is in the tree and audible
 	add_child(music_router)
-	add_child(preload("res://scripts/runtime/performance_monitors.gd").new()) # release-build-queryable agent surface (Performance.get_custom_monitor); self-registers in _ready, unregisters in _exit_tree
+	add_child(preload("res://scripts/runtime/performance_monitors.gd").new()) # release-build diagnostics child; self-registering/read-only
 
 func ensure_initialized(silent_new_game: bool = true) -> void:
 	if _initialized:

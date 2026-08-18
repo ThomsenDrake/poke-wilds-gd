@@ -1,5 +1,5 @@
 Status: approved
-Last verified: 2026-07-18
+Last verified: 2026-08-18
 Review cadence days: 30
 Date: 2026-07-18
 Source paths: scripts/domain/world_generator.gd, scripts/runtime/world_view.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/app/main.gd, scripts/ui/start_menu.gd

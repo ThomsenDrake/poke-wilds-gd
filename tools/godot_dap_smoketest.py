@@ -249,6 +249,10 @@ SCENARIO_REQUIREMENTS = {
         "all": ["legibility_soak_passed"],
         "any": [["session_loaded", "session_created"]],
     },
+    "feedback_flow": {
+        "all": ["feedback_capture_requested", "feedback_report_sent", "feedback_flow_passed"],
+        "any": [["session_loaded", "session_created"]],
+    },
     "battle_anim": {
         "all": ["battle_anim_passed"],
         "any": [["session_loaded", "session_created"]],

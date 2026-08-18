@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-15
+Last verified: 2026-08-16
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/run_codex_cloud_visuals.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/run_codex_cloud_visuals.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, docs/references/feedback-report-schema.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -84,6 +84,10 @@ Agents answer "what is the game doing?" from **structured text**, in this order:
    windowed sweep shots, merged onto the scenario entry as
    `vision_review_quarantine` findings. Advisory only: quarantine-FOREVER,
    never promoted to red (see Recipes below).
+6. A packaged playtest report (manifest `[feedback_reports]`) — start at the
+   public issue's report id, run `python3 tools/fetch_feedback_report.py <id>`,
+   then read the verified `report.json` before its trace/UI/save/screenshot
+   siblings. The maintainer token stays in the environment and is never echoed.
 
 Screenshots are golden-baseline **verification artifacts**, not a primary
 perception channel: capture paths go in transcripts, never binary image data in
