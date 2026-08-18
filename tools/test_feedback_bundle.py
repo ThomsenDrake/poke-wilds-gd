@@ -298,6 +298,7 @@ class FeedbackBundleTests(unittest.TestCase):
 
     def test_runtime_bundle_checks_zip_results_and_atomically_repairs_install_id(self) -> None:
         source = (package_playtest.ROOT / "scripts/runtime/feedback_bundle.gd").read_text(encoding="utf-8")
+        trace_logger = (package_playtest.ROOT / "scripts/core/trace_logger.gd").read_text(encoding="utf-8")
         self.assertIn("var write_error := packer.write_file", source)
         self.assertIn("var entry_close_error := packer.close_file()", source)
         self.assertIn('if packer.close() != OK:', source)
@@ -307,6 +308,11 @@ class FeedbackBundleTests(unittest.TestCase):
         reduction = source[source.index("func _reduce_to_limit"):source.index("func _reduce_trace_middle")]
         self.assertIn("FileAccess.get_file_as_bytes(path).size() > MAX_BUNDLE_BYTES", reduction)
         self.assertIn("or _uncompressed_size(artifacts) > MAX_UNCOMPRESSED_BYTES", reduction)
+        bundle_marker = source[source.index("func _reduce_trace_middle"):source.index("func _artifact_manifest")]
+        logger_marker = trace_logger[trace_logger.index('var gap := (JSON.stringify({"event": "feedback_trace_truncated"'):
+                                     trace_logger.index("var tail_size :=", trace_logger.index("var gap :="))]
+        self.assertIn('"ts_msec": Time.get_ticks_msec()', bundle_marker)
+        self.assertIn('"ts_msec": Time.get_ticks_msec()', logger_marker)
 
     def test_runtime_outbox_checks_sidecar_write_and_retry_scheduler_rescans(self) -> None:
         outbox = (package_playtest.ROOT / "scripts/runtime/feedback_outbox.gd").read_text(encoding="utf-8")

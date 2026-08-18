@@ -157,7 +157,8 @@ func _uncompressed_size(artifacts: Dictionary) -> int:
 
 
 func _reduce_trace_middle(bytes: PackedByteArray, limit: int) -> PackedByteArray:
-	var marker := (JSON.stringify({"event": "feedback_trace_truncated", "source": "FeedbackBundle",
+	var marker := (JSON.stringify({"event": "feedback_trace_truncated",
+		"ts_msec": Time.get_ticks_msec(), "source": "FeedbackBundle",
 		"payload": {"reason": "bundle_size_limit"}}) + "\n").to_utf8_buffer()
 	var prefix_size := mini(bytes.size(), maxi(16 * 1024, limit / 4))
 	var prefix := BoundedJsonl.complete_prefix(bytes.slice(0, prefix_size))

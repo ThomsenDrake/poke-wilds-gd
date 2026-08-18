@@ -57,8 +57,9 @@ func session_log_slice(limit_bytes: int = 5 * 1024 * 1024) -> Dictionary:
 		return {"bytes": complete, "source_bytes": source_bytes, "truncated": false}
 	var prefix_size := mini(256 * 1024, limit_bytes / 4)
 	var prefix := BoundedJsonl.complete_prefix(file.get_buffer(prefix_size))
-	var gap := (JSON.stringify({"event": "feedback_trace_truncated", "source": "TraceLogger", "payload": {
-		"omitted_bytes": source_bytes - limit_bytes}}) + "\n").to_utf8_buffer()
+	var gap := (JSON.stringify({"event": "feedback_trace_truncated",
+		"ts_msec": Time.get_ticks_msec(), "source": "TraceLogger",
+		"payload": {"omitted_bytes": source_bytes - limit_bytes}}) + "\n").to_utf8_buffer()
 	var tail_size := maxi(0, limit_bytes - prefix.size() - gap.size())
 	file.seek(maxi(_session_start_offset + prefix.size(), end - tail_size))
 	var tail := BoundedJsonl.complete_tail(file.get_buffer(tail_size))

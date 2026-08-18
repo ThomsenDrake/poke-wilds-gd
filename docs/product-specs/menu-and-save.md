@@ -12,6 +12,10 @@ Source paths: scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/Ba
   calls the save store, and never overwrites the player's live save. Its separate
   outbox owner atomically publishes the ZIP before the metadata commit marker, so
   retry cannot observe a torn pair. See [playtest-feedback.md](playtest-feedback.md).
+- Oversized current-session traces retain complete JSONL records around an explicit
+  truncation marker. That synthetic record carries the same `event`, `ts_msec`,
+  `source`, and `payload` fields as every emitted runtime trace, so strict consumers
+  can continue parsing a feedback bundle after the gap.
 
 - Pressing `Enter` opens the start menu while the player is not in battle.
 - The start menu lists `POKEMON`, `BAG`, `SAVE`, `OPTIONS`, `NEW GAME`, and `CLOSE` (the `OPTIONS` entry, index 3, opens the Options submenu below).

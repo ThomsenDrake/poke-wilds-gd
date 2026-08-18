@@ -230,6 +230,9 @@ atomically replaced with the relay's exact 32-lowercase-hex identity format.
 Its reduction loop enforces both the 16 MiB compressed and 24 MiB uncompressed relay
 limits before outbox commit; the Python contract test pins both conditions. Worker tests
 also pin code-point-safe body/title truncation after message validation.
+The journey forces both current-session and bundle-size trace reduction and parses each
+`feedback_trace_truncated` marker, including the canonical numeric `ts_msec`, so an
+oversized diagnostic stream remains valid under the repository-wide JSONL contract.
 It also suspends an active retry transport, submits another report, and proves the
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
 entry. The first report is queued under one synthetic package identity, the active

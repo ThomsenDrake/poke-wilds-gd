@@ -267,6 +267,8 @@ quality_bucket = "runtime"
 # opt-in per developer machine); editor-only, never loaded in game runs; a
 # malformed line degrades to raw display, never dropped. Agent-vendor-neutral:
 # it renders the repo's own JSONL contract (docs/references/trace-events.md);
+# current-session truncation preserves that contract by giving its synthetic gap
+# record the canonical event/ts_msec/source/payload fields, pinned by feedback_flow.
 # README: addons/agent_trace/README.md. AGENT-NEUTRAL INTEGRATION Phase 4 rides
 # THIS entry's trace surfaces only by adjacency — the AccessKit property
 # annotations themselves live in the title_flow entry's gbc_widgets/gbc_stage
@@ -2020,7 +2022,8 @@ quality_bucket = "feedback"
 # original-package private-route retry, route cleanup, failed-block-marker quarantine,
 # cross-route retry isolation without consuming pre-existing outbox entries, retry
 # suppression, pre-outbox refusal of unconfigured builds, runtime HTTPS revalidation,
-# and semantic machine-identity redaction.
+# semantic machine-identity redaction, and canonical timestamped truncation markers
+# from both the session slicer and bundle-size reducer.
 # Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
 # public truncation, atomic expiring/uploading ownership, terminal expired-row retries,

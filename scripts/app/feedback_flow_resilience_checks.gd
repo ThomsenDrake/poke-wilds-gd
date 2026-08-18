@@ -6,6 +6,8 @@ class QuietRuntime:
 		pass
 
 const Redactor := preload("res://scripts/core/feedback_redactor.gd")
+const TraceLogger := preload("res://scripts/core/trace_logger.gd")
+const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const OUTBOX_DIR := "user://feedback_outbox"
 
@@ -23,6 +25,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_tree = tree
 	_result_copy_contract()
 	_redaction_contract()
+	_trace_truncation_contract()
 	await _missing_configuration_contract()
 	_controller.smoke_set_build_info({"channel": "scenario-blocked", "build_id": "scenario-blocked",
 		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/blocked",
@@ -109,6 +112,31 @@ func _redaction_contract() -> void:
 		"runtime accepted an unsafe embedded endpoint")
 	_check(_controller.smoke_validated_endpoint("https://feedback.invalid/") == "https://feedback.invalid",
 		"runtime rejected or failed to normalize a legitimate HTTPS endpoint")
+
+
+func _trace_truncation_contract() -> void:
+	var logger := TraceLogger.new()
+	logger.emit_event("feedback_truncation_probe", "FeedbackFlowResilienceChecks")
+	var session_slice := logger.session_log_slice(64)
+	_check(bool(session_slice.get("truncated", false)), "trace logger truncation probe did not truncate")
+	_check(_has_valid_truncation_marker(session_slice.get("bytes", PackedByteArray()), "TraceLogger"),
+		"trace logger truncation marker omitted the canonical trace shape")
+	var source_line := (JSON.stringify({"event": "feedback_truncation_probe", "ts_msec": 1,
+		"source": "FeedbackFlowResilienceChecks", "payload": {}}) + "\n")
+	var reduced := FeedbackBundle.new()._reduce_trace_middle(
+		source_line.repeat(2048).to_utf8_buffer(), 64 * 1024)
+	_check(_has_valid_truncation_marker(reduced, "FeedbackBundle"),
+		"bundle-size truncation marker omitted the canonical trace shape")
+
+
+func _has_valid_truncation_marker(bytes: PackedByteArray, source: String) -> bool:
+	for line in bytes.get_string_from_utf8().split("\n", false):
+		var record = JSON.parse_string(line)
+		if record is Dictionary and record.get("event") == "feedback_trace_truncated" \
+				and record.get("source") == source:
+			return record.has("ts_msec") and int(record.get("ts_msec", -1)) >= 0 \
+				and record.get("payload") is Dictionary
+	return false
 
 
 func _result_copy_contract() -> void:

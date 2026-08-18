@@ -160,3 +160,6 @@ The injected scenario transport leaves reports from prior runs queued and untouc
 only report IDs created by the current journey affect its counters or assertions.
 The journey also submits from an unconfigured synthetic build and proves no transport,
 ZIP, metadata marker, or private route is created.
+Both trace-reduction stages preserve the canonical runtime record shape: their
+`feedback_trace_truncated` marker carries `event`, numeric boot-clock `ts_msec`,
+`source`, and `payload`. The focused journey forces and parses both marker producers.
