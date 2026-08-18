@@ -219,8 +219,49 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must scope Cloudflare credentials to individual steps"
         )
-    for secret_name in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"):
-        reference = f"{secret_name}: ${{{{ secrets.{secret_name} }}}}"
+    credential_references = {
+        secret_name: f"{secret_name}: ${{{{ secrets.{secret_name} }}}}"
+        for secret_name in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID")
+    }
+    credential_step_names = {
+        "Apply staging D1 migrations",
+        "Deploy staging Worker",
+        "Apply production D1 migrations",
+        "Deploy production Worker",
+    }
+    credential_step_counts = {name: 0 for name in credential_step_names}
+    for lines in _workflow_step_blocks(text):
+        first_line = lines[0] if lines else ""
+        step_name = (
+            first_line.removeprefix("- name: ")
+            if first_line.startswith("- name: ")
+            else ""
+        )
+        present = {
+            secret_name
+            for secret_name, reference in credential_references.items()
+            if reference in lines
+        }
+        if step_name in credential_step_names:
+            credential_step_counts[step_name] += 1
+            missing = sorted(set(credential_references) - present)
+            if missing:
+                issues.append(
+                    f"feedback relay step {step_name!r} must receive both Cloudflare credentials; "
+                    f"missing {', '.join(missing)}"
+                )
+        elif present:
+            label = step_name or first_line or "unnamed step"
+            issues.append(
+                f"feedback relay step {label!r} must not receive Cloudflare credentials: "
+                f"{', '.join(sorted(present))}"
+            )
+    for step_name, count in sorted(credential_step_counts.items()):
+        if count != 1:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain exactly one {step_name!r} step"
+            )
+    for secret_name, reference in credential_references.items():
         if text.count(reference) != 4:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
