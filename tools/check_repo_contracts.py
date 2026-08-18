@@ -290,7 +290,6 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     required = (
         "branches:\n      - main",
         '      - "services/feedback-relay/**"',
-        "permissions:\n  contents: read",
         (
             "group: feedback-relay-${{ github.event_name == 'pull_request' && "
             "format('pr-{0}', github.event.pull_request.number) || github.ref }}"
@@ -319,6 +318,21 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             issues.append(
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} is missing deployment contract: {fragment}"
             )
+    workflow_lines = text.splitlines()
+    permission_headers = [
+        index for index, line in enumerate(workflow_lines) if line == "permissions:"
+    ]
+    permission_entries: list[str] = []
+    if len(permission_headers) == 1:
+        for line in workflow_lines[permission_headers[0] + 1:]:
+            if line and not line[0].isspace():
+                break
+            if line.strip():
+                permission_entries.append(line)
+    if len(permission_headers) != 1 or permission_entries != ["  contents: read"]:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} workflow permissions must be exactly contents: read"
+        )
     for action_ref in (
         "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
         "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
@@ -366,13 +380,22 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         'const u=new URL(d.targets[0]); if (u.protocol !== "https:") process.exit(1); '
         'u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)\')"'
     )
-    health_request_line = (
-        'response="$(curl --fail-with-body --silent --show-error --retry 5 '
-        '--retry-all-errors --retry-delay 2 "$health_url")"'
+    health_retry_lines = (
+        "for attempt in 1 2 3 4 5 6; do",
+        'if [ "$attempt" -lt 6 ]; then sleep 2; fi',
+        "done",
+        "exit 1",
+    )
+    health_request_prefix = (
+        'if response="$(curl --fail-with-body --silent --show-error --max-time 10 '
+        '"$health_url")" && '
     )
     job_step_contracts = {
         "validate": {
             "Install from the lockfile": ("run: npm ci",),
+            "Validate repository deployment contracts": (
+                "run: python3 ../../tools/check_repo_contracts.py",
+            ),
             "Type-check and test the Worker": ("run: npm run check",),
             "Validate the staging deployment bundle": (
                 "run: npx wrangler deploy --dry-run --strict --keep-vars --env staging",
@@ -394,8 +417,9 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 "run: |",
                 deployment_record_line % "feedback-staging-deploy.jsonl",
                 health_url_line,
-                health_request_line,
-                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'',
+                *health_retry_lines,
+                health_request_prefix + 'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'; then',
+                "exit 0",
             ),
         },
         "deploy-production": {
@@ -411,8 +435,9 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 "run: |",
                 deployment_record_line % "feedback-production-deploy.jsonl",
                 health_url_line,
-                health_request_line,
-                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'',
+                *health_retry_lines,
+                health_request_prefix + 'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'; then',
+                "exit 0",
             ),
         },
     }

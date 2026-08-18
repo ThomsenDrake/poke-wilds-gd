@@ -277,11 +277,14 @@ Relay changes additionally require
 production/staging `wrangler deploy --dry-run` commands from
 `services/feedback-relay`; dry-run verification never deploys.
 On a pull request that changes `services/feedback-relay/**`, the
-`feedback-relay-deploy` workflow runs those Worker checks and dry-runs without
-Cloudflare credentials. After the same change reaches `main`, it applies remote
+`feedback-relay-deploy` workflow runs the repository deployment-contract gate,
+the Worker checks, and both dry-runs without Cloudflare credentials. After the
+same change reaches `main`, it applies remote
 D1 migrations and deploys through the `feedback-staging` GitHub environment,
-requires the typed staging `/healthz` response, then repeats that sequence through
-`feedback-production`. Production is therefore unreachable from this workflow
+requires the typed staging `/healthz` response for the exact deployed Worker
+version (retrying stale-but-healthy edge responses during propagation), then repeats
+that sequence through `feedback-production`. Production is therefore unreachable
+from this workflow
 until validation and staging health both pass. Its single non-cancelling concurrency
 group for pushes and dispatches of `main` prevents two migration/deployment
 sequences from overlapping. Pull requests and non-main dispatches use separate
