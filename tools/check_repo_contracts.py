@@ -470,6 +470,13 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
             )
     active_text = text
+    quoted_mapping_key = re.compile(
+        r'''(?m)^\s*(?:-\s*)?(?:"[^"\r\n]+"|'[^'\r\n]+')\s*:'''
+    )
+    if quoted_mapping_key.search(active_text):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not use quoted YAML mapping keys"
+        )
     yaml_anchor_or_alias = re.compile(
         r"(?m)(?:^|[\s:\-\[\{,])[&*](?![&*])[^ \t\r\n\[\]\{\},]+"
     )
