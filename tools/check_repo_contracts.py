@@ -287,6 +287,13 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     active_text = "\n".join(
         line for line in text.splitlines() if not line.lstrip().startswith("#")
     )
+    yaml_anchor_or_alias = re.compile(
+        r"(?m)(?:^|[\s:\-\[\{,])[&*](?![&*])[^ \t\r\n\[\]\{\},]+"
+    )
+    if yaml_anchor_or_alias.search(active_text):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not use YAML anchors or aliases"
+        )
     for pattern in credential_references.values():
         active_text = pattern.sub("", active_text)
     if secrets_context.search(active_text):
