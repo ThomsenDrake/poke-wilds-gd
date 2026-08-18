@@ -366,6 +366,16 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         '      - ".github/workflows/feedback-relay-deploy.yml"',
         '      - "services/feedback-relay/**"',
     ]
+    expected_on = [
+        "on:",
+        *expected_push_trigger,
+        *expected_pull_request_trigger,
+        "  workflow_dispatch:",
+    ]
+    if _yaml_mapping_block(text, "on:") != expected_on:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must use only its exact push, pull-request, and manual triggers"
+        )
     if _yaml_mapping_block(text, "  push:") != expected_push_trigger:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must use the exact main-push relay trigger"
@@ -373,6 +383,31 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     if _yaml_mapping_block(text, "  pull_request:") != expected_pull_request_trigger:
         issues.append(
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must validate every relay pull-request update"
+        )
+    if _yaml_mapping_block(text, "concurrency:") != [
+        "concurrency:",
+        "  group: feedback-relay-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}",
+        "  cancel-in-progress: false",
+    ]:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must use the exact non-cancelling deployment concurrency contract"
+        )
+    if _yaml_mapping_block(text, "defaults:") != [
+        "defaults:",
+        "  run:",
+        "    working-directory: services/feedback-relay",
+    ]:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must use only the contracted run working directory"
+        )
+    workflow_keys = [
+        line.split(":", 1)[0]
+        for line in text.splitlines()
+        if line and not line[0].isspace() and re.match(r"^[A-Za-z0-9_-]+:", line)
+    ]
+    if workflow_keys != ["name", "on", "permissions", "concurrency", "defaults", "jobs"]:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain only its contracted workflow keys"
         )
     deploy_if = (
         "if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' "
@@ -486,13 +521,30 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must contain only validate, deploy-staging, and deploy-production jobs"
         )
     job_metadata = {
-        "validate": (),
-        "deploy-staging": (deploy_if, "needs: validate", "environment: feedback-staging"),
+        "validate": ("runs-on: ubuntu-latest", "timeout-minutes: 15"),
+        "deploy-staging": (
+            deploy_if,
+            "needs: validate",
+            "runs-on: ubuntu-latest",
+            "timeout-minutes: 15",
+            "environment: feedback-staging",
+        ),
         "deploy-production": (
             deploy_if,
             "needs: deploy-staging",
+            "runs-on: ubuntu-latest",
+            "timeout-minutes: 15",
             "environment: feedback-production",
         ),
+    }
+    job_keys = {
+        "validate": ["runs-on", "timeout-minutes", "steps"],
+        "deploy-staging": [
+            "if", "needs", "runs-on", "timeout-minutes", "environment", "steps"
+        ],
+        "deploy-production": [
+            "if", "needs", "runs-on", "timeout-minutes", "environment", "steps"
+        ],
     }
     for job_name, step_contracts in job_step_contracts.items():
         blocks = job_blocks.get(job_name, [])
@@ -503,6 +555,15 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             continue
         job = blocks[0]
         raw_job_lines = [line.rstrip() for line in job.splitlines() if line.strip()]
+        actual_job_keys = [
+            line.strip().split(":", 1)[0]
+            for line in job.splitlines()
+            if re.match(r"^    [A-Za-z0-9_-]+:", line)
+        ]
+        if actual_job_keys != job_keys[job_name]:
+            issues.append(
+                f"feedback relay job {job_name!r} must contain only its contracted job keys"
+            )
         job_if_lines = [
             line.strip() for line in job.splitlines() if re.match(r"^    if:", line)
         ]
