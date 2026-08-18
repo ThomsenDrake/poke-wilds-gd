@@ -222,8 +222,11 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
             issues.append(
                 "feedback relay must bind Worker version metadata in production and staging"
             )
-        if "version_id: env.WORKER_VERSION.id" not in worker_text:
-            issues.append("feedback relay health must report the executing Worker version ID")
+        if (
+            "version_id: env.WORKER_VERSION.id" not in worker_text
+            or "version_tag: env.WORKER_VERSION.tag" not in worker_text
+        ):
+            issues.append("feedback relay health must report the executing Worker version")
     required = (
         "branches:\n      - main",
         '      - "services/feedback-relay/**"',
@@ -249,6 +252,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-staging-deploy.jsonl",
         "WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-production-deploy.jsonl",
         'h.version_id !== d.version_id',
+        'h.version_tag !== process.env.GITHUB_SHA',
     )
     for fragment in required:
         if fragment not in text:
@@ -293,8 +297,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         'deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/%s" node -e \'const fs=require("node:fs"); '
         'const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\\r?\\n/).filter(Boolean).map(JSON.parse); '
         'const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; '
-        'if (deploys.length !== 1 || d.worker_tag !== process.env.GITHUB_SHA || '
-        'typeof d.version_id !== "string" || d.version_id.length === 0 || '
+        'if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || '
         '!Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); '
         'process.stdout.write(JSON.stringify(d))\')"'
     )
@@ -332,7 +335,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 deployment_record_line % "feedback-staging-deploy.jsonl",
                 health_url_line,
                 health_request_line,
-                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)\'',
+                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'',
             ),
         },
         "deploy-production": {
@@ -349,7 +352,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 deployment_record_line % "feedback-production-deploy.jsonl",
                 health_url_line,
                 health_request_line,
-                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)\'',
+                'DEPLOYMENT="$deployment" RESPONSE="$response" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)\'',
             ),
         },
     }

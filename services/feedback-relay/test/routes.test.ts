@@ -33,6 +33,7 @@ describe("feedback report route boundaries", () => {
       environment: "test",
       report_schema: 1,
       version_id: "version-test",
+      version_tag: "commit-test",
     });
   });
 

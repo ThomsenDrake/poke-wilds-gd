@@ -72,10 +72,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Verify staging health
         run: |
-          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-staging-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || d.worker_tag !== process.env.GITHUB_SHA || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); process.stdout.write(JSON.stringify(d))')"
+          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-staging-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); process.stdout.write(JSON.stringify(d))')"
           health_url="$(DEPLOYMENT="$deployment" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const u=new URL(d.targets[0]); if (u.protocol !== "https:") process.exit(1); u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)')"
           response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 "$health_url")"
-          DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)'
+          DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)'
 
   deploy-production:
     if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -105,7 +105,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Verify production health
         run: |
-          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-production-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || d.worker_tag !== process.env.GITHUB_SHA || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); process.stdout.write(JSON.stringify(d))')"
+          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-production-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); process.stdout.write(JSON.stringify(d))')"
           health_url="$(DEPLOYMENT="$deployment" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const u=new URL(d.targets[0]); if (u.protocol !== "https:") process.exit(1); u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)')"
           response="$(curl --fail-with-body --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 "$health_url")"
-          DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id) process.exit(1)'
+          DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)'

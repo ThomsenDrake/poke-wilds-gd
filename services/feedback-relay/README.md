@@ -31,8 +31,8 @@ deployment, while dashboard-managed non-secret vars remain intact. Worker secret
 are not replaced or copied into GitHub. The Cloudflare CI credential is scoped to
 the four migration/deploy steps; lockfile installation, checks, dry-runs, and health
 probes cannot read it. Each deploy tags the Worker version with `GITHUB_SHA`;
-the health probe requires the structured deploy record to carry that tag and the
-Worker's version-metadata binding to return the same deployed version ID.
+the health probe requires the Worker's version-metadata binding to return that
+tag and the same version ID recorded by Wrangler's structured deploy output.
 Third-party GitHub Actions are pinned to full commit SHAs; dependency installation
 continues to use the committed npm lockfile.
 
