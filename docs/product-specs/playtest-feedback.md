@@ -114,6 +114,9 @@ reports reconcile by searching the hidden marker before create.
 The public issue contains only the sanitized player sentence, tester handle,
 report/build/commit/platform/captured-screen fields, artifact expiry, and the authenticated
 `tools/fetch_feedback_report.py` command. It never links raw artifacts publicly.
+Every untrusted display field is HTML-encoded and Markdown-escaped before issue
+composition, so player comments, headings, fences, or table separators cannot hide or
+restructure the fixed agent handoff.
 R2 objects expire after 180 days through the scheduled cleanup; the issue and D1
 receipt remain. Each daily invocation atomically claims deterministic 100-row pages in
 D1 before bulk-deleting R2 and marking the claim expired, up to 1,000 objects, and emits aggregate-only cap telemetry if a

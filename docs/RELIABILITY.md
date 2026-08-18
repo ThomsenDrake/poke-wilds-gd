@@ -271,6 +271,9 @@ Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from
 `services/feedback-relay`; dry-run verification never deploys.
+The Worker issue-body test feeds HTML comments, headings, code fences, and table
+separators through every untrusted display field and asserts the escaped player text
+cannot hide the fixed agent-handoff heading or private-bundle fetch command.
 
 Run `biome_probe` after touching world generation, biome definitions, or the spawn/reachability logic. It asserts determinism, ring progression, navigable spawn, and reachability invariants in a single trace.
 Run `biome_traverse` after touching traversal gating, biome encounter filtering, or the player avatar blocked path. It exercises biome crossing, traversal-gate blocking, and a biome-aware wild battle.

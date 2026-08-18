@@ -94,6 +94,9 @@ both paths and parses their markers, while the pure source contract pins each pr
 Oversized engine logs now discard a leading partial line before UTF-8 decoding and
 redaction, preventing an arbitrary tail offset from separating sensitive data from its
 redaction cue; the focused journey pins that ordering with an isolated fixture.
+Public issue composition also HTML-encodes and Markdown-escapes every untrusted display
+field, so player delimiters cannot hide or restructure the agent handoff; Worker tests
+pin comments, headings, fences, table separators, and handoff visibility.
 
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 

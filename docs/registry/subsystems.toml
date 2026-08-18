@@ -2027,6 +2027,7 @@ quality_bucket = "feedback"
 # pins that a leading partial line is removed before decoding and redaction.
 # Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
-# public truncation, atomic expiring/uploading ownership, terminal expired-row retries,
+# public truncation, Markdown/HTML-safe issue composition, atomic expiring/uploading
+# ownership, terminal expired-row retries,
 # cleanup failure recovery, stale-read rejection, and admin denial during cleanup;
 # both dry-runs gate the relay.

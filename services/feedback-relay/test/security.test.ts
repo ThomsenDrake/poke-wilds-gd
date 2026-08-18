@@ -86,6 +86,22 @@ describe("feedback relay contracts", () => {
     expect(issueBody(meta, "2030-01-02T03:04:05.000Z")).toContain("expires 2030-01-02");
   });
 
+  it("renders player Markdown and HTML as inert issue text", () => {
+    const meta = metadata();
+    const body = issueBody({ ...meta, message: "<!-- hide handoff\n## Fake section\n```\nraw\n```",
+      runtime: { ...meta.runtime, os_name: "mac|OS" },
+      game: { ...meta.game, current_screen: "over|world" },
+      capture: { ...meta.capture, screen: "over|world" } });
+    expect(body).toContain("&lt;");
+    expect(body).not.toContain("<!-- hide handoff");
+    expect(body).not.toContain("\n## Fake section");
+    expect(body).toContain("\\#\\# Fake section");
+    expect(body).toContain("mac\\|OS");
+    expect(body).toContain("over\\|world");
+    expect(body).toContain("## Agent handoff");
+    expect(body).toContain("python3 tools/fetch_feedback_report.py");
+  });
+
   it("preserves Unicode code points while truncating public text and titles", () => {
     const emojiMessage = "😀".repeat(1000);
     expect(sanitizePublicText(emojiMessage)).toBe(emojiMessage);

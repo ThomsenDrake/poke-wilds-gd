@@ -4,6 +4,7 @@ import { upstreamUnavailable } from "./errors";
 
 let cachedToken = "";
 let cachedUntil = 0;
+const MARKDOWN_DELIMITERS = new Set(Array.from("\\`*_{}[]()#+-.!|~"));
 
 export async function findOrCreateIssue(env: Env, metadata: ReportMetadata, expiresAt: string): Promise<{ number: number; html_url: string }> {
   const token = await installationToken(env);
@@ -23,19 +24,26 @@ export async function findOrCreateIssue(env: Env, metadata: ReportMetadata, expi
 
 export function issueBody(metadata: ReportMetadata, expiresAt: string = new Date(Date.now() + 180 * 86400_000).toISOString()): string {
 	const expires = new Date(expiresAt).toISOString().slice(0, 10);
-	const screen = sanitizePublicText(metadata.game.current_screen);
-	const platform = sanitizePublicText(metadata.runtime.os_name);
+	const screen = markdownText(metadata.game.current_screen);
+	const platform = markdownText(metadata.runtime.os_name);
 	return `<!-- feedback-report-id:${metadata.report_id} -->\n` +
-    `## Player report\n\n${sanitizePublicText(metadata.message)}\n\n` +
+    `## Player report\n\n${markdownText(metadata.message)}\n\n` +
     `## Agent handoff\n\n` +
     `| Field | Value |\n|---|---|\n` +
     `| Report | \`${metadata.report_id}\` |\n` +
     `| Tester | \`${metadata.tester_id}\` |\n` +
-    `| Build | \`${sanitizePublicText(metadata.build.build_id)}\` |\n` +
-    `| Commit | \`${sanitizePublicText(metadata.build.commit_sha)}\` |\n` +
+    `| Build | \`${markdownText(metadata.build.build_id)}\` |\n` +
+    `| Commit | \`${markdownText(metadata.build.commit_sha)}\` |\n` +
 		`| Platform | ${platform} |\n| Screen | ${screen} |\n\n` +
     `Private reproduction bundle (expires ${expires}):\n\n` +
     `\`python3 tools/fetch_feedback_report.py ${metadata.report_id}\`\n`;
+}
+
+function markdownText(value: string): string {
+  const htmlSafe = sanitizePublicText(value)
+    .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return Array.from(htmlSafe, (character) =>
+    MARKDOWN_DELIMITERS.has(character) ? `\\${character}` : character).join("");
 }
 
 async function findIssue(env: Env, token: string, reportId: string): Promise<{ number: number; html_url: string } | null> {
