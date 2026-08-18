@@ -233,6 +233,9 @@ also pin code-point-safe body/title truncation after message validation.
 The journey forces both current-session and bundle-size trace reduction and parses each
 `feedback_trace_truncated` marker, including the canonical numeric `ts_msec`, so an
 oversized diagnostic stream remains valid under the repository-wide JSONL contract.
+Its isolated engine-log fixture starts the 2 MiB-style tail inside an authorization
+line and proves the entire partial line is dropped before UTF-8 decoding and redaction;
+the following complete diagnostic remains available.
 It also suspends an active retry transport, submits another report, and proves the
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
 entry. The first report is queued under one synthetic package identity, the active

@@ -309,10 +309,14 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn("FileAccess.get_file_as_bytes(path).size() > MAX_BUNDLE_BYTES", reduction)
         self.assertIn("or _uncompressed_size(artifacts) > MAX_UNCOMPRESSED_BYTES", reduction)
         bundle_marker = source[source.index("func _reduce_trace_middle"):source.index("func _artifact_manifest")]
+        engine_tail = source[source.index("static func _engine_log_slice_at"):source.index("func _write_zip")]
         logger_marker = trace_logger[trace_logger.index('var gap := (JSON.stringify({"event": "feedback_trace_truncated"'):
                                      trace_logger.index("var tail_size :=", trace_logger.index("var gap :="))]
         self.assertIn('"ts_msec": Time.get_ticks_msec()', bundle_marker)
         self.assertIn('"ts_msec": Time.get_ticks_msec()', logger_marker)
+        self.assertIn("while first_newline < bytes.size()", engine_tail)
+        self.assertLess(engine_tail.index("bytes = bytes.slice(first_newline + 1)"),
+                        engine_tail.index("bytes.get_string_from_utf8()"))
 
     def test_runtime_outbox_checks_sidecar_write_and_retry_scheduler_rescans(self) -> None:
         outbox = (package_playtest.ROOT / "scripts/runtime/feedback_outbox.gd").read_text(encoding="utf-8")

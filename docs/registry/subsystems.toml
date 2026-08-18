@@ -2023,7 +2023,8 @@ quality_bucket = "feedback"
 # cross-route retry isolation without consuming pre-existing outbox entries, retry
 # suppression, pre-outbox refusal of unconfigured builds, runtime HTTPS revalidation,
 # semantic machine-identity redaction, and canonical timestamped truncation markers
-# from both the session slicer and bundle-size reducer.
+# from both the session slicer and bundle-size reducer. Its bounded engine-log fixture
+# pins that a leading partial line is removed before decoding and redaction.
 # Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
 # public truncation, atomic expiring/uploading ownership, terminal expired-row retries,

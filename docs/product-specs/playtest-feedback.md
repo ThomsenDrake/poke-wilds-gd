@@ -163,3 +163,6 @@ ZIP, metadata marker, or private route is created.
 Both trace-reduction stages preserve the canonical runtime record shape: their
 `feedback_trace_truncated` marker carries `event`, numeric boot-clock `ts_msec`,
 `source`, and `payload`. The focused journey forces and parses both marker producers.
+When the bounded engine-log tail begins mid-line, capture advances past that partial
+line before UTF-8 decoding and redaction. This prevents a tail boundary from retaining
+a sensitive suffix after discarding the label that would have triggered redaction.

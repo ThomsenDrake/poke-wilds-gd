@@ -10,6 +10,7 @@ const TraceLogger := preload("res://scripts/core/trace_logger.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const OUTBOX_DIR := "user://feedback_outbox"
+const ENGINE_TAIL_TEST_PATH := "user://feedback-flow-engine-tail.log"
 
 var _controller: Node
 var _dialog: Control
@@ -26,6 +27,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_result_copy_contract()
 	_redaction_contract()
 	_trace_truncation_contract()
+	_engine_log_tail_contract()
 	await _missing_configuration_contract()
 	_controller.smoke_set_build_info({"channel": "scenario-blocked", "build_id": "scenario-blocked",
 		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/blocked",
@@ -137,6 +139,27 @@ func _has_valid_truncation_marker(bytes: PackedByteArray, source: String) -> boo
 			return record.has("ts_msec") and int(record.get("ts_msec", -1)) >= 0 \
 				and record.get("payload") is Dictionary
 	return false
+
+
+func _engine_log_tail_contract() -> void:
+	_remove(ENGINE_TAIL_TEST_PATH)
+	var sensitive_line := "Authorization: Bearer SENSITIVE-FRAGMENT\n"
+	var safe_line := "safe diagnostic\n"
+	var prefix := "older diagnostic\n"
+	var file := FileAccess.open(ENGINE_TAIL_TEST_PATH, FileAccess.WRITE)
+	_check(file != null, "engine-log tail check could not create its fixture")
+	if file == null:
+		return
+	_check(file.store_string(prefix + sensitive_line + safe_line),
+		"engine-log tail check could not write its fixture")
+	file.close()
+	var limit := sensitive_line.length() - "Authorization: Bearer ".length() + safe_line.length()
+	var sliced := FeedbackBundle._engine_log_slice_at(ENGINE_TAIL_TEST_PATH, limit)
+	var sliced_bytes: PackedByteArray = sliced.get("bytes", PackedByteArray())
+	var text := sliced_bytes.get_string_from_utf8()
+	_check(bool(sliced.get("truncated", false)) and text == safe_line,
+		"engine-log tail retained a partial pre-redaction line")
+	_remove(ENGINE_TAIL_TEST_PATH)
 
 
 func _result_copy_contract() -> void:

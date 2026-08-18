@@ -85,16 +85,26 @@ func load_build_info() -> Dictionary:
 
 
 static func engine_log_slice() -> Dictionary:
-	var path := "user://logs/godot.log"
+	return _engine_log_slice_at("user://logs/godot.log", ENGINE_LOG_LIMIT)
+
+
+static func _engine_log_slice_at(path: String, limit_bytes: int) -> Dictionary:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return {"bytes": PackedByteArray(), "source_bytes": 0, "truncated": false}
 	var source_bytes := file.get_length()
-	file.seek(maxi(0, source_bytes - ENGINE_LOG_LIMIT))
-	var text := Redactor.sanitize_text(file.get_buffer(mini(source_bytes, ENGINE_LOG_LIMIT)).get_string_from_utf8())
+	var start := maxi(0, source_bytes - limit_bytes)
+	file.seek(maxi(0, start - 1))
+	var bytes := file.get_buffer(source_bytes if start == 0 else mini(source_bytes, limit_bytes + 1))
 	file.close()
+	if start > 0:
+		var first_newline := 0
+		while first_newline < bytes.size() and bytes[first_newline] != 10:
+			first_newline += 1
+		bytes = bytes.slice(first_newline + 1) if first_newline < bytes.size() else PackedByteArray()
+	var text := Redactor.sanitize_text(bytes.get_string_from_utf8())
 	return {"bytes": text.to_utf8_buffer(), "source_bytes": source_bytes,
-		"truncated": source_bytes > ENGINE_LOG_LIMIT}
+		"truncated": source_bytes > limit_bytes}
 
 
 func _write_zip(path: String, artifacts: Dictionary) -> String:

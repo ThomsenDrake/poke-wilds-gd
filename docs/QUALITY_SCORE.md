@@ -91,6 +91,9 @@ Feedback trace-schema follow-up (2026-08-18): scores remain unchanged. Both the
 current-session slicer and the bundle-size reducer now emit truncation markers with the
 canonical `event`/`ts_msec`/`source`/`payload` shape. The real feedback journey forces
 both paths and parses their markers, while the pure source contract pins each producer.
+Oversized engine logs now discard a leading partial line before UTF-8 decoding and
+redaction, preventing an arbitrary tail offset from separating sensitive data from its
+redaction cue; the focused journey pins that ordering with an isolated fixture.
 
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
