@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-17
+Last verified: 2026-08-18
 Review cadence days: 14
-Source paths: scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
+Source paths: .github/workflows/feedback-relay-deploy.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg
 
 # Playtest Feedback
 
@@ -134,6 +134,15 @@ backstop if future global intake ever exceeds that bounded daily capacity. Relay
 contain only report/build identifiers, byte counts, status, and issue number.
 
 ## Release and agent workflow
+
+The relay is deployed as repository-owned infrastructure. Pull requests changing
+`services/feedback-relay/**` must pass the Worker lockfile install, checks, and
+production/staging Wrangler dry-runs without deployment credentials. The merge to
+`main` applies migrations and deploys staging first; a typed `/healthz` check must
+pass before the workflow can apply production migrations or deploy production.
+The two GitHub deployment environments hold only a least-privilege Cloudflare CI
+token and account ID. Runtime GitHub App, admin, and invite secrets stay solely in
+Cloudflare and never enter GitHub Actions.
 
 Production and staging infrastructure were provisioned before this port. Their
 end-to-end canaries opened issues #32 and #33 and those issues were closed after

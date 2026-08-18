@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-16
+Last verified: 2026-08-18
 Review cadence days: 14
-Source paths: docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, scripts, scenes, tools
+Source paths: .github/workflows/feedback-relay-deploy.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools
 
 # Quality Score
 
@@ -43,6 +43,14 @@ Feedback routing/retention follow-up (2026-08-17): scores remain unchanged. A
 local-only private route preserves each queued report's original package authorization
 without placing it in its ZIP, upload metadata, trace, or logs; the real journey changes
 synthetic package identity between queue and retry and proves route cleanup on success.
+
+Feedback deployment automation (2026-08-18): scores remain unchanged. A
+path-filtered GitHub Actions workflow now gates relay changes with the locked Worker
+checks and both Wrangler dry-runs, then serializes D1 migration, deploy, and typed
+health verification through staging before production. GitHub receives only the
+least-privilege Cloudflare deployment credential; Worker runtime secrets remain in
+Cloudflare.
+
 The relay cleanup now drains up to ten deterministic 100-row pages with one bulk R2
 delete and guarded D1 update per page, with failure-order and bounded-cap tests. Relay
 message validation now shares Godot's Unicode-code-point unit, and explicit HTTP 408

@@ -96,6 +96,10 @@ product_spec_doc = "docs/product-specs/playtest-feedback.md"
 issue_repository = "ThomsenDrake/poke-wilds-gd"
 bundle_entrypoint = "report.json"
 fetch_command = "python3 tools/fetch_feedback_report.py <report-id>"
+deployment_workflow_path = ".github/workflows/feedback-relay-deploy.yml"
+staging_environment = "feedback-staging"
+production_environment = "feedback-production"
+deployment_trigger = "push to main changing services/feedback-relay/**"
 
 [visual_baselines]
 # Committed golden screenshots plus metadata sidecars (<shot>.png.sidecar.json).

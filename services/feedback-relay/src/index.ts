@@ -13,7 +13,13 @@ export default {
     try {
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname === "/healthz") {
-        return json({ ok: true, environment: env.ENVIRONMENT, report_schema: 1 });
+        return json({
+          ok: true,
+          environment: env.ENVIRONMENT,
+          report_schema: 1,
+          version_id: env.WORKER_VERSION.id,
+          version_tag: env.WORKER_VERSION.tag,
+        });
       }
       if (url.pathname.startsWith("/v1/admin/")) return await adminRoute(request, env, url);
       if (request.method === "POST" && url.pathname === "/v1/reports") return await createReport(request, env);

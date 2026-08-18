@@ -1,0 +1,123 @@
+name: feedback-relay-deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/feedback-relay-deploy.yml"
+      - "services/feedback-relay/**"
+  pull_request:
+    paths:
+      - ".github/workflows/feedback-relay-deploy.yml"
+      - "services/feedback-relay/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feedback-relay-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: services/feedback-relay
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/feedback-relay/package-lock.json
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Validate repository deployment contracts
+        run: python3 ../../tools/check_repo_contracts.py
+      - name: Type-check and test the Worker
+        run: npm run check
+      - name: Validate the staging deployment bundle
+        run: npx wrangler deploy --dry-run --strict --keep-vars --env staging
+      - name: Validate the production deployment bundle
+        run: npx wrangler deploy --dry-run --strict --keep-vars --env=""
+
+  deploy-staging:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: feedback-staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/feedback-relay/package-lock.json
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Apply staging D1 migrations
+        run: npx wrangler d1 migrations apply DB --remote --env staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy staging Worker
+        run: npx wrangler deploy --strict --keep-vars --env staging --tag "${GITHUB_SHA}" --message "GitHub Actions ${GITHUB_SHA}"
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-staging-deploy.jsonl
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify staging health
+        run: |
+          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-staging-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets)) process.exit(1); process.stdout.write(JSON.stringify(d))')"
+          health_url="$(DEPLOYMENT="$deployment" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const urls=d.targets.flatMap((target)=>{if(typeof target!=="string")return[];try{const u=new URL(target);return u.protocol==="https:"?[u]:[]}catch{return[]}}); if(urls.length!==1)process.exit(1); const u=urls[0]; u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)')"
+          for attempt in 1 2 3 4 5 6; do
+            if response="$(curl --fail-with-body --silent --show-error --max-time 10 "$health_url")" && DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "staging" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)'; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 6 ]; then sleep 2; fi
+          done
+          exit 1
+
+  deploy-production:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: feedback-production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/feedback-relay/package-lock.json
+      - name: Install from the lockfile
+        run: npm ci
+      - name: Apply production D1 migrations
+        run: npx wrangler d1 migrations apply DB --remote --env=""
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Deploy production Worker
+        run: npx wrangler deploy --strict --keep-vars --env="" --tag "${GITHUB_SHA}" --message "GitHub Actions ${GITHUB_SHA}"
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/feedback-production-deploy.jsonl
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify production health
+        run: |
+          deployment="$(OUTPUT_FILE="${RUNNER_TEMP}/feedback-production-deploy.jsonl" node -e 'const fs=require("node:fs"); const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse); const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || !Array.isArray(d.targets)) process.exit(1); process.stdout.write(JSON.stringify(d))')"
+          health_url="$(DEPLOYMENT="$deployment" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const urls=d.targets.flatMap((target)=>{if(typeof target!=="string")return[];try{const u=new URL(target);return u.protocol==="https:"?[u]:[]}catch{return[]}}); if(urls.length!==1)process.exit(1); const u=urls[0]; u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)')"
+          for attempt in 1 2 3 4 5 6; do
+            if response="$(curl --fail-with-body --silent --show-error --max-time 10 "$health_url")" && DEPLOYMENT="$deployment" RESPONSE="$response" node -e 'const d=JSON.parse(process.env.DEPLOYMENT); const h=JSON.parse(process.env.RESPONSE); if (h.ok !== true || h.environment !== "production" || h.report_schema !== 1 || h.version_id !== d.version_id || h.version_tag !== process.env.GITHUB_SHA) process.exit(1)'; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 6 ]; then sleep 2; fi
+          done
+          exit 1
