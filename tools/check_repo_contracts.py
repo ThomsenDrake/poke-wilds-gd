@@ -485,15 +485,19 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
                 issues.append(
                     f"feedback relay job {job_name!r} is missing {metadata_line!r}"
                 )
+        step_blocks = _workflow_step_blocks(job)
         for action_ref in (
             "uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
             "uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
         ):
-            if sum(action_ref in line for line in job_lines) != 1:
+            expected_first_line = f"- {action_ref}"
+            if sum(
+                bool(lines) and lines[0] == expected_first_line
+                for lines in step_blocks
+            ) != 1:
                 issues.append(
                     f"feedback relay job {job_name!r} must use {action_ref} exactly once"
                 )
-        step_blocks = _workflow_step_blocks(job)
         named_steps: dict[str, list[list[str]]] = {}
         for lines in step_blocks:
             first_line = lines[0] if lines else ""
