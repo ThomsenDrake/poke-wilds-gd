@@ -71,7 +71,7 @@ export interface InviteRow {
 
 export interface ReportRow {
   report_id: string;
-  status: "received" | "stored" | "issuing" | "completed" | "expired";
+  status: "received" | "uploading" | "stored" | "issuing" | "completed" | "expiring" | "expired";
   bundle_key: string;
   bundle_sha256: string;
   issue_number: number | null;

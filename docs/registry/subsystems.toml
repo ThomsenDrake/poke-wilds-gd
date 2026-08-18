@@ -2022,5 +2022,6 @@ quality_bucket = "feedback"
 # suppression, runtime HTTPS revalidation, and semantic machine-identity redaction.
 # Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
-# public truncation, terminal expired-row retries, and R2-before-D1 failure ordering;
+# public truncation, atomic expiring/uploading ownership, terminal expired-row retries,
+# cleanup failure recovery, stale-read rejection, and admin denial during cleanup;
 # both dry-runs gate the relay.

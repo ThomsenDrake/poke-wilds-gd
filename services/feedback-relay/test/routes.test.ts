@@ -134,6 +134,44 @@ describe("feedback report route boundaries", () => {
     expect(findOrCreateIssue).not.toHaveBeenCalled();
   });
 
+  it("loses an upload claim to cleanup without restoring the private bundle", async () => {
+    const harness = routeHarness({
+      existing: reportRow("received"),
+      existingAfterUploadClaim: reportRow("expiring"),
+      uploadClaimChanges: 0,
+    });
+    const response = await submit(harness.env);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ error: "report_expired" });
+    expect(harness.put).not.toHaveBeenCalled();
+    expect(findOrCreateIssue).not.toHaveBeenCalled();
+  });
+
+  it("keeps an active upload lease in progress without a second R2 write", async () => {
+    const harness = routeHarness({ existing: reportRow("uploading") });
+    const response = await submit(harness.env);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ error: "upload_in_progress" });
+    expect(harness.put).not.toHaveBeenCalled();
+  });
+
+  it("denies admin bundle reads as soon as cleanup owns the report", async () => {
+    const scoped = env(true);
+    const get = vi.fn();
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    scoped.REPORTS = { get } as unknown as R2Bucket;
+    scoped.DB = {
+      prepare: () => ({ bind: () => ({ first: async () => ({ status: "expiring", bundle_key: "private", bundle_sha256: "hash" }) }) }),
+    } as unknown as D1Database;
+    const response = await worker.fetch(new Request(
+      "https://relay.test/v1/admin/reports/01234567-89ab-cdef-0123-456789abcdef/bundle",
+      { headers: { Authorization: `Bearer ${"a".repeat(32)}` } },
+    ), scoped);
+    expect(response.status).toBe(410);
+    expect(await response.json()).toMatchObject({ error: "artifact_expired" });
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it("keeps a fresh issuing report in progress without touching R2 or issue creation", async () => {
     const { metadata, bundle } = await uploadPayload();
     const scoped = env(true);
@@ -230,16 +268,21 @@ describe("expired report cleanup", () => {
     const result = await cleanupExpiredReports(harness.env);
     expect(result).toEqual({ batches: 2, processed: 155, limited: false });
     expect(harness.deleted).toHaveBeenCalledTimes(2);
+    expect(harness.claimed).toEqual([cleanupIds(100, 0), cleanupIds(55, 100)]);
     expect(harness.updated).toEqual([cleanupIds(100, 0), cleanupIds(55, 100)]);
     expect(harness.queries[0]).toContain("datetime(expires_at) <= CURRENT_TIMESTAMP");
     expect(harness.queries[0]).toContain("ORDER BY datetime(expires_at), report_id LIMIT ?");
-    expect(harness.queries[1]).toContain("datetime(expires_at) <= CURRENT_TIMESTAMP");
+    expect(harness.queries[0]).toContain("SET status='expiring'");
+    expect(harness.queries[0]).toContain("RETURNING report_id, bundle_key");
+    expect(harness.queries[0]).toContain("status NOT IN ('uploading','issuing')");
+    expect(harness.events.slice(0, 3)).toEqual(["claim", "delete", "finalize"]);
   });
 
   it("stops immediately on an empty page", async () => {
     const harness = cleanupHarness([[]]);
     await expect(cleanupExpiredReports(harness.env)).resolves.toEqual({ batches: 0, processed: 0, limited: false });
     expect(harness.deleted).not.toHaveBeenCalled();
+    expect(harness.claimed).toEqual([]);
     expect(harness.updated).toEqual([]);
   });
 
@@ -256,6 +299,14 @@ describe("expired report cleanup", () => {
   it("does not mark rows expired when bulk R2 deletion fails", async () => {
     const harness = cleanupHarness([cleanupRows(1, 0)], { deleteFailures: 1 });
     await expect(cleanupExpiredReports(harness.env)).rejects.toThrow("storage delete failed");
+    expect(harness.claimed).toEqual([cleanupIds(1, 0)]);
+    expect(harness.updated).toEqual([]);
+  });
+
+  it("does not touch R2 when the cleanup claim fails", async () => {
+    const harness = cleanupHarness([cleanupRows(1, 0)], { claimFailures: 1 });
+    await expect(cleanupExpiredReports(harness.env)).rejects.toThrow("database claim failed");
+    expect(harness.deleted).not.toHaveBeenCalled();
     expect(harness.updated).toEqual([]);
   });
 
@@ -269,16 +320,27 @@ describe("expired report cleanup", () => {
   });
 });
 
-type HarnessOptions = { existing?: ReturnType<typeof reportRow>; admissionChanges?: number; put?: ReturnType<typeof vi.fn>; completionError?: Error };
+type HarnessOptions = {
+  existing?: ReturnType<typeof reportRow>;
+  existingAfterUploadClaim?: ReturnType<typeof reportRow>;
+  admissionChanges?: number;
+  uploadClaimChanges?: number;
+  put?: ReturnType<typeof vi.fn>;
+  completionError?: Error;
+};
 
 function cleanupHarness(pages: Array<Array<{ report_id: string; bundle_key: string }>>,
-  failures: { deleteFailures?: number; updateFailures?: number } = {}) {
+  failures: { claimFailures?: number; deleteFailures?: number; updateFailures?: number } = {}) {
   let page = 0;
+  let claimFailures = failures.claimFailures ?? 0;
   let deleteFailures = failures.deleteFailures ?? 0;
   let updateFailures = failures.updateFailures ?? 0;
+  const claimed: string[][] = [];
   const updated: string[][] = [];
   const queries: string[] = [];
+  const events: string[] = [];
   const deleted = vi.fn(async () => {
+    events.push("delete");
     if (deleteFailures > 0) {
       deleteFailures -= 1;
       throw new Error("storage delete failed");
@@ -291,20 +353,31 @@ function cleanupHarness(pages: Array<Array<{ report_id: string; bundle_key: stri
       queries.push(query);
       return {
         bind: (value: number | string) => ({
-          all: async () => ({ results: pages[page++] ?? [] }),
+          all: async () => {
+            events.push("claim");
+            if (claimFailures > 0) {
+              claimFailures -= 1;
+              throw new Error("database claim failed");
+            }
+            const rows = pages[page++] ?? [];
+            if (rows.length > 0) claimed.push(rows.map((row) => row.report_id));
+            return { results: rows };
+          },
           run: async () => {
+            const ids = JSON.parse(String(value)) as string[];
+            events.push("finalize");
             if (updateFailures > 0) {
               updateFailures -= 1;
               throw new Error("database update failed");
             }
-            updated.push(JSON.parse(String(value)) as string[]);
+            updated.push(ids);
             return { meta: { changes: updated.at(-1)?.length ?? 0 } };
           },
         }),
       };
     },
   } as unknown as D1Database;
-  return { env: envValue, deleted, updated, queries };
+  return { env: envValue, deleted, claimed, updated, queries, events };
 }
 
 function cleanupRows(count: number, offset: number): Array<{ report_id: string; bundle_key: string }> {
@@ -320,7 +393,7 @@ function routeHarness(options: HarnessOptions = {}) {
   const put = options.put ?? vi.fn().mockResolvedValue(undefined);
   const existing = options.existing;
   const envValue = env(true);
-  envValue.REPORTS = { put } as unknown as R2Bucket;
+  envValue.REPORTS = { put, delete: vi.fn().mockResolvedValue(undefined) } as unknown as R2Bucket;
   envValue.DB = {
     prepare: (query: string) => {
       queries.push(query);
@@ -329,10 +402,15 @@ function routeHarness(options: HarnessOptions = {}) {
           first: async () => {
             if (query.startsWith("SELECT tester_id")) return { tester_id: "T-TEST", nickname: "Tester", token_hash: "", cohort_id: "friends" };
             if (query.startsWith("SELECT report_id,status")) return existing ? { ...existing, bundle_sha256: existing.bundle_sha256 || currentBundleHash } : null;
+            if (query.startsWith("SELECT status,issue_number")) {
+              const row = options.existingAfterUploadClaim ?? existing;
+              return row ? { ...row, bundle_sha256: row.bundle_sha256 || currentBundleHash } : null;
+            }
             return null;
           },
           run: async () => {
             if (query.startsWith("INSERT OR IGNORE")) return { meta: { changes: options.admissionChanges ?? 1 } };
+            if (query.includes("SET status='uploading'")) return { meta: { changes: options.uploadClaimChanges ?? 1 } };
             if (query.startsWith("UPDATE reports SET status='completed'")) {
               if (options.completionError) throw options.completionError;
               return { meta: { changes: 1 } };

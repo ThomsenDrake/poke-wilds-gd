@@ -6,6 +6,7 @@ import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
 const CLEANUP_PAGE_SIZE = 100;
 const CLEANUP_MAX_BATCHES = 10;
+const ACTIVE_LEASE_TIMEOUT_SQL = "datetime('now','-2 minutes')";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -32,16 +33,22 @@ export default {
 export async function cleanupExpiredReports(env: Env): Promise<{ batches: number; processed: number; limited: boolean }> {
   let processed = 0;
   for (let batch = 0; batch < CLEANUP_MAX_BATCHES; batch += 1) {
-    const expired = await env.DB.prepare(
-      "SELECT report_id, bundle_key FROM reports WHERE datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
-      "ORDER BY datetime(expires_at), report_id LIMIT ?",
+    const claimed = await env.DB.prepare(
+      "UPDATE reports SET status='expiring', updated_at=CURRENT_TIMESTAMP " +
+      "WHERE report_id IN (SELECT report_id FROM reports " +
+      "WHERE datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      `AND (status NOT IN ('uploading','issuing') OR datetime(updated_at) <= ${ACTIVE_LEASE_TIMEOUT_SQL}) ` +
+      "ORDER BY datetime(expires_at), report_id LIMIT ?) " +
+      "AND datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      `AND (status NOT IN ('uploading','issuing') OR datetime(updated_at) <= ${ACTIVE_LEASE_TIMEOUT_SQL}) ` +
+      "RETURNING report_id, bundle_key",
     ).bind(CLEANUP_PAGE_SIZE).all<{ report_id: string; bundle_key: string }>();
-    const rows = expired.results;
+    const rows = claimed.results;
     if (rows.length === 0) return { batches: batch, processed, limited: false };
     await env.REPORTS.delete(rows.map((row) => row.bundle_key));
     await env.DB.prepare(
       "UPDATE reports SET status='expired', updated_at=CURRENT_TIMESTAMP " +
-      "WHERE datetime(expires_at) <= CURRENT_TIMESTAMP AND status != 'expired' " +
+      "WHERE status='expiring' " +
       "AND report_id IN (SELECT value FROM json_each(?))",
     ).bind(JSON.stringify(rows.map((row) => row.report_id))).run();
     processed += rows.length;
@@ -77,8 +84,18 @@ async function createReport(request: Request, env: Env): Promise<Response> {
     "SELECT report_id,status,bundle_key,bundle_sha256,issue_number,issue_url,updated_at,expires_at FROM reports WHERE report_id=?",
   ).bind(metadata.report_id).first<ReportRow>();
   if (existing && existing.bundle_sha256 !== metadata.bundle_sha256) return json({ ok: false, error: "report_id_conflict" }, 409);
-  if (existing?.status === "expired") return json({ ok: false, report_id: metadata.report_id, error: "report_expired" }, 410);
+  if (existing?.status === "expiring" || existing?.status === "expired") {
+    return json({ ok: false, report_id: metadata.report_id, error: "report_expired" }, 410);
+  }
   if (existing?.status === "completed") return json({ ok: true, report_id: metadata.report_id, issue_number: existing.issue_number, issue_url: existing.issue_url }, 200);
+  if (existing?.status === "uploading") {
+    const updatedAt = Date.parse(existing.updated_at.endsWith("Z") ? existing.updated_at : `${existing.updated_at}Z`);
+    if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < 120_000) {
+      return json({ ok: false, report_id: metadata.report_id, error: "upload_in_progress" }, 202, { "Retry-After": "30" });
+    }
+    await env.DB.prepare("UPDATE reports SET status='received',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='uploading' AND updated_at=?")
+      .bind(metadata.report_id, existing.updated_at).run();
+  }
   if (existing?.status === "issuing") {
     const updatedAt = Date.parse(existing.updated_at.endsWith("Z") ? existing.updated_at : `${existing.updated_at}Z`);
     if (!Number.isFinite(updatedAt) || Date.now() - updatedAt < 120_000) {
@@ -103,22 +120,41 @@ async function createReport(request: Request, env: Env): Promise<Response> {
         "SELECT report_id,status,bundle_sha256,issue_number,issue_url,updated_at,expires_at FROM reports WHERE report_id=?",
       ).bind(metadata.report_id).first<ReportRow>();
       if (raced && raced.bundle_sha256 !== metadata.bundle_sha256) return json({ ok: false, error: "report_id_conflict" }, 409);
+      if (raced?.status === "expiring" || raced?.status === "expired") {
+        return json({ ok: false, report_id: metadata.report_id, error: "report_expired" }, 410);
+      }
       if (raced?.status === "completed") return json({ ok: true, report_id: metadata.report_id, issue_number: raced.issue_number, issue_url: raced.issue_url }, 200);
       if (raced) return json({ ok: false, report_id: metadata.report_id, error: "issue_in_progress" }, 202, { "Retry-After": "30" });
       return json({ ok: false, error: "daily_limit" }, 429, { "Retry-After": "3600" });
     }
   }
-  await env.REPORTS.put(key, bytes, { httpMetadata: { contentType: "application/zip", contentDisposition: `attachment; filename="feedback-${metadata.report_id}.zip"` },
-    customMetadata: { report_id: metadata.report_id, sha256: metadata.bundle_sha256 } });
-  await env.DB.prepare("UPDATE reports SET status='stored',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='received'")
+  const uploadClaim = await env.DB.prepare(
+    "UPDATE reports SET status='uploading',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status IN ('received','stored')",
+  ).bind(metadata.report_id).run();
+  if ((uploadClaim.meta.changes ?? 0) !== 1) return await reportStateResponse(env, metadata.report_id);
+  try {
+    await env.REPORTS.put(key, bytes, { httpMetadata: { contentType: "application/zip", contentDisposition: `attachment; filename="feedback-${metadata.report_id}.zip"` },
+      customMetadata: { report_id: metadata.report_id, sha256: metadata.bundle_sha256 } });
+  } catch (error) {
+    await env.DB.prepare("UPDATE reports SET status='received',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='uploading'")
+      .bind(metadata.report_id).run();
+    throw error;
+  }
+  const stored = await env.DB.prepare("UPDATE reports SET status='stored',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='uploading'")
     .bind(metadata.report_id).run();
+  if ((stored.meta.changes ?? 0) !== 1) {
+    await env.REPORTS.delete(key);
+    return await reportStateResponse(env, metadata.report_id);
+  }
   const claim = await env.DB.prepare("UPDATE reports SET status='issuing',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='stored'")
     .bind(metadata.report_id).run();
-  if ((claim.meta.changes ?? 0) !== 1) return json({ ok: false, report_id: metadata.report_id, error: "issue_in_progress" }, 202);
+  if ((claim.meta.changes ?? 0) !== 1) return await reportStateResponse(env, metadata.report_id);
   try {
     const issue = await findOrCreateIssue(env, metadata, existing?.expires_at ?? expires);
-    await env.DB.prepare("UPDATE reports SET status='completed',issue_number=?,issue_url=?,updated_at=CURRENT_TIMESTAMP WHERE report_id=?")
-      .bind(issue.number, issue.html_url, metadata.report_id).run();
+    const completed = await env.DB.prepare(
+      "UPDATE reports SET status='completed',issue_number=?,issue_url=?,updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='issuing'",
+    ).bind(issue.number, issue.html_url, metadata.report_id).run();
+    if ((completed.meta.changes ?? 0) !== 1) return await reportStateResponse(env, metadata.report_id);
     console.log(JSON.stringify({ event: "feedback_report_created", report_id: metadata.report_id,
       build_id: metadata.build.build_id, status: "completed", bundle_bytes: bytes.byteLength,
       issue_number: issue.number, latency_ms: Date.now() - started }));
@@ -126,6 +162,19 @@ async function createReport(request: Request, env: Env): Promise<Response> {
   } catch (error) {
     throw error;
   }
+}
+
+async function reportStateResponse(env: Env, reportId: string): Promise<Response> {
+  const row = await env.DB.prepare(
+    "SELECT status,issue_number,issue_url FROM reports WHERE report_id=?",
+  ).bind(reportId).first<Pick<ReportRow, "status" | "issue_number" | "issue_url">>();
+  if (row?.status === "expiring" || row?.status === "expired") {
+    return json({ ok: false, report_id: reportId, error: "report_expired" }, 410);
+  }
+  if (row?.status === "completed") {
+    return json({ ok: true, report_id: reportId, issue_number: row.issue_number, issue_url: row.issue_url }, 200);
+  }
+  return json({ ok: false, report_id: reportId, error: "issue_in_progress" }, 202, { "Retry-After": "30" });
 }
 
 async function authorizeInvite(request: Request, env: Env): Promise<{ invite: InviteRow; tokenHash: string }> {
@@ -192,9 +241,10 @@ async function adminRoute(request: Request, env: Env, url: URL): Promise<Respons
   }
   const reportMatch = url.pathname.match(/^\/v1\/admin\/reports\/([0-9a-f-]+)\/bundle$/);
   if (request.method === "GET" && reportMatch) {
-    const row = await env.DB.prepare("SELECT bundle_key,bundle_sha256 FROM reports WHERE report_id=?")
-      .bind(reportMatch[1]).first<{ bundle_key: string; bundle_sha256: string }>();
+    const row = await env.DB.prepare("SELECT status,bundle_key,bundle_sha256 FROM reports WHERE report_id=?")
+      .bind(reportMatch[1]).first<{ status: ReportRow["status"]; bundle_key: string; bundle_sha256: string }>();
     if (!row) return json({ ok: false, error: "not_found" }, 404);
+    if (row.status === "expiring" || row.status === "expired") return json({ ok: false, error: "artifact_expired" }, 410);
     const object = await env.REPORTS.get(row.bundle_key);
     if (!object) return json({ ok: false, error: "artifact_expired" }, 410);
     return new Response(object.body, { headers: { "Content-Type": "application/zip",

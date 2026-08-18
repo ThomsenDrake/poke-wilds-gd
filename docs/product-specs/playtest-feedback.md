@@ -93,11 +93,15 @@ client hash, EOCD-declared ZIP central directory with matching local headers and
 exact entry allowlist, v1 manifest, tester identity, and full bundle/manifest agreement
 before private R2 storage. Idempotent report lookup occurs before an atomic D1 daily
 quota admission, so retries are never rejected solely because the quota filled later. D1
-owns idempotency and the received→stored→issuing→completed lifecycle. A
+owns idempotency and the received→uploading→stored→issuing→completed lifecycle. The
+uploading lease and cleanup's atomic `expiring` claim are mutually exclusive D1
+transitions; interrupted/stale leases are recoverable, and cleanup never deletes R2
+before it owns the row. A
 conditional issuing claim plus the hidden `feedback-report-id` GitHub marker
 prevents retries or crash recovery from opening a second issue.
-An `expired` receipt is terminal: a matching late retry receives HTTP 410 before R2
-or GitHub work, so cleanup cannot be undone by a retained local bundle.
+An `expiring` or `expired` receipt is terminal: a matching late retry receives HTTP
+410 before R2 or GitHub work, and admin download refuses the bundle as soon as cleanup
+owns the row, so cleanup cannot be undone by a retained local bundle.
 
 An `issuing` report remains issuing across ambiguous GitHub/R2/D1 failures, so an
 immediate retry receives in-progress rather than risking a second issue. Stale issuing
@@ -107,8 +111,8 @@ The public issue contains only the sanitized player sentence, tester handle,
 report/build/commit/platform/captured-screen fields, artifact expiry, and the authenticated
 `tools/fetch_feedback_report.py` command. It never links raw artifacts publicly.
 R2 objects expire after 180 days through the scheduled cleanup; the issue and D1
-receipt remain. Each daily invocation drains deterministic 100-row pages, bulk-deleting
-R2 before marking D1, up to 1,000 objects, and emits aggregate-only cap telemetry if a
+receipt remain. Each daily invocation atomically claims deterministic 100-row pages in
+D1 before bulk-deleting R2 and marking the claim expired, up to 1,000 objects, and emits aggregate-only cap telemetry if a
 full tenth page suggests more work. The provisioned R2 lifecycle is the authoritative
 backstop if future global intake ever exceeds that bounded daily capacity. Relay logs
 contain only report/build identifiers, byte counts, status, and issue number.

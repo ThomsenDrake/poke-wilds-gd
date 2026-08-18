@@ -248,6 +248,11 @@ source contract pins that this same guard returns blocked before `HTTPRequest.re
 Sidecar publication checks the write and flush result before its atomic rename. The
 outbox publishes metadata last as an atomic commit marker, so retry sees only complete
 ZIP/route/metadata sets and preserves malformed/incomplete entries outside the active queue.
+The relay's cross-store retention race is pinned at the D1 ownership boundary: report
+uploads must claim `uploading` before R2, scheduled cleanup atomically claims
+`expiring` rows before deletion, and a stale upload read that loses that transition
+returns 410 without an R2 write. Cleanup failures leave the claim retryable, stale
+active leases are recoverable, and admin downloads refuse both retention-terminal states.
 Packaging/fetch tests reject non-HTTPS endpoints before either admin request and hold a
 cross-platform advisory lock across the shared build-metadata write/export/cleanup
 sequence; a concurrent exporter must refuse without deleting the active owner's metadata.

@@ -37,12 +37,15 @@ npx wrangler r2 bucket lifecycle add poke-wilds-feedback-private-staging feedbac
 
 The daily scheduled handler deletes private bundles after their 180-day expiry in
 deterministic 100-row pages, up to 1,000 objects per run. Each page bulk-deletes R2
-before its guarded D1 status update; stored ISO timestamps are normalized through
-SQLite `datetime()` before comparison, and failures remain eligible for the next run.
+only after an atomic D1 `expiring` claim returns the exact rows it owns, then finishes
+with a guarded `expired` update. Uploads hold a short `uploading` lease before writing
+R2, so either upload or cleanup wins the D1 transition; stale leases and interrupted
+cleanup claims remain eligible for the next run. Stored ISO timestamps are normalized
+through SQLite `datetime()` before comparison.
 A full tenth page emits aggregate-only capacity telemetry. The provisioned R2 lifecycle is the
 authoritative backstop if future global intake exceeds that bounded Worker capacity.
-Expired report IDs are terminal and return HTTP 410 before any R2 write, so a late
-client retry cannot recreate an object that cleanup will no longer revisit.
+Expiring and expired report IDs are terminal for uploads and admin downloads, so a
+late client retry cannot recreate or expose an object after cleanup takes ownership.
 Worker logs contain identifiers, sizes, status, issue numbers, and aggregate cleanup
 counts only.
 
