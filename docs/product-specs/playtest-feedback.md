@@ -43,6 +43,10 @@ hexadecimal characters; a missing or malformed persisted value is regenerated in
 same-directory temporary file and atomically renamed into place before bundle creation.
 Success deletes all three outbox files and shows only the issue number. A tester
 never sees raw logs, tokens, repository plumbing, or a GitHub login.
+Before success is announced, the outbox atomically changes its metadata commit marker
+to terminal `sent`, then checks private-route, ZIP, and metadata deletion in that order.
+A deletion failure quarantines the retained files and returns a local cleanup failure;
+the terminal marker or quarantine prevents a subsequent launch from uploading again.
 
 ## Capture and privacy contract
 

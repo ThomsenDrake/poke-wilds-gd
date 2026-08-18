@@ -2,8 +2,8 @@ extends RefCounted
 
 class QuietRuntime:
 	extends Node
-	func emit_trace(_event: String, _source: String, _payload: Dictionary) -> void:
-		pass
+	var events: Array[String] = []
+	func emit_trace(event: String, _source: String, _payload: Dictionary) -> void: events.append(event)
 
 const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const TraceLogger := preload("res://scripts/core/trace_logger.gd")
@@ -18,6 +18,7 @@ var _tree: SceneTree
 var _failures: Array[String] = []
 var _transport_calls := 0
 var _unexpected_transport_calls := 0
+var _sent_cleanup_calls := 0
 
 
 func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
@@ -53,6 +54,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_check(not FileAccess.file_exists(stem + ".route"), "blocked quarantine retained its private route")
 	await _controller.smoke_retry(report_id)
 	_check(_transport_calls == 2, "quarantined permanent rejection uploaded again")
+	await _sent_cleanup_contract()
 	_controller.smoke_set_build_info({})
 	for suffix in [".blocked-write-failed.json", ".blocked-write-failed.zip"]:
 		_remove(stem + suffix)
@@ -70,6 +72,35 @@ func _blocked_transport(prepared: Dictionary) -> Dictionary:
 	# must discover and quarantine the pair from its committed report identity.
 	prepared["metadata_path"] = ""
 	return {"status": "blocked", "reason": "scenario_permanent"}
+
+
+func _sent_cleanup_contract() -> void:
+	_controller.smoke_set_build_info({"channel": "scenario-sent", "build_id": "scenario-sent",
+		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/sent",
+		"invite_token": "scenario-token-sent", "tester_id": "T-SCENARIO-SENT"})
+	_controller.smoke_set_transport(func(_prepared: Dictionary) -> Dictionary:
+		_sent_cleanup_calls += 1
+		return {"status": "sent", "issue_number": 4321})
+	_controller.smoke_set_remove_failure(func(path: String) -> bool: return path.ends_with(".zip"))
+	await SmokeTap.tap(_tree, "feedback_report")
+	var report_id := str(_controller.smoke_state().get("report_id", ""))
+	var quiet_runtime := QuietRuntime.new()
+	var result: Dictionary = await _controller.smoke_submit("Sent cleanup must be durable.", quiet_runtime)
+	await SmokeTap.tap_key(_tree, Key.KEY_ESCAPE)
+	_controller.smoke_set_remove_failure(Callable())
+	var stem := "%s/%s" % [OUTBOX_DIR, report_id]
+	_check(result.get("status") == "blocked" and result.get("reason") == "sent_cleanup_failed",
+		"failed sent cleanup was declared successful")
+	_check(FileAccess.file_exists(stem + ".sent-cleanup-failed.json") \
+		and FileAccess.file_exists(stem + ".sent-cleanup-failed.zip") \
+		and not FileAccess.file_exists(stem + ".route"), "failed sent cleanup was not quarantined")
+	var marker = JSON.parse_string(FileAccess.get_file_as_string(stem + ".sent-cleanup-failed.json"))
+	_check(marker is Dictionary and marker.get("upload_status") == "sent" \
+		and not quiet_runtime.events.has("feedback_report_sent"), "sent terminal state or trace was dishonest")
+	quiet_runtime.free()
+	await _controller.smoke_retry(report_id)
+	_check(_sent_cleanup_calls == 1, "quarantined sent report uploaded again")
+	for suffix in [".sent-cleanup-failed.json", ".sent-cleanup-failed.zip"]: _remove(stem + suffix)
 
 
 func _missing_configuration_contract() -> void:

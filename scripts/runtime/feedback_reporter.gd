@@ -57,9 +57,14 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 	else:
 		result = {"status": "queued", "reason": "upload_in_progress"}
 	if result.get("status") == "sent":
-		_outbox.remove(prepared)
-		runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
-			"report_id": capture["report_id"], "issue_number": result.get("issue_number", 0)})
+		if _outbox.finalize_sent(prepared, int(result.get("issue_number", 0))):
+			runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
+				"report_id": capture["report_id"], "issue_number": result.get("issue_number", 0)})
+		else:
+			result = {"status": "blocked", "reason": "sent_cleanup_failed",
+				"issue_number": result.get("issue_number", 0)}
+			runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
+				"report_id": capture["report_id"], "reason": result["reason"]})
 	else:
 		runtime.emit_trace("feedback_report_queued" if result.get("status") == "queued" else "feedback_report_failed",
 			"FeedbackReporter", {"report_id": capture["report_id"], "reason": result.get("reason", "upload_failed")})
@@ -135,11 +140,13 @@ func retry_pending(only_report_id: String = "") -> void:
 		var report_id := str(prepared["metadata"].get("report_id", ""))
 		var result: Dictionary = await _upload(prepared)
 		if result.get("status") == "sent":
-			_outbox.remove(prepared)
 			var runtime := get_node_or_null("/root/GameRuntime")
-			if runtime != null:
+			if _outbox.finalize_sent(prepared, int(result.get("issue_number", 0))) and runtime != null:
 				runtime.emit_trace("feedback_report_sent", "FeedbackReporter", {
 					"report_id": report_id, "issue_number": result.get("issue_number", 0), "retried": true})
+			elif runtime != null:
+				runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
+					"report_id": report_id, "reason": "sent_cleanup_failed", "retried": true})
 		elif result.get("status") == "queued":
 			continue
 		else:
@@ -197,6 +204,11 @@ func set_install_id_path_for_smoke(path: String) -> void:
 func set_build_info_for_smoke(build: Dictionary) -> void:
 	if OS.has_feature("editor"):
 		_bundle.set_build_info_for_smoke(build)
+
+
+func set_remove_failure_for_smoke(failure: Callable) -> void:
+	if OS.has_feature("editor"):
+		_outbox.set_remove_failure_for_smoke(failure)
 
 
 func state_for_smoke() -> Dictionary:

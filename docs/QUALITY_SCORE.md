@@ -97,6 +97,10 @@ redaction cue; the focused journey pins that ordering with an isolated fixture.
 Public issue composition also HTML-encodes and Markdown-escapes every untrusted display
 field, so player delimiters cannot hide or restructure the agent handoff; Worker tests
 pin comments, headings, fences, table separators, and handoff visibility.
+Successful uploads now atomically persist a terminal `sent` marker before checked
+route/bundle/metadata deletion. Any failed cleanup is quarantined and reported as a
+local failure rather than emitting success; the focused journey injects a ZIP-delete
+failure and proves the report cannot upload twice.
 
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 

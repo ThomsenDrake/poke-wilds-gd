@@ -8,6 +8,7 @@ const TMP_SUFFIX := ".tmp"
 const ROUTE_SUFFIX := ".route"
 
 var _session_quarantined := {}
+var _remove_failure_override: Callable
 
 
 func staging_bundle_path(report_id: String) -> String:
@@ -59,7 +60,7 @@ func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary
 		if parsed.is_empty():
 			_quarantine(report_id, "corrupt")
 			continue
-		if str(parsed.get("upload_status", "")) == "blocked":
+		if str(parsed.get("upload_status", "")) in ["blocked", "sent"]:
 			continue
 		var bundle_path := _bundle_path(report_id)
 		if not FileAccess.file_exists(bundle_path):
@@ -105,10 +106,32 @@ func quarantine_blocked(prepared: Dictionary) -> void:
 	_quarantine(report_id, "blocked-write-failed")
 
 
-func remove(prepared: Dictionary) -> void:
-	_remove(str(prepared.get("bundle_path", "")))
-	_remove(str(prepared.get("metadata_path", "")))
-	_remove(str(prepared.get("route_path", "")))
+func finalize_sent(prepared: Dictionary, issue_number: int) -> bool:
+	var report_id := str(prepared.get("metadata", {}).get("report_id", ""))
+	var metadata_path := str(prepared.get("metadata_path", ""))
+	if not _is_report_id(report_id) or metadata_path.is_empty():
+		_quarantine_sent(report_id)
+		return false
+	var metadata: Dictionary = prepared.get("metadata", {}).duplicate(true)
+	metadata["upload_status"] = "sent"
+	metadata["issue_number"] = issue_number
+	if not _atomic_write_json(metadata_path, metadata):
+		_quarantine_sent(report_id)
+		return false
+	# Keep the terminal metadata marker until its private route and bundle are
+	# gone. Any failed deletion therefore remains non-retryable across launches.
+	for path in [str(prepared.get("route_path", "")), str(prepared.get("bundle_path", "")), metadata_path]:
+		if not _remove(path):
+			_quarantine_sent(report_id)
+			return false
+	return true
+
+
+func _quarantine_sent(report_id: String) -> void:
+	if not _is_report_id(report_id):
+		return
+	_session_quarantined[report_id] = true
+	_quarantine(report_id, "sent-cleanup-failed")
 
 
 func discard_staging(path: String) -> void:
@@ -221,6 +244,14 @@ func _preserve(source: String, destination: String) -> void:
 		_rename(source, destination)
 
 
-func _remove(path: String) -> void:
-	if not path.is_empty() and FileAccess.file_exists(path):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+func _remove(path: String) -> bool:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return true
+	if _remove_failure_override.is_valid() and bool(_remove_failure_override.call(path)):
+		return false
+	return DirAccess.remove_absolute(ProjectSettings.globalize_path(path)) == OK
+
+
+func set_remove_failure_for_smoke(failure: Callable) -> void:
+	if OS.has_feature("editor"):
+		_remove_failure_override = failure

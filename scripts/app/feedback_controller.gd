@@ -127,6 +127,11 @@ func smoke_set_build_info(build: Dictionary) -> void:
 		_reporter.set_build_info_for_smoke(build)
 
 
+func smoke_set_remove_failure(failure: Callable) -> void:
+	if OS.has_feature("editor"):
+		_reporter.set_remove_failure_for_smoke(failure)
+
+
 func smoke_reporter_state() -> Dictionary:
 	return _reporter.state_for_smoke() if OS.has_feature("editor") else {}
 

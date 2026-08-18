@@ -2024,7 +2024,9 @@ quality_bucket = "feedback"
 # suppression, pre-outbox refusal of unconfigured builds, runtime HTTPS revalidation,
 # semantic machine-identity redaction, and canonical timestamped truncation markers
 # from both the session slicer and bundle-size reducer. Its bounded engine-log fixture
-# pins that a leading partial line is removed before decoding and redaction.
+# pins that a leading partial line is removed before decoding and redaction. A forced
+# sent-cleanup deletion failure pins terminal marking, quarantine, and retry suppression
+# before success can be emitted.
 # Worker tests pin bounded
 # multi-page expiry cleanup, normalized ISO timestamp comparisons, code-point-safe
 # public truncation, Markdown/HTML-safe issue composition, atomic expiring/uploading

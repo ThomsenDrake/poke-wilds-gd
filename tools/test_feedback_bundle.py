@@ -329,6 +329,11 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn("if not _outbox.mark_blocked(prepared, reason):", reporter)
         self.assertIn("_outbox.quarantine_blocked(prepared)", reporter)
         self.assertIn("_session_quarantined[report_id] = true", outbox)
+        self.assertIn('metadata["upload_status"] = "sent"', outbox)
+        finalize = outbox[outbox.index("func finalize_sent("):outbox.index("func _quarantine_sent(")]
+        self.assertLess(finalize.index("_atomic_write_json(metadata_path"), finalize.index("for path in ["))
+        self.assertIn("if not _remove(path):", finalize)
+        self.assertIn("if _outbox.finalize_sent(prepared", reporter)
         submit = reporter[reporter.index("func submit("):reporter.index("func _upload(")]
         self.assertLess(submit.index("_configuration_error"), submit.index("_outbox.commit"))
         upload = reporter[reporter.index("func _upload("):reporter.index("func retry_pending(")]

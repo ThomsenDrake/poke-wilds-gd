@@ -249,6 +249,9 @@ The resilience half forces a permanent rejection plus a failed blocked-sidecar w
 then proves the active pair is quarantined, its private route is removed, and explicit
 retry cannot upload it again. It also pins that a one-character machine username does
 not rewrite ordinary prose while labeled identity fields and user paths remain redacted.
+It separately forces deletion failure after a successful relay response: the outbox
+must persist `sent` before cleanup, quarantine the retained pair, suppress every retry,
+and emit no `feedback_report_sent` trace until all three active paths are gone.
 An unconfigured-build submission returns `unsaved` before bundle/outbox creation, reaches
 no transport, and leaves no ZIP/metadata/route set; legacy malformed routes block rather
 than entering the bounded retry schedule. The runtime request node permits zero redirects
