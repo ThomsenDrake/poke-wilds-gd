@@ -2000,7 +2000,7 @@ validation_commands = [
   "python3 tools/run_playtests.py --scenario display_matrix",
   "python3 tools/test_feedback_bundle.py",
   "cd services/feedback-relay && npm ci && npm run check",
-  "cd services/feedback-relay && npx wrangler deploy --dry-run",
+  "cd services/feedback-relay && npx wrangler deploy --env=\"\" --dry-run",
   "cd services/feedback-relay && npx wrangler deploy --env staging --dry-run",
 ]
 required_trace_events = ["feedback_capture_requested", "feedback_report_queued", "feedback_report_sent", "feedback_report_failed", "feedback_flow_passed", "feedback_flow_failed"]
@@ -2033,4 +2033,6 @@ quality_bucket = "feedback"
 # public truncation, Markdown/HTML-safe issue composition, atomic expiring/uploading
 # ownership, terminal expired-row retries,
 # cleanup failure recovery, stale-read rejection, and admin denial during cleanup;
-# both dry-runs gate the relay.
+# both dry-runs gate the relay. The path-filtered GitHub Actions deployment then
+# applies D1 migrations, deploys and health-checks staging, and only after that
+# succeeds repeats the migration/deploy/health sequence for production.

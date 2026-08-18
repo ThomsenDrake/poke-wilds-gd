@@ -93,6 +93,8 @@ POKEAPI_CI_CONSUMERS = {
     ".github/workflows/playtests-headless.yml": "python3 tools/verify_all.py --skip-windowed",
 }
 
+FEEDBACK_RELAY_DEPLOY_WORKFLOW = ".github/workflows/feedback-relay-deploy.yml"
+
 
 def _workflow_step_blocks(text: str) -> list[list[str]]:
     """Return active lines for actual six-space GitHub Actions step blocks."""
@@ -153,6 +155,102 @@ def pokeapi_ci_cache_issues(root: Path) -> list[str]:
                     f"{rel} must order pinned cache restore -> --fetch-pinned -> consumer")
         if any("--refresh" in line for lines in steps for line in lines):
             issues.append(f"{rel} must never run --refresh in CI")
+    return issues
+
+
+def feedback_relay_deploy_issues(root: Path) -> list[str]:
+    """Pin the relay's validate -> staging -> production deployment contract."""
+    path = root / FEEDBACK_RELAY_DEPLOY_WORKFLOW
+    if not path.exists():
+        return [f"Missing feedback relay deployment workflow: {FEEDBACK_RELAY_DEPLOY_WORKFLOW}"]
+    text = path.read_text(encoding="utf-8")
+    issues: list[str] = []
+    required = (
+        "branches:\n      - main",
+        '      - "services/feedback-relay/**"',
+        "permissions:\n  contents: read",
+        "group: feedback-relay-deploy",
+        "cancel-in-progress: false",
+        "run: npm ci",
+        "run: npm run check",
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "npx wrangler deploy --dry-run --strict --keep-vars --env staging",
+        'npx wrangler deploy --dry-run --strict --keep-vars --env=""',
+        "environment: feedback-staging",
+        "environment: feedback-production",
+        "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
+        "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+        "npx wrangler d1 migrations apply DB --remote --env staging",
+        'npx wrangler d1 migrations apply DB --remote --env=""',
+        "https://poke-wilds-feedback-relay-staging.drake-t.workers.dev/healthz",
+        "https://poke-wilds-feedback-relay.drake-t.workers.dev/healthz",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} is missing deployment contract: {fragment}"
+            )
+    for action_ref in (
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+    ):
+        if text.count(action_ref) != 3:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must pin {action_ref} in all three jobs"
+            )
+
+    if text.count('      - "services/feedback-relay/**"') != 2:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must path-filter relay changes on push and pull_request"
+        )
+    deploy_if = (
+        "if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' "
+        "&& github.ref == 'refs/heads/main')"
+    )
+    if text.count(deploy_if) != 2:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must deploy only a push or manual dispatch of main"
+        )
+    if re.search(r"(?m)^    env:\n      CLOUDFLARE_", text):
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must scope Cloudflare credentials to individual steps"
+        )
+    for secret_name in ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"):
+        reference = f"{secret_name}: ${{{{ secrets.{secret_name} }}}}"
+        if text.count(reference) != 4:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must expose {secret_name} only to four migration/deploy steps"
+            )
+
+    staging_at = text.find("  deploy-staging:")
+    production_at = text.find("  deploy-production:")
+    if staging_at < 0 or production_at < 0 or staging_at >= production_at:
+        issues.append(
+            f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must declare staging before production"
+        )
+    else:
+        staging = text[staging_at:production_at]
+        production = text[production_at:]
+        if "needs: validate" not in staging:
+            issues.append("feedback relay staging deployment must need validate")
+        if "needs: deploy-staging" not in production:
+            issues.append("feedback relay production deployment must need deploy-staging")
+        for label, block in (("staging", staging), ("production", production)):
+            migrate_at = block.find("wrangler d1 migrations apply")
+            deploy_at = block.find("wrangler deploy --strict")
+            health_at = block.find("/healthz")
+            if not (0 <= migrate_at < deploy_at < health_at):
+                issues.append(
+                    f"feedback relay {label} must order migration -> deploy -> health check"
+                )
+
+    forbidden = ("GITHUB_PRIVATE_KEY", "ADMIN_TOKEN", "invite_token")
+    for secret_name in forbidden:
+        if secret_name in text:
+            issues.append(
+                f"{FEEDBACK_RELAY_DEPLOY_WORKFLOW} must not receive Worker runtime secret {secret_name}"
+            )
     return issues
 
 
@@ -409,6 +507,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(region_coverage_issues(root))
     issues.extend(core_tools_stdlib_issues(root))
     issues.extend(pokeapi_ci_cache_issues(root))
+    issues.extend(feedback_relay_deploy_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
