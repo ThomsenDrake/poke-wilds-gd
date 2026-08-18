@@ -163,13 +163,17 @@ function isIntegerPair(value: unknown): value is [number, number] {
 }
 
 export function sanitizePublicText(value: string): string {
-  return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
-    .trim().slice(0, 1000).replaceAll("@", "@\u200b");
+  const cleaned = value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim();
+  return truncateCodePoints(cleaned, 1000).replaceAll("@", "@\u200b");
 }
 
 export function issueTitle(message: string): string {
   const first = sanitizePublicText(message).split(/(?<=[.!?])\s|\n/, 1)[0] || "Playtest report";
-  return `[Playtest] ${first.slice(0, 90)}`;
+  return `[Playtest] ${truncateCodePoints(first, 90)}`;
+}
+
+function truncateCodePoints(value: string, limit: number): string {
+  return Array.from(value).slice(0, limit).join("");
 }
 
 export function constantTimeEqual(left: string, right: string): boolean {

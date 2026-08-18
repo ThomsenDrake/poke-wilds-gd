@@ -227,6 +227,9 @@ permanent-upload `blocked` bundles, so the player is never told a missing bundle
 The bundle writer treats entry-write, entry-close, and final-close errors as build
 failures, and the journey seeds a malformed isolated install-ID file and proves it is
 atomically replaced with the relay's exact 32-lowercase-hex identity format.
+Its reduction loop enforces both the 16 MiB compressed and 24 MiB uncompressed relay
+limits before outbox commit; the Python contract test pins both conditions. Worker tests
+also pin code-point-safe body/title truncation after message validation.
 It also suspends an active retry transport, submits another report, and proves the
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
 entry. The first report is queued under one synthetic package identity, the active

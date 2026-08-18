@@ -7,6 +7,7 @@ const BUILD_INFO_PATH := "res://generated/playtest_build.json"
 const INSTALL_ID_PATH := "user://feedback_install_id.txt"
 const INSTALL_ID_TMP_SUFFIX := ".tmp"
 const MAX_BUNDLE_BYTES := 16 * 1024 * 1024
+const MAX_UNCOMPRESSED_BYTES := 24 * 1024 * 1024
 const ENGINE_LOG_LIMIT := 2 * 1024 * 1024
 
 var _install_id_path := INSTALL_ID_PATH
@@ -125,7 +126,8 @@ func _close_zip_after_error(packer: ZIPPacker, reason: String) -> String:
 
 func _reduce_to_limit(path: String, artifacts: Dictionary, manifest: Dictionary,
 		truncated_paths: Dictionary) -> String:
-	while FileAccess.get_file_as_bytes(path).size() > MAX_BUNDLE_BYTES:
+	while FileAccess.get_file_as_bytes(path).size() > MAX_BUNDLE_BYTES \
+			or _uncompressed_size(artifacts) > MAX_UNCOMPRESSED_BYTES:
 		var engine: PackedByteArray = artifacts["engine.log"]
 		if not engine.is_empty():
 			# The log is already newest-tail ordered, so removing from its front
@@ -144,6 +146,14 @@ func _reduce_to_limit(path: String, artifacts: Dictionary, manifest: Dictionary,
 		if not error.is_empty():
 			return error
 	return ""
+
+
+func _uncompressed_size(artifacts: Dictionary) -> int:
+	var total := 0
+	for value in artifacts.values():
+		var bytes: PackedByteArray = value
+		total += bytes.size()
+	return total
 
 
 func _reduce_trace_middle(bytes: PackedByteArray, limit: int) -> PackedByteArray:

@@ -86,6 +86,13 @@ describe("feedback relay contracts", () => {
     expect(issueBody(meta, "2030-01-02T03:04:05.000Z")).toContain("expires 2030-01-02");
   });
 
+  it("preserves Unicode code points while truncating public text and titles", () => {
+    const emojiMessage = "😀".repeat(1000);
+    expect(sanitizePublicText(emojiMessage)).toBe(emojiMessage);
+    expect(Array.from(sanitizePublicText(`${emojiMessage}extra`))).toHaveLength(1000);
+    expect(issueTitle("😀".repeat(100))).toBe(`[Playtest] ${"😀".repeat(90)}`);
+  });
+
   it("hashes byte-identically", async () => {
     expect(await sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });

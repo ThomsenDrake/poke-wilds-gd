@@ -49,9 +49,11 @@ every visible sibling under the common UI parent, an optional
 pre-dialog screenshot, and `README.txt`. Trace capture begins at the first event
 written by this process even though `agent_trace.jsonl` remains append-only
 across launches. Trace and engine logs are capped at 5 MiB and 2 MiB; the bundle
-is capped at 16 MiB; if compression ever exceeds the cap, reduction removes
-old engine-log material first and then the middle of the trace while preserving
-its beginning, newest complete records, and an explicit truncation marker.
+is capped at 16 MiB compressed and 24 MiB across uncompressed entries; if either cap
+is exceeded, reduction removes old engine-log material first and then the middle of
+the trace while preserving its beginning, newest complete records, and an explicit
+truncation marker. If irreducible save/UI/screenshot data still exceeds either cap,
+bundle creation fails locally instead of committing an artifact the relay will reject.
 
 Redaction replaces home/user-data/application paths and credential-shaped log
 material. It never records an OS username, hostname, or device

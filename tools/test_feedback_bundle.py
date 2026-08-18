@@ -245,6 +245,10 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn('if packer.close() != OK:', source)
         self.assertIn('pattern.compile("^[0-9a-f]{32}$")', source)
         self.assertIn("DirAccess.rename_absolute(ProjectSettings.globalize_path(temporary)", source)
+        self.assertIn("const MAX_UNCOMPRESSED_BYTES := 24 * 1024 * 1024", source)
+        reduction = source[source.index("func _reduce_to_limit"):source.index("func _reduce_trace_middle")]
+        self.assertIn("FileAccess.get_file_as_bytes(path).size() > MAX_BUNDLE_BYTES", reduction)
+        self.assertIn("or _uncompressed_size(artifacts) > MAX_UNCOMPRESSED_BYTES", reduction)
 
     def test_runtime_outbox_checks_sidecar_write_and_retry_scheduler_rescans(self) -> None:
         outbox = (package_playtest.ROOT / "scripts/runtime/feedback_outbox.gd").read_text(encoding="utf-8")

@@ -29,6 +29,8 @@ self-hash and contains `{path, bytes, sha256, truncated}` for every other entry.
 tester/install IDs, build, runtime, game, and capture values inside the ZIP to agree with this
 envelope. Maximums are 64 KiB metadata,
 16 MiB compressed ZIP, 24 MiB total uncompressed entries, and seven entries.
+The client reduces engine-log and trace data against both byte caps before committing
+the ZIP and fails locally when irreducible entries alone exceed a cap.
 
 Agents must reject duplicate or unexpected paths, nested paths, traversal segments,
 symlink-prone entries, compressed input above 16 MiB, unsupported ZIP methods, central/local
