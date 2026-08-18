@@ -153,5 +153,61 @@ class CommandCodeIncompleteRepairTests(unittest.TestCase):
         self.assertEqual(meta["per_pass"][0]["repair_added"], ["menu.cursor"])
 
 
+class OpenAICompatibleFallbackTests(unittest.TestCase):
+    def test_default_argv_keeps_low_effort_on_luna(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        argv = VLM.command_code_argv("/bin/cmd", "prompt", cfg)
+        self.assertEqual(cfg.command_code_effort, "low")
+        self.assertEqual(argv[argv.index("--effort") + 1], "low")
+        self.assertEqual(argv[argv.index("--model") + 1], "gpt-5.6-luna")
+
+    def test_fallback_constants_are_mistral_medium_high_effort(self) -> None:
+        self.assertEqual(VLM.FALLBACK_MODEL, "mistral-medium-3-5")
+        self.assertEqual(VLM.FALLBACK_EFFORT, "high")
+        self.assertEqual(VLM.DEFAULT_FALLBACK_BASE, "https://api.mistral.ai/v1")
+
+    def test_probe_uses_openai_compatible_when_command_code_missing(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        with mock.patch.object(VLM, "_command_code_available", return_value=(False, "cmd CLI not found")):
+            backend, reason = VLM.probe_availability(cfg)
+        self.assertEqual(backend, "openai_compatible")
+        self.assertIn("fallback key present", reason)
+
+    def test_fallback_request_sends_reasoning_effort_high(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured.update({"url": url, "body": body, "headers": headers, "timeout": timeout})
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            text = VLM._call_fallback(cfg, "system", "user", [], 0.0, 1)
+        self.assertEqual(text, '{"answers":[]}')
+        self.assertEqual(captured["url"], "https://api.mistral.ai/v1/chat/completions")
+        self.assertEqual(captured["body"]["model"], "mistral-medium-3-5")
+        self.assertEqual(captured["body"]["reasoning_effort"], "high")
+        self.assertTrue(captured["headers"]["Authorization"].startswith("Bearer "))
+        self.assertNotIn(cfg.fallback_key, str(captured["url"]))
+
+    def test_describe_records_fallback_presence_without_secret(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "super-secret-key"
+        meta = cfg.describe()
+        self.assertTrue(meta["fallback_key_present"])
+        dumped = VLM.json.dumps(meta)
+        self.assertNotIn("super-secret-key", dumped)
+        self.assertEqual(meta["fallback_model"], "mistral-medium-3-5")
+        self.assertEqual(meta["fallback_effort"], "high")
+
+    def test_openai_compatible_is_single_pass(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        self.assertEqual(VLM._required_passes(cfg, "openai_compatible"), 1)
+        self.assertEqual(VLM._required_passes(cfg, "command_code"), 1)
+        self.assertEqual(VLM._required_passes(cfg, "dashscope"), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

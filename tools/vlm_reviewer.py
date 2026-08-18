@@ -68,10 +68,14 @@ default.
 RUNTIME (default `auto`): Command Code headless `gpt-5.6-luna` is tried
 FIRST for each image via `cmd -p --no-session --permission-mode plan`; it
 reads the local PNG paths from the prompt and returns strict JSON. If that
-CLI/model is unavailable, hosted `qwen3.8-max-preview` via the token-plan
-MaaS endpoint (DEFAULT_DASHSCOPE_BASE) is tried when DASHSCOPE_API_KEY is
-set (env only, NEVER logged); then local qwen3-vl:8b (Instruct) via Ollama's
-HTTP API when pulled; else required review fails closed. The wrapper is PURE
+CLI/model is unavailable, the same Command Code review harness is pointed at
+an OpenAI-compatible HTTP endpoint (default `https://api.mistral.ai/v1`)
+running `mistral-medium-3-5` at reasoning effort `high` when
+`MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY` is set (env only, NEVER logged);
+then hosted `qwen3.8-max-preview` via the token-plan MaaS endpoint
+(DEFAULT_DASHSCOPE_BASE) when DASHSCOPE_API_KEY is set; then local
+qwen3-vl:8b (Instruct) via Ollama's HTTP API when pulled; else required
+review fails closed. The wrapper is PURE
 STDLIB (urllib.request + json + base64; NO SDK, NO venv) and stays a CORE tool:
 OPTIONAL_TOOL_EXEMPTIONS remains pinned to exactly {vision_metrics.py}. An
 explicit model id is pinned, never `latest`. Hosted calls budget max_tokens=
@@ -112,13 +116,17 @@ ROOT = TOOLS.parent
 
 SCHEMA = "vision-review/2"
 REVIEWER_KIND = "model-vision-llm"      # must equal vision_review.KIND_MODEL so coverage joins
-DEFAULT_MODEL = "qwen3-vl:8b"           # local fallback model (explicit tag, never latest)
+DEFAULT_MODEL = "qwen3-vl:8b"           # local Ollama model (explicit tag, never latest)
 COMMAND_CODE_MODEL = "gpt-5.6-luna"
-FALLBACK_MODEL = "qwen3-vl:4b"          # faster / lower-fidelity lane or memory contention
+COMMAND_CODE_EFFORT = "low"
+FALLBACK_MODEL = "mistral-medium-3-5"   # OpenAI-compatible Command Code harness fallback
+FALLBACK_EFFORT = "high"
+DEFAULT_FALLBACK_BASE = "https://api.mistral.ai/v1"
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
 DEFAULT_DASHSCOPE_MODEL = "qwen3.8-max-preview"
 DEFAULT_TIMEOUT = 180                   # per call; reasoning models spend tokens thinking (keep headroom; < REVIEWER_TIMEOUT=300)
+SINGLE_PASS_BACKENDS = ("command_code", "openai_compatible")
 PROBE_TIMEOUT = 5
 DEFAULT_COMMAND_CODE_PROBE_TIMEOUT = 30
 MAX_CROPS = 6                           # bound image tokens; native-res crops carry the small-diff signal
@@ -181,11 +189,19 @@ class Config:
         self.runtime = str(pick("runtime", "VLM_RUNTIME", "auto")).lower()
         self.model = str(pick("model", "VLM_MODEL", DEFAULT_MODEL))
         self.command_code_model = str(pick("command_code_model", "COMMAND_CODE_MODEL", COMMAND_CODE_MODEL))
+        self.command_code_effort = str(pick("command_code_effort", "COMMAND_CODE_EFFORT", COMMAND_CODE_EFFORT)).lower()
+        self.fallback_model = str(pick("fallback_model", "VLM_FALLBACK_MODEL", FALLBACK_MODEL))
+        self.fallback_effort = str(pick("fallback_effort", "VLM_FALLBACK_EFFORT", FALLBACK_EFFORT)).lower()
+        self.fallback_base = str(pick("fallback_base", "VLM_FALLBACK_BASE_URL", DEFAULT_FALLBACK_BASE)).rstrip("/")
         self.ollama_host = str(pick("ollama_host", "OLLAMA_HOST", DEFAULT_OLLAMA_HOST)).rstrip("/")
         self.dashscope_base = str(pick("dashscope_base", "DASHSCOPE_BASE_URL", DEFAULT_DASHSCOPE_BASE)).rstrip("/")
         self.dashscope_model = str(pick("dashscope_model", "DASHSCOPE_MODEL", DEFAULT_DASHSCOPE_MODEL))
         # SECRET: env only, never logged. Only a presence bool is recorded.
         self.dashscope_key = os.environ.get("DASHSCOPE_API_KEY", "")
+        self.fallback_key = (
+            os.environ.get("VLM_FALLBACK_API_KEY", "")
+            or os.environ.get("MISTRAL_API_KEY", "")
+        )
         self.timeout = int(pick("timeout", "VLM_TIMEOUT", DEFAULT_TIMEOUT))
         self.base_dir = Path(pick("base_dir", "VISION_REVIEW_BASE_DIR", str(ROOT / ".godot-smoke")))
         self.baseline_dir = Path(pick("baseline_dir", "VLM_BASELINE_DIR",
@@ -204,9 +220,13 @@ class Config:
         """reviewer_meta config block. NEVER includes secret values."""
         return {
             "runtime": self.runtime, "model": self.model, "command_code_model": self.command_code_model,
+            "command_code_effort": self.command_code_effort,
+            "fallback_model": self.fallback_model, "fallback_effort": self.fallback_effort,
+            "fallback_base": self.fallback_base,
             "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
+            "fallback_key_present": bool(self.fallback_key),
             "command_code_key_present": bool(os.environ.get("COMMAND_CODE_API_KEY")),
             "command_code_preflight_reused": (
                 os.environ.get("POKEWILDS_COMMAND_CODE_PREFLIGHTED") == "1"
@@ -340,8 +360,14 @@ def _model_in_tags(host: str, model: str) -> tuple[bool, str]:
     return False, f"model {model} not pulled (have: {', '.join(names) or 'none'})"
 
 
+def _fallback_available(cfg: Config) -> tuple[bool, str]:
+    if cfg.fallback_key:
+        return True, "openai-compatible fallback key present"
+    return False, "no MISTRAL_API_KEY/VLM_FALLBACK_API_KEY"
+
+
 def probe_availability(cfg: Config) -> tuple[str | None, str]:
-    """Resolve the active backend in priority order: Command Code, DashScope, Ollama."""
+    """Resolve the active backend: Command Code, OpenAI-compatible fallback, DashScope, Ollama."""
     command_reason = "command code not probed"
     if cfg.runtime in ("command_code", "auto"):
         ok, reason = _command_code_available()
@@ -350,6 +376,14 @@ def probe_availability(cfg: Config) -> tuple[str | None, str]:
         command_reason = reason
         if cfg.runtime == "command_code":
             return None, command_reason
+    fallback_reason = "openai-compatible fallback not probed"
+    if cfg.runtime in ("openai_compatible", "auto"):
+        ok, reason = _fallback_available(cfg)
+        if ok:
+            return "openai_compatible", reason
+        fallback_reason = reason
+        if cfg.runtime == "openai_compatible":
+            return None, fallback_reason
     dash_reason = "dashscope not probed"
     if cfg.runtime in ("dashscope", "auto"):
         if cfg.dashscope_key:
@@ -365,7 +399,7 @@ def probe_availability(cfg: Config) -> tuple[str | None, str]:
         ollama_reason = reason
         if cfg.runtime == "ollama":
             return None, ollama_reason
-    return None, f"{command_reason}; {dash_reason}; {ollama_reason}"
+    return None, f"{command_reason}; {fallback_reason}; {dash_reason}; {ollama_reason}"
 
 
 # --------------------------------------------------------------------------
@@ -655,7 +689,8 @@ def command_code_argv(cmd: str, prompt: str, cfg: Config) -> list[str]:
     return [
         cmd, "-p", prompt, "--model", cfg.command_code_model, "--no-session",
         "--skip-onboarding", "--permission-mode", "plan", "--max-turns", "8",
-        "--effort", "low", "--output-format", "text", "--add-dir", str(ROOT),
+        "--effort", cfg.command_code_effort, "--output-format", "text",
+        "--add-dir", str(ROOT),
     ]
 
 
@@ -729,28 +764,63 @@ def _call_ollama(cfg: Config, system: str, user_text: str, images: list[str],
     return str((doc.get("message") or {}).get("content", ""))
 
 
-def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
-                    temperature: float, seed: int) -> str:
+def _openai_compatible_text(doc: dict) -> str:
+    choices = doc.get("choices") or []
+    msg = (choices[0] or {}).get("message") if choices else {}
+    c = (msg or {}).get("content", "")
+    if isinstance(c, list):  # some servers return content parts
+        parts = []
+        for part in c:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "thinking":
+                continue  # Mistral high-effort traces; keep only the final answer
+            parts.append(part.get("text", "") if "text" in part else "")
+        c = "".join(parts)
+    return str(c)
+
+
+def _call_openai_compatible(cfg: Config, system: str, user_text: str,
+                            images: list[str], temperature: float, seed: int, *,
+                            base: str, model: str, key: str,
+                            extra: dict | None = None) -> str:
     images = _images_above_minimum(images)
     content = [{"type": "text", "text": user_text}]
     for b in images:
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}})
     body = {
-        "model": cfg.dashscope_model, "temperature": temperature, "seed": seed,
-        # Reasoning models (qwen3.8-max-preview) spend completion tokens thinking;
-        # 4096 leaves headroom for the reasoning trace + the JSON answer.
+        "model": model, "temperature": temperature, "seed": seed,
+        # Reasoning models spend completion tokens thinking; 4096 leaves
+        # headroom for the reasoning trace + the JSON answer.
         "max_tokens": 4096,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": content}],
     }
-    doc = _post_json(cfg.dashscope_base + "/chat/completions", body,
-                     {"Authorization": f"Bearer {cfg.dashscope_key}"}, cfg.timeout)
-    choices = doc.get("choices") or []
-    msg = (choices[0] or {}).get("message") if choices else {}
-    c = (msg or {}).get("content", "")
-    if isinstance(c, list):  # some servers return content parts
-        c = "".join(part.get("text", "") for part in c if isinstance(part, dict))
-    return str(c)
+    if extra:
+        body.update(extra)
+    doc = _post_json(base + "/chat/completions", body,
+                     {"Authorization": f"Bearer {key}"}, cfg.timeout)
+    return _openai_compatible_text(doc)
+
+
+def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
+                    temperature: float, seed: int) -> str:
+    return _call_openai_compatible(
+        cfg, system, user_text, images, temperature, seed,
+        base=cfg.dashscope_base, model=cfg.dashscope_model, key=cfg.dashscope_key)
+
+
+def _call_fallback(cfg: Config, system: str, user_text: str, images: list[str],
+                   temperature: float, seed: int) -> str:
+    if not cfg.fallback_key:
+        raise RuntimeError("openai-compatible fallback key missing")
+    extra = {}
+    if cfg.fallback_effort:
+        extra["reasoning_effort"] = cfg.fallback_effort
+    return _call_openai_compatible(
+        cfg, system, user_text, images, temperature, seed,
+        base=cfg.fallback_base, model=cfg.fallback_model, key=cfg.fallback_key,
+        extra=extra)
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,
@@ -759,9 +829,25 @@ def _call_model(cfg: Config, backend: str, system: str, user_text: str,
     if backend == "command_code":
         return _call_command_code(cfg, system, user_text, public_ctx,
                                  list(order or ["before", "after"]))
+    if backend == "openai_compatible":
+        return _call_fallback(cfg, system, user_text, images, temperature, seed)
     if backend == "ollama":
         return _call_ollama(cfg, system, user_text, images, temperature, seed)
     return _call_dashscope(cfg, system, user_text, images, temperature, seed)
+
+
+def _required_passes(cfg: Config, backend: str) -> int:
+    return 1 if backend in SINGLE_PASS_BACKENDS else cfg.n
+
+
+def _backend_model_name(cfg: Config, backend: str) -> str:
+    if backend == "command_code":
+        return cfg.command_code_model
+    if backend == "openai_compatible":
+        return cfg.fallback_model
+    if backend == "dashscope":
+        return cfg.dashscope_model
+    return cfg.model
 
 
 # --------------------------------------------------------------------------
@@ -994,7 +1080,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
     temperature = 0.2 if cfg.independent_vote else 0.0
     passes: list[list[dict]] = []
     per_pass: list[dict] = []
-    required_passes = 1 if backend == "command_code" else cfg.n
+    required_passes = _required_passes(cfg, backend)
     for i in range(required_passes):
         rng = random.Random(cfg.seed + i)  # per-pass order seed, recorded
         order = ["before", "after"]
@@ -1062,7 +1148,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
         per_pass.append({"pass": i, "order": order, "parse": parse_note,
                          "answers": len(answers), **norm})
 
-    required_passes = 1 if backend == "command_code" else cfg.n
+    required_passes = _required_passes(cfg, backend)
     unanimous, vote = _unanimous(passes, required=required_passes)
     # Track C.3 — self-critique: a third adversarial pass that tries to REFUTE
     # each unanimous 'no'. Any successfully refuted finding is demoted (kept in
@@ -1073,8 +1159,8 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
             public_ctx, cfg, backend, catalog, questions, unanimous, temperature)
     except Exception as exc:
         critique_meta = {"ran": False, "reason": f"{type(exc).__name__}: {exc}"}
-    model_name = cfg.command_code_model if backend == "command_code" else (cfg.dashscope_model if backend == "dashscope" else cfg.model)
-    vote_semantics = ("single bounded image review (Command Code fallback)" if backend == "command_code"
+    model_name = _backend_model_name(cfg, backend)
+    vote_semantics = ("single bounded image review (Command Code harness)" if backend in SINGLE_PASS_BACKENDS
                       else ("independent two-sample vote" if cfg.independent_vote
                             else "determinism/repro guard (identical greedy decodes at temperature 0)"))
     meta = {"ran": True, "backend": backend, "model": model_name, "group": group,
@@ -1184,7 +1270,7 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                     required = int(mmeta.get("questions_total", 0))
                     completed = int(mmeta.get("passes_completed", 0))
                     answered = len(answers)
-                    expected_passes = 1 if mmeta.get("backend") == "command_code" else cfg.n
+                    expected_passes = _required_passes(cfg, str(mmeta.get("backend") or ""))
                     if completed != expected_passes or answered != required:
                         raise RuntimeError(
                             f"required vision review incomplete: passes {completed}/{expected_passes}, "
@@ -1231,8 +1317,8 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runtime", choices=["command_code", "ollama", "dashscope", "auto"], default=None,
-                        help="model backend (default: env VLM_RUNTIME or auto: Command Code gpt-5.6-luna, then DashScope, then Ollama)")
+    parser.add_argument("--runtime", choices=["command_code", "openai_compatible", "ollama", "dashscope", "auto"], default=None,
+                        help="model backend (default: env VLM_RUNTIME or auto: Command Code gpt-5.6-luna, then OpenAI-compatible Mistral Medium 3.5, then DashScope, then Ollama)")
     parser.add_argument("--model", default=None,
                         help=f"Ollama model tag, pinned explicit (default: env VLM_MODEL or {DEFAULT_MODEL})")
     parser.add_argument("--ollama-host", dest="ollama_host", default=None,
@@ -1241,6 +1327,16 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                         help="DashScope OpenAI-compatible base URL (env DASHSCOPE_BASE_URL)")
     parser.add_argument("--dashscope-model", dest="dashscope_model", default=None,
                         help="DashScope model (env DASHSCOPE_MODEL or qwen3-vl-plus)")
+    parser.add_argument("--fallback-base", dest="fallback_base", default=None,
+                        help=f"OpenAI-compatible fallback base URL (env VLM_FALLBACK_BASE_URL or {DEFAULT_FALLBACK_BASE})")
+    parser.add_argument("--fallback-model", dest="fallback_model", default=None,
+                        help=f"OpenAI-compatible fallback model (env VLM_FALLBACK_MODEL or {FALLBACK_MODEL})")
+    parser.add_argument("--fallback-effort", dest="fallback_effort", default=None,
+                        help=f"fallback reasoning effort (env VLM_FALLBACK_EFFORT or {FALLBACK_EFFORT})")
+    parser.add_argument("--command-code-model", dest="command_code_model", default=None,
+                        help=f"Command Code model (env COMMAND_CODE_MODEL or {COMMAND_CODE_MODEL})")
+    parser.add_argument("--command-code-effort", dest="command_code_effort", default=None,
+                        help=f"Command Code reasoning effort (env COMMAND_CODE_EFFORT or {COMMAND_CODE_EFFORT})")
     parser.add_argument("--timeout", type=int, default=None,
                         help=f"per-call wall-clock seconds (default: env VLM_TIMEOUT or {DEFAULT_TIMEOUT})")
     parser.add_argument("--base-dir", dest="base_dir", default=None,

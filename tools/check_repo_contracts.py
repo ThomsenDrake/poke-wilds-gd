@@ -1653,6 +1653,23 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
     argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
     if "--auto-accept" in argv:
         issues.append("vlm_reviewer Command Code argv must not use --auto-accept")
+    if reviewer.FALLBACK_MODEL != "mistral-medium-3-5":
+        issues.append(
+            "vlm_reviewer fallback model must stay mistral-medium-3-5 "
+            f"(got {reviewer.FALLBACK_MODEL})"
+        )
+    if reviewer.FALLBACK_EFFORT != "high":
+        issues.append(
+            "vlm_reviewer fallback reasoning effort must stay high "
+            f"(got {reviewer.FALLBACK_EFFORT})"
+        )
+    try:
+        effort_at = argv.index("--effort")
+    except ValueError:
+        issues.append("vlm_reviewer Command Code argv must set --effort")
+        effort_at = -1
+    if effort_at >= 0 and (effort_at + 1 >= len(argv) or argv[effort_at + 1] != "low"):
+        issues.append("vlm_reviewer default Command Code argv must set --effort low")
     try:
         mode_at = argv.index("--permission-mode")
     except ValueError:
