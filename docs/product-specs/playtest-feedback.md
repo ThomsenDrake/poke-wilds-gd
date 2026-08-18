@@ -33,6 +33,10 @@ when no retryable entry remains. Sidecar writes must complete and flush before t
 atomic rename can publish the commit marker. A permanent 4xx keeps the local artifact without a retry loop and
 reports that retained copy to the player. Bundle-build or outbox-commit failure returns
 `unsaved` and instead says the report could not be saved; it never claims a local artifact.
+Missing or invalid embedded relay configuration is refused before bundle creation or
+outbox commit, so a non-personalized export cannot create a permanently unsendable
+private route; a legacy malformed route is terminally blocked rather than retried forever.
+Runtime uploads also reject redirects instead of forwarding the invite credential.
 Bundle creation checks the result of each ZIP entry write, entry close, and final archive
 close before the outbox can commit it. The stable install ID must be exactly 32 lowercase
 hexadecimal characters; a missing or malformed persisted value is regenerated into a
@@ -134,11 +138,14 @@ release, and removes the generated metadata in a lock-owned `finally` block. Raw
 tokens remain only in the ignored mode-0600 `.playtest/invites.json` and inside
 their revocable packages; commands never print them. Private/generated/output paths
 remain excluded through `.gitignore`, while an untracked exportable resource blocks
-distribution so the embedded commit SHA describes every packaged input.
+distribution so the embedded commit SHA describes every packaged input. The admin
+registration request rejects redirects rather than forwarding its credential to a
+different origin or downgraded transport.
 
 An authorized agent reads the public issue, runs the supplied fetch command,
 and starts at `report.json`. The fetcher refuses an unsafe endpoint before constructing
-the admin-authenticated request, streams through the private admin route,
+the admin-authenticated request and rejects redirects before any credential-bearing
+follow-up, then streams through the private admin route,
 checks the transport hash, safely extracts the allowlisted files into a temporary sibling
 and atomically publishes them only after success, and verifies
 every manifest checksum. The focused `feedback_flow` scenario drives real `F`
@@ -151,3 +158,5 @@ One retry pass also leaves an unavailable old route queued while sending a later
 independently routed report, so cross-package outbox entries cannot starve each other.
 The injected scenario transport leaves reports from prior runs queued and untouched;
 only report IDs created by the current journey affect its counters or assertions.
+The journey also submits from an unconfigured synthetic build and proves no transport,
+ZIP, metadata marker, or private route is created.

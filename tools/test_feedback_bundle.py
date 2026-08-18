@@ -15,8 +15,11 @@ import stat
 import struct
 from types import SimpleNamespace
 from unittest import mock
+import urllib.error
+import urllib.request
 
-from fetch_feedback_report import bundle_request, resolve_report_id, transport_hash_matches
+from feedback_endpoint import _RejectRedirects, open_no_redirect
+from fetch_feedback_report import bundle_request, download_bundle, resolve_report_id, transport_hash_matches
 from inspect_feedback_bundle import extract_bundle, inspect_bundle
 import package_playtest
 
@@ -219,6 +222,20 @@ class FeedbackBundleTests(unittest.TestCase):
             with self.subTest(endpoint=endpoint), self.assertRaisesRegex(ValueError, "HTTPS"):
                 bundle_request(endpoint, report_id, "private")
 
+    def test_privileged_feedback_requests_reject_every_redirect(self) -> None:
+        request = urllib.request.Request(
+            "https://relay.test/private", headers={"Authorization": "placeholder"}
+        )
+        for code in (301, 302, 303, 307, 308):
+            with self.subTest(code=code), self.assertRaisesRegex(urllib.error.HTTPError, "redirect refused") as raised:
+                _RejectRedirects().redirect_request(
+                    request, None, code, "Redirect", {}, "http://different-origin.test/private"
+                )
+            self.assertEqual(raised.exception.code, code)
+            raised.exception.close()
+        self.assertIs(package_playtest.register_invite.__kwdefaults__["urlopen"], open_no_redirect)
+        self.assertIs(download_bundle.__kwdefaults__["urlopen"], open_no_redirect)
+
     def test_packaging_cleanup_runs_when_export_fails(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -302,9 +319,13 @@ class FeedbackBundleTests(unittest.TestCase):
         self.assertIn("if not _outbox.mark_blocked(prepared, reason):", reporter)
         self.assertIn("_outbox.quarantine_blocked(prepared)", reporter)
         self.assertIn("_session_quarantined[report_id] = true", outbox)
-        self.assertIn('return {"status": "blocked", "reason": "feedback_endpoint_invalid"}', reporter)
+        submit = reporter[reporter.index("func submit("):reporter.index("func _upload(")]
+        self.assertLess(submit.index("_configuration_error"), submit.index("_outbox.commit"))
         upload = reporter[reporter.index("func _upload("):reporter.index("func retry_pending(")]
-        self.assertLess(upload.index("_validated_endpoint(raw_endpoint)"), upload.index("_http.request_raw"))
+        self.assertIn('return {"status": "blocked", "reason": configuration_error}', upload)
+        self.assertLess(upload.index("_configuration_error"), upload.index("_http.request_raw"))
+        self.assertIn("_http.max_redirects = 0", reporter)
+        self.assertIn("HTTPRequest.RESULT_REDIRECT_LIMIT_REACHED", upload)
         retry = reporter[reporter.index("func retry_pending("):reporter.index("func _persist_blocked(")]
         self.assertNotIn('elif result.get("status") == "queued":\n\t\t\tbreak', retry)
         self.assertNotIn("\t\t\t_retry_timer.stop()", reporter)
@@ -357,8 +378,7 @@ class FeedbackBundleTests(unittest.TestCase):
             captured.append((request, timeout))
             return Response()
 
-        with mock.patch.object(package_playtest.urllib.request, "urlopen", side_effect=urlopen):
-            package_playtest.register_invite("https://relay.test/", "admin", invite)
+        package_playtest.register_invite("https://relay.test/", "admin", invite, urlopen=urlopen)
         self.assertEqual(captured[0][0].get_header("User-agent"), "poke-wilds-playtest-package/1.0")
         self.assertEqual(captured[0][0].get_header("Authorization"), "Bearer admin")
 

@@ -14,7 +14,7 @@ import tempfile
 import urllib.error
 import urllib.request
 
-from feedback_endpoint import validated_endpoint
+from feedback_endpoint import open_no_redirect, validated_endpoint
 from inspect_feedback_bundle import extract_bundle
 
 REPORT_ID = re.compile(
@@ -71,6 +71,11 @@ def bundle_request(endpoint: str, report_id: str, token: str) -> urllib.request.
     )
 
 
+def download_bundle(request: urllib.request.Request, *, urlopen=open_no_redirect) -> tuple[bytes, str]:
+    with urlopen(request, timeout=30) as response:
+        return response.read(17 * 1024 * 1024), response.headers.get("X-Content-SHA256", "")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("report", help="Report UUID or public GitHub issue URL")
@@ -89,9 +94,7 @@ def main() -> int:
     except ValueError as exc:
         parser.error(str(exc))
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            payload = response.read(17 * 1024 * 1024)
-            expected = response.headers.get("X-Content-SHA256", "")
+        payload, expected = download_bundle(request)
     except urllib.error.HTTPError as exc:
         print(f"feedback download failed: HTTP {exc.code}", file=sys.stderr)
         return 1

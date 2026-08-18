@@ -243,6 +243,10 @@ The resilience half forces a permanent rejection plus a failed blocked-sidecar w
 then proves the active pair is quarantined, its private route is removed, and explicit
 retry cannot upload it again. It also pins that a one-character machine username does
 not rewrite ordinary prose while labeled identity fields and user paths remain redacted.
+An unconfigured-build submission returns `unsaved` before bundle/outbox creation, reaches
+no transport, and leaves no ZIP/metadata/route set; legacy malformed routes block rather
+than entering the bounded retry schedule. The runtime request node permits zero redirects
+and classifies the redirect-limit result as terminal before any credential-bearing hop.
 The editor-only endpoint probe rejects HTTP and normalizes HTTPS, while the Python
 source contract pins that this same guard returns blocked before `HTTPRequest.request_raw`.
 Sidecar publication checks the write and flush result before its atomic rename. The
@@ -253,7 +257,8 @@ uploads must claim `uploading` before R2, scheduled cleanup atomically claims
 `expiring` rows before deletion, and a stale upload read that loses that transition
 returns 410 without an R2 write. Cleanup failures leave the claim retryable, stale
 active leases are recoverable, and admin downloads refuse both retention-terminal states.
-Packaging/fetch tests reject non-HTTPS endpoints before either admin request and hold a
+Packaging/fetch tests reject non-HTTPS endpoints and every redirect before either admin
+credential can be forwarded, and hold a
 cross-platform advisory lock across the shared build-metadata write/export/cleanup
 sequence; a concurrent exporter must refuse without deleting the active owner's metadata.
 Relay changes additionally require

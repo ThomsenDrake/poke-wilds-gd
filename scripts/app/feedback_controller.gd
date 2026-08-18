@@ -139,6 +139,10 @@ func smoke_result_message(result: Dictionary) -> String:
 	return _result_message(result) if OS.has_feature("editor") else ""
 
 
+func smoke_submit(message: String, runtime: Node) -> Dictionary:
+	return await _reporter.submit(message, _capture, runtime) if OS.has_feature("editor") else {}
+
+
 func smoke_retry(report_id: String) -> void:
 	if OS.has_feature("editor"):
 		await _reporter.retry_pending(report_id)

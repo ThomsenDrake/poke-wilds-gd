@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
+import urllib.error
 import urllib.parse
+import urllib.request
+
+
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect before urllib can copy a privileged header."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        if fp is not None:
+            fp.close()
+        raise urllib.error.HTTPError(req.full_url, code, "redirect refused", headers, None)
+
+
+_NO_REDIRECT_OPENER = urllib.request.build_opener(_RejectRedirects())
+
+
+def open_no_redirect(request: urllib.request.Request, *, timeout: int):
+    return _NO_REDIRECT_OPENER.open(request, timeout=timeout)
 
 
 def validated_endpoint(endpoint: str) -> str:

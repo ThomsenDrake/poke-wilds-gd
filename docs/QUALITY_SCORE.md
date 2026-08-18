@@ -82,6 +82,11 @@ uploads now own a guarded `uploading` lease before R2, while cleanup atomically 
 `expiring` rows before deletion. Worker tests pin both transition orderings, cleanup
 failure recovery, stale-read rejection without an R2 write, and immediate admin denial.
 
+Feedback credential/configuration follow-up (2026-08-18): scores remain unchanged.
+Both privileged Python clients reject redirects before an admin credential can cross a
+hop. The real journey proves an unconfigured export returns `unsaved` before bundle or
+outbox creation and cannot leave a permanently retrying private route.
+
 Legendary-dungeon validation layer (2026-08-11): validation remains at the existing score, now backed by the rng-free warp/resolver/chamber core, additive dungeon-context persistence, explicit in-dungeon mutation/refusal guards, the dedicated end-to-end scenario, and the 44/45 presentation baselines.
 
 Navigation-audit fixture hardening (2026-08-11): `app_bootstrap` scores remain unchanged. The battle half now owns its seeded new game, rebuilt `WorldView`, and avatar resync, then bounded-waits asynchronous turn playback before deciding whether a terminal battle must restart. This supersedes the older row's `(code, save, seed)` shorthand for `nav_audit`: its encounter scope/level and battle decisions are a function of (code, seed), never inherited boot geometry.

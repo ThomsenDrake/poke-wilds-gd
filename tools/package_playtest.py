@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 import urllib.error
 import urllib.request
 
-from feedback_endpoint import validated_endpoint as _validated_endpoint
+from feedback_endpoint import open_no_redirect, validated_endpoint as _validated_endpoint
 
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / ".playtest" / "invites.json"
@@ -132,7 +132,7 @@ def invite_for(friend: str, cohort: str) -> dict:
     return invite
 
 
-def register_invite(endpoint: str, admin_token: str, invite: dict) -> None:
+def register_invite(endpoint: str, admin_token: str, invite: dict, *, urlopen=open_no_redirect) -> None:
     endpoint = validated_endpoint(endpoint)
     payload = json.dumps({"tester_id": invite["tester_id"], "nickname": invite["nickname"],
                           "cohort_id": invite["cohort_id"],
@@ -143,7 +143,7 @@ def register_invite(endpoint: str, admin_token: str, invite: dict) -> None:
                  "User-Agent": USER_AGENT},
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urlopen(request, timeout=20) as response:
             if response.status not in (200, 201):
                 raise RuntimeError(f"invite registration returned HTTP {response.status}")
     except urllib.error.HTTPError as exc:

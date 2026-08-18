@@ -20,6 +20,7 @@ func _ready() -> void:
 	_http = HTTPRequest.new()
 	_http.process_mode = Node.PROCESS_MODE_ALWAYS
 	_http.timeout = 15.0
+	_http.max_redirects = 0
 	add_child(_http)
 	_retry_timer = Timer.new()
 	_retry_timer.one_shot = true
@@ -31,6 +32,11 @@ func _ready() -> void:
 
 func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 	var report_id := str(capture.get("report_id", ""))
+	var configuration_error := _configuration_error(_bundle.load_build_info())
+	if not configuration_error.is_empty():
+		runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
+			"report_id": report_id, "reason": configuration_error})
+		return {"status": "unsaved", "reason": configuration_error}
 	var staging_path := _outbox.staging_bundle_path(report_id)
 	var built := _bundle.build(message, capture, staging_path)
 	if not bool(built.get("ok", false)):
@@ -66,16 +72,15 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 
 
 func _upload(prepared: Dictionary) -> Dictionary:
-	if _transport_override.is_valid():
-		return await _transport_override.call(prepared)
 	var build: Dictionary = prepared.get("build", {})
 	var raw_endpoint := str(build.get("endpoint", ""))
+	var configuration_error := _configuration_error(build)
+	if not configuration_error.is_empty():
+		return {"status": "blocked", "reason": configuration_error}
+	if _transport_override.is_valid():
+		return await _transport_override.call(prepared)
 	var token := str(build.get("invite_token", ""))
-	if raw_endpoint.strip_edges().is_empty() or token.is_empty():
-		return {"status": "queued", "reason": "feedback_not_configured"}
 	var endpoint := _validated_endpoint(raw_endpoint)
-	if endpoint.is_empty():
-		return {"status": "blocked", "reason": "feedback_endpoint_invalid"}
 	var metadata_json := JSON.stringify(prepared["metadata"])
 	var bundle_bytes := FileAccess.get_file_as_bytes(prepared["bundle_path"])
 	var boundary := "----PokeWildsFeedback" + str(prepared["metadata"]["report_id"]).replace("-", "")
@@ -91,8 +96,11 @@ func _upload(prepared: Dictionary) -> Dictionary:
 	if request_error != OK:
 		return {"status": "queued", "reason": "request_start_failed"}
 	var response: Array = await _http.request_completed
-	if int(response[0]) != HTTPRequest.RESULT_SUCCESS:
-		return {"status": "queued", "reason": "transport_%d" % int(response[0])}
+	var transport_result := int(response[0])
+	if transport_result == HTTPRequest.RESULT_REDIRECT_LIMIT_REACHED:
+		return {"status": "blocked", "reason": "redirect_refused"}
+	if transport_result != HTTPRequest.RESULT_SUCCESS:
+		return {"status": "queued", "reason": "transport_%d" % transport_result}
 	var code := int(response[1])
 	var parsed = JSON.parse_string((response[3] as PackedByteArray).get_string_from_utf8())
 	if code == 200 or code == 201:
@@ -104,6 +112,15 @@ func _upload(prepared: Dictionary) -> Dictionary:
 	if code == 202 or code == 408 or code == 429 or code >= 500 or code == 0:
 		return {"status": "queued", "reason": "http_%d" % code}
 	return {"status": "blocked", "reason": "http_%d" % code}
+
+
+func _configuration_error(build: Dictionary) -> String:
+	var raw_endpoint := str(build.get("endpoint", ""))
+	if raw_endpoint.strip_edges().is_empty() or str(build.get("invite_token", "")).is_empty():
+		return "feedback_not_configured"
+	if _validated_endpoint(raw_endpoint).is_empty():
+		return "feedback_endpoint_invalid"
+	return ""
 
 
 func retry_pending(only_report_id: String = "") -> void:
