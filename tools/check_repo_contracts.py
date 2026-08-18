@@ -143,6 +143,54 @@ def _active_yaml_text(text: str) -> str:
     return "\n".join(active_lines)
 
 
+def _active_jsonc_text(text: str) -> str:
+    """Remove JSONC line/block comments while preserving quoted strings."""
+    active: list[str] = []
+    in_string = False
+    escaped = False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        following = text[index + 1] if index + 1 < len(text) else ""
+        if in_string:
+            active.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            active.append(char)
+            index += 1
+            continue
+        if char == "/" and following == "/":
+            index += 2
+            while index < len(text) and text[index] not in "\r\n":
+                index += 1
+            continue
+        if char == "/" and following == "*":
+            index += 2
+            closed = False
+            while index + 1 < len(text) and text[index:index + 2] != "*/":
+                if text[index] in "\r\n":
+                    active.append(text[index])
+                index += 1
+            if index + 1 < len(text):
+                closed = True
+                index += 2
+            if not closed:
+                active.append("/*")
+                index = len(text)
+            continue
+        active.append(char)
+        index += 1
+    return "".join(active)
+
+
 def _workflow_job_blocks(text: str) -> dict[str, list[str]]:
     """Return top-level job blocks keyed by job name, retaining duplicates."""
     jobs_at = text.find("\njobs:\n")
@@ -218,7 +266,19 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     else:
         wrangler_text = wrangler_path.read_text(encoding="utf-8")
         worker_text = worker_path.read_text(encoding="utf-8")
-        if wrangler_text.count('"binding": "WORKER_VERSION"') != 2:
+        try:
+            wrangler = json.loads(_active_jsonc_text(wrangler_text))
+        except (TypeError, ValueError) as exc:
+            issues.append(f"feedback relay Wrangler config is unreadable: {exc}")
+            wrangler = {}
+        environments = wrangler.get("env", {}) if isinstance(wrangler, dict) else {}
+        staging = environments.get("staging", {}) if isinstance(environments, dict) else {}
+        production_binding = wrangler.get("version_metadata") if isinstance(wrangler, dict) else None
+        staging_binding = staging.get("version_metadata") if isinstance(staging, dict) else None
+        if (
+            production_binding != {"binding": "WORKER_VERSION"}
+            or staging_binding != {"binding": "WORKER_VERSION"}
+        ):
             issues.append(
                 "feedback relay must bind Worker version metadata in production and staging"
             )
