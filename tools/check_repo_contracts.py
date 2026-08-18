@@ -428,13 +428,15 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
         'const rows=fs.readFileSync(process.env.OUTPUT_FILE,"utf8").split(/\\r?\\n/).filter(Boolean).map(JSON.parse); '
         'const deploys=rows.filter((row)=>row.type==="deploy"); const d=deploys[0]; '
         'if (deploys.length !== 1 || typeof d.version_id !== "string" || d.version_id.length === 0 || '
-        '!Array.isArray(d.targets) || d.targets.length !== 1) process.exit(1); '
+        '!Array.isArray(d.targets)) process.exit(1); '
         'process.stdout.write(JSON.stringify(d))\')"'
     )
     health_url_line = (
         'health_url="$(DEPLOYMENT="$deployment" node -e \'const d=JSON.parse(process.env.DEPLOYMENT); '
-        'const u=new URL(d.targets[0]); if (u.protocol !== "https:") process.exit(1); '
-        'u.pathname="/healthz"; u.search=""; u.hash=""; process.stdout.write(u.href)\')"'
+        'const urls=d.targets.flatMap((target)=>{if(typeof target!=="string")return[];'
+        'try{const u=new URL(target);return u.protocol==="https:"?[u]:[]}catch{return[]}}); '
+        'if(urls.length!==1)process.exit(1); const u=urls[0]; u.pathname="/healthz"; '
+        'u.search=""; u.hash=""; process.stdout.write(u.href)\')"'
     )
     health_request_prefix = (
         'if response="$(curl --fail-with-body --silent --show-error --max-time 10 '
