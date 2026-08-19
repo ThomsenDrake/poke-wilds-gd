@@ -208,6 +208,145 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertEqual(VLM._required_passes(cfg, "command_code"), 1)
         self.assertEqual(VLM._required_passes(cfg, "dashscope"), 2)
 
+    def test_auto_lists_every_locally_ready_backend(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.dashscope_key = "dash-placeholder"
+        with mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")):
+            ready = VLM.iter_available_backends(cfg)
+        self.assertEqual(
+            [backend for backend, _reason in ready],
+            ["command_code", "openai_compatible", "dashscope"],
+        )
+
+    def test_auto_advances_to_fallback_after_command_code_call_failure(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "super-secret-key"
+        cfg.required = True
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+
+        def fake_run_model(_ctx, _cfg, backend):
+            if backend == "command_code":
+                raise RuntimeError("luna 503 leaked super-secret-key")
+            return answers_ok, {
+                "ran": True,
+                "backend": backend,
+                "questions_total": 1,
+                "passes_completed": 1,
+            }
+
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model) as run_model:
+            _findings, answers, meta = VLM.run_review({}, cfg)
+
+        self.assertEqual([call.args[2] for call in run_model.call_args_list],
+                         ["command_code", "openai_compatible"])
+        self.assertEqual(answers, answers_ok)
+        self.assertEqual(meta["model"]["backend"], "openai_compatible")
+        self.assertEqual(meta["model"]["prior_backends"][0]["backend"], "command_code")
+        dumped = VLM.json.dumps(meta)
+        self.assertNotIn("super-secret-key", dumped)
+        self.assertIn("<redacted>", meta["model"]["prior_backends"][0]["error"])
+
+    def test_auto_walks_past_failing_fallback_to_dashscope(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.dashscope_key = "dash-placeholder"
+        cfg.required = True
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+
+        def fake_run_model(_ctx, _cfg, backend):
+            if backend in ("command_code", "openai_compatible"):
+                raise RuntimeError(f"{backend} down")
+            return answers_ok, {
+                "ran": True,
+                "backend": backend,
+                "questions_total": 1,
+                "passes_completed": 2,
+            }
+
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model) as run_model:
+            _findings, answers, meta = VLM.run_review({}, cfg)
+
+        self.assertEqual(
+            [call.args[2] for call in run_model.call_args_list],
+            ["command_code", "openai_compatible", "dashscope"],
+        )
+        self.assertEqual(meta["model"]["backend"], "dashscope")
+        self.assertEqual(answers, answers_ok)
+        self.assertEqual(
+            [row["backend"] for row in meta["model"]["prior_backends"]],
+            ["command_code", "openai_compatible"],
+        )
+
+    def test_pinned_runtime_does_not_walk_after_call_failure(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "command_code"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.required = True
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "run_model", side_effect=RuntimeError("luna 503")) as run_model:
+            with self.assertRaises(RuntimeError) as raised:
+                VLM.run_review({}, cfg)
+        self.assertEqual([call.args[2] for call in run_model.call_args_list], ["command_code"])
+        self.assertIn("required vision model failed", str(raised.exception))
+        self.assertIn("luna 503", str(raised.exception))
+
+    def test_auto_walks_after_incomplete_required_review(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.required = True
+
+        def fake_run_model(_ctx, _cfg, backend):
+            if backend == "command_code":
+                return [{"question_id": "q1", "verdict": "yes", "note": "ok"}], {
+                    "ran": True,
+                    "backend": backend,
+                    "questions_total": 2,
+                    "passes_completed": 1,
+                }
+            return [
+                {"question_id": "q1", "verdict": "yes", "note": "ok"},
+                {"question_id": "q2", "verdict": "yes", "note": "ok"},
+            ], {
+                "ran": True,
+                "backend": backend,
+                "questions_total": 2,
+                "passes_completed": 1,
+            }
+
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model) as run_model:
+            _findings, answers, meta = VLM.run_review({}, cfg)
+
+        self.assertEqual(
+            [call.args[2] for call in run_model.call_args_list],
+            ["command_code", "openai_compatible"],
+        )
+        self.assertEqual(len(answers), 2)
+        self.assertEqual(meta["model"]["backend"], "openai_compatible")
+        self.assertIn("incomplete", meta["model"]["prior_backends"][0]["error"])
+
+    def test_auto_required_fails_only_after_every_ready_backend_fails(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.required = True
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
+                mock.patch.object(VLM, "run_model", side_effect=RuntimeError("provider down")):
+            with self.assertRaises(RuntimeError) as raised:
+                VLM.run_review({}, cfg)
+        self.assertIn("required vision model failed", str(raised.exception))
+        self.assertIn("provider down", str(raised.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

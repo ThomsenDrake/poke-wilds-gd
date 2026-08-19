@@ -1663,6 +1663,20 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             "vlm_reviewer fallback reasoning effort must stay high "
             f"(got {reviewer.FALLBACK_EFFORT})"
         )
+    if reviewer.AUTO_BACKEND_ORDER != (
+        "command_code", "openai_compatible", "dashscope", "ollama"
+    ):
+        issues.append(
+            "vlm_reviewer AUTO_BACKEND_ORDER must stay command_code, "
+            f"openai_compatible, dashscope, ollama (got {reviewer.AUTO_BACKEND_ORDER})"
+        )
+    src = tool_path.read_text(encoding="utf-8")
+    if "iter_available_backends(cfg)" not in src:
+        issues.append("run_review must walk iter_available_backends after local probes")
+    if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:
+        issues.append(
+            "auto runtime must record prior_backends and walk after a live call failure"
+        )
     try:
         effort_at = argv.index("--effort")
     except ValueError:

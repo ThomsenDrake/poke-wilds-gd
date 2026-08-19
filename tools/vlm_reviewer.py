@@ -68,14 +68,17 @@ default.
 RUNTIME (default `auto`): Command Code headless `gpt-5.6-luna` is tried
 FIRST for each image via `cmd -p --no-session --permission-mode plan`; it
 reads the local PNG paths from the prompt and returns strict JSON. If that
-CLI/model is unavailable, the same Command Code review harness is pointed at
-an OpenAI-compatible HTTP endpoint (default `https://api.mistral.ai/v1`)
-running `mistral-medium-3-5` at reasoning effort `high` when
-`MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY` is set (env only, NEVER logged);
-then hosted `qwen3.8-max-preview` via the token-plan MaaS endpoint
+CLI is locally unavailable OR the live Luna request fails, the same
+Command Code review harness is pointed at an OpenAI-compatible HTTP
+endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
+at reasoning effort `high` when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
+is set (env only, NEVER logged); a live Mistral failure then walks hosted
+`qwen3.8-max-preview` via the token-plan MaaS endpoint
 (DEFAULT_DASHSCOPE_BASE) when DASHSCOPE_API_KEY is set; then local
 qwen3-vl:8b (Instruct) via Ollama's HTTP API when pulled; else required
-review fails closed. The wrapper is PURE
+review fails closed. A pinned `--runtime` / `VLM_RUNTIME` does not walk.
+`reviewer_meta.prior_backends` records secret-free probe+error rows for
+every skipped candidate. The wrapper is PURE
 STDLIB (urllib.request + json + base64; NO SDK, NO venv) and stays a CORE tool:
 OPTIONAL_TOOL_EXEMPTIONS remains pinned to exactly {vision_metrics.py}. An
 explicit model id is pinned, never `latest`. Hosted calls budget max_tokens=
@@ -127,6 +130,7 @@ DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/co
 DEFAULT_DASHSCOPE_MODEL = "qwen3.8-max-preview"
 DEFAULT_TIMEOUT = 180                   # per call; reasoning models spend tokens thinking (keep headroom; < REVIEWER_TIMEOUT=300)
 SINGLE_PASS_BACKENDS = ("command_code", "openai_compatible")
+AUTO_BACKEND_ORDER = ("command_code", "openai_compatible", "dashscope", "ollama")
 PROBE_TIMEOUT = 5
 DEFAULT_COMMAND_CODE_PROBE_TIMEOUT = 30
 MAX_CROPS = 6                           # bound image tokens; native-res crops carry the small-diff signal
@@ -366,40 +370,84 @@ def _fallback_available(cfg: Config) -> tuple[bool, str]:
     return False, "no MISTRAL_API_KEY/VLM_FALLBACK_API_KEY"
 
 
-def probe_availability(cfg: Config) -> tuple[str | None, str]:
-    """Resolve the active backend: Command Code, OpenAI-compatible fallback, DashScope, Ollama."""
-    command_reason = "command code not probed"
-    if cfg.runtime in ("command_code", "auto"):
-        ok, reason = _command_code_available()
-        if ok:
-            return "command_code", reason
-        command_reason = reason
-        if cfg.runtime == "command_code":
-            return None, command_reason
-    fallback_reason = "openai-compatible fallback not probed"
-    if cfg.runtime in ("openai_compatible", "auto"):
-        ok, reason = _fallback_available(cfg)
-        if ok:
-            return "openai_compatible", reason
-        fallback_reason = reason
-        if cfg.runtime == "openai_compatible":
-            return None, fallback_reason
-    dash_reason = "dashscope not probed"
-    if cfg.runtime in ("dashscope", "auto"):
+def _probe_backend(cfg: Config, backend: str) -> tuple[bool, str]:
+    """Local readiness only — a live request can still fail after this returns True."""
+    if backend == "command_code":
+        return _command_code_available()
+    if backend == "openai_compatible":
+        return _fallback_available(cfg)
+    if backend == "dashscope":
         if cfg.dashscope_key:
-            return "dashscope", "dashscope key present"
-        dash_reason = "no DASHSCOPE_API_KEY"
-        if cfg.runtime == "dashscope":
-            return None, dash_reason
-    ollama_reason = "ollama not probed"
-    if cfg.runtime in ("ollama", "auto"):
-        ok, reason = _model_in_tags(cfg.ollama_host, cfg.model)
+            return True, "dashscope key present"
+        return False, "no DASHSCOPE_API_KEY"
+    if backend == "ollama":
+        return _model_in_tags(cfg.ollama_host, cfg.model)
+    return False, f"unknown backend {backend}"
+
+
+def _candidate_order(cfg: Config) -> tuple[str, ...]:
+    if cfg.runtime == "auto":
+        return AUTO_BACKEND_ORDER
+    if cfg.runtime in AUTO_BACKEND_ORDER:
+        return (cfg.runtime,)
+    return ()
+
+
+def iter_available_backends(cfg: Config) -> list[tuple[str, str]]:
+    """Locally-ready backends in auto (or pinned) order. Call success is separate."""
+    ready: list[tuple[str, str]] = []
+    for backend in _candidate_order(cfg):
+        ok, reason = _probe_backend(cfg, backend)
         if ok:
-            return "ollama", reason
-        ollama_reason = reason
-        if cfg.runtime == "ollama":
-            return None, ollama_reason
-    return None, f"{command_reason}; {fallback_reason}; {dash_reason}; {ollama_reason}"
+            ready.append((backend, reason))
+    return ready
+
+
+def probe_availability(cfg: Config) -> tuple[str | None, str]:
+    """Resolve the first locally-ready backend, or a secret-free skip reason."""
+    ready = iter_available_backends(cfg)
+    if ready:
+        return ready[0]
+    order = _candidate_order(cfg)
+    if not order:
+        return None, (
+            "command code not probed; openai-compatible fallback not probed; "
+            "dashscope not probed; ollama not probed"
+        )
+    return None, "; ".join(_probe_backend(cfg, backend)[1] for backend in order)
+
+
+def _redact_secrets(cfg: Config, text: str) -> str:
+    secrets = [
+        cfg.fallback_key,
+        cfg.dashscope_key,
+        os.environ.get("COMMAND_CODE_API_KEY", ""),
+        os.environ.get("VLM_FALLBACK_API_KEY", ""),
+        os.environ.get("MISTRAL_API_KEY", ""),
+        os.environ.get("DASHSCOPE_API_KEY", ""),
+    ]
+    redacted = text
+    for secret in secrets:
+        if secret:
+            redacted = redacted.replace(secret, "<redacted>")
+    return redacted
+
+
+def _model_call_error(cfg: Config, exc: BaseException) -> str:
+    return _redact_secrets(cfg, f"{type(exc).__name__}: {exc}")[:240]
+
+
+def _require_complete_model(cfg: Config, answers: list[dict], mmeta: dict) -> None:
+    if not cfg.required:
+        return
+    required = int(mmeta.get("questions_total", 0))
+    completed = int(mmeta.get("passes_completed", 0))
+    answered = len(answers)
+    expected_passes = _required_passes(cfg, str(mmeta.get("backend") or ""))
+    if completed != expected_passes or answered != required:
+        raise RuntimeError(
+            f"required vision review incomplete: passes {completed}/{expected_passes}, "
+            f"answers {answered}/{required}")
 
 
 # --------------------------------------------------------------------------
@@ -1255,33 +1303,52 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     if cfg.no_model:
         meta["model"] = {"ran": False, "reason": "disabled (--no-model / VLM_NO_MODEL)"}
     else:
-        backend, reason = probe_availability(cfg)
-        if backend is None:
+        candidates = iter_available_backends(cfg)
+        if not candidates:
+            _backend, reason = probe_availability(cfg)
             meta["model"] = {"ran": False, "reason": reason}
             if cfg.required:
                 raise RuntimeError(f"required vision model unavailable: {reason}")
             print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
                   file=sys.stderr)
         else:
-            try:
-                answers, mmeta = run_model(public_ctx, cfg, backend)
-                meta["model"] = mmeta
-                if cfg.required:
-                    required = int(mmeta.get("questions_total", 0))
-                    completed = int(mmeta.get("passes_completed", 0))
-                    answered = len(answers)
-                    expected_passes = _required_passes(cfg, str(mmeta.get("backend") or ""))
-                    if completed != expected_passes or answered != required:
-                        raise RuntimeError(
-                            f"required vision review incomplete: passes {completed}/{expected_passes}, "
-                            f"answers {answered}/{required}")
-            except Exception as exc:
+            tried: list[dict] = []
+            last_error = ""
+            selected = False
+            for backend, probe_reason in candidates:
+                try:
+                    answers, mmeta = run_model(public_ctx, cfg, backend)
+                    _require_complete_model(cfg, answers, mmeta)
+                    meta["model"] = mmeta
+                    if tried:
+                        meta["model"]["prior_backends"] = list(tried)
+                    selected = True
+                    break
+                except Exception as exc:
+                    last_error = _model_call_error(cfg, exc)
+                    tried.append({
+                        "backend": backend,
+                        "probe": probe_reason,
+                        "error": last_error,
+                    })
+                    if cfg.runtime != "auto":
+                        break
+            if not selected:
                 answers = []
-                meta["model"] = {"ran": False,
-                                 "reason": f"model pass error: {type(exc).__name__}: {exc}"}
+                if len(tried) == 1:
+                    reason = f"model pass error: {tried[0]['error']}"
+                else:
+                    parts = [f"{row['backend']}: {row['error']}" for row in tried]
+                    reason = "model pass error: " + "; ".join(parts)
+                meta["model"] = {
+                    "ran": False,
+                    "reason": reason,
+                    "prior_backends": tried,
+                }
                 if cfg.required:
-                    raise RuntimeError(f"required vision model failed: {type(exc).__name__}: {str(exc)[:240]}") from exc
-                print(f"vlm_reviewer: model pass error ({exc}); deterministic pass only",
+                    raise RuntimeError(
+                        f"required vision model failed: {last_error}") from None
+                print(f"vlm_reviewer: {reason}; deterministic pass only",
                       file=sys.stderr)
     if cfg.required and not meta.get("model", {}).get("ran"):
         raise RuntimeError("required vision model did not run")
