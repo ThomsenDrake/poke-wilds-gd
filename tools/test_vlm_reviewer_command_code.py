@@ -627,14 +627,15 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         cfg.timeout = 180
         cfg.required = True
         seen: list[str] = []
+        now = {"t": 0.0}
 
         def fake_run_model(_ctx, _cfg, backend):
             seen.append(backend)
+            now["t"] = 290.0
             raise RuntimeError(f"{backend} down")
 
-        clock = iter([0.0, 290.0])
         with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
-                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: next(clock, 290.0)), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: now["t"]), \
                 mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
                 mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
                 mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
@@ -644,6 +645,96 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertEqual(seen, ["command_code"])
         self.assertIn("outer reviewer budget exhausted", str(raised.exception))
         self.assertIn("openai_compatible", str(raised.exception))
+
+    def test_auto_does_not_probe_when_outer_budget_already_short(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.required = True
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "25"}, clear=False), \
+                mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")) as cmd_probe, \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(True, "model present")) as ollama_probe, \
+                mock.patch.object(VLM, "run_model", side_effect=RuntimeError("should not run")) as run_model:
+            with self.assertRaises(RuntimeError) as raised:
+                VLM.run_review({}, cfg, started=0.0)
+        cmd_probe.assert_not_called()
+        ollama_probe.assert_not_called()
+        run_model.assert_not_called()
+        self.assertIn("outer reviewer budget exhausted", str(raised.exception))
+
+    def test_command_code_probe_timeout_is_capped_by_remaining_budget(self) -> None:
+        with mock.patch.dict(os.environ, {
+            "PATH": "/bin",
+            "COMMAND_CODE_API_KEY": "test-only-placeholder",
+            "COMMAND_CODE_PROBE_TIMEOUT": "30",
+        }, clear=True), mock.patch.object(VLM, "_cmd_executable", return_value="/bin/cmd"), \
+                mock.patch.object(VLM.subprocess, "run") as run:
+            run.return_value = SimpleNamespace(returncode=0, stdout="1.26.0\n", stderr="")
+            available, reason = VLM._command_code_available(timeout=20)
+        self.assertTrue(available)
+        self.assertEqual(reason, "cmd CLI available")
+        self.assertEqual(run.call_args.kwargs["timeout"], 20)
+
+    def test_ollama_probe_timeout_is_capped_by_remaining_budget(self) -> None:
+        with mock.patch.object(VLM.urllib.request, "urlopen") as urlopen:
+            urlopen.side_effect = TimeoutError("slow tags")
+            available, reason = VLM._model_in_tags(
+                "http://127.0.0.1:11434", "qwen3-vl:8b", timeout=2
+            )
+        self.assertFalse(available)
+        self.assertIn("probe failed", reason)
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 2)
+
+    def test_run_review_caps_readiness_probe_to_remaining_budget(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.required = True
+        seen: list[int | None] = []
+
+        def fake_available(timeout=None):
+            seen.append(timeout)
+            return True, "cmd CLI available"
+
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+        now = {"t": 260.0}
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: now["t"]), \
+                mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", side_effect=fake_available), \
+                mock.patch.object(VLM, "run_model", return_value=(answers_ok, {
+                    "ran": True,
+                    "backend": "command_code",
+                    "questions_total": 1,
+                    "passes_completed": 1,
+                })):
+            _findings, _answers, meta = VLM.run_review({}, cfg, started=0.0)
+        self.assertEqual(seen, [20])
+        self.assertEqual(meta["model"]["backend"], "command_code")
+
+    def test_required_failure_lists_every_backend_through_parent_truncate(self) -> None:
+        tried = [
+            {"backend": name, "error": "RuntimeError: " + ("x" * 240)}
+            for name in ("command_code", "openai_compatible", "dashscope", "ollama")
+        ]
+        reason = VLM._model_pass_error_reason(tried)
+        line = (
+            "vlm_reviewer: internal error: RuntimeError: required vision model "
+            f"failed: {reason}"
+        )
+        spec = importlib.util.spec_from_file_location(
+            "vision_review_under_test",
+            ROOT / "tools/vision_review.py",
+        )
+        assert spec is not None and spec.loader is not None
+        vision = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(vision)
+        noise = "vlm_reviewer: art-anchor live-unverified (counted, never a finding): menu"
+        detail = vision.reviewer_cmd_error_detail(noise + "\n" + line)
+        self.assertLessEqual(len(detail), 400)
+        self.assertIn("command_code", detail)
+        self.assertIn("openai_compatible", detail)
+        self.assertIn("dashscope", detail)
+        self.assertIn("ollama", detail)
 
     def test_vision_review_clamps_child_outer_budget_to_reviewer_timeout(self) -> None:
         spec = importlib.util.spec_from_file_location(

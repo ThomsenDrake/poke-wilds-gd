@@ -1721,6 +1721,33 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append(
             "HTTP and cmd model calls must recompute live_call_timeout before each invocation"
         )
+    if "_probe_backend(cfg, backend, timeout=" not in src:
+        issues.append(
+            "run_review must cap readiness probes by remaining budget before probing"
+        )
+    if "ok, probe_reason = _probe_backend(cfg, backend)\n" in src:
+        issues.append("run_review must not probe a backend before checking remaining budget")
+    if reviewer.PARENT_VISIBLE_REASON_BUDGET > 320:
+        issues.append(
+            "PARENT_VISIBLE_REASON_BUDGET must stay <= 320 so four backend "
+            "failures survive reviewer_cmd_error_detail"
+        )
+    four_backend_reason = reviewer._model_pass_error_reason([
+        {"backend": name, "error": "RuntimeError: " + ("x" * 240)}
+        for name in ("command_code", "openai_compatible", "dashscope", "ollama")
+    ])
+    wrapped = (
+        "vlm_reviewer: internal error: RuntimeError: required vision model "
+        f"failed: {four_backend_reason}"
+    )
+    if vision is not None:
+        detail = vision.reviewer_cmd_error_detail(wrapped)
+        for name in ("command_code", "openai_compatible", "dashscope", "ollama"):
+            if name not in detail:
+                issues.append(
+                    "required-failure parent detail must still name "
+                    f"{name} after reviewer_cmd_error_detail truncate"
+                )
     vision_src = Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8")
     if 'env["VLM_OUTER_BUDGET"] = str(child_outer_budget(env))' not in vision_src:
         issues.append("vision_review must clamp VLM_OUTER_BUDGET to REVIEWER_TIMEOUT for the child")

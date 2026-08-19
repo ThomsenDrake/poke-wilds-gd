@@ -91,12 +91,13 @@ retry); the hosted path is prompt-instructed JSON so validate+repair is
 mandatory there. The per-call timeout (VLM_TIMEOUT, default 180) bounds each
 HTTP or cmd call. The pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
 invocation; auto-walk attempts share that budget (VLM_OUTER_BUDGET, 20s emit
-reserve) so a Luna timeout cannot starve Mistral. The worst case (standalone
-Command Code probe 30s, or HTTP probe 5s, plus n=2 + a repair retry per pass)
-can still exceed the outer bound under a slow model -- the outer bound then
-kills the invocation and the pipeline records a TOOL ERROR (fail-closed, never
-a silent pass); for slow endpoints raise VLM_TIMEOUT and REVIEWER_TIMEOUT
-together.
+reserve) so a Luna timeout cannot starve Mistral. Readiness probes are checked against that leftover before they run and their
+timeouts are capped to it, so a 30s Command Code ``--version`` probe cannot
+overrun a short ``VLM_OUTER_BUDGET``. The worst case (n=2 + a repair retry
+per pass) can still exceed the outer bound under a slow model -- the outer
+bound then kills the invocation and the pipeline records a TOOL ERROR
+(fail-closed, never a silent pass); for slow endpoints raise VLM_TIMEOUT and
+REVIEWER_TIMEOUT together.
 
 Stdlib-only. Reuses vision_review.default_reviewer / parse_rubric_questions /
 _shot_group via the sanctioned importlib pattern (never forked); geometry stays
@@ -143,6 +144,9 @@ SINGLE_PASS_BACKENDS = ("command_code", "openai_compatible")
 AUTO_BACKEND_ORDER = ("command_code", "openai_compatible", "dashscope", "ollama")
 PROBE_TIMEOUT = 5
 DEFAULT_COMMAND_CODE_PROBE_TIMEOUT = 30
+# Raised required-failure reason must survive vision_review.reviewer_cmd_error_detail
+# (400 chars) after the wrapper prefix. Keep the summary inside that window.
+PARENT_VISIBLE_REASON_BUDGET = 320
 MAX_CROPS = 6                           # bound image tokens; native-res crops carry the small-diff signal
 MAX_TEXT = 1600                         # cap embedded text blocks so a large bundle cannot blow the context
 RUBRIC_REF = "docs/references/vision-review-rubric.md"
@@ -182,6 +186,18 @@ def live_call_timeout(cfg: Config, now: float | None = None) -> int:
             f"(remaining={remaining}s)"
         )
     return remaining
+
+
+def _bounded_probe_timeout(configured: int, timeout: int | None) -> int:
+    """Never let a readiness probe run longer than leftover reviewer budget."""
+    limit = max(1, int(configured))
+    if timeout is None:
+        return limit
+    try:
+        requested = int(timeout)
+    except (TypeError, ValueError):
+        return limit
+    return max(1, min(limit, requested))
 
 
 def _command_code_probe_timeout() -> int:
@@ -395,13 +411,15 @@ def load_questions(public_ctx: dict) -> tuple[str, list[dict]]:
 # --------------------------------------------------------------------------
 # model availability probes (POSITIVE detection only)
 # --------------------------------------------------------------------------
-def _model_in_tags(host: str, model: str) -> tuple[bool, str]:
+def _model_in_tags(host: str, model: str, timeout: int | None = None) -> tuple[bool, str]:
     """True iff GET /api/tags succeeds AND lists `model` (exact, or same
     name:tag ignoring an implicit :latest). Positive detection only -- a probe
     error is treated as UNavailable so degrade is the safe default."""
     try:
         req = urllib.request.Request(host + "/api/tags", headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+        with urllib.request.urlopen(
+            req, timeout=_bounded_probe_timeout(PROBE_TIMEOUT, timeout)
+        ) as resp:
             doc = json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError, urllib.error.URLError) as exc:
         return False, f"ollama probe failed: {type(exc).__name__}"
@@ -421,10 +439,10 @@ def _fallback_available(cfg: Config) -> tuple[bool, str]:
     return False, "no MISTRAL_API_KEY/VLM_FALLBACK_API_KEY"
 
 
-def _probe_backend(cfg: Config, backend: str) -> tuple[bool, str]:
+def _probe_backend(cfg: Config, backend: str, timeout: int | None = None) -> tuple[bool, str]:
     """Local readiness only — a live request can still fail after this returns True."""
     if backend == "command_code":
-        return _command_code_available()
+        return _command_code_available(timeout=timeout)
     if backend == "openai_compatible":
         return _fallback_available(cfg)
     if backend == "dashscope":
@@ -432,7 +450,7 @@ def _probe_backend(cfg: Config, backend: str) -> tuple[bool, str]:
             return True, "dashscope key present"
         return False, "no DASHSCOPE_API_KEY"
     if backend == "ollama":
-        return _model_in_tags(cfg.ollama_host, cfg.model)
+        return _model_in_tags(cfg.ollama_host, cfg.model, timeout=timeout)
     return False, f"unknown backend {backend}"
 
 
@@ -487,11 +505,38 @@ def probe_availability(cfg: Config) -> tuple[str | None, str]:
     return None, _unavailable_reason(cfg, skipped)
 
 
+def _compact_text(text: str, limit: int) -> str:
+    cleaned = " ".join(str(text).split())
+    if limit <= 0:
+        return ""
+    if len(cleaned) <= limit:
+        return cleaned
+    if limit <= 3:
+        return cleaned[:limit]
+    return cleaned[:limit - 3].rstrip() + "..."
+
+
 def _model_pass_error_reason(tried: list[dict]) -> str:
-    if len(tried) == 1:
-        return f"model pass error: {tried[0]['error']}"
-    parts = [f"{row['backend']}: {row['error']}" for row in tried]
-    return "model pass error: " + "; ".join(parts)
+    """Parent-visible summary. ``prior_backends`` keeps the long form.
+
+    ``vision_review.reviewer_cmd_error_detail`` truncates the selected stderr
+    line to 400 characters, so this stays inside PARENT_VISIBLE_REASON_BUDGET
+    and names every attempted backend.
+    """
+    prefix = "model pass error: "
+    if not tried:
+        return prefix + "no backend attempted"
+    usable = max(32, PARENT_VISIBLE_REASON_BUDGET - len(prefix))
+    n = len(tried)
+    seps = 2 * max(0, n - 1)
+    each = max(12, (usable - seps) // n)
+    parts = []
+    for row in tried:
+        backend = str(row.get("backend") or "?")
+        label = f"{backend}: "
+        body = _compact_text(str(row.get("error") or "failed"), max(4, each - len(label)))
+        parts.append(label + body)
+    return prefix + "; ".join(parts)
 
 
 def _prior_backend_rows(
@@ -788,7 +833,7 @@ def _cmd_executable() -> str | None:
     return None
 
 
-def _command_code_available() -> tuple[bool, str]:
+def _command_code_available(timeout: int | None = None) -> tuple[bool, str]:
     cmd = _cmd_executable()
     if not cmd:
         return False, "cmd CLI not found"
@@ -799,7 +844,9 @@ def _command_code_available() -> tuple[bool, str]:
         return True, "cmd CLI available (launcher preflight reused)"
     try:
         proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
-                              timeout=_command_code_probe_timeout(), check=False)
+                              timeout=_bounded_probe_timeout(
+                                  _command_code_probe_timeout(), timeout),
+                              check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"cmd probe failed: {type(exc).__name__}"
     if proc.returncode != 0:
@@ -1429,7 +1476,16 @@ def run_review(public_ctx: dict, cfg: Config,
         skipped: list[tuple[str, str]] = []
         selected = False
         for backend in _candidate_order(cfg):
-            ok, probe_reason = _probe_backend(cfg, backend)
+            call_timeout = remaining_call_timeout(cfg, started)
+            if call_timeout < MIN_BACKEND_TIMEOUT_S:
+                tried.append({
+                    "backend": backend,
+                    "probe": "not probed",
+                    "error": f"outer reviewer budget exhausted ({call_timeout}s left)",
+                    "call_timeout_s": call_timeout,
+                })
+                break
+            ok, probe_reason = _probe_backend(cfg, backend, timeout=call_timeout)
             if not ok:
                 skipped.append((backend, probe_reason))
                 continue
