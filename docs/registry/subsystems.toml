@@ -2074,7 +2074,7 @@ required_trace_events = [
   "update_available",
   "update_verified",
   "update_apply_started",
-  "update_apply_failed",
+  "update_apply_refused",
   "update_relaunching",
   "update_flow_passed",
   "update_flow_failed",

@@ -36,6 +36,12 @@ static func shared_latest() -> Dictionary:
 	return SHARED.duplicate(true)
 
 
+static func reset_user_state() -> void:
+	for path in [IDENTITY_PATH, ARTIFACT_PATH, INSTALL_PATH,
+			"user://updates/applied.json", "user://updates/pending.json"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
 static func expect_skip(failures: Array, updater: Node) -> void:
 	_check(failures, updater != null and not updater.should_check(), "editor/scenario boot did not skip the network check")
 

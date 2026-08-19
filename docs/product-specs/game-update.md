@@ -96,5 +96,5 @@ persist across a fake new `build.json`. Default title fixtures stay
 ## Traces
 
 `update_check_started`, `update_available`, `update_verified`,
-`update_apply_started`, `update_apply_failed`, `update_relaunching`,
+`update_apply_started`, `update_apply_refused`, `update_relaunching`,
 `update_flow_passed`, `update_flow_failed`.

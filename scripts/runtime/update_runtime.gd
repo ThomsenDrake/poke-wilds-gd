@@ -83,7 +83,7 @@ func apply_available() -> Dictionary:
 	var downloaded := await _download_artifact(build)
 	if not bool(downloaded.get("ok", false)):
 		_busy = false
-		_trace("update_apply_failed", {"reason": str(downloaded.get("error", "download_failed"))})
+		_trace("update_apply_refused", {"reason": str(downloaded.get("error", "download_failed"))})
 		return downloaded
 	_trace("update_verified", {"sha256": str(build.get("sha256", "")), "bytes": int(build.get("bytes", 0))})
 	_trace("update_apply_started", {"os": key, "build_id": str(_latest.get("build_id", ""))})
@@ -91,7 +91,7 @@ func apply_available() -> Dictionary:
 	var applied := _invoke_apply(os_name, str(downloaded.get("path", "")), target)
 	if not bool(applied.get("ok", false)):
 		_busy = false
-		_trace("update_apply_failed", {"reason": str(applied.get("error", "apply_failed"))})
+		_trace("update_apply_refused", {"reason": str(applied.get("error", "apply_failed"))})
 		return applied
 	_write_json(APPLIED_PATH, {"build_id": _latest.get("build_id", ""),
 		"published_at": _latest.get("published_at", "")})
@@ -225,5 +225,5 @@ func smoke_set_latest(latest: Dictionary) -> void:
 	if not OS.has_feature("editor"):
 		return
 	_latest = UpdateManifest.parse(latest)
-	_available = UpdateManifest.is_newer(_latest, _current(), _applied())
+	_available = not _latest.is_empty()
 	availability_changed.emit(_available)

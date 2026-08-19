@@ -20,7 +20,7 @@ All runtime traces are JSONL records with `event`, `ts_msec`, `source`, and `pay
 | `update_available` | `UpdateRuntime` | The shared latest build is newer than the running `build_id` / `published_at`. Payload carries build_id and os. |
 | `update_verified` | `UpdateRuntime` | The downloaded artifact SHA-256 matched the manifest. Payload carries sha256 and bytes. |
 | `update_apply_started` | `UpdateRuntime` | The OS-specific install swap began. Payload carries os and build_id. |
-| `update_apply_failed` | `UpdateRuntime` | Download, hash, or apply refused. Payload carries a non-sensitive reason. The old binary and `user://` save stay in place. |
+| `update_apply_refused` | `UpdateRuntime` | Download, hash, or apply refused. Payload carries a non-sensitive reason. The old binary and `user://` save stay in place. `*_failed` stays reserved for scenario-gate non-pass. |
 | `update_relaunching` | `UpdateRuntime` | The new binary is about to relaunch. Payload carries build_id. |
 | `update_flow_passed` | `UpdateFlowScenario` | Injected-transport title UPDATE journey: default rows, UPDATE first row, cancel, hash-mismatch refuse, apply+relaunch, identity persist. |
 | `update_flow_failed` | `UpdateFlowScenario` | Symmetric focused-gate failure marker with a reasons array; emitted alongside `push_error`. |
