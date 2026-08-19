@@ -2089,6 +2089,7 @@ quality_bucket = "update"
 # so a generic replace does not strip F-to-report. is_newer refuses an unstamped
 # current build (no downgrade); apply globalizes user:// before copy/unzip.
 # The download toast holds (duration 0) until apply finishes so title lock and
-# banner stay paired. Editor/scenario boots skip
+# banner stay paired. UPDATE is offerable only when is_newer and this OS has a
+# manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
 # Godot binary. Saves stay in user://godot_port_save.json.

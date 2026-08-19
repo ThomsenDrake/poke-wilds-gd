@@ -22,6 +22,19 @@ static func os_key(os_name: String) -> String:
 			return ""
 
 
+static func build_for_os(latest: Dictionary, os_name: String) -> Dictionary:
+	var key := os_key(os_name)
+	if key.is_empty() or latest.is_empty():
+		return {}
+	var build = latest.get("builds", {}).get(key, {})
+	return build.duplicate(true) if build is Dictionary and not build.is_empty() else {}
+
+
+static func is_offerable(latest: Dictionary, current: Dictionary, applied: Dictionary,
+		os_name: String) -> bool:
+	return is_newer(latest, current, applied) and not build_for_os(latest, os_name).is_empty()
+
+
 static func parse(value) -> Dictionary:
 	if not value is Dictionary:
 		return {}

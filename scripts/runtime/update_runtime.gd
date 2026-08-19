@@ -60,6 +60,11 @@ func is_newer_build(latest: Dictionary, current: Dictionary, applied: Dictionary
 	return UpdateManifest.is_newer(latest, current, applied)
 
 
+func is_offerable_build(latest: Dictionary, current: Dictionary, applied: Dictionary,
+		os_name: String) -> bool:
+	return UpdateManifest.is_offerable(latest, current, applied, os_name)
+
+
 func start_check() -> void:
 	if not should_check() or _busy:
 		return
@@ -72,10 +77,11 @@ func _run_check() -> void:
 	var latest := await _fetch_latest()
 	_busy = false
 	_latest = latest
-	_available = UpdateManifest.is_newer(latest, _current(), _applied())
+	var os_name := OS.get_name()
+	_available = UpdateManifest.is_offerable(latest, _current(), _applied(), os_name)
 	if _available:
 		_trace("update_available", {"build_id": str(latest.get("build_id", "")),
-			"os": UpdateManifest.os_key(OS.get_name())})
+			"os": UpdateManifest.os_key(os_name)})
 	availability_changed.emit(_available)
 
 
@@ -84,7 +90,7 @@ func apply_available() -> Dictionary:
 		return {"ok": false, "error": "busy"}
 	var os_name := OS.get_name()
 	var key := UpdateManifest.os_key(os_name)
-	var build = _latest.get("builds", {}).get(key, {}) if not _latest.is_empty() else {}
+	var build := UpdateManifest.build_for_os(_latest, os_name)
 	if not _available or build.is_empty():
 		return {"ok": false, "error": "not_available"}
 	_busy = true
@@ -232,5 +238,5 @@ func smoke_set_latest(latest: Dictionary) -> void:
 	if not OS.has_feature("editor"):
 		return
 	_latest = UpdateManifest.parse(latest)
-	_available = not _latest.is_empty()
+	_available = not _latest.is_empty() and not UpdateManifest.build_for_os(_latest, OS.get_name()).is_empty()
 	availability_changed.emit(_available)

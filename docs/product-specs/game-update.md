@@ -74,8 +74,10 @@ channel; the persisted friend `channel` is only for `F` reports.
 }
 ```
 
-OS key comes from `OS.get_name()` (`Linux`/`Windows`/`macOS`). Unknown OS: no
-`UPDATE` row. Artifacts live under R2 `updates/<channel>/<build_id>/<os>`.
+OS key comes from `OS.get_name()` (`Linux`/`Windows`/`macOS`). The title
+offers `UPDATE` only when `is_newer` is true **and** that OS has a non-empty
+manifest build (`is_offerable`). Unknown OS: no `UPDATE` row. Artifacts live
+under R2 `updates/<channel>/<build_id>/<os>`.
 Publish uploads via the R2 S3 API / wrangler, never a Worker POST. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
 pointer only after all three object checksums exist.
@@ -95,9 +97,10 @@ pointer only after all three object checksums exist.
 
 `update_flow` drives the title `UPDATE` row through an injected transport (no
 network). It covers no-update default entries, update-available first row,
-confirm/cancel, hash-mismatch refuse, scenario/editor check skip, and identity
-persist across a fake new `build.json`. Default title fixtures stay
-`CONTINUE` / `NEW GAME` so existing title baselines do not churn.
+confirm/cancel, hash-mismatch refuse, scenario/editor check skip, identity
+persist across a fake new `build.json`, and no UPDATE offer on an unknown OS.
+Default title fixtures stay `CONTINUE` / `NEW GAME` so existing title
+baselines do not churn.
 
 ## Traces
 

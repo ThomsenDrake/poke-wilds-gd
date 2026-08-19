@@ -62,6 +62,18 @@ class UpdateManifestTests(unittest.TestCase):
         self.assertTrue(update_manifest.is_newer(latest, stamped_friend))
         self.assertFalse(update_manifest.is_newer(latest, newer_friend))
 
+    def test_is_offerable_requires_a_supported_os_build(self) -> None:
+        latest = parse(self._valid())
+        older = {"build_id": "friends-old", "published_at": "2026-08-01T00:00:00Z"}
+        self.assertTrue(update_manifest.is_offerable(latest, older, {}, "Linux"))
+        self.assertTrue(update_manifest.is_offerable(latest, older, {}, "Windows"))
+        self.assertTrue(update_manifest.is_offerable(latest, older, {}, "macOS"))
+        self.assertFalse(update_manifest.is_offerable(latest, older, {}, "Android"))
+        self.assertFalse(update_manifest.is_offerable(latest, older, {}, "Web"))
+        self.assertFalse(update_manifest.is_offerable(latest, older, {}, ""))
+        self.assertEqual(update_manifest.build_for_os(latest, "Android"), {})
+        self.assertEqual(update_manifest.os_key("Android"), "")
+
 
 class UpdateApplyTests(unittest.TestCase):
     def test_linux_unlinks_and_replaces(self) -> None:

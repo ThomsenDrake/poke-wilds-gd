@@ -75,6 +75,20 @@ static func expect_shared_channel(failures: Array, updater: Node) -> void:
 		"update check used the friend feedback channel instead of playtest")
 
 
+static func expect_os_gate(failures: Array, updater: Node) -> void:
+	var latest := shared_latest()
+	_check(failures, updater != null and updater.is_offerable_build(latest, {}, {}, "Linux"),
+		"Linux was not offered a newer shared latest")
+	_check(failures, updater.is_offerable_build(latest, {}, {}, "Windows"),
+		"Windows was not offered a newer shared latest")
+	_check(failures, updater.is_offerable_build(latest, {}, {}, "macOS"),
+		"macOS was not offered a newer shared latest")
+	_check(failures, not updater.is_offerable_build(latest, {}, {}, "Android"),
+		"unknown OS was offered UPDATE")
+	_check(failures, not updater.is_offerable_build(latest, {}, {}, ""),
+		"empty OS was offered UPDATE")
+
+
 static func hash_mismatch_payload() -> PackedByteArray:
 	return PackedByteArray([1, 2, 3, 4])
 

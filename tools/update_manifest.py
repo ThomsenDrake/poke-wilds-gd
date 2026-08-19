@@ -52,6 +52,18 @@ def parse(value: object) -> dict:
     }
 
 
+def build_for_os(latest: dict, os_name: str) -> dict:
+    key = os_key(os_name)
+    if not key or not latest:
+        return {}
+    build = latest.get("builds", {}).get(key, {})
+    return dict(build) if isinstance(build, dict) and build else {}
+
+
+def is_offerable(latest: dict, current: dict, applied: dict | None, os_name: str) -> bool:
+    return is_newer(latest, current, applied or {}) and bool(build_for_os(latest, os_name))
+
+
 def is_newer(latest: dict, current: dict, applied: dict | None = None) -> bool:
     applied = applied or {}
     latest_id = str(latest.get("build_id", ""))
