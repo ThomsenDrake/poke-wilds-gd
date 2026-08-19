@@ -2,6 +2,7 @@ extends RefCounted
 
 const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const BoundedJsonl := preload("res://scripts/core/bounded_jsonl.gd")
+const UpdateIdentity := preload("res://scripts/runtime/update_identity.gd")
 
 const BUILD_INFO_PATH := "res://generated/playtest_build.json"
 const INSTALL_ID_PATH := "user://feedback_install_id.txt"
@@ -77,11 +78,13 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 func load_build_info() -> Dictionary:
 	if OS.has_feature("editor") and not _build_info_override.is_empty():
 		return _build_info_override.duplicate(true)
-	if not FileAccess.file_exists(BUILD_INFO_PATH):
-		return {"channel": "development", "build_id": "local", "commit_sha": "unknown",
-			"endpoint": "", "invite_token": "", "tester_id": "UNASSIGNED"}
-	var parsed = JSON.parse_string(FileAccess.get_file_as_string(BUILD_INFO_PATH))
-	return parsed if parsed is Dictionary else {}
+	var embedded := {"channel": "development", "build_id": "local", "commit_sha": "unknown",
+		"endpoint": "", "invite_token": "", "tester_id": "UNASSIGNED"}
+	if FileAccess.file_exists(BUILD_INFO_PATH):
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(BUILD_INFO_PATH))
+		if parsed is Dictionary:
+			embedded = parsed
+	return UpdateIdentity.merge(embedded)
 
 
 static func engine_log_slice() -> Dictionary:

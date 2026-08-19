@@ -283,8 +283,8 @@
         "revert_scope": {
           "scripts/app/nav_audit.gd": "da8ed8283c70b908a1836e2ea2df4b9b35e46ddb350621daa5e8f1bfb7911094",
           "scripts/app/nav_audit_battle.gd": "b3468cadbaaf368cf7f9e34fc5861b6ec03006a417118ed23b8217604a26f291",
-          "tools/run_playtests.py": "a0e50f4b7fa7cb78c88be364f6ca6b420325183fe58c006df0641feecfc727e9",
-          "tools/godot_dap_smoketest.py": "eaf5b2a1a428e4c7c1859994bffc12647644f8e8f264458a70aa61676e142a3f",
+          "tools/run_playtests.py": "570f397edb2a343af4d4a7e590dc16000afbc72fb83aa75a6491081315456360",
+          "tools/godot_dap_smoketest.py": "0b05f37e5f15fffcfd6431862a9effa754340aa8cb405b90902f6313476e56ca",
           "tools/verify_all.py": "59924c1d2f890851eeaa9ef77d0208bc3a16eaafcfcf061d3e44adbf37a013f3"
         },
         "re_stamp_log": [
@@ -931,6 +931,20 @@
             "old_pin": "f01c13ba4a28",
             "new_pin": "eaf5b2a1a428",
             "reason": "legitimate edit (playtest-feedback port): registered feedback_flow with required feedback_capture_requested, feedback_report_sent, and feedback_flow_passed traces. ERROR_MARKERS, failed_event_entry, and the honest-reporting and determinism mechanisms remain unchanged."
+          },
+          {
+            "date": "2026-08-19",
+            "file": "tools/run_playtests.py",
+            "old_pin": "a0e50f4b7fa7",
+            "new_pin": "570f397edb2a",
+            "reason": "legitimate edit (shared game updates): registered update_flow in PLAYTEST_SCENARIOS so the injected-transport title UPDATE journey joins the canonical suite. Additive list edit only; ERROR_MARKERS remains single-sourced from godot_dap_smoketest.py, failed_event_entry still collects structured *_failed reasons, and finalize's ok contract is unchanged."
+          },
+          {
+            "date": "2026-08-19",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "eaf5b2a1a428",
+            "new_pin": "0b05f37e5f15",
+            "reason": "legitimate edit (shared game updates): registered update_flow with required update_flow_passed. ERROR_MARKERS, failed_event_entry, and the honest-reporting and determinism mechanisms remain unchanged."
           }
         ]
       },

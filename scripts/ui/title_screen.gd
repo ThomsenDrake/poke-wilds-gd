@@ -37,6 +37,8 @@ signal closed # argless latch — emits on EVERY hide (the bind_ui_consumers con
 
 const GbcStage := preload("res://scripts/ui/gbc_stage.gd")
 const TitleStage := preload("res://scripts/ui/title_screen_stage.gd")
+const TitleUpdate := preload("res://scripts/ui/title_update.gd")
+const UpdateRuntime := preload("res://scripts/runtime/update_runtime.gd")
 
 const ENTRY_CONTINUE := "CONTINUE"
 const ENTRY_NEW_GAME := "NEW GAME"
@@ -53,6 +55,8 @@ var _rows # GbcWidgets.RowList over the entry band (black ink + black arrow curs
 var _has_save := false
 var _in_splash := false
 var _awaiting_confirm := false
+var _update := TitleUpdate.new()
+var _updater: Node
 
 func _ready() -> void:
 	visible = false
@@ -64,8 +68,10 @@ func _ready() -> void:
 	_rows = built.rows
 	_splash = TitleStage.witness(self, "Splash")
 	_entry_panel = TitleStage.witness(self, "EntryPanel")
-	_splash_timer.timeout.connect(_on_splash_timeout)
+	_splash_timer.timeout.connect(_finish_splash.bind("timeout"))
+	_updater = UpdateRuntime.new(); add_child(_updater)
 	var confirm_box := get_node_or_null("../MessageBox")
+	_update.setup(self, _updater, confirm_box)
 	if confirm_box != null and confirm_box.has_signal("confirmed"):
 		confirm_box.connect("confirmed", _on_new_game_confirmed)
 		confirm_box.connect("cancelled", _on_new_game_cancelled)
@@ -82,6 +88,7 @@ func begin_boot(has_save: bool) -> void:
 	_entry_panel.visible = false
 	visible = true
 	_splash_timer.start()
+	_update.persist_and_maybe_check()
 	_trace("splash_shown", {})
 
 # Title phase; also the back-from-creation-cancel path (title_shown re-emits).
@@ -93,7 +100,7 @@ func show_title() -> void:
 	_rebuild_entries()
 	_entry_panel.visible = true
 	visible = true
-	_trace("title_shown", {"has_save": _has_save, "entries": _entry_labels()})
+	_trace("title_shown", {"has_save": _has_save, "entries": _update.labels(_has_save)})
 
 # Every exit path hides through here: visible=false FIRST, then the latch.
 func hide_screen() -> void:
@@ -103,10 +110,15 @@ func hide_screen() -> void:
 	closed.emit()
 
 # --- Scenario seams (restyle design §2.1; the old EntryPanel/Entries ItemList reads) ---
-func entry_labels() -> Array: return _entry_labels()
+func entry_labels() -> Array: return _update.labels(_has_save)
 func selected_entry() -> int: return _rows.selected()
 func select_entry(index: int) -> void: _rows.select(index)
 func entry_row_text(index: int) -> String: return _rows.row_text(index)
+func refresh_entries() -> void:
+	if visible and not _in_splash: _rebuild_entries()
+func smoke_updater() -> Node: return _updater
+func smoke_set_update_available(available: bool) -> void:
+	_update.smoke_set_available(available); refresh_entries()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
@@ -116,7 +128,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_finish_splash("key")
 			get_viewport().set_input_as_handled()
 		return
-	if _awaiting_confirm: # the MessageBox sibling owns Z/X while the save-wipe confirm is open
+	if _awaiting_confirm or _update.is_awaiting(): # MessageBox owns Z/X for NEW GAME and UPDATE
 		return
 	if event.is_action_pressed("move_up"):
 		_rows.move(-1)
@@ -136,9 +148,6 @@ func _finish_splash(reason: String) -> void:
 	_trace("splash_closed", {"reason": reason})
 	show_title()
 
-func _on_splash_timeout() -> void:
-	_finish_splash("timeout")
-
 func _is_any_action_pressed(event: InputEvent) -> bool:
 	for action in SPLASH_SKIP_ACTIONS:
 		if event.is_action_pressed(action):
@@ -146,14 +155,13 @@ func _is_any_action_pressed(event: InputEvent) -> bool:
 	return false
 
 func _rebuild_entries() -> void:
-	_rows.set_rows(_entry_labels()) # resets the cursor to row 0 (the CONTINUE start)
+	_rows.set_rows(_update.labels(_has_save)) # resets the cursor to row 0
 	TitleStage.center_rows(_rows)
-
-func _entry_labels() -> Array:
-	return [ENTRY_CONTINUE, ENTRY_NEW_GAME] if _has_save else [ENTRY_NEW_GAME]
 
 func _activate_selected() -> void:
 	if _rows.row_count() == 0:
+		return
+	if _update.try_activate(_rows.row_text(_rows.selected())):
 		return
 	if _rows.row_text(_rows.selected()) == ENTRY_CONTINUE:
 		_trace("title_continued", {"party_size": _party_size()})
@@ -171,7 +179,7 @@ func _begin_new_game() -> void:
 		return
 	var confirm_box := get_node_or_null("../MessageBox")
 	if confirm_box == null or not confirm_box.has_method("show_confirm"):
-		var runtime := _runtime()
+		var runtime := get_node_or_null("/root/GameRuntime")
 		if runtime != null:
 			runtime.warn("TitleScreen", "Confirm box is missing; NEW GAME was refused.", {})
 		return
@@ -186,22 +194,24 @@ func _choose_new_game() -> void:
 # The confirmed signal is SHARED (StartMenu's NEW GAME + StorageScreen's
 # RELEASE ride it too): a confirm this screen did not open chooses nothing.
 func _on_new_game_confirmed() -> void:
+	if _update.on_confirmed():
+		return
 	if not _awaiting_confirm:
 		return
 	_awaiting_confirm = false
 	_choose_new_game()
 
-func _on_new_game_cancelled() -> void: _awaiting_confirm = false # cancel stays on the title
+func _on_new_game_cancelled() -> void:
+	if _update.on_cancelled():
+		return
+	_awaiting_confirm = false # cancel stays on the title
 
 func _party_size() -> int:
-	var runtime := _runtime()
+	var runtime := get_node_or_null("/root/GameRuntime")
 	var session = runtime.get("session") if runtime != null else null
 	return int(session.party.size()) if session != null else 0
 
 func _trace(event_name: String, payload: Dictionary) -> void:
-	var runtime := _runtime()
+	var runtime := get_node_or_null("/root/GameRuntime")
 	if runtime != null:
 		runtime.emit_trace(event_name, "TitleScreen", payload)
-
-func _runtime() -> Node:
-	return get_node_or_null("/root/GameRuntime")
