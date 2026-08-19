@@ -91,12 +91,13 @@ static func _build_title_card(stage: Control) -> Dictionary:
 # Rebuild keeps the previously selected label so an async UPDATE insert cannot
 # steal Z from CONTINUE / NEW GAME.
 static func rebuild_rows(rows, labels: Array) -> void:
-	var keep := rows.row_text(rows.selected()) if rows.row_count() > 0 else ""
+	var keep: String = rows.row_text(rows.selected()) if rows.row_count() > 0 else ""
 	rows.set_rows(labels)
 	center_rows(rows)
-	var idx := rows.row_texts().find(keep)
-	if idx >= 0:
-		rows.select(idx)
+	for i in rows.row_count():
+		if rows.row_text(i) == keep:
+			rows.select(i)
+			return
 
 
 static func center_rows(rows) -> void:
