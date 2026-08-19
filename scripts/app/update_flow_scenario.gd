@@ -37,20 +37,22 @@ func run(ctx: Dictionary) -> void:
 	_check(title.visible, "UPDATE cancel hid the title")
 	_download_error = "hash_mismatch"
 	_hold_download = true
+	var refuse_from := _runner.trace_log_line_count()
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
 	await SmokeTap.tap(get_tree(), "action_a")
 	await _wait_until(func(): return _ctx.message_box.is_holding())
 	_check(_ctx.message_box.is_holding(), "download toast hid while UPDATE still held title input")
 	_hold_download = false
-	await _wait_until(func(): return _runner.trace_log_has_since("update_apply_refused", 0))
+	await _wait_until(func(): return _runner.trace_log_has_since("update_apply_refused", refuse_from), 60)
+	await get_tree().process_frame
 	_check(not _applied, "hash mismatch still applied")
-	_check(_runner.trace_log_has_since("update_apply_refused", 0), "hash mismatch did not trace update_apply_refused")
+	_check(_runner.trace_log_has_since("update_apply_refused", refuse_from), "hash mismatch did not trace update_apply_refused")
 	_download_error = ""
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
 	await SmokeTap.tap(get_tree(), "action_a")
-	await _wait_until(func(): return _applied and _relaunched)
+	await _wait_until(func(): return _applied and _relaunched, 40)
 	_check(_applied and _relaunched, "successful UPDATE did not apply and relaunch")
 	_check(not updater.latest_build().is_empty(), "shared latest was not staged on the updater")
 	Checks.persist_friend(_failures)
