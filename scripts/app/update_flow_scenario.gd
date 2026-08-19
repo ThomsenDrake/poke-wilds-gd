@@ -25,7 +25,7 @@ func run(ctx: Dictionary) -> void:
 	Checks.expect_skip(_failures, updater)
 	title.show_title()
 	Checks.expect_default_rows(_failures, title, bool(_ctx.runtime.has_loaded_save()))
-	var kept := title.entry_row_text(title.selected_entry())
+	var kept: String = str(title.entry_row_text(title.selected_entry()))
 	updater.smoke_set_latest(Checks.shared_latest())
 	title.smoke_set_update_available(true)
 	Checks.expect_update_row(_failures, title, bool(_ctx.runtime.has_loaded_save()))
