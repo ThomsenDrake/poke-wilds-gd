@@ -71,7 +71,7 @@ reads the local PNG paths from the prompt and returns strict JSON. If that
 CLI is locally unavailable OR the live Luna request fails, the same
 Command Code review harness is pointed at an OpenAI-compatible HTTP
 endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
-at reasoning effort `high` when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
+at reasoning effort `high` (seed field `random_seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
 is set (env only, NEVER logged); later backends are probed only after a
 higher-priority miss or live failure. A live Mistral failure then walks hosted
 `qwen3.8-max-preview` via the token-plan MaaS endpoint
@@ -125,6 +125,7 @@ COMMAND_CODE_MODEL = "gpt-5.6-luna"
 COMMAND_CODE_EFFORT = "low"
 FALLBACK_MODEL = "mistral-medium-3-5"   # OpenAI-compatible Command Code harness fallback
 FALLBACK_EFFORT = "high"
+FALLBACK_SEED_FIELD = "random_seed"     # Mistral chat-completions; rejects OpenAI `seed`
 DEFAULT_FALLBACK_BASE = "https://api.mistral.ai/v1"
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
@@ -871,13 +872,14 @@ def _openai_compatible_text(doc: dict) -> str:
 def _call_openai_compatible(cfg: Config, system: str, user_text: str,
                             images: list[str], temperature: float, seed: int, *,
                             base: str, model: str, key: str,
-                            extra: dict | None = None) -> str:
+                            extra: dict | None = None,
+                            seed_key: str = "seed") -> str:
     images = _images_above_minimum(images)
     content = [{"type": "text", "text": user_text}]
     for b in images:
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}})
     body = {
-        "model": model, "temperature": temperature, "seed": seed,
+        "model": model, "temperature": temperature, seed_key: seed,
         # Reasoning models spend completion tokens thinking; 4096 leaves
         # headroom for the reasoning trace + the JSON answer.
         "max_tokens": 4096,
@@ -908,7 +910,7 @@ def _call_fallback(cfg: Config, system: str, user_text: str, images: list[str],
     return _call_openai_compatible(
         cfg, system, user_text, images, temperature, seed,
         base=cfg.fallback_base, model=cfg.fallback_model, key=cfg.fallback_key,
-        extra=extra)
+        extra=extra, seed_key=FALLBACK_SEED_FIELD)
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,

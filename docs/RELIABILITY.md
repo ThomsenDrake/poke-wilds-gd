@@ -481,7 +481,7 @@ Endpoint / secret configuration (flags win over env):
 | `VLM_MODEL` | `--model` | `qwen3-vl:8b` | Ollama tag (explicit, never `latest`); 30b/32b avoided on 24GB |
 | `VLM_FALLBACK_BASE_URL` | `--fallback-base` | `https://api.mistral.ai/v1` | OpenAI-compatible fallback endpoint used by the Command Code review harness when `cmd` / luna is locally unavailable or the live Luna request fails |
 | `VLM_FALLBACK_MODEL` | `--fallback-model` | `mistral-medium-3-5` | OpenAI-compatible fallback model (Mistral Medium 3.5) |
-| `VLM_FALLBACK_EFFORT` | `--fallback-effort` | `high` | Fallback reasoning effort sent as `reasoning_effort` on the OpenAI-compatible request |
+| `VLM_FALLBACK_EFFORT` | `--fallback-effort` | `high` | Fallback reasoning effort sent as `reasoning_effort` on the OpenAI-compatible request. The fallback also sends Mistral `random_seed` (not OpenAI `seed`, which `api.mistral.ai` rejects) |
 | `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY` | — | (unset) | SECRET — env only, NEVER logged; `reviewer_meta` records `fallback_key_present` only. Fallback path is inert until one is set |
 | `OLLAMA_HOST` | `--ollama-host` | `http://127.0.0.1:11434` | Local Ollama base URL |
 | `DASHSCOPE_BASE_URL` | `--dashscope-base` | `https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1` | Hosted OpenAI-compatible endpoint (the user's token-plan MaaS endpoint; swap for `https://dashscope-intl.aliyuncs.com/compatible-mode/v1` etc. as needed) |

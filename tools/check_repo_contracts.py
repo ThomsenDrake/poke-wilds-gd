@@ -1677,6 +1677,11 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             "vlm_reviewer fallback reasoning effort must stay high "
             f"(got {reviewer.FALLBACK_EFFORT})"
         )
+    if reviewer.FALLBACK_SEED_FIELD != "random_seed":
+        issues.append(
+            "vlm_reviewer fallback seed field must stay random_seed "
+            f"(got {reviewer.FALLBACK_SEED_FIELD})"
+        )
     if reviewer.AUTO_BACKEND_ORDER != (
         "command_code", "openai_compatible", "dashscope", "ollama"
     ):
@@ -1696,6 +1701,10 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
     if "_prior_backend_rows(skipped, tried)" not in src:
         issues.append(
             "prior_backends must merge probe-skipped rows with live-call failures"
+        )
+    if "seed_key=FALLBACK_SEED_FIELD" not in src:
+        issues.append(
+            "openai-compatible fallback must send Mistral random_seed, not OpenAI seed"
         )
     if 'required vision model failed: {reason}' not in src:
         issues.append(

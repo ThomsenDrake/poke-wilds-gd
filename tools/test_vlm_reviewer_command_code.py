@@ -230,6 +230,8 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertEqual(captured["url"], "https://api.mistral.ai/v1/chat/completions")
         self.assertEqual(captured["body"]["model"], "mistral-medium-3-5")
         self.assertEqual(captured["body"]["reasoning_effort"], "high")
+        self.assertEqual(captured["body"]["random_seed"], 1)
+        self.assertNotIn("seed", captured["body"])
         self.assertTrue(captured["headers"]["Authorization"].startswith("Bearer "))
         self.assertNotIn(cfg.fallback_key, str(captured["url"]))
 
