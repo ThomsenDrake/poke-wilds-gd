@@ -49,6 +49,7 @@ func run(ctx: Dictionary) -> void:
 	_check(_applied and _relaunched, "successful UPDATE did not apply and relaunch")
 	_check(not updater.latest_build().is_empty(), "shared latest was not staged on the updater")
 	Checks.persist_friend(_failures)
+	Checks.expect_shared_channel(_failures, updater)
 	Checks.apply_linux_fixture(_failures)
 	Input.use_accumulated_input = false
 	if _failures.is_empty():

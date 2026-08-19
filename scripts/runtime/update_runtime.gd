@@ -52,6 +52,10 @@ func latest_build() -> Dictionary:
 	return _latest.duplicate(true)
 
 
+func update_channel() -> String:
+	return UpdateManifest.DEFAULT_CHANNEL
+
+
 func start_check() -> void:
 	if not should_check() or _busy:
 		return
@@ -60,7 +64,7 @@ func start_check() -> void:
 
 func _run_check() -> void:
 	_busy = true
-	_trace("update_check_started", {"channel": str(_bundle.load_build_info().get("channel", ""))})
+	_trace("update_check_started", {"channel": update_channel()})
 	var latest := await _fetch_latest()
 	_busy = false
 	_latest = latest
@@ -108,8 +112,7 @@ func _fetch_latest() -> Dictionary:
 	var endpoint := _update_endpoint()
 	if endpoint.is_empty():
 		return {}
-	var channel := str(_current().get("channel", "playtest"))
-	var err := _http.request(endpoint + "/v1/updates/latest?channel=" + channel,
+	var err := _http.request(endpoint + "/v1/updates/latest?channel=" + update_channel(),
 		PackedStringArray(["Accept: application/json"]), HTTPClient.METHOD_GET)
 	if err != OK:
 		return {}

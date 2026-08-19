@@ -67,6 +67,12 @@ static func persist_friend(failures: Array) -> void:
 	_check(failures, str(merged.get("invite_token", "")) == "friend-token", "persisted friend token did not win")
 	_check(failures, str(merged.get("tester_id", "")) == "PKMN-EEVEE-TEST", "persisted tester_id did not win")
 	_check(failures, str(merged.get("build_id", "")) == "playtest-newbuild", "embedded build_id was not kept")
+	_check(failures, str(merged.get("channel", "")) == "friends-1", "persisted friend channel did not stay on F reports")
+
+
+static func expect_shared_channel(failures: Array, updater: Node) -> void:
+	_check(failures, updater != null and updater.update_channel() == "playtest",
+		"update check used the friend feedback channel instead of playtest")
 
 
 static func hash_mismatch_payload() -> PackedByteArray:

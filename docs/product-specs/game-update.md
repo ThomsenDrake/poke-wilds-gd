@@ -46,7 +46,8 @@ that persisted route for new `F` reports; the new embedded `playtest_build.json`
 supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
 identity wins when present. Editor smoke build-info overrides are not merged
-with disk identity.
+with disk identity. The latest check always queries the shared `playtest`
+channel; the persisted friend `channel` is only for `F` reports.
 
 ## Manifest
 

@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SCHEMA_VERSION := 1
+const DEFAULT_CHANNEL := "playtest"
 const OS_KEYS := ["linux", "windows", "macos"]
 const SHA256_RE := "^[0-9a-f]{64}$"
 const CHANNEL_RE := "^[a-z0-9-]{1,40}$"
