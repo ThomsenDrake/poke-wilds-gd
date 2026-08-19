@@ -159,10 +159,29 @@ def _outer_budget_s() -> int:
 
 
 def remaining_call_timeout(cfg: Config, started: float, now: float | None = None) -> int:
-    """Per-call timeout capped by the remaining reviewer-cmd wall budget."""
+    """Seconds left for one model call after the shared outer-budget reserve.
+
+    May return below MIN_BACKEND_TIMEOUT_S (including 0) so a later HTTP/cmd
+    call can be recapped to the true leftover instead of the first invocation's
+    leftover. The walk uses MIN_BACKEND_TIMEOUT_S to skip starting a new
+    backend; live_call_timeout() fail-closes when nothing remains.
+    """
     current = time.monotonic() if now is None else now
     remaining = _outer_budget_s() - (current - started) - OUTER_RESERVE_S
     return max(0, min(int(cfg.timeout), int(remaining)))
+
+
+def live_call_timeout(cfg: Config, now: float | None = None) -> int:
+    """Recompute remaining timeout immediately before every HTTP/cmd call."""
+    if cfg.review_started is None:
+        return int(cfg.timeout)
+    remaining = remaining_call_timeout(cfg, cfg.review_started, now=now)
+    if remaining <= 0:
+        raise RuntimeError(
+            "outer reviewer budget exhausted before model call "
+            f"(remaining={remaining}s)"
+        )
+    return remaining
 
 
 def _command_code_probe_timeout() -> int:
@@ -246,6 +265,7 @@ class Config:
                                  or os.environ.get("VLM_INDEPENDENT_VOTE") == "1")
         self.send_raw_frames = os.environ.get("VLM_SEND_RAW_FRAMES") == "1"
         self.n = 2  # recorded discipline: two passes, unanimity vote
+        self.review_started = None  # set by run_review; live_call_timeout uses it
 
     def describe(self) -> dict:
         """reviewer_meta config block. NEVER includes secret values."""
@@ -820,7 +840,7 @@ def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dic
     prompt = _command_code_prompt(cfg, public_ctx, system, user_text, order)
     proc = subprocess.run(
         command_code_argv(cmd, prompt, cfg),
-        capture_output=True, text=True, timeout=cfg.timeout, check=False,
+        capture_output=True, text=True, timeout=live_call_timeout(cfg), check=False,
     )
     if proc.returncode != 0:
         detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "no stderr"
@@ -878,7 +898,7 @@ def _call_ollama(cfg: Config, system: str, user_text: str, images: list[str],
         "options": {"temperature": temperature, "num_predict": 1024, "seed": seed},
         "messages": [{"role": "system", "content": system}, user_msg],
     }
-    doc = _post_json(cfg.ollama_host + "/api/chat", body, {}, cfg.timeout)
+    doc = _post_json(cfg.ollama_host + "/api/chat", body, {}, live_call_timeout(cfg))
     return str((doc.get("message") or {}).get("content", ""))
 
 
@@ -945,7 +965,7 @@ def _call_openai_compatible(cfg: Config, system: str, user_text: str,
     if extra:
         body.update(extra)
     doc = _post_json(base + "/chat/completions", body,
-                     {"Authorization": f"Bearer {key}"}, cfg.timeout)
+                     {"Authorization": f"Bearer {key}"}, live_call_timeout(cfg))
     return _openai_compatible_text(doc)
 
 
@@ -1387,6 +1407,7 @@ def run_review(public_ctx: dict, cfg: Config,
     meta: dict = {"schema": SCHEMA, "generated_by": "tools/vlm_reviewer.py",
                   "config": cfg.describe()}
     started = time.monotonic() if started is None else started
+    cfg.review_started = started
 
     det_findings, det_note, anchor_unverified, anchor_kind_ran = deterministic_findings(public_ctx, cfg)
     meta["deterministic"] = {"count": len(det_findings), "note": det_note,
@@ -1421,8 +1442,6 @@ def run_review(public_ctx: dict, cfg: Config,
                     "call_timeout_s": call_timeout,
                 })
                 break
-            prior_timeout = cfg.timeout
-            cfg.timeout = call_timeout
             try:
                 answers, mmeta = run_model(public_ctx, cfg, backend)
                 _require_complete_model(cfg, answers, mmeta)
@@ -1437,12 +1456,10 @@ def run_review(public_ctx: dict, cfg: Config,
                     "backend": backend,
                     "probe": probe_reason,
                     "error": _model_call_error(cfg, exc),
-                    "call_timeout_s": call_timeout,
+                    "call_timeout_s": remaining_call_timeout(cfg, started),
                 })
                 if cfg.runtime != "auto":
                     break
-            finally:
-                cfg.timeout = prior_timeout
         if not selected:
             answers = []
             if tried:

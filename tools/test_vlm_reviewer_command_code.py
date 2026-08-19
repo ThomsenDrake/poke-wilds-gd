@@ -552,11 +552,17 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         cfg.timeout = 180
         cfg.required = True
         answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
-        seen: list[tuple[str, int]] = []
+        seen: list[tuple[str, int, int]] = []
+        now = {"t": 0.0}
 
         def fake_run_model(_ctx, call_cfg, backend):
-            seen.append((backend, call_cfg.timeout))
+            seen.append((
+                backend,
+                call_cfg.timeout,
+                VLM.live_call_timeout(call_cfg),
+            ))
             if backend == "command_code":
+                now["t"] = 180.0
                 raise RuntimeError("luna timeout")
             return answers_ok, {
                 "ran": True,
@@ -565,16 +571,55 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
                 "passes_completed": 1,
             }
 
-        clock = iter([0.0, 180.0])
         with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
-                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: next(clock, 180.0)), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: now["t"]), \
                 mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
                 mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
                 mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
                 mock.patch.object(VLM, "run_model", side_effect=fake_run_model):
             _findings, _answers, meta = VLM.run_review({}, cfg, started=0.0)
-        self.assertEqual(seen, [("command_code", 180), ("openai_compatible", 100)])
+        self.assertEqual(seen, [
+            ("command_code", 180, 180),
+            ("openai_compatible", 180, 100),
+        ])
+        self.assertEqual(cfg.timeout, 180)
         self.assertEqual(meta["model"]["backend"], "openai_compatible")
+
+    def test_live_call_timeout_uses_configured_timeout_without_review_started(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.timeout = 180
+        self.assertIsNone(cfg.review_started)
+        self.assertEqual(VLM.live_call_timeout(cfg), 180)
+
+    def test_live_call_timeout_recomputed_before_each_http_call(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.timeout = 180
+        cfg.review_started = 0.0
+        cfg.fallback_key = "test-only-placeholder"
+        seen: list[int] = []
+        now = {"t": 180.0}
+
+        def fake_post(_url, _body, _headers, timeout):
+            seen.append(timeout)
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: now["t"]), \
+                mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "sys", "user", [], 0.0, 1)
+            now["t"] = 270.0
+            VLM._call_fallback(cfg, "sys", "user", [], 0.0, 1)
+        self.assertEqual(seen, [100, 10])
+        self.assertEqual(cfg.timeout, 180)
+
+    def test_live_call_timeout_fails_when_budget_exhausted(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.timeout = 180
+        cfg.review_started = 0.0
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False):
+            with self.assertRaises(RuntimeError) as raised:
+                VLM.live_call_timeout(cfg, now=290.0)
+        self.assertIn("outer reviewer budget exhausted", str(raised.exception))
 
     def test_auto_skips_later_backend_when_outer_budget_exhausted(self) -> None:
         cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))

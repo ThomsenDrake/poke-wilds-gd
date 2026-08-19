@@ -1709,6 +1709,18 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append("run_review must not eagerly probe every backend before the first call")
     if "remaining_call_timeout(cfg, started)" not in src:
         issues.append("run_review must cap each backend call by remaining_call_timeout")
+    if "cfg.timeout = call_timeout" in src:
+        issues.append(
+            "run_review must not freeze remaining timeout onto cfg.timeout for the whole backend"
+        )
+    if "timeout=live_call_timeout(cfg)" not in src:
+        issues.append(
+            "Command Code subprocess must recompute live_call_timeout before each invocation"
+        )
+    if src.count("live_call_timeout(cfg)") < 3:
+        issues.append(
+            "HTTP and cmd model calls must recompute live_call_timeout before each invocation"
+        )
     vision_src = Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8")
     if 'env["VLM_OUTER_BUDGET"] = str(child_outer_budget(env))' not in vision_src:
         issues.append("vision_review must clamp VLM_OUTER_BUDGET to REVIEWER_TIMEOUT for the child")
