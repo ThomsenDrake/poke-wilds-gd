@@ -68,10 +68,18 @@ default.
 RUNTIME (default `auto`): Command Code headless `gpt-5.6-luna` is tried
 FIRST for each image via `cmd -p --no-session --permission-mode plan`; it
 reads the local PNG paths from the prompt and returns strict JSON. If that
-CLI/model is unavailable, hosted `qwen3.8-max-preview` via the token-plan
-MaaS endpoint (DEFAULT_DASHSCOPE_BASE) is tried when DASHSCOPE_API_KEY is
-set (env only, NEVER logged); then local qwen3-vl:8b (Instruct) via Ollama's
-HTTP API when pulled; else required review fails closed. The wrapper is PURE
+CLI is locally unavailable OR the live Luna request fails, the same
+Command Code review harness is pointed at an OpenAI-compatible HTTP
+endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
+at reasoning effort `high` (seed field `random_seed` on a mistral.ai hostname, else `seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
+is set (env only, NEVER logged); later backends are probed only after a
+higher-priority miss or live failure. A live Mistral failure then walks hosted
+`qwen3.8-max-preview` via the token-plan MaaS endpoint
+(DEFAULT_DASHSCOPE_BASE) when DASHSCOPE_API_KEY is set; then local
+qwen3-vl:8b (Instruct) via Ollama's HTTP API when pulled; else required
+review fails closed. A pinned `--runtime` / `VLM_RUNTIME` does not walk.
+`reviewer_meta.prior_backends` records secret-free rows for probe-skipped
+backends and live-call failures. The wrapper is PURE
 STDLIB (urllib.request + json + base64; NO SDK, NO venv) and stays a CORE tool:
 OPTIONAL_TOOL_EXEMPTIONS remains pinned to exactly {vision_metrics.py}. An
 explicit model id is pinned, never `latest`. Hosted calls budget max_tokens=
@@ -81,12 +89,15 @@ dropped (full frames + SoM overlays always go). Ollama's grammar-constrained
 `format=<schema>` guarantees output SHAPE (one defensive validate/repair
 retry); the hosted path is prompt-instructed JSON so validate+repair is
 mandatory there. The per-call timeout (VLM_TIMEOUT, default 180) bounds each
-HTTP call; the pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
-invocation. The worst case (standalone Command Code probe 30s, or HTTP probe
-5s, plus n=2 + a repair retry per pass) can
-exceed the outer bound under a slow model -- the outer bound then kills the
-invocation and the pipeline records a TOOL ERROR (fail-closed, never a silent
-pass); for slow endpoints raise VLM_TIMEOUT and REVIEWER_TIMEOUT together.
+HTTP or cmd call. The pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
+invocation; auto-walk attempts share that budget (VLM_OUTER_BUDGET, 20s emit
+reserve) so a Luna timeout cannot starve Mistral. Readiness probes are checked against that leftover before they run and their
+timeouts are capped to it, so a 30s Command Code ``--version`` probe cannot
+overrun a short ``VLM_OUTER_BUDGET``. The worst case (n=2 + a repair retry
+per pass) can still exceed the outer bound under a slow model -- the outer
+bound then kills the invocation and the pipeline records a TOOL ERROR
+(fail-closed, never a silent pass); for slow endpoints raise VLM_TIMEOUT and
+REVIEWER_TIMEOUT together.
 
 Stdlib-only. Reuses vision_review.default_reviewer / parse_rubric_questions /
 _shot_group via the sanctioned importlib pattern (never forked); geometry stays
@@ -104,28 +115,90 @@ import random
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
 TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
 
 SCHEMA = "vision-review/2"
 REVIEWER_KIND = "model-vision-llm"      # must equal vision_review.KIND_MODEL so coverage joins
-DEFAULT_MODEL = "qwen3-vl:8b"           # local fallback model (explicit tag, never latest)
+DEFAULT_MODEL = "qwen3-vl:8b"           # local Ollama model (explicit tag, never latest)
 COMMAND_CODE_MODEL = "gpt-5.6-luna"
-FALLBACK_MODEL = "qwen3-vl:4b"          # faster / lower-fidelity lane or memory contention
+COMMAND_CODE_EFFORT = "low"
+FALLBACK_MODEL = "mistral-medium-3-5"   # OpenAI-compatible Command Code harness fallback
+FALLBACK_EFFORT = "high"
+FALLBACK_EFFORT_VALUES = ("none", "minimal", "low", "medium", "high", "xhigh")
+FALLBACK_EFFORT_OMIT = ("off", "omit", "disabled", "-")
+FALLBACK_SEED_FIELD = "random_seed"     # Mistral chat-completions; rejects OpenAI `seed`
+DEFAULT_FALLBACK_BASE = "https://api.mistral.ai/v1"
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
 DEFAULT_DASHSCOPE_MODEL = "qwen3.8-max-preview"
 DEFAULT_TIMEOUT = 180                   # per call; reasoning models spend tokens thinking (keep headroom; < REVIEWER_TIMEOUT=300)
+DEFAULT_OUTER_BUDGET = 300              # must == vision_review.REVIEWER_TIMEOUT
+OUTER_RESERVE_S = 20                    # leave room to emit JSON before the plugin is killed
+MIN_BACKEND_TIMEOUT_S = 15
+SINGLE_PASS_BACKENDS = ("command_code", "openai_compatible")
+AUTO_BACKEND_ORDER = ("command_code", "openai_compatible", "dashscope", "ollama")
 PROBE_TIMEOUT = 5
 DEFAULT_COMMAND_CODE_PROBE_TIMEOUT = 30
+# Raised required-failure reason must survive vision_review.reviewer_cmd_error_detail
+# (400 chars) after the wrapper prefix. Keep the summary inside that window.
+PARENT_VISIBLE_REASON_BUDGET = 320
 MAX_CROPS = 6                           # bound image tokens; native-res crops carry the small-diff signal
 MAX_TEXT = 1600                         # cap embedded text blocks so a large bundle cannot blow the context
 RUBRIC_REF = "docs/references/vision-review-rubric.md"
 
 EXIT_OK, EXIT_ERROR = 0, 2
+
+
+def _outer_budget_s() -> int:
+    raw = os.environ.get("VLM_OUTER_BUDGET", str(DEFAULT_OUTER_BUDGET))
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return DEFAULT_OUTER_BUDGET
+
+
+def remaining_call_timeout(cfg: Config, started: float, now: float | None = None) -> int:
+    """Seconds left for one model call after the shared outer-budget reserve.
+
+    May return below MIN_BACKEND_TIMEOUT_S (including 0) so a later HTTP/cmd
+    call can be recapped to the true leftover instead of the first invocation's
+    leftover. The walk uses MIN_BACKEND_TIMEOUT_S to skip starting a new
+    backend; live_call_timeout() fail-closes when nothing remains.
+    """
+    current = time.monotonic() if now is None else now
+    remaining = _outer_budget_s() - (current - started) - OUTER_RESERVE_S
+    return max(0, min(int(cfg.timeout), int(remaining)))
+
+
+def live_call_timeout(cfg: Config, now: float | None = None) -> int:
+    """Recompute remaining timeout immediately before every HTTP/cmd call."""
+    if cfg.review_started is None:
+        return int(cfg.timeout)
+    remaining = remaining_call_timeout(cfg, cfg.review_started, now=now)
+    if remaining <= 0:
+        raise RuntimeError(
+            "outer reviewer budget exhausted before model call "
+            f"(remaining={remaining}s)"
+        )
+    return remaining
+
+
+def _bounded_probe_timeout(configured: int, timeout: int | None) -> int:
+    """Never let a readiness probe run longer than leftover reviewer budget."""
+    limit = max(1, int(configured))
+    if timeout is None:
+        return limit
+    try:
+        requested = int(timeout)
+    except (TypeError, ValueError):
+        return limit
+    return max(1, min(limit, requested))
 
 
 def _command_code_probe_timeout() -> int:
@@ -181,11 +254,21 @@ class Config:
         self.runtime = str(pick("runtime", "VLM_RUNTIME", "auto")).lower()
         self.model = str(pick("model", "VLM_MODEL", DEFAULT_MODEL))
         self.command_code_model = str(pick("command_code_model", "COMMAND_CODE_MODEL", COMMAND_CODE_MODEL))
+        self.command_code_effort = str(pick("command_code_effort", "COMMAND_CODE_EFFORT", COMMAND_CODE_EFFORT)).lower()
+        self.fallback_model = str(pick("fallback_model", "VLM_FALLBACK_MODEL", FALLBACK_MODEL))
+        self.fallback_effort = str(pick("fallback_effort", "VLM_FALLBACK_EFFORT", "")).strip().lower()
+        self.fallback_base = str(pick("fallback_base", "VLM_FALLBACK_BASE_URL", DEFAULT_FALLBACK_BASE)).rstrip("/")
+        self.fallback_seed_field = str(pick(
+            "fallback_seed_field", "VLM_FALLBACK_SEED_FIELD", "")).strip().lower()
         self.ollama_host = str(pick("ollama_host", "OLLAMA_HOST", DEFAULT_OLLAMA_HOST)).rstrip("/")
         self.dashscope_base = str(pick("dashscope_base", "DASHSCOPE_BASE_URL", DEFAULT_DASHSCOPE_BASE)).rstrip("/")
         self.dashscope_model = str(pick("dashscope_model", "DASHSCOPE_MODEL", DEFAULT_DASHSCOPE_MODEL))
         # SECRET: env only, never logged. Only a presence bool is recorded.
         self.dashscope_key = os.environ.get("DASHSCOPE_API_KEY", "")
+        self.fallback_key = (
+            os.environ.get("VLM_FALLBACK_API_KEY", "")
+            or os.environ.get("MISTRAL_API_KEY", "")
+        )
         self.timeout = int(pick("timeout", "VLM_TIMEOUT", DEFAULT_TIMEOUT))
         self.base_dir = Path(pick("base_dir", "VISION_REVIEW_BASE_DIR", str(ROOT / ".godot-smoke")))
         self.baseline_dir = Path(pick("baseline_dir", "VLM_BASELINE_DIR",
@@ -199,14 +282,21 @@ class Config:
                                  or os.environ.get("VLM_INDEPENDENT_VOTE") == "1")
         self.send_raw_frames = os.environ.get("VLM_SEND_RAW_FRAMES") == "1"
         self.n = 2  # recorded discipline: two passes, unanimity vote
+        self.review_started = None  # set by run_review; live_call_timeout uses it
 
     def describe(self) -> dict:
         """reviewer_meta config block. NEVER includes secret values."""
         return {
             "runtime": self.runtime, "model": self.model, "command_code_model": self.command_code_model,
+            "command_code_effort": self.command_code_effort,
+            "fallback_model": self.fallback_model,
+            "fallback_effort": _fallback_reasoning_effort(self) or "omit",
+            "fallback_base": self.fallback_base,
+            "fallback_seed_field": _fallback_seed_key(self),
             "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
+            "fallback_key_present": bool(self.fallback_key),
             "command_code_key_present": bool(os.environ.get("COMMAND_CODE_API_KEY")),
             "command_code_preflight_reused": (
                 os.environ.get("POKEWILDS_COMMAND_CODE_PREFLIGHTED") == "1"
@@ -219,6 +309,8 @@ class Config:
                                if self.independent_vote else
                                "determinism/repro guard (two identical greedy decodes at temperature 0)"),
             "order_shuffle": True, "per_call_timeout_s": self.timeout,
+            "outer_budget_s": _outer_budget_s(),
+            "outer_reserve_s": OUTER_RESERVE_S,
             "pixel_budget_note": "Qwen min/max_pixels is a model/server setting, not a per-request "
                                  "option; native-res crops carry the small-diff signal; crops with a "
                                  "side < 11px are dropped (the hosted endpoint rejects <=10px images)",
@@ -320,13 +412,15 @@ def load_questions(public_ctx: dict) -> tuple[str, list[dict]]:
 # --------------------------------------------------------------------------
 # model availability probes (POSITIVE detection only)
 # --------------------------------------------------------------------------
-def _model_in_tags(host: str, model: str) -> tuple[bool, str]:
+def _model_in_tags(host: str, model: str, timeout: int | None = None) -> tuple[bool, str]:
     """True iff GET /api/tags succeeds AND lists `model` (exact, or same
     name:tag ignoring an implicit :latest). Positive detection only -- a probe
     error is treated as UNavailable so degrade is the safe default."""
     try:
         req = urllib.request.Request(host + "/api/tags", headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT) as resp:
+        with urllib.request.urlopen(
+            req, timeout=_bounded_probe_timeout(PROBE_TIMEOUT, timeout)
+        ) as resp:
             doc = json.loads(resp.read().decode("utf-8"))
     except (OSError, ValueError, urllib.error.URLError) as exc:
         return False, f"ollama probe failed: {type(exc).__name__}"
@@ -340,32 +434,156 @@ def _model_in_tags(host: str, model: str) -> tuple[bool, str]:
     return False, f"model {model} not pulled (have: {', '.join(names) or 'none'})"
 
 
-def probe_availability(cfg: Config) -> tuple[str | None, str]:
-    """Resolve the active backend in priority order: Command Code, DashScope, Ollama."""
-    command_reason = "command code not probed"
-    if cfg.runtime in ("command_code", "auto"):
-        ok, reason = _command_code_available()
-        if ok:
-            return "command_code", reason
-        command_reason = reason
-        if cfg.runtime == "command_code":
-            return None, command_reason
-    dash_reason = "dashscope not probed"
-    if cfg.runtime in ("dashscope", "auto"):
+def _fallback_available(cfg: Config) -> tuple[bool, str]:
+    if cfg.fallback_key:
+        return True, "openai-compatible fallback key present"
+    return False, "no MISTRAL_API_KEY/VLM_FALLBACK_API_KEY"
+
+
+def _probe_backend(cfg: Config, backend: str, timeout: int | None = None) -> tuple[bool, str]:
+    """Local readiness only — a live request can still fail after this returns True."""
+    if backend == "command_code":
+        return _command_code_available(timeout=timeout)
+    if backend == "openai_compatible":
+        return _fallback_available(cfg)
+    if backend == "dashscope":
         if cfg.dashscope_key:
-            return "dashscope", "dashscope key present"
-        dash_reason = "no DASHSCOPE_API_KEY"
-        if cfg.runtime == "dashscope":
-            return None, dash_reason
-    ollama_reason = "ollama not probed"
-    if cfg.runtime in ("ollama", "auto"):
-        ok, reason = _model_in_tags(cfg.ollama_host, cfg.model)
+            return True, "dashscope key present"
+        return False, "no DASHSCOPE_API_KEY"
+    if backend == "ollama":
+        return _model_in_tags(cfg.ollama_host, cfg.model, timeout=timeout)
+    return False, f"unknown backend {backend}"
+
+
+def _candidate_order(cfg: Config) -> tuple[str, ...]:
+    if cfg.runtime == "auto":
+        return AUTO_BACKEND_ORDER
+    if cfg.runtime in AUTO_BACKEND_ORDER:
+        return (cfg.runtime,)
+    return ()
+
+
+def probe_backends(cfg: Config) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """One local probe pass. Returns (ready, skipped) as (backend, reason) rows."""
+    ready: list[tuple[str, str]] = []
+    skipped: list[tuple[str, str]] = []
+    for backend in _candidate_order(cfg):
+        ok, reason = _probe_backend(cfg, backend)
         if ok:
-            return "ollama", reason
-        ollama_reason = reason
-        if cfg.runtime == "ollama":
-            return None, ollama_reason
-    return None, f"{command_reason}; {dash_reason}; {ollama_reason}"
+            ready.append((backend, reason))
+        else:
+            skipped.append((backend, reason))
+    return ready, skipped
+
+
+def iter_available_backends(cfg: Config) -> list[tuple[str, str]]:
+    """Locally-ready backends in auto (or pinned) order. Call success is separate."""
+    ready, _skipped = probe_backends(cfg)
+    return ready
+
+
+def _unavailable_reason(cfg: Config, skipped: list[tuple[str, str]]) -> str:
+    if not _candidate_order(cfg):
+        return (
+            "command code not probed; openai-compatible fallback not probed; "
+            "dashscope not probed; ollama not probed"
+        )
+    return "; ".join(reason for _backend, reason in skipped) or "no backend probed"
+
+
+def probe_availability(cfg: Config) -> tuple[str | None, str]:
+    """Resolve the first locally-ready backend, or a secret-free skip reason.
+
+    Stops at the first ready backend so a dead Ollama host is not probed when
+    Command Code or the OpenAI-compatible fallback is already usable.
+    """
+    skipped: list[tuple[str, str]] = []
+    for backend in _candidate_order(cfg):
+        ok, reason = _probe_backend(cfg, backend)
+        if ok:
+            return backend, reason
+        skipped.append((backend, reason))
+    return None, _unavailable_reason(cfg, skipped)
+
+
+def _compact_text(text: str, limit: int) -> str:
+    cleaned = " ".join(str(text).split())
+    if limit <= 0:
+        return ""
+    if len(cleaned) <= limit:
+        return cleaned
+    if limit <= 3:
+        return cleaned[:limit]
+    return cleaned[:limit - 3].rstrip() + "..."
+
+
+def _model_pass_error_reason(tried: list[dict]) -> str:
+    """Parent-visible summary. ``prior_backends`` keeps the long form.
+
+    ``vision_review.reviewer_cmd_error_detail`` truncates the selected stderr
+    line to 400 characters, so this stays inside PARENT_VISIBLE_REASON_BUDGET
+    and names every attempted backend.
+    """
+    prefix = "model pass error: "
+    if not tried:
+        return prefix + "no backend attempted"
+    usable = max(32, PARENT_VISIBLE_REASON_BUDGET - len(prefix))
+    n = len(tried)
+    seps = 2 * max(0, n - 1)
+    each = max(12, (usable - seps) // n)
+    parts = []
+    for row in tried:
+        backend = str(row.get("backend") or "?")
+        label = f"{backend}: "
+        body = _compact_text(str(row.get("error") or "failed"), max(4, each - len(label)))
+        parts.append(label + body)
+    return prefix + "; ".join(parts)
+
+
+def _prior_backend_rows(
+    skipped: list[tuple[str, str]],
+    tried: list[dict],
+) -> list[dict]:
+    """Probe-skipped rows first, then live-call failures. Secret-free."""
+    rows = [
+        {"backend": backend, "probe": reason, "skipped": True}
+        for backend, reason in skipped
+    ]
+    rows.extend(tried)
+    return rows
+
+
+def _redact_secrets(cfg: Config, text: str) -> str:
+    secrets = [
+        cfg.fallback_key,
+        cfg.dashscope_key,
+        os.environ.get("COMMAND_CODE_API_KEY", ""),
+        os.environ.get("VLM_FALLBACK_API_KEY", ""),
+        os.environ.get("MISTRAL_API_KEY", ""),
+        os.environ.get("DASHSCOPE_API_KEY", ""),
+    ]
+    redacted = text
+    for secret in secrets:
+        if secret:
+            redacted = redacted.replace(secret, "<redacted>")
+    return redacted
+
+
+def _model_call_error(cfg: Config, exc: BaseException) -> str:
+    return _redact_secrets(cfg, f"{type(exc).__name__}: {exc}")[:240]
+
+
+def _require_complete_model(cfg: Config, answers: list[dict], mmeta: dict) -> None:
+    if not cfg.required:
+        return
+    required = int(mmeta.get("questions_total", 0))
+    completed = int(mmeta.get("passes_completed", 0))
+    answered = len(answers)
+    expected_passes = _required_passes(cfg, str(mmeta.get("backend") or ""))
+    if completed != expected_passes or answered != required:
+        raise RuntimeError(
+            f"required vision review incomplete: passes {completed}/{expected_passes}, "
+            f"answers {answered}/{required}")
 
 
 # --------------------------------------------------------------------------
@@ -616,7 +834,7 @@ def _cmd_executable() -> str | None:
     return None
 
 
-def _command_code_available() -> tuple[bool, str]:
+def _command_code_available(timeout: int | None = None) -> tuple[bool, str]:
     cmd = _cmd_executable()
     if not cmd:
         return False, "cmd CLI not found"
@@ -627,7 +845,9 @@ def _command_code_available() -> tuple[bool, str]:
         return True, "cmd CLI available (launcher preflight reused)"
     try:
         proc = subprocess.run([cmd, "--version"], capture_output=True, text=True,
-                              timeout=_command_code_probe_timeout(), check=False)
+                              timeout=_bounded_probe_timeout(
+                                  _command_code_probe_timeout(), timeout),
+                              check=False)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"cmd probe failed: {type(exc).__name__}"
     if proc.returncode != 0:
@@ -655,7 +875,8 @@ def command_code_argv(cmd: str, prompt: str, cfg: Config) -> list[str]:
     return [
         cmd, "-p", prompt, "--model", cfg.command_code_model, "--no-session",
         "--skip-onboarding", "--permission-mode", "plan", "--max-turns", "8",
-        "--effort", "low", "--output-format", "text", "--add-dir", str(ROOT),
+        "--effort", cfg.command_code_effort, "--output-format", "text",
+        "--add-dir", str(ROOT),
     ]
 
 
@@ -667,7 +888,7 @@ def _call_command_code(cfg: Config, system: str, user_text: str, public_ctx: dic
     prompt = _command_code_prompt(cfg, public_ctx, system, user_text, order)
     proc = subprocess.run(
         command_code_argv(cmd, prompt, cfg),
-        capture_output=True, text=True, timeout=cfg.timeout, check=False,
+        capture_output=True, text=True, timeout=live_call_timeout(cfg), check=False,
     )
     if proc.returncode != 0:
         detail = proc.stderr.strip().splitlines()[-1] if proc.stderr.strip() else "no stderr"
@@ -725,32 +946,105 @@ def _call_ollama(cfg: Config, system: str, user_text: str, images: list[str],
         "options": {"temperature": temperature, "num_predict": 1024, "seed": seed},
         "messages": [{"role": "system", "content": system}, user_msg],
     }
-    doc = _post_json(cfg.ollama_host + "/api/chat", body, {}, cfg.timeout)
+    doc = _post_json(cfg.ollama_host + "/api/chat", body, {}, live_call_timeout(cfg))
     return str((doc.get("message") or {}).get("content", ""))
 
 
-def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
-                    temperature: float, seed: int) -> str:
+def _openai_compatible_text(doc: dict) -> str:
+    choices = doc.get("choices") or []
+    msg = (choices[0] or {}).get("message") if choices else {}
+    c = (msg or {}).get("content", "")
+    if isinstance(c, list):  # some servers return content parts
+        parts = []
+        for part in c:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "thinking":
+                continue  # Mistral high-effort traces; keep only the final answer
+            parts.append(part.get("text", "") if "text" in part else "")
+        c = "".join(parts)
+    return str(c)
+
+
+def _fallback_host_is_mistral(base: str) -> bool:
+    """True only when the URL hostname is mistral.ai or a mistral.ai subdomain."""
+    raw = str(base or "").strip()
+    if not raw:
+        return False
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    host = (parsed.hostname or "").lower().rstrip(".")
+    return host == "mistral.ai" or host.endswith(".mistral.ai")
+
+
+def _fallback_reasoning_effort(cfg: Config) -> str | None:
+    """Mistral default is high; custom hosts omit unless an effort value is set.
+
+    ``off`` / ``omit`` / ``disabled`` / ``-`` drop the field. ``none`` is a valid
+    Mistral API value and is sent as-is.
+    """
+    override = cfg.fallback_effort
+    if override in FALLBACK_EFFORT_OMIT:
+        return None
+    if override in FALLBACK_EFFORT_VALUES:
+        return override
+    if _fallback_host_is_mistral(cfg.fallback_base):
+        return FALLBACK_EFFORT
+    return None
+
+
+def _fallback_seed_key(cfg: Config) -> str:
+    """Mistral chat-completions uses random_seed; other OpenAI-compatible hosts use seed."""
+    override = cfg.fallback_seed_field
+    if override in ("seed", FALLBACK_SEED_FIELD):
+        return override
+    if _fallback_host_is_mistral(cfg.fallback_base):
+        return FALLBACK_SEED_FIELD
+    return "seed"
+
+
+def _call_openai_compatible(cfg: Config, system: str, user_text: str,
+                            images: list[str], temperature: float, seed: int, *,
+                            base: str, model: str, key: str,
+                            extra: dict | None = None,
+                            seed_key: str = "seed") -> str:
     images = _images_above_minimum(images)
     content = [{"type": "text", "text": user_text}]
     for b in images:
         content.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}})
     body = {
-        "model": cfg.dashscope_model, "temperature": temperature, "seed": seed,
-        # Reasoning models (qwen3.8-max-preview) spend completion tokens thinking;
-        # 4096 leaves headroom for the reasoning trace + the JSON answer.
+        "model": model, "temperature": temperature, seed_key: seed,
+        # Reasoning models spend completion tokens thinking; 4096 leaves
+        # headroom for the reasoning trace + the JSON answer.
         "max_tokens": 4096,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": content}],
     }
-    doc = _post_json(cfg.dashscope_base + "/chat/completions", body,
-                     {"Authorization": f"Bearer {cfg.dashscope_key}"}, cfg.timeout)
-    choices = doc.get("choices") or []
-    msg = (choices[0] or {}).get("message") if choices else {}
-    c = (msg or {}).get("content", "")
-    if isinstance(c, list):  # some servers return content parts
-        c = "".join(part.get("text", "") for part in c if isinstance(part, dict))
-    return str(c)
+    if extra:
+        body.update(extra)
+    doc = _post_json(base + "/chat/completions", body,
+                     {"Authorization": f"Bearer {key}"}, live_call_timeout(cfg))
+    return _openai_compatible_text(doc)
+
+
+def _call_dashscope(cfg: Config, system: str, user_text: str, images: list[str],
+                    temperature: float, seed: int) -> str:
+    return _call_openai_compatible(
+        cfg, system, user_text, images, temperature, seed,
+        base=cfg.dashscope_base, model=cfg.dashscope_model, key=cfg.dashscope_key)
+
+
+def _call_fallback(cfg: Config, system: str, user_text: str, images: list[str],
+                   temperature: float, seed: int) -> str:
+    if not cfg.fallback_key:
+        raise RuntimeError("openai-compatible fallback key missing")
+    extra = {}
+    effort = _fallback_reasoning_effort(cfg)
+    if effort:
+        extra["reasoning_effort"] = effort
+    return _call_openai_compatible(
+        cfg, system, user_text, images, temperature, seed,
+        base=cfg.fallback_base, model=cfg.fallback_model, key=cfg.fallback_key,
+        extra=extra, seed_key=_fallback_seed_key(cfg))
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,
@@ -759,9 +1053,25 @@ def _call_model(cfg: Config, backend: str, system: str, user_text: str,
     if backend == "command_code":
         return _call_command_code(cfg, system, user_text, public_ctx,
                                  list(order or ["before", "after"]))
+    if backend == "openai_compatible":
+        return _call_fallback(cfg, system, user_text, images, temperature, seed)
     if backend == "ollama":
         return _call_ollama(cfg, system, user_text, images, temperature, seed)
     return _call_dashscope(cfg, system, user_text, images, temperature, seed)
+
+
+def _required_passes(cfg: Config, backend: str) -> int:
+    return 1 if backend in SINGLE_PASS_BACKENDS else cfg.n
+
+
+def _backend_model_name(cfg: Config, backend: str) -> str:
+    if backend == "command_code":
+        return cfg.command_code_model
+    if backend == "openai_compatible":
+        return cfg.fallback_model
+    if backend == "dashscope":
+        return cfg.dashscope_model
+    return cfg.model
 
 
 # --------------------------------------------------------------------------
@@ -792,15 +1102,17 @@ def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
     # "answers" there made every valid critique read as malformed (dead pass).
     def _valid(doc: object) -> bool:
         return isinstance(doc, dict) and isinstance(doc.get(list_key), list)
+    first_err: BaseException | None = None
     try:
         doc = _extract_json(content)
         if _valid(doc):
             return doc, "ok"
-        return None, f"{list_key} not a list"
+        first_err = ValueError(f"{list_key} not a list")
     except (ValueError, KeyError) as exc:
         first_err = exc
-    # ONE repair retry (mandatory on the prompt-instructed DashScope path; a
-    # defensive backstop on the grammar-constrained Ollama path).
+    # ONE repair retry (mandatory on the prompt-instructed DashScope / Mistral
+    # path; a defensive backstop on the grammar-constrained Ollama path).
+    # Wrong-shape JSON (valid object, missing/non-list answers) also repairs.
     repair_system = (system + "\n\nYour last reply was not valid JSON matching the schema. "
                      "Return ONLY the JSON object now. Error: %s" % first_err)
     try:
@@ -994,7 +1306,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
     temperature = 0.2 if cfg.independent_vote else 0.0
     passes: list[list[dict]] = []
     per_pass: list[dict] = []
-    required_passes = 1 if backend == "command_code" else cfg.n
+    required_passes = _required_passes(cfg, backend)
     for i in range(required_passes):
         rng = random.Random(cfg.seed + i)  # per-pass order seed, recorded
         order = ["before", "after"]
@@ -1062,7 +1374,7 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
         per_pass.append({"pass": i, "order": order, "parse": parse_note,
                          "answers": len(answers), **norm})
 
-    required_passes = 1 if backend == "command_code" else cfg.n
+    required_passes = _required_passes(cfg, backend)
     unanimous, vote = _unanimous(passes, required=required_passes)
     # Track C.3 — self-critique: a third adversarial pass that tries to REFUTE
     # each unanimous 'no'. Any successfully refuted finding is demoted (kept in
@@ -1073,8 +1385,8 @@ def run_model(public_ctx: dict, cfg: Config, backend: str) -> tuple[list[dict], 
             public_ctx, cfg, backend, catalog, questions, unanimous, temperature)
     except Exception as exc:
         critique_meta = {"ran": False, "reason": f"{type(exc).__name__}: {exc}"}
-    model_name = cfg.command_code_model if backend == "command_code" else (cfg.dashscope_model if backend == "dashscope" else cfg.model)
-    vote_semantics = ("single bounded image review (Command Code fallback)" if backend == "command_code"
+    model_name = _backend_model_name(cfg, backend)
+    vote_semantics = ("single bounded image review (Command Code harness)" if backend in SINGLE_PASS_BACKENDS
                       else ("independent two-sample vote" if cfg.independent_vote
                             else "determinism/repro guard (identical greedy decodes at temperature 0)"))
     meta = {"ran": True, "backend": backend, "model": model_name, "group": group,
@@ -1149,9 +1461,12 @@ def _self_critique(public_ctx: dict, cfg: Config, backend: str, catalog: str,
 # --------------------------------------------------------------------------
 # orchestration
 # --------------------------------------------------------------------------
-def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], dict]:
+def run_review(public_ctx: dict, cfg: Config,
+               started: float | None = None) -> tuple[list[dict], list[dict], dict]:
     meta: dict = {"schema": SCHEMA, "generated_by": "tools/vlm_reviewer.py",
                   "config": cfg.describe()}
+    started = time.monotonic() if started is None else started
+    cfg.review_started = started
 
     det_findings, det_note, anchor_unverified, anchor_kind_ran = deterministic_findings(public_ctx, cfg)
     meta["deterministic"] = {"count": len(det_findings), "note": det_note,
@@ -1169,33 +1484,74 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     if cfg.no_model:
         meta["model"] = {"ran": False, "reason": "disabled (--no-model / VLM_NO_MODEL)"}
     else:
-        backend, reason = probe_availability(cfg)
-        if backend is None:
-            meta["model"] = {"ran": False, "reason": reason}
-            if cfg.required:
-                raise RuntimeError(f"required vision model unavailable: {reason}")
-            print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
-                  file=sys.stderr)
-        else:
+        tried: list[dict] = []
+        skipped: list[tuple[str, str]] = []
+        selected = False
+        for backend in _candidate_order(cfg):
+            call_timeout = remaining_call_timeout(cfg, started)
+            if call_timeout < MIN_BACKEND_TIMEOUT_S:
+                tried.append({
+                    "backend": backend,
+                    "probe": "not probed",
+                    "error": f"outer reviewer budget exhausted ({call_timeout}s left)",
+                    "call_timeout_s": call_timeout,
+                })
+                break
+            ok, probe_reason = _probe_backend(cfg, backend, timeout=call_timeout)
+            if not ok:
+                skipped.append((backend, probe_reason))
+                continue
+            call_timeout = remaining_call_timeout(cfg, started)
+            if call_timeout < MIN_BACKEND_TIMEOUT_S:
+                tried.append({
+                    "backend": backend,
+                    "probe": probe_reason,
+                    "error": f"outer reviewer budget exhausted ({call_timeout}s left)",
+                    "call_timeout_s": call_timeout,
+                })
+                break
             try:
                 answers, mmeta = run_model(public_ctx, cfg, backend)
+                _require_complete_model(cfg, answers, mmeta)
                 meta["model"] = mmeta
-                if cfg.required:
-                    required = int(mmeta.get("questions_total", 0))
-                    completed = int(mmeta.get("passes_completed", 0))
-                    answered = len(answers)
-                    expected_passes = 1 if mmeta.get("backend") == "command_code" else cfg.n
-                    if completed != expected_passes or answered != required:
-                        raise RuntimeError(
-                            f"required vision review incomplete: passes {completed}/{expected_passes}, "
-                            f"answers {answered}/{required}")
+                prior = _prior_backend_rows(skipped, tried)
+                if prior:
+                    meta["model"]["prior_backends"] = prior
+                selected = True
+                break
             except Exception as exc:
-                answers = []
-                meta["model"] = {"ran": False,
-                                 "reason": f"model pass error: {type(exc).__name__}: {exc}"}
+                tried.append({
+                    "backend": backend,
+                    "probe": probe_reason,
+                    "error": _model_call_error(cfg, exc),
+                    "call_timeout_s": remaining_call_timeout(cfg, started),
+                })
+                if cfg.runtime != "auto":
+                    break
+        if not selected:
+            answers = []
+            if tried:
+                reason = _model_pass_error_reason(tried)
+                meta["model"] = {
+                    "ran": False,
+                    "reason": reason,
+                    "prior_backends": _prior_backend_rows(skipped, tried),
+                }
                 if cfg.required:
-                    raise RuntimeError(f"required vision model failed: {type(exc).__name__}: {str(exc)[:240]}") from exc
-                print(f"vlm_reviewer: model pass error ({exc}); deterministic pass only",
+                    raise RuntimeError(
+                        f"required vision model failed: {reason}") from None
+                print(f"vlm_reviewer: {reason}; deterministic pass only",
+                      file=sys.stderr)
+            else:
+                reason = _unavailable_reason(cfg, skipped)
+                meta["model"] = {
+                    "ran": False,
+                    "reason": reason,
+                    "prior_backends": _prior_backend_rows(skipped, []),
+                }
+                if cfg.required:
+                    raise RuntimeError(f"required vision model unavailable: {reason}")
+                print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
                       file=sys.stderr)
     if cfg.required and not meta.get("model", {}).get("ran"):
         raise RuntimeError("required vision model did not run")
@@ -1231,8 +1587,8 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--runtime", choices=["command_code", "ollama", "dashscope", "auto"], default=None,
-                        help="model backend (default: env VLM_RUNTIME or auto: Command Code gpt-5.6-luna, then DashScope, then Ollama)")
+    parser.add_argument("--runtime", choices=["command_code", "openai_compatible", "ollama", "dashscope", "auto"], default=None,
+                        help="model backend (default: env VLM_RUNTIME or auto: Command Code gpt-5.6-luna, then OpenAI-compatible Mistral Medium 3.5, then DashScope, then Ollama)")
     parser.add_argument("--model", default=None,
                         help=f"Ollama model tag, pinned explicit (default: env VLM_MODEL or {DEFAULT_MODEL})")
     parser.add_argument("--ollama-host", dest="ollama_host", default=None,
@@ -1241,6 +1597,21 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                         help="DashScope OpenAI-compatible base URL (env DASHSCOPE_BASE_URL)")
     parser.add_argument("--dashscope-model", dest="dashscope_model", default=None,
                         help="DashScope model (env DASHSCOPE_MODEL or qwen3-vl-plus)")
+    parser.add_argument("--fallback-base", dest="fallback_base", default=None,
+                        help=f"OpenAI-compatible fallback base URL (env VLM_FALLBACK_BASE_URL or {DEFAULT_FALLBACK_BASE})")
+    parser.add_argument("--fallback-model", dest="fallback_model", default=None,
+                        help=f"OpenAI-compatible fallback model (env VLM_FALLBACK_MODEL or {FALLBACK_MODEL})")
+    parser.add_argument("--fallback-effort", dest="fallback_effort", default=None,
+                        help="fallback reasoning_effort: none|minimal|low|medium|high|xhigh, "
+                             f"or off to omit (env VLM_FALLBACK_EFFORT; default auto: {FALLBACK_EFFORT} "
+                             "on a mistral.ai hostname, else omitted)")
+    parser.add_argument("--fallback-seed-field", dest="fallback_seed_field", default=None,
+                        help="fallback seed JSON field: seed or random_seed "
+                             f"(env VLM_FALLBACK_SEED_FIELD; default auto: {FALLBACK_SEED_FIELD} on a mistral.ai hostname, else seed)")
+    parser.add_argument("--command-code-model", dest="command_code_model", default=None,
+                        help=f"Command Code model (env COMMAND_CODE_MODEL or {COMMAND_CODE_MODEL})")
+    parser.add_argument("--command-code-effort", dest="command_code_effort", default=None,
+                        help=f"Command Code reasoning effort (env COMMAND_CODE_EFFORT or {COMMAND_CODE_EFFORT})")
     parser.add_argument("--timeout", type=int, default=None,
                         help=f"per-call wall-clock seconds (default: env VLM_TIMEOUT or {DEFAULT_TIMEOUT})")
     parser.add_argument("--base-dir", dest="base_dir", default=None,

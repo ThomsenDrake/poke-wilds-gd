@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import re
 import socket
@@ -1649,10 +1650,204 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         return [f"command code reviewer: cannot load vlm_reviewer.py: {exc}"]
 
     issues: list[str] = []
-    cfg = reviewer.Config(reviewer._parse_args([]))
-    argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    if reviewer.COMMAND_CODE_EFFORT != "low":
+        issues.append(
+            "vlm_reviewer COMMAND_CODE_EFFORT default must stay low "
+            f"(got {reviewer.COMMAND_CODE_EFFORT})"
+        )
+    saved_env = {
+        key: os.environ.pop(key)
+        for key in ("COMMAND_CODE_EFFORT", "COMMAND_CODE_MODEL")
+        if key in os.environ
+    }
+    try:
+        cfg = reviewer.Config(reviewer._parse_args([]))
+        argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    finally:
+        os.environ.update(saved_env)
     if "--auto-accept" in argv:
         issues.append("vlm_reviewer Command Code argv must not use --auto-accept")
+    if reviewer.FALLBACK_MODEL != "mistral-medium-3-5":
+        issues.append(
+            "vlm_reviewer fallback model must stay mistral-medium-3-5 "
+            f"(got {reviewer.FALLBACK_MODEL})"
+        )
+    if reviewer.FALLBACK_EFFORT != "high":
+        issues.append(
+            "vlm_reviewer fallback reasoning effort must stay high "
+            f"(got {reviewer.FALLBACK_EFFORT})"
+        )
+    if reviewer.FALLBACK_SEED_FIELD != "random_seed":
+        issues.append(
+            "vlm_reviewer fallback seed field must stay random_seed "
+            f"(got {reviewer.FALLBACK_SEED_FIELD})"
+        )
+    if reviewer.DEFAULT_OUTER_BUDGET != 300:
+        issues.append(
+            "vlm_reviewer DEFAULT_OUTER_BUDGET must stay 300 "
+            f"(got {reviewer.DEFAULT_OUTER_BUDGET})"
+        )
+    try:
+        vision = _load_tool("vision_review", Path(__file__).resolve().with_name("vision_review.py"))
+    except (OSError, RuntimeError) as exc:
+        issues.append(f"command code reviewer: cannot load vision_review.py: {exc}")
+        vision = None
+    if vision is not None and reviewer.DEFAULT_OUTER_BUDGET != vision.REVIEWER_TIMEOUT:
+        issues.append(
+            "vlm_reviewer DEFAULT_OUTER_BUDGET must equal vision_review.REVIEWER_TIMEOUT "
+            f"({reviewer.DEFAULT_OUTER_BUDGET} != {vision.REVIEWER_TIMEOUT})"
+        )
+    if reviewer.AUTO_BACKEND_ORDER != (
+        "command_code", "openai_compatible", "dashscope", "ollama"
+    ):
+        issues.append(
+            "vlm_reviewer AUTO_BACKEND_ORDER must stay command_code, "
+            f"openai_compatible, dashscope, ollama (got {reviewer.AUTO_BACKEND_ORDER})"
+        )
+    src = tool_path.read_text(encoding="utf-8")
+    if "candidates, skipped = probe_backends(cfg)" in src:
+        issues.append("run_review must not eagerly probe every backend before the first call")
+    if "remaining_call_timeout(cfg, started)" not in src:
+        issues.append("run_review must cap each backend call by remaining_call_timeout")
+    if "cfg.timeout = call_timeout" in src:
+        issues.append(
+            "run_review must not freeze remaining timeout onto cfg.timeout for the whole backend"
+        )
+    if "timeout=live_call_timeout(cfg)" not in src:
+        issues.append(
+            "Command Code subprocess must recompute live_call_timeout before each invocation"
+        )
+    if src.count("live_call_timeout(cfg)") < 3:
+        issues.append(
+            "HTTP and cmd model calls must recompute live_call_timeout before each invocation"
+        )
+    if "_probe_backend(cfg, backend, timeout=" not in src:
+        issues.append(
+            "run_review must cap readiness probes by remaining budget before probing"
+        )
+    if "ok, probe_reason = _probe_backend(cfg, backend)\n" in src:
+        issues.append("run_review must not probe a backend before checking remaining budget")
+    if reviewer.PARENT_VISIBLE_REASON_BUDGET > 320:
+        issues.append(
+            "PARENT_VISIBLE_REASON_BUDGET must stay <= 320 so four backend "
+            "failures survive reviewer_cmd_error_detail"
+        )
+    four_backend_reason = reviewer._model_pass_error_reason([
+        {"backend": name, "error": "RuntimeError: " + ("x" * 240)}
+        for name in ("command_code", "openai_compatible", "dashscope", "ollama")
+    ])
+    wrapped = (
+        "vlm_reviewer: internal error: RuntimeError: required vision model "
+        f"failed: {four_backend_reason}"
+    )
+    if vision is not None:
+        detail = vision.reviewer_cmd_error_detail(wrapped)
+        for name in ("command_code", "openai_compatible", "dashscope", "ollama"):
+            if name not in detail:
+                issues.append(
+                    "required-failure parent detail must still name "
+                    f"{name} after reviewer_cmd_error_detail truncate"
+                )
+    vision_src = Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8")
+    if 'env["VLM_OUTER_BUDGET"] = str(child_outer_budget(env))' not in vision_src:
+        issues.append("vision_review must clamp VLM_OUTER_BUDGET to REVIEWER_TIMEOUT for the child")
+    if 'setdefault("VLM_OUTER_BUDGET"' in vision_src:
+        issues.append("vision_review must not preserve a VLM_OUTER_BUDGET larger than REVIEWER_TIMEOUT")
+    if vision is not None:
+        if vision.child_outer_budget({"VLM_OUTER_BUDGET": "600"}) != vision.REVIEWER_TIMEOUT:
+            issues.append("child_outer_budget must clamp 600s to REVIEWER_TIMEOUT")
+        if vision.child_outer_budget({"VLM_OUTER_BUDGET": "120"}) != 120:
+            issues.append("child_outer_budget must keep a shorter inherited budget")
+        if vision.child_outer_budget({}) != vision.REVIEWER_TIMEOUT:
+            issues.append("child_outer_budget must default to REVIEWER_TIMEOUT")
+    if "for backend in _candidate_order(cfg):" not in src:
+        issues.append("run_review must walk _candidate_order and probe the next backend only as needed")
+    if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:
+        issues.append(
+            "auto runtime must record prior_backends and walk after a live call failure"
+        )
+    if "_prior_backend_rows(skipped, tried)" not in src:
+        issues.append(
+            "prior_backends must merge probe-skipped rows with live-call failures"
+        )
+    if "_fallback_reasoning_effort(cfg)" not in src:
+        issues.append(
+            "openai-compatible fallback must choose reasoning_effort from the fallback host"
+        )
+    mistral_effort_cfg = reviewer.Config(reviewer._parse_args([]))
+    mistral_effort_cfg.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    mistral_effort_cfg.fallback_effort = ""
+    if reviewer._fallback_reasoning_effort(mistral_effort_cfg) != "high":
+        issues.append(
+            "default Mistral fallback must send reasoning_effort high "
+            f"(got {reviewer._fallback_reasoning_effort(mistral_effort_cfg)})"
+        )
+    custom_effort = reviewer.Config(reviewer._parse_args([]))
+    custom_effort.fallback_base = "https://example.test/v1"
+    custom_effort.fallback_effort = ""
+    if reviewer._fallback_reasoning_effort(custom_effort) is not None:
+        issues.append(
+            "non-Mistral fallback URL must omit reasoning_effort unless explicitly set "
+            f"(got {reviewer._fallback_reasoning_effort(custom_effort)})"
+        )
+    if '"mistral.ai" in ' in src:
+        issues.append(
+            "fallback host detection must parse the URL hostname, not substring-match mistral.ai"
+        )
+    if not reviewer._fallback_host_is_mistral(reviewer.DEFAULT_FALLBACK_BASE):
+        issues.append("DEFAULT_FALLBACK_BASE must classify as a Mistral hostname")
+    if reviewer._fallback_host_is_mistral("https://mistral.ai.proxy.example/v1"):
+        issues.append("a mistral.ai substring in a proxy hostname must not count as Mistral")
+    proxy_effort = reviewer.Config(reviewer._parse_args([]))
+    proxy_effort.fallback_base = "https://mistral.ai.proxy.example/v1"
+    proxy_effort.fallback_effort = ""
+    proxy_effort.fallback_seed_field = ""
+    if reviewer._fallback_reasoning_effort(proxy_effort) is not None:
+        issues.append("proxy hostname containing mistral.ai must omit reasoning_effort")
+    if reviewer._fallback_seed_key(proxy_effort) != "seed":
+        issues.append("proxy hostname containing mistral.ai must use OpenAI seed")
+    if 'return None, f"{list_key} not a list"' in src:
+        issues.append(
+            "_parse_with_repair must repair invalid JSON shapes, not return immediately"
+        )
+    omit_effort = reviewer.Config(reviewer._parse_args([]))
+    omit_effort.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    omit_effort.fallback_effort = "off"
+    if reviewer._fallback_reasoning_effort(omit_effort) is not None:
+        issues.append("VLM_FALLBACK_EFFORT=off must omit reasoning_effort")
+    if "seed_key=_fallback_seed_key(cfg)" not in src:
+        issues.append(
+            "openai-compatible fallback must choose seed vs random_seed from the fallback host"
+        )
+    default_seed_cfg = reviewer.Config(reviewer._parse_args([]))
+    default_seed_cfg.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    default_seed_cfg.fallback_seed_field = ""
+    if reviewer._fallback_seed_key(default_seed_cfg) != "random_seed":
+        issues.append(
+            "default Mistral fallback base must resolve seed field to random_seed "
+            f"(got {reviewer._fallback_seed_key(default_seed_cfg)})"
+        )
+    custom = reviewer.Config(reviewer._parse_args([]))
+    custom.fallback_base = "https://example.test/v1"
+    custom.fallback_seed_field = ""
+    if reviewer._fallback_seed_key(custom) != "seed":
+        issues.append(
+            "non-Mistral fallback URL must resolve seed field to seed "
+            f"(got {reviewer._fallback_seed_key(custom)})"
+        )
+    if 'required vision model failed: {reason}' not in src:
+        issues.append(
+            "required auto exhaustion must raise the aggregate secret-free reason"
+        )
+    if "required vision model failed: {last_error}" in src:
+        issues.append("required-mode failure must not drop earlier backend errors")
+    try:
+        effort_at = argv.index("--effort")
+    except ValueError:
+        issues.append("vlm_reviewer Command Code argv must set --effort")
+        effort_at = -1
+    if effort_at >= 0 and (effort_at + 1 >= len(argv) or argv[effort_at + 1] != "low"):
+        issues.append("vlm_reviewer default Command Code argv must set --effort low")
     try:
         mode_at = argv.index("--permission-mode")
     except ValueError:
