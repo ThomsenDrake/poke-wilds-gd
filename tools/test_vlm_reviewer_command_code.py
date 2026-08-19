@@ -600,6 +600,19 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertIn("outer reviewer budget exhausted", str(raised.exception))
         self.assertIn("openai_compatible", str(raised.exception))
 
+    def test_vision_review_clamps_child_outer_budget_to_reviewer_timeout(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "vision_review_under_test",
+            ROOT / "tools/vision_review.py",
+        )
+        assert spec is not None and spec.loader is not None
+        vision = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(vision)
+        self.assertEqual(vision.child_outer_budget({"VLM_OUTER_BUDGET": "600"}), 300)
+        self.assertEqual(vision.child_outer_budget({"VLM_OUTER_BUDGET": "120"}), 120)
+        self.assertEqual(vision.child_outer_budget({}), 300)
+        self.assertEqual(vision.child_outer_budget({"VLM_OUTER_BUDGET": "nope"}), 300)
+
 
 if __name__ == "__main__":
     unittest.main()

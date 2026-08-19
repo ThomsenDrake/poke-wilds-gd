@@ -1709,8 +1709,18 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append("run_review must not eagerly probe every backend before the first call")
     if "remaining_call_timeout(cfg, started)" not in src:
         issues.append("run_review must cap each backend call by remaining_call_timeout")
-    if "VLM_OUTER_BUDGET" not in Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8"):
-        issues.append("vision_review must export VLM_OUTER_BUDGET to the reviewer-cmd child")
+    vision_src = Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8")
+    if 'env["VLM_OUTER_BUDGET"] = str(child_outer_budget(env))' not in vision_src:
+        issues.append("vision_review must clamp VLM_OUTER_BUDGET to REVIEWER_TIMEOUT for the child")
+    if 'setdefault("VLM_OUTER_BUDGET"' in vision_src:
+        issues.append("vision_review must not preserve a VLM_OUTER_BUDGET larger than REVIEWER_TIMEOUT")
+    if vision is not None:
+        if vision.child_outer_budget({"VLM_OUTER_BUDGET": "600"}) != vision.REVIEWER_TIMEOUT:
+            issues.append("child_outer_budget must clamp 600s to REVIEWER_TIMEOUT")
+        if vision.child_outer_budget({"VLM_OUTER_BUDGET": "120"}) != 120:
+            issues.append("child_outer_budget must keep a shorter inherited budget")
+        if vision.child_outer_budget({}) != vision.REVIEWER_TIMEOUT:
+            issues.append("child_outer_budget must default to REVIEWER_TIMEOUT")
     if "for backend in _candidate_order(cfg):" not in src:
         issues.append("run_review must walk _candidate_order and probe the next backend only as needed")
     if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:

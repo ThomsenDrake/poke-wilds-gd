@@ -1342,6 +1342,22 @@ def reviewer_cmd_error_detail(stderr: str, limit: int = 400) -> str:
     return chosen[:limit]
 
 
+def child_outer_budget(environ: dict[str, str] | None = None) -> int:
+    """Wall budget exported to reviewer-cmd. Never exceeds REVIEWER_TIMEOUT.
+
+    A larger inherited VLM_OUTER_BUDGET would let the child schedule Luna and a
+    fallback as if it had more time than this subprocess actually gets.
+    A smaller inherited value is kept so local tests can tighten the walk.
+    """
+    env = os.environ if environ is None else environ
+    raw = str(env.get("VLM_OUTER_BUDGET", "")).strip()
+    try:
+        inherited = int(raw) if raw else REVIEWER_TIMEOUT
+    except ValueError:
+        inherited = REVIEWER_TIMEOUT
+    return max(1, min(inherited, REVIEWER_TIMEOUT))
+
+
 def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str], dict]:
     """Run the configured plugin reviewer. FAIL-CLOSED per the grounding
     contract: non-zero exit, timeout, invalid JSON, or findings-not-a-list is
@@ -1363,7 +1379,7 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str],
     try:
         argv = shlex.split(cmd)
         env = os.environ.copy()
-        env.setdefault("VLM_OUTER_BUDGET", str(REVIEWER_TIMEOUT))
+        env["VLM_OUTER_BUDGET"] = str(child_outer_budget(env))
         proc = subprocess.run(argv, input=json.dumps(public_ctx), capture_output=True,
                               text=True, timeout=REVIEWER_TIMEOUT, shell=False,
                               env=env)
