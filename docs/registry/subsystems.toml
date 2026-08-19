@@ -2089,7 +2089,7 @@ quality_bucket = "update"
 # Shared (not friend-specific) desktop updater: player-boot title UPDATE row,
 # public GET /v1/updates/latest?channel=playtest (never the persisted friend
 # feedback channel), admin checksum-gated publish, OS apply
-# (Windows rename, Linux unlink, macOS app swap), and sticky user:// identity
+# (Windows rename, Linux stage-then-promote, macOS app swap), and sticky user:// identity
 # so a generic replace does not strip F-to-report. is_newer refuses an unstamped
 # current build (no downgrade); apply globalizes user:// before copy/unzip.
 # The download toast holds (duration 0) until apply finishes so title lock and
@@ -2100,6 +2100,7 @@ quality_bucket = "update"
 # a failed promote restores .old and deferred apply skips applied.json.
 # Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
 # Update checks use the embedded endpoint, not persisted friend identity.
+# Linux copies and chmods *.new before the short promote/rollback.
 # Successful apply clears user://updates/ except applied.json.
 # Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live

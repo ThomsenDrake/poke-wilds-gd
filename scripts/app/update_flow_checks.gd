@@ -38,7 +38,7 @@ static func shared_latest() -> Dictionary:
 
 static func reset_user_state() -> void:
 	for path in [IDENTITY_PATH, ARTIFACT_PATH, INSTALL_PATH, INSTALL_PATH + ".new",
-			"user://PokeWilds-update.cmd", "user://updates/applied.json",
+			INSTALL_PATH + ".old", "user://PokeWilds-update.cmd", "user://updates/applied.json",
 			"user://updates/pending.json"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
@@ -131,6 +131,10 @@ static func apply_linux_fixture(failures: Array) -> void:
 	_check(failures, bool(result.get("ok", false)), "linux apply refused a user:// artifact path")
 	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH) == PackedByteArray([1, 2, 3, 4]),
 		"linux apply did not replace the install bytes")
+	_check(failures, not FileAccess.file_exists(INSTALL_PATH + ".new"),
+		"linux apply left a sibling staging file")
+	_check(failures, not FileAccess.file_exists(INSTALL_PATH + ".old"),
+		"linux apply left the previous binary at .old")
 
 
 static func apply_windows_fixture(failures: Array) -> void:

@@ -34,7 +34,7 @@ static func apply(os_name: String, artifact: String, target: String) -> Dictiona
 		"Windows":
 			return _apply_windows(target, artifact)
 		"Linux":
-			return _apply_file(target, artifact, false, true)
+			return _apply_linux(target, artifact)
 		"macOS":
 			return _apply_macos(target, artifact)
 		_:
@@ -86,23 +86,26 @@ static func _windows_helper_body(target: String, staged: String, pid: int) -> St
 	return "\r\n".join(lines) + "\r\n"
 
 
-static func _apply_file(target: String, artifact: String, keep_old: bool, chmod_exec: bool) -> Dictionary:
+static func _apply_linux(target: String, artifact: String) -> Dictionary:
+	var staged := target + ".new"
 	var old_path := target + ".old"
+	_remove_path(staged)
+	if DirAccess.copy_absolute(artifact, staged) != OK:
+		_remove_path(staged)
+		return {"ok": false, "error": "write_failed"}
+	_chmod_executable(staged)
 	_remove_path(old_path)
 	if FileAccess.file_exists(target) or DirAccess.dir_exists_absolute(target):
-		var renamed := DirAccess.rename_absolute(target, old_path)
-		if renamed != OK:
+		if DirAccess.rename_absolute(target, old_path) != OK:
+			_remove_path(staged)
 			return {"ok": false, "error": "rename_failed"}
-	var copied := DirAccess.copy_absolute(artifact, target)
-	if copied != OK:
-		if FileAccess.file_exists(old_path):
+	if DirAccess.rename_absolute(staged, target) != OK:
+		if FileAccess.file_exists(old_path) or DirAccess.dir_exists_absolute(old_path):
 			DirAccess.rename_absolute(old_path, target)
+		_remove_path(staged)
 		return {"ok": false, "error": "write_failed"}
-	if chmod_exec:
-		_chmod_executable(target)
-	if not keep_old:
-		_remove_path(old_path)
-	return {"ok": true, "old_path": old_path if keep_old else ""}
+	_remove_path(old_path)
+	return {"ok": true, "old_path": ""}
 
 
 static func _apply_macos(target: String, artifact: String) -> Dictionary:

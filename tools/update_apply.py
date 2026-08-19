@@ -22,7 +22,7 @@ def apply(os_name: str, artifact: Path, target: Path) -> dict:
     if os_name == "Windows":
         return _apply_windows(target, artifact)
     if os_name == "Linux":
-        return _apply_file(target, artifact, keep_old=False)
+        return _apply_linux(target, artifact)
     if os_name == "macOS":
         return _apply_macos(target, artifact)
     return {"ok": False, "error": "unknown_os"}
@@ -84,17 +84,32 @@ def _windows_helper_body(target: Path, staged: Path, pid: int) -> str:
     ])
 
 
-def _apply_file(target: Path, artifact: Path, *, keep_old: bool) -> dict:
+def _apply_linux(target: Path, artifact: Path) -> dict:
+    staged = Path(str(target) + ".new")
     old = Path(str(target) + ".old")
+    if staged.exists():
+        staged.unlink()
+    try:
+        shutil.copy2(artifact, staged)
+        staged.chmod(0o755)
+    except OSError:
+        if staged.exists():
+            staged.unlink()
+        return {"ok": False, "error": "write_failed"}
     cleanup_old(target)
-    if target.exists():
-        target.replace(old)
-    shutil.copy2(artifact, target)
-    if target.name.endswith(".x86_64") or not keep_old:
-        target.chmod(0o755)
-    if not keep_old and old.exists():
+    try:
+        if target.exists():
+            target.replace(old)
+        staged.replace(target)
+    except OSError:
+        if old.exists() and not target.exists():
+            old.replace(target)
+        if staged.exists():
+            staged.unlink()
+        return {"ok": False, "error": "write_failed"}
+    if old.exists():
         old.unlink()
-    return {"ok": True, "old_path": str(old) if keep_old else ""}
+    return {"ok": True, "old_path": ""}
 
 
 def _apply_macos(target: Path, artifact: Path) -> dict:

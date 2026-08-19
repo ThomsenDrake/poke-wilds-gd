@@ -76,7 +76,7 @@ class UpdateManifestTests(unittest.TestCase):
 
 
 class UpdateApplyTests(unittest.TestCase):
-    def test_linux_unlinks_and_replaces(self) -> None:
+    def test_linux_stages_then_promotes(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             current = root / "PokeWilds.x86_64"
@@ -87,6 +87,28 @@ class UpdateApplyTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertEqual(current.read_bytes(), b"new")
             self.assertFalse(Path(str(current) + ".old").exists())
+            self.assertFalse(Path(str(current) + ".new").exists())
+            self.assertEqual(current.stat().st_mode & 0o111, 0o111)
+
+    def test_linux_restores_old_when_promote_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            current = root / "PokeWilds.x86_64"
+            artifact = root / "new.bin"
+            current.write_bytes(b"old")
+            artifact.write_bytes(b"new")
+            real_replace = Path.replace
+
+            def flaky(self: Path, target: Path) -> Path:
+                if self.name.endswith(".new"):
+                    raise OSError("promote failed")
+                return real_replace(self, target)
+
+            with mock.patch.object(Path, "replace", flaky):
+                result = update_apply.apply("Linux", artifact, current)
+            self.assertFalse(result["ok"])
+            self.assertEqual(current.read_bytes(), b"old")
+            self.assertFalse(Path(str(current) + ".new").exists())
 
     def test_windows_stages_helper_and_swaps_after_exit(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

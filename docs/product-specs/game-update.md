@@ -102,7 +102,10 @@ pointer only after all three object checksums exist.
   `.old` before launch. `applied.json` is not written for a deferred Windows
   apply, so a rolled-back install can still be offered UPDATE. Next boot
   deletes `.old`. The running image is never renamed in-process.
-- Linux: unlink the running binary, write the new file, `chmod 0755`, relaunch.
+- Linux: copy and `chmod 0755` the verified artifact to a sibling `*.new`,
+  then promote it over the live path. If promotion fails, the previous
+  binary is restored from `.old`. The live path is not removed until the
+  staged file is ready.
 - macOS: unzip the new `.app` to a sibling `*.new`, swap with the live bundle,
   relaunch. Unsigned Gatekeeper "Open" stays a documented one-time step;
   codesign/notarization stay 0.
