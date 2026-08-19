@@ -12,7 +12,9 @@ first only when a newer shared latest exists; editor/scenario boots skip the
 network check so default title fixtures stay `CONTINUE` / `NEW GAME`. A
 hash/apply refuse emits `update_apply_refused` (`*_failed` stays the
 scenario-gate marker). Latest checks always query shared `playtest`, never
-the persisted friend feedback channel.
+the persisted friend feedback channel. `is_newer` refuses when the running
+build has no resolvable `published_at`, and apply globalizes `user://` paths
+before copy/unzip.
 `feedback_reporting` scores stay unchanged: `load_build_info()` now prefers a
 persisted `user://playtest_identity.json` route after a generic replace.
 

@@ -55,6 +55,12 @@ class UpdateManifestTests(unittest.TestCase):
         self.assertFalse(update_manifest.is_newer(latest, older, newer))
         same_time = {"build_id": "aaa-older", "published_at": latest["published_at"]}
         self.assertTrue(update_manifest.is_newer(latest, same_time))
+        unstamped = {"build_id": "friends-old"}
+        self.assertFalse(update_manifest.is_newer(latest, unstamped))
+        stamped_friend = {"build_id": "friends-1-aaaaaaaaaa-20260801T000000Z"}
+        newer_friend = {"build_id": "friends-1-aaaaaaaaaa-20260820T000000Z"}
+        self.assertTrue(update_manifest.is_newer(latest, stamped_friend))
+        self.assertFalse(update_manifest.is_newer(latest, newer_friend))
 
 
 class UpdateApplyTests(unittest.TestCase):

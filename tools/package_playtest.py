@@ -172,12 +172,14 @@ def build_package(args: argparse.Namespace, admin_token: str) -> tuple[Path, str
             register_invite(endpoint, admin_token, invite)
             commit = run("git", "rev-parse", "HEAD")
             version = run("git", "describe", "--tags", "--always")
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            timestamp = published_at.replace(":", "").replace("-", "")
             build_id = f"{args.channel}-{commit[:10]}-{timestamp}"
             BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
             BUILD_INFO.write_text(json.dumps({
                 "schema_version": 1, "version": version, "commit_sha": commit,
                 "build_id": build_id, "channel": args.channel, "endpoint": endpoint,
+                "published_at": published_at,
                 "tester_id": invite["tester_id"], "invite_token": invite["token"],
             }, indent=2) + "\n", encoding="utf-8")
             output_dir = ROOT / "dist" / "playtest" / invite["tester_id"]

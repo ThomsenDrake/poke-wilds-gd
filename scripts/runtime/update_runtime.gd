@@ -56,6 +56,10 @@ func update_channel() -> String:
 	return UpdateManifest.DEFAULT_CHANNEL
 
 
+func is_newer_build(latest: Dictionary, current: Dictionary, applied: Dictionary = {}) -> bool:
+	return UpdateManifest.is_newer(latest, current, applied)
+
+
 func start_check() -> void:
 	if not should_check() or _busy:
 		return
@@ -91,8 +95,8 @@ func apply_available() -> Dictionary:
 		return downloaded
 	_trace("update_verified", {"sha256": str(build.get("sha256", "")), "bytes": int(build.get("bytes", 0))})
 	_trace("update_apply_started", {"os": key, "build_id": str(_latest.get("build_id", ""))})
-	var target := UpdateApplier.install_path()
-	var applied := _invoke_apply(os_name, str(downloaded.get("path", "")), target)
+	var artifact := ProjectSettings.globalize_path(str(downloaded.get("path", "")))
+	var applied := _invoke_apply(os_name, artifact, UpdateApplier.install_path())
 	if not bool(applied.get("ok", false)):
 		_busy = false
 		_trace("update_apply_refused", {"reason": str(applied.get("error", "apply_failed"))})

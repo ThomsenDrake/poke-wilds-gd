@@ -59,14 +59,19 @@ def is_newer(latest: dict, current: dict, applied: dict | None = None) -> bool:
         return False
     if latest_id == str(current.get("build_id", "")) or latest_id == str(applied.get("build_id", "")):
         return False
-    latest_ts = str(latest.get("published_at", ""))
+    latest_ts = stamp_of(latest)
     if not latest_ts:
         return False
-    if not _is_newer_stamp(latest_ts, latest_id, str(applied.get("published_at", "")),
-                           str(applied.get("build_id", ""))):
+    if not _is_newer_stamp(latest_ts, latest_id, stamp_of(applied), str(applied.get("build_id", ""))):
         return False
-    return _is_newer_stamp(latest_ts, latest_id, str(current.get("published_at", "")),
-                           str(current.get("build_id", "")))
+    return _is_newer_stamp(latest_ts, latest_id, stamp_of(current), str(current.get("build_id", "")))
+
+
+def stamp_of(value: dict) -> str:
+    published = str(value.get("published_at", ""))
+    if PUBLISHED_RE.fullmatch(published):
+        return published
+    return _stamp_from_build_id(str(value.get("build_id", "")))
 
 
 def artifact_key(channel: str, build_id: str, os_name: str) -> str:
@@ -92,9 +97,18 @@ def _parse_build(value: object) -> dict:
     return {"url": url, "sha256": digest, "bytes": size, "filename": filename}
 
 
+def _stamp_from_build_id(build_id: str) -> str:
+    tail = build_id.rsplit("-", 1)[-1]
+    if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", tail):
+        return ""
+    return f"{tail[0:4]}-{tail[4:6]}-{tail[6:8]}T{tail[9:11]}:{tail[11:13]}:{tail[13:15]}Z"
+
+
 def _is_newer_stamp(latest_ts: str, latest_id: str, baseline_ts: str, baseline_id: str) -> bool:
     if not baseline_ts and not baseline_id:
         return True
+    if not baseline_ts or not latest_ts:
+        return False
     if latest_ts != baseline_ts:
-        return (not baseline_ts) or latest_ts > baseline_ts
+        return latest_ts > baseline_ts
     return latest_id > baseline_id

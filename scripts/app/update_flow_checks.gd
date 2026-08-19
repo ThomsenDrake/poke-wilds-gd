@@ -88,11 +88,20 @@ static func write_install_fixture() -> void:
 	file.close()
 
 
+static func expect_no_downgrade(failures: Array, updater: Node) -> void:
+	var latest := shared_latest()
+	_check(failures, updater != null and not updater.is_newer_build(latest, {"build_id": "friends-old"}),
+		"unstamped friend build was treated as older than the shared latest")
+	_check(failures, updater.is_newer_build(latest, {"build_id": "friends-1-aaaaaaaaaa-20260801T000000Z"}),
+		"stamped older friend build_id did not count as older")
+	_check(failures, not updater.is_newer_build(latest, {"build_id": "friends-1-aaaaaaaaaa-20260820T000000Z"}),
+		"stamped newer friend build_id was offered as a downgrade")
+
+
 static func apply_linux_fixture(failures: Array) -> void:
 	write_install_fixture()
-	var result := UpdateApplier.apply("Linux", ProjectSettings.globalize_path(ARTIFACT_PATH),
-		ProjectSettings.globalize_path(INSTALL_PATH))
-	_check(failures, bool(result.get("ok", false)), "linux apply refused a valid artifact")
+	var result := UpdateApplier.apply("Linux", ARTIFACT_PATH, INSTALL_PATH)
+	_check(failures, bool(result.get("ok", false)), "linux apply refused a user:// artifact path")
 	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH) == PackedByteArray([1, 2, 3, 4]),
 		"linux apply did not replace the install bytes")
 

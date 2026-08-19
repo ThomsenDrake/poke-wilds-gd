@@ -24,6 +24,8 @@ static func cleanup_old(target: String) -> void:
 
 
 static func apply(os_name: String, artifact: String, target: String) -> Dictionary:
+	artifact = _absolute(artifact)
+	target = _absolute(target)
 	if artifact.is_empty() or target.is_empty() or not FileAccess.file_exists(artifact):
 		return {"ok": false, "error": "pending_missing"}
 	if target.begins_with(SAVE_PREFIX) or target.contains("godot_port_save.json"):
@@ -83,6 +85,12 @@ static func _apply_macos(target: String, artifact: String) -> Dictionary:
 	_remove_path(staged)
 	_remove_path(old_path)
 	return {"ok": true, "old_path": ""}
+
+
+static func _absolute(path: String) -> String:
+	if path.begins_with("user://") or path.begins_with("res://"):
+		return ProjectSettings.globalize_path(path)
+	return path
 
 
 static func _chmod_executable(target: String) -> void:

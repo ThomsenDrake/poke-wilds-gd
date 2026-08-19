@@ -26,7 +26,10 @@ the executable does not touch that path. The application name and macOS
 `application/bundle_identifier="com.drakethomsen.pokewildsgodot"` stay pinned;
 changing either forks `user://` and looks like a lost save. Schema migration
 stays on the existing load path. The updater never downgrades: comparison is
-monotonic `published_at` then `build_id`.
+monotonic `published_at` then `build_id`. A running build with a `build_id` but
+no resolvable timestamp (embedded `published_at` or a compact UTC tail on the
+`build_id`) is not treated as older. Friend packages embed `published_at` so
+they can still move forward to a newer shared latest.
 
 First install stays one file per OS (Linux `.x86_64`, Windows `.exe`, macOS
 `.zip` → `.app`; PCK remains embedded). v1 is a full artifact replace.

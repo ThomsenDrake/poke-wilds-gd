@@ -64,14 +64,19 @@ static func is_newer(latest: Dictionary, current: Dictionary, applied: Dictionar
 		return false
 	if latest_id == str(applied.get("build_id", "")):
 		return false
-	var latest_ts := str(latest.get("published_at", ""))
+	var latest_ts := stamp_of(latest)
 	if latest_ts.is_empty():
 		return false
-	if not _is_newer_stamp(latest_ts, latest_id, str(applied.get("published_at", "")),
-			str(applied.get("build_id", ""))):
+	if not _is_newer_stamp(latest_ts, latest_id, stamp_of(applied), str(applied.get("build_id", ""))):
 		return false
-	return _is_newer_stamp(latest_ts, latest_id, str(current.get("published_at", "")),
-		str(current.get("build_id", "")))
+	return _is_newer_stamp(latest_ts, latest_id, stamp_of(current), str(current.get("build_id", "")))
+
+
+static func stamp_of(value: Dictionary) -> String:
+	var published := str(value.get("published_at", ""))
+	if _matches(PUBLISHED_RE, published):
+		return published
+	return _stamp_from_build_id(str(value.get("build_id", "")))
 
 
 static func _parse_build(value) -> Dictionary:
@@ -90,12 +95,25 @@ static func _parse_build(value) -> Dictionary:
 	return {"url": url, "sha256": digest, "bytes": bytes, "filename": filename}
 
 
+static func _stamp_from_build_id(build_id: String) -> String:
+	var parts := build_id.split("-")
+	if parts.is_empty():
+		return ""
+	var tail := parts[parts.size() - 1]
+	if not _matches("^[0-9]{8}T[0-9]{6}Z$", tail):
+		return ""
+	return "%s-%s-%sT%s:%s:%sZ" % [tail.substr(0, 4), tail.substr(4, 2), tail.substr(6, 2),
+		tail.substr(9, 2), tail.substr(11, 2), tail.substr(13, 2)]
+
+
 static func _is_newer_stamp(latest_ts: String, latest_id: String, baseline_ts: String,
 		baseline_id: String) -> bool:
 	if baseline_ts.is_empty() and baseline_id.is_empty():
 		return true
+	if baseline_ts.is_empty() or latest_ts.is_empty():
+		return false
 	if latest_ts != baseline_ts:
-		return baseline_ts.is_empty() or latest_ts > baseline_ts
+		return latest_ts > baseline_ts
 	return latest_id > baseline_id
 
 

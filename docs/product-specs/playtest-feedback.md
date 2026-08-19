@@ -80,7 +80,8 @@ route is neither an artifact nor upload metadata and never enters the ZIP, trace
 
 `tools/package_playtest.py` creates one package per friend and platform. The
 friend never types a code: the export embeds a public-safe tester handle and a
-revocable opaque invite token in generated, ignored build metadata.
+revocable opaque invite token in generated, ignored build metadata, plus
+`published_at` so a later shared update can compare monotonically.
 A later shared update ([game-update.md](game-update.md)) does not re-embed that
 token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
 `channel` into `user://playtest_identity.json`, and `load_build_info()` prefers

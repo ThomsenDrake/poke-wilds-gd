@@ -2084,6 +2084,8 @@ quality_bucket = "update"
 # public GET /v1/updates/latest?channel=playtest (never the persisted friend
 # feedback channel), admin checksum-gated publish, OS apply
 # (Windows rename, Linux unlink, macOS app swap), and sticky user:// identity
-# so a generic replace does not strip F-to-report. Editor/scenario boots skip
+# so a generic replace does not strip F-to-report. is_newer refuses an unstamped
+# current build (no downgrade); apply globalizes user:// before copy/unzip.
+# Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
 # Godot binary. Saves stay in user://godot_port_save.json.
