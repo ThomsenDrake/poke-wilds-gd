@@ -88,7 +88,7 @@ class UpdateApplyTests(unittest.TestCase):
             self.assertEqual(current.read_bytes(), b"new")
             self.assertFalse(Path(str(current) + ".old").exists())
 
-    def test_windows_keeps_old_until_cleanup(self) -> None:
+    def test_windows_stages_helper_and_swaps_after_exit(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             current = root / "PokeWilds.exe"
@@ -97,10 +97,16 @@ class UpdateApplyTests(unittest.TestCase):
             artifact.write_bytes(b"new")
             result = update_apply.apply("Windows", artifact, current)
             self.assertTrue(result["ok"])
+            self.assertTrue(result["deferred"])
+            self.assertEqual(current.read_bytes(), b"old")
+            self.assertEqual(Path(str(current) + ".new").read_bytes(), b"new")
+            self.assertTrue(Path(result["helper"]).is_file())
+            self.assertIn("PokeWilds-update.cmd", result["helper"])
+            finished = update_apply.complete_windows_swap(current)
             self.assertEqual(current.read_bytes(), b"new")
-            self.assertEqual(Path(result["old_path"]).read_bytes(), b"old")
+            self.assertEqual(Path(finished["old_path"]).read_bytes(), b"old")
             update_apply.cleanup_old(current)
-            self.assertFalse(Path(result["old_path"]).exists())
+            self.assertFalse(Path(finished["old_path"]).exists())
 
     def test_macos_swaps_app_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

@@ -32,13 +32,52 @@ static func apply(os_name: String, artifact: String, target: String) -> Dictiona
 		return {"ok": false, "error": "save_path_refused"}
 	match os_name:
 		"Windows":
-			return _apply_file(target, artifact, true, false)
+			return _apply_windows(target, artifact)
 		"Linux":
 			return _apply_file(target, artifact, false, true)
 		"macOS":
 			return _apply_macos(target, artifact)
 		_:
 			return {"ok": false, "error": "unknown_os"}
+
+
+static func launch_deferred(applied: Dictionary) -> bool:
+	var helper := str(applied.get("helper", ""))
+	if helper.is_empty():
+		return false
+	OS.create_process("cmd.exe", PackedStringArray(["/c", "start", "", helper]))
+	return true
+
+
+static func _apply_windows(target: String, artifact: String) -> Dictionary:
+	var staged := target + ".new"
+	_remove_path(staged)
+	if DirAccess.copy_absolute(artifact, staged) != OK:
+		return {"ok": false, "error": "write_failed"}
+	var helper := target.get_base_dir().path_join("PokeWilds-update.cmd")
+	var file := FileAccess.open(helper, FileAccess.WRITE)
+	if file == null:
+		_remove_path(staged)
+		return {"ok": false, "error": "helper_failed"}
+	file.store_string(_windows_helper_body(target, staged, OS.get_process_id()))
+	file.close()
+	return {"ok": true, "deferred": true, "helper": helper, "old_path": target + ".old"}
+
+
+static func _windows_helper_body(target: String, staged: String, pid: int) -> String:
+	var old_path := target + ".old"
+	var lines := PackedStringArray([
+		"@echo off",
+		":wait",
+		"timeout /t 1 /nobreak >nul",
+		"tasklist /FI \"PID eq %s\" | find \"%s\" >nul" % [str(pid), str(pid)],
+		"if not errorlevel 1 goto wait",
+		"if exist \"%s\" del /f /q \"%s\"" % [old_path, old_path],
+		"if exist \"%s\" move /y \"%s\" \"%s\"" % [target, target, old_path],
+		"move /y \"%s\" \"%s\"" % [staged, target],
+		"start \"\" \"%s\"" % target,
+	])
+	return "\r\n".join(lines) + "\r\n"
 
 
 static func _apply_file(target: String, artifact: String, keep_old: bool, chmod_exec: bool) -> Dictionary:

@@ -109,8 +109,9 @@ func apply_available() -> Dictionary:
 		return applied
 	_write_json(APPLIED_PATH, {"build_id": _latest.get("build_id", ""),
 		"published_at": _latest.get("published_at", "")})
+	_clear_staging()
 	_trace("update_relaunching", {"build_id": str(_latest.get("build_id", ""))})
-	_relaunch()
+	_relaunch(applied)
 	_busy = false
 	return {"ok": true}
 
@@ -172,12 +173,28 @@ func _invoke_apply(os_name: String, artifact: String, target: String) -> Diction
 	return UpdateApplier.apply(os_name, artifact, target)
 
 
-func _relaunch() -> void:
+func _relaunch(applied: Dictionary = {}) -> void:
 	if _relauncher.is_valid():
 		_relauncher.call()
 		return
+	if UpdateApplier.launch_deferred(applied):
+		get_tree().quit()
+		return
 	OS.set_restart_on_exit(true)
 	get_tree().quit()
+
+
+func _clear_staging() -> void:
+	var abs_dir := ProjectSettings.globalize_path(UPDATES_DIR)
+	var dir := DirAccess.open(abs_dir)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var name := dir.get_next()
+	while name != "":
+		if name != "." and name != ".." and name != "applied.json":
+			DirAccess.remove_absolute(abs_dir.path_join(name))
+		name = dir.get_next()
 
 
 func _update_endpoint() -> String:

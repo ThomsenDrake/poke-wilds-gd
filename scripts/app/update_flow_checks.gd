@@ -37,8 +37,9 @@ static func shared_latest() -> Dictionary:
 
 
 static func reset_user_state() -> void:
-	for path in [IDENTITY_PATH, ARTIFACT_PATH, INSTALL_PATH,
-			"user://updates/applied.json", "user://updates/pending.json"]:
+	for path in [IDENTITY_PATH, ARTIFACT_PATH, INSTALL_PATH, INSTALL_PATH + ".new",
+			"user://PokeWilds-update.cmd", "user://updates/applied.json",
+			"user://updates/pending.json"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
@@ -54,7 +55,11 @@ static func expect_default_rows(failures: Array, title: Node, has_save: bool) ->
 static func expect_update_row(failures: Array, title: Node, has_save: bool) -> void:
 	var expected: Array = ["UPDATE", "CONTINUE", "NEW GAME"] if has_save else ["UPDATE", "NEW GAME"]
 	_check(failures, title.entry_labels() == expected, "UPDATE row %s != %s" % [str(title.entry_labels()), str(expected)])
-	_check(failures, title.entry_row_text(title.selected_entry()) == "UPDATE", "cursor did not start on UPDATE")
+
+
+static func expect_selection_kept(failures: Array, title: Node, label: String) -> void:
+	_check(failures, title.entry_row_text(title.selected_entry()) == label,
+		"async UPDATE stole the title cursor from %s" % label)
 
 
 static func persist_friend(failures: Array) -> void:
@@ -118,6 +123,28 @@ static func apply_linux_fixture(failures: Array) -> void:
 	_check(failures, bool(result.get("ok", false)), "linux apply refused a user:// artifact path")
 	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH) == PackedByteArray([1, 2, 3, 4]),
 		"linux apply did not replace the install bytes")
+
+
+static func apply_windows_fixture(failures: Array) -> void:
+	write_install_fixture()
+	var result := UpdateApplier.apply("Windows", ARTIFACT_PATH, INSTALL_PATH)
+	_check(failures, bool(result.get("ok", false)) and bool(result.get("deferred", false)),
+		"windows apply did not stage a deferred helper swap")
+	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH) == PackedByteArray([9, 9, 9, 9]),
+		"windows apply mutated the running image in-process")
+	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH + ".new") == PackedByteArray([1, 2, 3, 4]),
+		"windows apply did not stage the new bytes beside the exe")
+	_check(failures, FileAccess.file_exists(str(result.get("helper", ""))),
+		"windows apply did not write PokeWilds-update.cmd")
+
+
+static func expect_staging_cleared(failures: Array) -> void:
+	_check(failures, not FileAccess.file_exists("user://updates/pending.json"),
+		"successful apply left pending.json")
+	_check(failures, not FileAccess.file_exists("user://updates/PokeWilds-linux.x86_64"),
+		"successful apply left the downloaded artifact")
+	_check(failures, FileAccess.file_exists("user://updates/applied.json"),
+		"successful apply did not keep applied.json")
 
 
 static func _check(failures: Array, ok: bool, reason: String) -> void:

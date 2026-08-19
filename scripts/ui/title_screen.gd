@@ -155,8 +155,7 @@ func _is_any_action_pressed(event: InputEvent) -> bool:
 	return false
 
 func _rebuild_entries() -> void:
-	_rows.set_rows(_update.labels(_has_save)) # resets the cursor to row 0
-	TitleStage.center_rows(_rows)
+	TitleStage.rebuild_rows(_rows, _update.labels(_has_save))
 
 func _activate_selected() -> void:
 	if _rows.row_count() == 0:

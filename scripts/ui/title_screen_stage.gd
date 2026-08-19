@@ -88,6 +88,17 @@ static func _build_title_card(stage: Control) -> Dictionary:
 
 # Vertically centers the entry rows within the baked band; the row count varies
 # (CONTINUE only with a save), so the centering runs on every rebuild.
+# Rebuild keeps the previously selected label so an async UPDATE insert cannot
+# steal Z from CONTINUE / NEW GAME.
+static func rebuild_rows(rows, labels: Array) -> void:
+	var keep := rows.row_text(rows.selected()) if rows.row_count() > 0 else ""
+	rows.set_rows(labels)
+	center_rows(rows)
+	var idx := rows.row_texts().find(keep)
+	if idx >= 0:
+		rows.select(idx)
+
+
 static func center_rows(rows) -> void:
 	rows.root().position.y = ENTRY_BAND.position.y + (ENTRY_BAND.size.y - rows.row_count() * GbcWidgets.RowList.PITCH) / 2.0
 

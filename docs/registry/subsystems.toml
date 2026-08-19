@@ -615,6 +615,7 @@ quality_bucket = "bootstrap"
 # SHARED UPDATE ROW (2026-08-19): title_screen.gd stays under the 220 wall by
 # extracting UPDATE + confirm/progress into title_update.gd (owned by game_update).
 # Default CONTINUE / NEW GAME fixtures are unchanged unless a newer latest is injected.
+# Async UPDATE insert preserves the selected label (rebuild_rows).
 # AGENT-NEUTRAL INTEGRATION Phase 4 (AccessKit semantic annotations):
 # gbc_widgets.gd + gbc_stage.gd now annotate every widget the shared library
 # builds with Godot 4.5+ accessibility PROPERTIES (accessibility_name /
@@ -2092,6 +2093,8 @@ quality_bucket = "update"
 # banner stay paired. UPDATE is offerable only when is_newer and this OS has a
 # manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Wrangler put uses
 # {REPORTS bucket}/{updates/...}; the public URL keeps the object key.
+# Windows stages *.new + PokeWilds-update.cmd and swaps after exit.
+# Successful apply clears user://updates/ except applied.json.
 # Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
 # Godot binary. Saves stay in user://godot_port_save.json.

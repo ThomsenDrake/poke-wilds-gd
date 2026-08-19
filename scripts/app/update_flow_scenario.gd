@@ -25,9 +25,11 @@ func run(ctx: Dictionary) -> void:
 	Checks.expect_skip(_failures, updater)
 	title.show_title()
 	Checks.expect_default_rows(_failures, title, bool(_ctx.runtime.has_loaded_save()))
+	var kept := title.entry_row_text(title.selected_entry())
 	updater.smoke_set_latest(Checks.shared_latest())
 	title.smoke_set_update_available(true)
 	Checks.expect_update_row(_failures, title, bool(_ctx.runtime.has_loaded_save()))
+	Checks.expect_selection_kept(_failures, title, kept)
 	_ctx.runtime.emit_trace("update_available", "UpdateRuntime", {"build_id": "playtest-newbuild", "os": "linux"})
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
@@ -59,7 +61,9 @@ func run(ctx: Dictionary) -> void:
 	Checks.expect_shared_channel(_failures, updater)
 	Checks.expect_os_gate(_failures, updater)
 	Checks.expect_no_downgrade(_failures, updater)
+	Checks.expect_staging_cleared(_failures)
 	Checks.apply_linux_fixture(_failures)
+	Checks.apply_windows_fixture(_failures)
 	Input.use_accumulated_input = false
 	if _failures.is_empty():
 		_ctx.runtime.emit_trace("update_flow_passed", "UpdateFlowScenario", {

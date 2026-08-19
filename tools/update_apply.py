@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import shutil
 import zipfile
@@ -19,7 +20,7 @@ def apply(os_name: str, artifact: Path, target: Path) -> dict:
     if SAVE_NAME in target.name:
         return {"ok": False, "error": "save_path_refused"}
     if os_name == "Windows":
-        return _apply_file(target, artifact, keep_old=True)
+        return _apply_windows(target, artifact)
     if os_name == "Linux":
         return _apply_file(target, artifact, keep_old=False)
     if os_name == "macOS":
@@ -33,6 +34,48 @@ def cleanup_old(target: Path) -> None:
         shutil.rmtree(old)
     elif old.exists():
         old.unlink()
+
+
+def complete_windows_swap(target: Path, staged: Path | None = None) -> dict:
+    target = Path(target)
+    staged = Path(staged) if staged is not None else Path(str(target) + ".new")
+    old = Path(str(target) + ".old")
+    if old.exists():
+        old.unlink()
+    if target.exists():
+        target.replace(old)
+    staged.replace(target)
+    return {"ok": True, "old_path": str(old)}
+
+
+def _apply_windows(target: Path, artifact: Path) -> dict:
+    staged = Path(str(target) + ".new")
+    if staged.exists():
+        staged.unlink()
+    shutil.copy2(artifact, staged)
+    helper = target.with_name("PokeWilds-update.cmd")
+    helper.write_text(
+        _windows_helper_body(target, staged, os.getpid()),
+        encoding="ascii",
+        newline="\r\n",
+    )
+    return {"ok": True, "deferred": True, "helper": str(helper), "old_path": str(target) + ".old"}
+
+
+def _windows_helper_body(target: Path, staged: Path, pid: int) -> str:
+    old = Path(str(target) + ".old")
+    return "\r\n".join([
+        "@echo off",
+        ":wait",
+        "timeout /t 1 /nobreak >nul",
+        f'tasklist /FI "PID eq {pid}" | find "{pid}" >nul',
+        "if not errorlevel 1 goto wait",
+        f'if exist "{old}" del /f /q "{old}"',
+        f'if exist "{target}" move /y "{target}" "{old}"',
+        f'move /y "{staged}" "{target}"',
+        f'start "" "{target}"',
+        "",
+    ])
 
 
 def _apply_file(target: Path, artifact: Path, *, keep_old: bool) -> dict:

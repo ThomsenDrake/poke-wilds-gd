@@ -21,7 +21,9 @@ and relaunches. The title keeps a held "Downloading update…" toast for the
 whole apply (it does not auto-hide at 30s) and only then shows success hide
 or the fail banner. Hash mismatch, a missing pending file, or an unwritable
 install/user dir refuses apply, leaves the old binary in place, and shows a
-MessageBox. The updater never writes `user://godot_port_save.json*`.
+MessageBox. A successful apply deletes `user://updates/pending.json` and the
+downloaded artifact (keeping `applied.json`) so later builds cannot pile up
+under unique filenames. The updater never writes `user://godot_port_save.json*`.
 
 Saves stay in Godot `user://` for `config/name="PokeWilds-Godot"`. Replacing
 the executable does not touch that path. The application name and macOS
@@ -90,8 +92,11 @@ pointer only after all three object checksums exist.
 
 `scripts/runtime/update_applier.gd` is the only OS-specific player code.
 
-- Windows: rename the running `.exe` to `.old`, write the new file, relaunch,
-  delete `.old` on the next successful boot.
+- Windows: copy the verified artifact to a sibling `*.new` and write
+  `PokeWilds-update.cmd`. The game launches that helper and quits; the helper
+  waits for the PID to exit, then moves the live `.exe` to `.old`, promotes
+  `*.new`, and starts the new binary. Next boot deletes `.old`. The running
+  image is never renamed in-process.
 - Linux: unlink the running binary, write the new file, `chmod 0755`, relaunch.
 - macOS: unzip the new `.app` to a sibling `*.new`, swap with the live bundle,
   relaunch. Unsigned Gatekeeper "Open" stays a documented one-time step;
