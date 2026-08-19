@@ -1,5 +1,5 @@
 Status: active
-Last verified: 2026-08-04
+Last verified: 2026-08-19
 Review cadence days: 14
 Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, docs/references/trace-events.md, docs/references/vision-review-rubric.md, docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md, scripts/app, scripts/runtime, tools
 
