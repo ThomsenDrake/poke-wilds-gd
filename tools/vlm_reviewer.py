@@ -72,7 +72,8 @@ CLI is locally unavailable OR the live Luna request fails, the same
 Command Code review harness is pointed at an OpenAI-compatible HTTP
 endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
 at reasoning effort `high` when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
-is set (env only, NEVER logged); a live Mistral failure then walks hosted
+is set (env only, NEVER logged); later backends are probed only after a
+higher-priority miss or live failure. A live Mistral failure then walks hosted
 `qwen3.8-max-preview` via the token-plan MaaS endpoint
 (DEFAULT_DASHSCOPE_BASE) when DASHSCOPE_API_KEY is set; then local
 qwen3-vl:8b (Instruct) via Ollama's HTTP API when pulled; else required
@@ -422,10 +423,17 @@ def _unavailable_reason(cfg: Config, skipped: list[tuple[str, str]]) -> str:
 
 
 def probe_availability(cfg: Config) -> tuple[str | None, str]:
-    """Resolve the first locally-ready backend, or a secret-free skip reason."""
-    ready, skipped = probe_backends(cfg)
-    if ready:
-        return ready[0]
+    """Resolve the first locally-ready backend, or a secret-free skip reason.
+
+    Stops at the first ready backend so a dead Ollama host is not probed when
+    Command Code or the OpenAI-compatible fallback is already usable.
+    """
+    skipped: list[tuple[str, str]] = []
+    for backend in _candidate_order(cfg):
+        ok, reason = _probe_backend(cfg, backend)
+        if ok:
+            return backend, reason
+        skipped.append((backend, reason))
     return None, _unavailable_reason(cfg, skipped)
 
 
@@ -1322,36 +1330,33 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     if cfg.no_model:
         meta["model"] = {"ran": False, "reason": "disabled (--no-model / VLM_NO_MODEL)"}
     else:
-        candidates, skipped = probe_backends(cfg)
-        if not candidates:
-            reason = _unavailable_reason(cfg, skipped)
-            meta["model"] = {"ran": False, "reason": reason}
-            if cfg.required:
-                raise RuntimeError(f"required vision model unavailable: {reason}")
-            print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
-                  file=sys.stderr)
-        else:
-            tried: list[dict] = []
-            selected = False
-            for backend, probe_reason in candidates:
-                try:
-                    answers, mmeta = run_model(public_ctx, cfg, backend)
-                    _require_complete_model(cfg, answers, mmeta)
-                    meta["model"] = mmeta
-                    if tried:
-                        meta["model"]["prior_backends"] = list(tried)
-                    selected = True
+        tried: list[dict] = []
+        skipped: list[tuple[str, str]] = []
+        selected = False
+        for backend in _candidate_order(cfg):
+            ok, probe_reason = _probe_backend(cfg, backend)
+            if not ok:
+                skipped.append((backend, probe_reason))
+                continue
+            try:
+                answers, mmeta = run_model(public_ctx, cfg, backend)
+                _require_complete_model(cfg, answers, mmeta)
+                meta["model"] = mmeta
+                if tried:
+                    meta["model"]["prior_backends"] = list(tried)
+                selected = True
+                break
+            except Exception as exc:
+                tried.append({
+                    "backend": backend,
+                    "probe": probe_reason,
+                    "error": _model_call_error(cfg, exc),
+                })
+                if cfg.runtime != "auto":
                     break
-                except Exception as exc:
-                    tried.append({
-                        "backend": backend,
-                        "probe": probe_reason,
-                        "error": _model_call_error(cfg, exc),
-                    })
-                    if cfg.runtime != "auto":
-                        break
-            if not selected:
-                answers = []
+        if not selected:
+            answers = []
+            if tried:
                 reason = _model_pass_error_reason(tried)
                 meta["model"] = {
                     "ran": False,
@@ -1362,6 +1367,13 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                     raise RuntimeError(
                         f"required vision model failed: {reason}") from None
                 print(f"vlm_reviewer: {reason}; deterministic pass only",
+                      file=sys.stderr)
+            else:
+                reason = _unavailable_reason(cfg, skipped)
+                meta["model"] = {"ran": False, "reason": reason}
+                if cfg.required:
+                    raise RuntimeError(f"required vision model unavailable: {reason}")
+                print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",
                       file=sys.stderr)
     if cfg.required and not meta.get("model", {}).get("ran"):
         raise RuntimeError("required vision model did not run")

@@ -805,7 +805,7 @@ validation_commands = [
   # REQUIRED model-reviewer lane (G2; Command Code gpt-5.6-luna first via `cmd` +
   # COMMAND_CODE_API_KEY, then the same harness against OpenAI-compatible
   # mistral-medium-3-5 at effort high, then hosted/local fallbacks; auto walks
-  # after a live request failure, not only a local probe miss; model
+  # after a live request failure and probes the next backend only then; model
   # findings remain quarantine-forever; windowed acceptance fails closed on
   # no model/coverage).
   # Cursor Cloud: tools/ensure_cloud_display.sh + tools/cloud_env.py persist

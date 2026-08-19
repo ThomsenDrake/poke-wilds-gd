@@ -353,6 +353,63 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertIn("command_code: RuntimeError: command_code down", text)
         self.assertIn("openai_compatible: RuntimeError: openai_compatible down", text)
 
+    def test_auto_success_does_not_probe_later_backends(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.dashscope_key = "dash-placeholder"
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(True, "model present")) as ollama_probe, \
+                mock.patch.object(
+                    VLM,
+                    "run_model",
+                    return_value=(answers_ok, {
+                        "ran": True,
+                        "backend": "command_code",
+                        "questions_total": 1,
+                        "passes_completed": 1,
+                    }),
+                ) as run_model:
+            _findings, answers, meta = VLM.run_review({}, cfg)
+        self.assertEqual([call.args[2] for call in run_model.call_args_list], ["command_code"])
+        self.assertEqual(answers, answers_ok)
+        self.assertEqual(meta["model"]["backend"], "command_code")
+        ollama_probe.assert_not_called()
+
+    def test_auto_fallback_success_does_not_probe_ollama(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+
+        def fake_run_model(_ctx, _cfg, backend):
+            if backend == "command_code":
+                raise RuntimeError("luna 503")
+            return answers_ok, {
+                "ran": True,
+                "backend": backend,
+                "questions_total": 1,
+                "passes_completed": 1,
+            }
+
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(True, "model present")) as ollama_probe, \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model):
+            _findings, _answers, meta = VLM.run_review({}, cfg)
+        self.assertEqual(meta["model"]["backend"], "openai_compatible")
+        ollama_probe.assert_not_called()
+
+    def test_probe_availability_stops_at_first_ready_backend(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        with mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(True, "model present")) as ollama_probe:
+            backend, reason = VLM.probe_availability(cfg)
+        self.assertEqual(backend, "command_code")
+        self.assertIn("cmd CLI available", reason)
+        ollama_probe.assert_not_called()
+
     def test_run_review_probes_each_backend_once_when_none_ready(self) -> None:
         cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
         cfg.required = False

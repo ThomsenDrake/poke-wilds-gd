@@ -1671,8 +1671,10 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             f"openai_compatible, dashscope, ollama (got {reviewer.AUTO_BACKEND_ORDER})"
         )
     src = tool_path.read_text(encoding="utf-8")
-    if "probe_backends(cfg)" not in src:
-        issues.append("run_review must take one probe_backends pass (no re-probe)")
+    if "candidates, skipped = probe_backends(cfg)" in src:
+        issues.append("run_review must not eagerly probe every backend before the first call")
+    if "for backend in _candidate_order(cfg):" not in src:
+        issues.append("run_review must walk _candidate_order and probe the next backend only as needed")
     if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:
         issues.append(
             "auto runtime must record prior_backends and walk after a live call failure"
