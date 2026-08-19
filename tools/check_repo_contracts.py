@@ -1671,12 +1671,18 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             f"openai_compatible, dashscope, ollama (got {reviewer.AUTO_BACKEND_ORDER})"
         )
     src = tool_path.read_text(encoding="utf-8")
-    if "iter_available_backends(cfg)" not in src:
-        issues.append("run_review must walk iter_available_backends after local probes")
+    if "probe_backends(cfg)" not in src:
+        issues.append("run_review must take one probe_backends pass (no re-probe)")
     if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:
         issues.append(
             "auto runtime must record prior_backends and walk after a live call failure"
         )
+    if 'required vision model failed: {reason}' not in src:
+        issues.append(
+            "required auto exhaustion must raise the aggregate secret-free reason"
+        )
+    if "required vision model failed: {last_error}" in src:
+        issues.append("required-mode failure must not drop earlier backend errors")
     try:
         effort_at = argv.index("--effort")
     except ValueError:

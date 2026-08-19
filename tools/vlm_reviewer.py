@@ -393,28 +393,47 @@ def _candidate_order(cfg: Config) -> tuple[str, ...]:
     return ()
 
 
-def iter_available_backends(cfg: Config) -> list[tuple[str, str]]:
-    """Locally-ready backends in auto (or pinned) order. Call success is separate."""
+def probe_backends(cfg: Config) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """One local probe pass. Returns (ready, skipped) as (backend, reason) rows."""
     ready: list[tuple[str, str]] = []
+    skipped: list[tuple[str, str]] = []
     for backend in _candidate_order(cfg):
         ok, reason = _probe_backend(cfg, backend)
         if ok:
             ready.append((backend, reason))
+        else:
+            skipped.append((backend, reason))
+    return ready, skipped
+
+
+def iter_available_backends(cfg: Config) -> list[tuple[str, str]]:
+    """Locally-ready backends in auto (or pinned) order. Call success is separate."""
+    ready, _skipped = probe_backends(cfg)
     return ready
+
+
+def _unavailable_reason(cfg: Config, skipped: list[tuple[str, str]]) -> str:
+    if not _candidate_order(cfg):
+        return (
+            "command code not probed; openai-compatible fallback not probed; "
+            "dashscope not probed; ollama not probed"
+        )
+    return "; ".join(reason for _backend, reason in skipped) or "no backend probed"
 
 
 def probe_availability(cfg: Config) -> tuple[str | None, str]:
     """Resolve the first locally-ready backend, or a secret-free skip reason."""
-    ready = iter_available_backends(cfg)
+    ready, skipped = probe_backends(cfg)
     if ready:
         return ready[0]
-    order = _candidate_order(cfg)
-    if not order:
-        return None, (
-            "command code not probed; openai-compatible fallback not probed; "
-            "dashscope not probed; ollama not probed"
-        )
-    return None, "; ".join(_probe_backend(cfg, backend)[1] for backend in order)
+    return None, _unavailable_reason(cfg, skipped)
+
+
+def _model_pass_error_reason(tried: list[dict]) -> str:
+    if len(tried) == 1:
+        return f"model pass error: {tried[0]['error']}"
+    parts = [f"{row['backend']}: {row['error']}" for row in tried]
+    return "model pass error: " + "; ".join(parts)
 
 
 def _redact_secrets(cfg: Config, text: str) -> str:
@@ -1303,9 +1322,9 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
     if cfg.no_model:
         meta["model"] = {"ran": False, "reason": "disabled (--no-model / VLM_NO_MODEL)"}
     else:
-        candidates = iter_available_backends(cfg)
+        candidates, skipped = probe_backends(cfg)
         if not candidates:
-            _backend, reason = probe_availability(cfg)
+            reason = _unavailable_reason(cfg, skipped)
             meta["model"] = {"ran": False, "reason": reason}
             if cfg.required:
                 raise RuntimeError(f"required vision model unavailable: {reason}")
@@ -1313,7 +1332,6 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                   file=sys.stderr)
         else:
             tried: list[dict] = []
-            last_error = ""
             selected = False
             for backend, probe_reason in candidates:
                 try:
@@ -1325,21 +1343,16 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                     selected = True
                     break
                 except Exception as exc:
-                    last_error = _model_call_error(cfg, exc)
                     tried.append({
                         "backend": backend,
                         "probe": probe_reason,
-                        "error": last_error,
+                        "error": _model_call_error(cfg, exc),
                     })
                     if cfg.runtime != "auto":
                         break
             if not selected:
                 answers = []
-                if len(tried) == 1:
-                    reason = f"model pass error: {tried[0]['error']}"
-                else:
-                    parts = [f"{row['backend']}: {row['error']}" for row in tried]
-                    reason = "model pass error: " + "; ".join(parts)
+                reason = _model_pass_error_reason(tried)
                 meta["model"] = {
                     "ran": False,
                     "reason": reason,
@@ -1347,7 +1360,7 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                 }
                 if cfg.required:
                     raise RuntimeError(
-                        f"required vision model failed: {last_error}") from None
+                        f"required vision model failed: {reason}") from None
                 print(f"vlm_reviewer: {reason}; deterministic pass only",
                       file=sys.stderr)
     if cfg.required and not meta.get("model", {}).get("ran"):

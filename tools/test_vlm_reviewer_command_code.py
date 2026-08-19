@@ -338,14 +338,33 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
         cfg.fallback_key = "test-only-placeholder"
         cfg.required = True
+
+        def fake_run_model(_ctx, _cfg, backend):
+            raise RuntimeError(f"{backend} down")
+
         with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
                 mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
                 mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
-                mock.patch.object(VLM, "run_model", side_effect=RuntimeError("provider down")):
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model):
             with self.assertRaises(RuntimeError) as raised:
                 VLM.run_review({}, cfg)
-        self.assertIn("required vision model failed", str(raised.exception))
-        self.assertIn("provider down", str(raised.exception))
+        text = str(raised.exception)
+        self.assertIn("required vision model failed", text)
+        self.assertIn("command_code: RuntimeError: command_code down", text)
+        self.assertIn("openai_compatible: RuntimeError: openai_compatible down", text)
+
+    def test_run_review_probes_each_backend_once_when_none_ready(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.required = False
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(False, "cmd CLI not found")) as cmd_probe, \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")) as ollama_probe:
+            _findings, _answers, meta = VLM.run_review({}, cfg)
+        self.assertEqual(cmd_probe.call_count, 1)
+        self.assertEqual(ollama_probe.call_count, 1)
+        self.assertFalse(meta["model"]["ran"])
+        self.assertIn("cmd CLI not found", meta["model"]["reason"])
+        self.assertIn("model not pulled", meta["model"]["reason"])
 
 
 if __name__ == "__main__":
