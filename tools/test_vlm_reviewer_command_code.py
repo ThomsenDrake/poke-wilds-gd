@@ -235,15 +235,51 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertTrue(captured["headers"]["Authorization"].startswith("Bearer "))
         self.assertNotIn(cfg.fallback_key, str(captured["url"]))
 
+    def test_custom_fallback_host_sends_openai_seed(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = "https://example.test/v1"
+        cfg.fallback_seed_field = ""
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured.update({"url": url, "body": body})
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "system", "user", [], 0.0, 7)
+        self.assertEqual(captured["url"], "https://example.test/v1/chat/completions")
+        self.assertEqual(captured["body"]["seed"], 7)
+        self.assertNotIn("random_seed", captured["body"])
+
+    def test_fallback_seed_field_override_wins_over_host(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = "https://example.test/v1"
+        cfg.fallback_seed_field = "random_seed"
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured["body"] = body
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "system", "user", [], 0.0, 3)
+        self.assertEqual(captured["body"]["random_seed"], 3)
+        self.assertNotIn("seed", captured["body"])
+
     def test_describe_records_fallback_presence_without_secret(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))
         cfg.fallback_key = "super-secret-key"
+        cfg.fallback_base = VLM.DEFAULT_FALLBACK_BASE
+        cfg.fallback_seed_field = ""
         meta = cfg.describe()
         self.assertTrue(meta["fallback_key_present"])
         dumped = VLM.json.dumps(meta)
         self.assertNotIn("super-secret-key", dumped)
         self.assertEqual(meta["fallback_model"], "mistral-medium-3-5")
         self.assertEqual(meta["fallback_effort"], "high")
+        self.assertEqual(meta["fallback_seed_field"], "random_seed")
 
     def test_openai_compatible_is_single_pass(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))

@@ -71,7 +71,7 @@ reads the local PNG paths from the prompt and returns strict JSON. If that
 CLI is locally unavailable OR the live Luna request fails, the same
 Command Code review harness is pointed at an OpenAI-compatible HTTP
 endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
-at reasoning effort `high` (seed field `random_seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
+at reasoning effort `high` (seed field `random_seed` on mistral.ai, else `seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
 is set (env only, NEVER logged); later backends are probed only after a
 higher-priority miss or live failure. A live Mistral failure then walks hosted
 `qwen3.8-max-preview` via the token-plan MaaS endpoint
@@ -199,6 +199,8 @@ class Config:
         self.fallback_model = str(pick("fallback_model", "VLM_FALLBACK_MODEL", FALLBACK_MODEL))
         self.fallback_effort = str(pick("fallback_effort", "VLM_FALLBACK_EFFORT", FALLBACK_EFFORT)).lower()
         self.fallback_base = str(pick("fallback_base", "VLM_FALLBACK_BASE_URL", DEFAULT_FALLBACK_BASE)).rstrip("/")
+        self.fallback_seed_field = str(pick(
+            "fallback_seed_field", "VLM_FALLBACK_SEED_FIELD", "")).strip().lower()
         self.ollama_host = str(pick("ollama_host", "OLLAMA_HOST", DEFAULT_OLLAMA_HOST)).rstrip("/")
         self.dashscope_base = str(pick("dashscope_base", "DASHSCOPE_BASE_URL", DEFAULT_DASHSCOPE_BASE)).rstrip("/")
         self.dashscope_model = str(pick("dashscope_model", "DASHSCOPE_MODEL", DEFAULT_DASHSCOPE_MODEL))
@@ -229,6 +231,7 @@ class Config:
             "command_code_effort": self.command_code_effort,
             "fallback_model": self.fallback_model, "fallback_effort": self.fallback_effort,
             "fallback_base": self.fallback_base,
+            "fallback_seed_field": _fallback_seed_key(self),
             "ollama_host": self.ollama_host,
             "dashscope_base": self.dashscope_base, "dashscope_model": self.dashscope_model,
             "dashscope_key_present": bool(self.dashscope_key),  # presence only, never the value
@@ -869,6 +872,17 @@ def _openai_compatible_text(doc: dict) -> str:
     return str(c)
 
 
+def _fallback_seed_key(cfg: Config) -> str:
+    """Mistral chat-completions uses random_seed; other OpenAI-compatible hosts use seed."""
+    override = cfg.fallback_seed_field
+    if override in ("seed", FALLBACK_SEED_FIELD):
+        return override
+    host = cfg.fallback_base.lower()
+    if "mistral.ai" in host:
+        return FALLBACK_SEED_FIELD
+    return "seed"
+
+
 def _call_openai_compatible(cfg: Config, system: str, user_text: str,
                             images: list[str], temperature: float, seed: int, *,
                             base: str, model: str, key: str,
@@ -910,7 +924,7 @@ def _call_fallback(cfg: Config, system: str, user_text: str, images: list[str],
     return _call_openai_compatible(
         cfg, system, user_text, images, temperature, seed,
         base=cfg.fallback_base, model=cfg.fallback_model, key=cfg.fallback_key,
-        extra=extra, seed_key=FALLBACK_SEED_FIELD)
+        extra=extra, seed_key=_fallback_seed_key(cfg))
 
 
 def _call_model(cfg: Config, backend: str, system: str, user_text: str,
@@ -1445,6 +1459,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                         help=f"OpenAI-compatible fallback model (env VLM_FALLBACK_MODEL or {FALLBACK_MODEL})")
     parser.add_argument("--fallback-effort", dest="fallback_effort", default=None,
                         help=f"fallback reasoning effort (env VLM_FALLBACK_EFFORT or {FALLBACK_EFFORT})")
+    parser.add_argument("--fallback-seed-field", dest="fallback_seed_field", default=None,
+                        help="fallback seed JSON field: seed or random_seed "
+                             f"(env VLM_FALLBACK_SEED_FIELD; default auto: {FALLBACK_SEED_FIELD} on mistral.ai, else seed)")
     parser.add_argument("--command-code-model", dest="command_code_model", default=None,
                         help=f"Command Code model (env COMMAND_CODE_MODEL or {COMMAND_CODE_MODEL})")
     parser.add_argument("--command-code-effort", dest="command_code_effort", default=None,

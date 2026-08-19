@@ -1702,9 +1702,25 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append(
             "prior_backends must merge probe-skipped rows with live-call failures"
         )
-    if "seed_key=FALLBACK_SEED_FIELD" not in src:
+    if "seed_key=_fallback_seed_key(cfg)" not in src:
         issues.append(
-            "openai-compatible fallback must send Mistral random_seed, not OpenAI seed"
+            "openai-compatible fallback must choose seed vs random_seed from the fallback host"
+        )
+    default_seed_cfg = reviewer.Config(reviewer._parse_args([]))
+    default_seed_cfg.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    default_seed_cfg.fallback_seed_field = ""
+    if reviewer._fallback_seed_key(default_seed_cfg) != "random_seed":
+        issues.append(
+            "default Mistral fallback base must resolve seed field to random_seed "
+            f"(got {reviewer._fallback_seed_key(default_seed_cfg)})"
+        )
+    custom = reviewer.Config(reviewer._parse_args([]))
+    custom.fallback_base = "https://example.test/v1"
+    custom.fallback_seed_field = ""
+    if reviewer._fallback_seed_key(custom) != "seed":
+        issues.append(
+            "non-Mistral fallback URL must resolve seed field to seed "
+            f"(got {reviewer._fallback_seed_key(custom)})"
         )
     if 'required vision model failed: {reason}' not in src:
         issues.append(
