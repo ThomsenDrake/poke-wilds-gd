@@ -273,7 +273,8 @@ credential can be forwarded, and hold a
 cross-platform advisory lock across the shared build-metadata write/export/cleanup
 sequence; a concurrent exporter must refuse without deleting the active owner's metadata.
 Shared updates (`tools/publish_update.py`) reuse that lock and dirty-tree refuse,
-export one artifact per OS without a friend token, upload via R2 (never a Worker POST),
+export one artifact per OS without a friend token, upload via R2 (never a Worker POST;
+wrangler `r2 object put` is `{bucket}/{object_key}`, public URL stays the object key),
 and publish `GET /v1/updates/latest` only after all three object checksums exist.
 `update_flow` is a headless playtest with an injected transport.
 Relay changes additionally require

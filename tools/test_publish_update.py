@@ -164,6 +164,30 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(metadata["tester_id"], "UNASSIGNED")
             self.assertEqual(metadata["channel"], "playtest")
 
+    def test_wrangler_put_prefixes_configured_bucket(self) -> None:
+        captured: list[list[str]] = []
+
+        def fake_run(cmd, check, cwd):  # noqa: ANN001
+            captured.append(cmd)
+            return mock.Mock()
+
+        with mock.patch.dict("os.environ", {
+            "PLAYTEST_UPDATE_PUBLIC_BASE": "https://cdn.test",
+            "PLAYTEST_UPDATE_R2_BUCKET": "poke-wilds-feedback-private",
+        }, clear=False), mock.patch.object(publish_update.subprocess, "run", side_effect=fake_run):
+            url = publish_update.wrangler_put(
+                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64)
+        self.assertEqual(url, "https://cdn.test/updates/playtest/b1/linux")
+        self.assertEqual(captured[0][4], "poke-wilds-feedback-private/updates/playtest/b1/linux")
+
+    def test_configured_r2_bucket_reads_reports_binding(self) -> None:
+        with mock.patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(publish_update.configured_r2_bucket(), "poke-wilds-feedback-private")
+            self.assertEqual(
+                publish_update.configured_r2_bucket(environment="staging"),
+                "poke-wilds-feedback-private-staging",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

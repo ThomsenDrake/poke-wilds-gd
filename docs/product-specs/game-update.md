@@ -78,7 +78,11 @@ OS key comes from `OS.get_name()` (`Linux`/`Windows`/`macOS`). The title
 offers `UPDATE` only when `is_newer` is true **and** that OS has a non-empty
 manifest build (`is_offerable`). Unknown OS: no `UPDATE` row. Artifacts live
 under R2 `updates/<channel>/<build_id>/<os>`.
-Publish uploads via the R2 S3 API / wrangler, never a Worker POST. The game
+Publish uploads via the R2 S3 API / wrangler, never a Worker POST. Wrangler
+`r2 object put` uses `{bucket}/{object_key}` from the REPORTS binding
+(`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`); the public
+artifact URL stays `{PLAYTEST_UPDATE_PUBLIC_BASE}/{object_key}` so Worker
+`head(updates/…)` and the download URL share the same key. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
 pointer only after all three object checksums exist.
 

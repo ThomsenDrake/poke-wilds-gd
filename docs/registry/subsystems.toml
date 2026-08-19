@@ -2090,6 +2090,8 @@ quality_bucket = "update"
 # current build (no downgrade); apply globalizes user:// before copy/unzip.
 # The download toast holds (duration 0) until apply finishes so title lock and
 # banner stay paired. UPDATE is offerable only when is_newer and this OS has a
-# manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Editor/scenario boots skip
+# manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Wrangler put uses
+# {REPORTS bucket}/{updates/...}; the public URL keeps the object key.
+# Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
 # Godot binary. Saves stay in user://godot_port_save.json.

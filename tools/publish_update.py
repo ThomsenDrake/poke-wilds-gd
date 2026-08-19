@@ -26,6 +26,7 @@ from package_playtest import (
 from update_manifest import artifact_key, parse
 
 ROOT = Path(__file__).resolve().parents[1]
+WRANGLER_CONFIG = ROOT / "services" / "feedback-relay" / "wrangler.jsonc"
 
 
 def sha256_file(path: Path) -> str:
@@ -115,11 +116,30 @@ def publish_manifest(endpoint: str, admin_token: str, exported: dict, builds: di
         return json.loads(response.read().decode())
 
 
+def wrangler_object_path(bucket: str, key: str) -> str:
+    return f"{bucket.strip().strip('/')}/{key.lstrip('/')}"
+
+
+def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> str:
+    override = os.environ.get("PLAYTEST_UPDATE_R2_BUCKET", "").strip()
+    if override:
+        return override
+    env_name = environment or os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", "").strip()
+    raw = text if text is not None else WRANGLER_CONFIG.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    block = data.get("env", {}).get(env_name, data) if env_name else data
+    for entry in block.get("r2_buckets", []):
+        if entry.get("binding") == "REPORTS" and entry.get("bucket_name"):
+            return str(entry["bucket_name"])
+    raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
+
+
 def wrangler_put(key: str, path: Path, digest: str) -> str:
     public_base = os.environ.get("PLAYTEST_UPDATE_PUBLIC_BASE", "").rstrip("/")
     if not public_base:
         raise RuntimeError("set PLAYTEST_UPDATE_PUBLIC_BASE to the HTTPS artifact origin")
-    subprocess.run(["wrangler", "r2", "object", "put", key, "--file", str(path),
+    object_path = wrangler_object_path(configured_r2_bucket(), key)
+    subprocess.run(["wrangler", "r2", "object", "put", object_path, "--file", str(path),
                     "--custom-metadata", f"sha256={digest}"], check=True, cwd=ROOT / "services" / "feedback-relay")
     return f"{public_base}/{key}"
 
