@@ -2081,7 +2081,8 @@ required_trace_events = [
 ]
 quality_bucket = "update"
 # Shared (not friend-specific) desktop updater: player-boot title UPDATE row,
-# public GET /v1/updates/latest, admin checksum-gated publish, OS apply
+# public GET /v1/updates/latest?channel=playtest (never the persisted friend
+# feedback channel), admin checksum-gated publish, OS apply
 # (Windows rename, Linux unlink, macOS app swap), and sticky user:// identity
 # so a generic replace does not strip F-to-report. Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
