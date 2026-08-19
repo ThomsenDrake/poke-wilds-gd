@@ -85,7 +85,9 @@ revocable opaque invite token in generated, ignored build metadata, plus
 A later shared update ([game-update.md](game-update.md)) does not re-embed that
 token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
 `channel` into `user://playtest_identity.json`, and `load_build_info()` prefers
-that persisted route for new `F` reports. Editor smoke build-info overrides are
+that persisted route for new `F` reports. Shared update checks read the
+embedded `endpoint` from `playtest_build.json` and do not follow the persisted
+friend relay. Editor smoke build-info overrides are
 not merged with disk identity. The relay
 stores only the token hash and private nickname. The package token is treated as
 extractable and is protected by revocation, cohort scoping, per-minute edge

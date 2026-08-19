@@ -75,7 +75,7 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 	return {"ok": true, "metadata": metadata, "build": build}
 
 
-func load_build_info() -> Dictionary:
+func load_embedded_build_info() -> Dictionary:
 	if OS.has_feature("editor") and not _build_info_override.is_empty():
 		return _build_info_override.duplicate(true)
 	var embedded := {"channel": "development", "build_id": "local", "commit_sha": "unknown",
@@ -84,7 +84,13 @@ func load_build_info() -> Dictionary:
 		var parsed = JSON.parse_string(FileAccess.get_file_as_string(BUILD_INFO_PATH))
 		if parsed is Dictionary:
 			embedded = parsed
-	return UpdateIdentity.merge(embedded)
+	return embedded
+
+
+func load_build_info() -> Dictionary:
+	if OS.has_feature("editor") and not _build_info_override.is_empty():
+		return _build_info_override.duplicate(true)
+	return UpdateIdentity.merge(load_embedded_build_info())
 
 
 static func engine_log_slice() -> Dictionary:

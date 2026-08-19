@@ -2018,6 +2018,9 @@ quality_bucket = "feedback"
 # SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
 # user://playtest_identity.json after a generic replace so F reports keep the
 # friend route; editor smoke overrides are not merged with disk identity.
+# load_embedded_build_info() is the unmerged stamp; update checks use that
+# endpoint, not the persisted friend host. Worker GET /v1/updates/artifacts
+# serves updates/ only and never reports/.
 # Packaged-player diagnostics: real F input captures before the pause-modal,
 # current-launch trace slicing prevents historical-log leakage, full save/UI/
 # screenshot state is checksummed into a private bundle, and a revocable
@@ -2092,8 +2095,11 @@ quality_bucket = "update"
 # The download toast holds (duration 0) until apply finishes so title lock and
 # banner stay paired. UPDATE is offerable only when is_newer and this OS has a
 # manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Wrangler put uses
-# {REPORTS bucket}/{updates/...}; the public URL keeps the object key.
-# Windows stages *.new + PokeWilds-update.cmd and swaps after exit.
+# {REPORTS bucket}/{updates/...} only.
+# Windows stages *.new + PokeWilds-update.cmd and swaps after exit;
+# a failed promote restores .old and deferred apply skips applied.json.
+# Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
+# Update checks use the embedded endpoint, not persisted friend identity.
 # Successful apply clears user://updates/ except applied.json.
 # Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live

@@ -40,6 +40,13 @@ export function parseChannel(value: string | null): string {
   return channel;
 }
 
+export function parseArtifactPath(pathname: string): { channel: string; buildId: string; os: UpdateOs } | null {
+  const match = pathname.match(/^\/v1\/updates\/artifacts\/([^/]+)\/([^/]+)\/([^/]+)$/);
+  if (!match || !CHANNEL.test(match[1]) || !BUILD_ID.test(match[2])) return null;
+  if (!OS_KEYS.includes(match[3] as UpdateOs)) return null;
+  return { channel: match[1], buildId: match[2], os: match[3] as UpdateOs };
+}
+
 export function parseManifest(value: unknown): UpdateManifest {
   if (!value || typeof value !== "object") throw badRequest("invalid_manifest");
   const body = value as Record<string, unknown>;

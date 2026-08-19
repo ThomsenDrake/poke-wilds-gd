@@ -485,6 +485,20 @@ describe("shared update routes", () => {
     },
   };
 
+  it("serves a public artifact without exposing report objects", async () => {
+    const scoped = env(true);
+    const body = new Uint8Array([7, 7, 7, 7]);
+    const get = vi.fn(async (key: string) => key === "updates/playtest/b1/linux"
+      ? { body, customMetadata: { sha256: digest } } : null);
+    scoped.REPORTS = { get } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/updates/artifacts/playtest/b1/linux"), scoped);
+    expect(response.status).toBe(200);
+    expect(get).toHaveBeenCalledWith("updates/playtest/b1/linux");
+    expect(get).not.toHaveBeenCalledWith(expect.stringContaining("reports/"));
+    const missing = await worker.fetch(new Request("https://relay.test/v1/updates/artifacts/playtest/b1/reports"), scoped);
+    expect(missing.status).toBe(404);
+  });
+
   it("serves a public latest manifest", async () => {
     const scoped = env(true);
     scoped.REPORTS = {

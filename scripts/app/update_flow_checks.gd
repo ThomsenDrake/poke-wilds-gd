@@ -80,6 +80,14 @@ static func expect_shared_channel(failures: Array, updater: Node) -> void:
 		"update check used the friend feedback channel instead of playtest")
 
 
+static func expect_embedded_update_endpoint(failures: Array, updater: Node) -> void:
+	var stored := UpdateIdentity.load_identity()
+	_check(failures, str(stored.get("endpoint", "")) == "https://relay.test",
+		"friend endpoint was not persisted for F reports")
+	_check(failures, updater != null and updater.update_endpoint() != str(stored.get("endpoint", "")),
+		"update check used the persisted friend endpoint")
+
+
 static func expect_os_gate(failures: Array, updater: Node) -> void:
 	var latest := shared_latest()
 	_check(failures, updater != null and updater.is_offerable_build(latest, {}, {}, "Linux"),
@@ -136,6 +144,9 @@ static func apply_windows_fixture(failures: Array) -> void:
 		"windows apply did not stage the new bytes beside the exe")
 	_check(failures, FileAccess.file_exists(str(result.get("helper", ""))),
 		"windows apply did not write PokeWilds-update.cmd")
+	var helper_text: String = FileAccess.get_file_as_string(str(result.get("helper", "")))
+	_check(failures, helper_text.contains("if errorlevel 1"),
+		"windows helper does not roll back a failed promote")
 
 
 static func expect_staging_cleared(failures: Array) -> void:

@@ -23,7 +23,7 @@ from package_playtest import (
     run,
     worktree_is_dirty,
 )
-from update_manifest import artifact_key, parse
+from update_manifest import artifact_key, artifact_public_url, parse
 
 ROOT = Path(__file__).resolve().parents[1]
 WRANGLER_CONFIG = ROOT / "services" / "feedback-relay" / "wrangler.jsonc"
@@ -134,14 +134,18 @@ def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> s
     raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
 
 
-def wrangler_put(key: str, path: Path, digest: str) -> str:
-    public_base = os.environ.get("PLAYTEST_UPDATE_PUBLIC_BASE", "").rstrip("/")
-    if not public_base:
-        raise RuntimeError("set PLAYTEST_UPDATE_PUBLIC_BASE to the HTTPS artifact origin")
+def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "") -> str:
+    parts = key.split("/")
+    if len(parts) != 4 or parts[0] != "updates":
+        raise RuntimeError("refusing to publish a non-updates object key")
     object_path = wrangler_object_path(configured_r2_bucket(), key)
     subprocess.run(["wrangler", "r2", "object", "put", object_path, "--file", str(path),
                     "--custom-metadata", f"sha256={digest}"], check=True, cwd=ROOT / "services" / "feedback-relay")
-    return f"{public_base}/{key}"
+    return artifact_public_url(
+        endpoint or os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""),
+        parts[1], parts[2], parts[3],
+        os.environ.get("PLAYTEST_UPDATE_PUBLIC_BASE", ""),
+    )
 
 
 def main() -> int:
@@ -159,7 +163,9 @@ def main() -> int:
     with build_metadata_lock():
         try:
             exported = export_shared(args.channel, endpoint, godot=godot_binary())
-            builds = upload_artifacts(exported, put_object=wrangler_put)
+            builds = upload_artifacts(
+                exported, put_object=lambda key, dest, digest: wrangler_put(
+                    key, dest, digest, endpoint=endpoint))
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)

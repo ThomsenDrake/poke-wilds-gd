@@ -72,10 +72,16 @@ static func _windows_helper_body(target: String, staged: String, pid: int) -> St
 		"timeout /t 1 /nobreak >nul",
 		"tasklist /FI \"PID eq %s\" | find \"%s\" >nul" % [str(pid), str(pid)],
 		"if not errorlevel 1 goto wait",
-		"if exist \"%s\" del /f /q \"%s\"" % [old_path, old_path],
-		"if exist \"%s\" move /y \"%s\" \"%s\"" % [target, target, old_path],
+		"if exist \"%s\" (" % target,
+		"move /y \"%s\" \"%s\"" % [target, old_path],
+		"if errorlevel 1 goto launch",
+		")",
 		"move /y \"%s\" \"%s\"" % [staged, target],
-		"start \"\" \"%s\"" % target,
+		"if errorlevel 1 (",
+		"if exist \"%s\" move /y \"%s\" \"%s\"" % [old_path, old_path, target],
+		")",
+		":launch",
+		"if exist \"%s\" start \"\" \"%s\"" % [target, target],
 	])
 	return "\r\n".join(lines) + "\r\n"
 

@@ -178,13 +178,24 @@ class PublishUpdateTests(unittest.TestCase):
             return mock.Mock()
 
         with mock.patch.dict("os.environ", {
-            "PLAYTEST_UPDATE_PUBLIC_BASE": "https://cdn.test",
             "PLAYTEST_UPDATE_R2_BUCKET": "poke-wilds-feedback-private",
         }, clear=False), mock.patch.object(publish_update.subprocess, "run", side_effect=fake_run):
             url = publish_update.wrangler_put(
-                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64)
-        self.assertEqual(url, "https://cdn.test/updates/playtest/b1/linux")
+                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64,
+                endpoint="https://relay.test")
+        self.assertEqual(url, "https://relay.test/v1/updates/artifacts/playtest/b1/linux")
         self.assertEqual(captured[0][4], "poke-wilds-feedback-private/updates/playtest/b1/linux")
+        with self.assertRaises(RuntimeError):
+            publish_update.wrangler_put(
+                "reports/friends-1/r1/bundle.zip", Path("/tmp/artifact.bin"), "c" * 64,
+                endpoint="https://relay.test")
+
+    def test_windows_helper_restores_old_when_promote_fails(self) -> None:
+        body = update_apply._windows_helper_body(
+            Path("C:/game/PokeWilds.exe"), Path("C:/game/PokeWilds.exe.new"), 42)
+        self.assertIn("if errorlevel 1 goto launch", body)
+        self.assertIn('move /y "C:/game/PokeWilds.exe.old" "C:/game/PokeWilds.exe"', body)
+        self.assertIn(":launch", body)
 
     def test_configured_r2_bucket_reads_reports_binding(self) -> None:
         with mock.patch.dict("os.environ", {}, clear=True):

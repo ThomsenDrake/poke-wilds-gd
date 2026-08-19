@@ -54,7 +54,8 @@ supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
 identity wins when present. Editor smoke build-info overrides are not merged
 with disk identity. The latest check always queries the shared `playtest`
-channel; the persisted friend `channel` is only for `F` reports.
+channel and the **embedded** relay `endpoint`; the persisted friend `channel`
+and `endpoint` are only for `F` reports.
 
 ## Manifest
 
@@ -82,9 +83,11 @@ manifest build (`is_offerable`). Unknown OS: no `UPDATE` row. Artifacts live
 under R2 `updates/<channel>/<build_id>/<os>`.
 Publish uploads via the R2 S3 API / wrangler, never a Worker POST. Wrangler
 `r2 object put` uses `{bucket}/{object_key}` from the REPORTS binding
-(`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`); the public
-artifact URL stays `{PLAYTEST_UPDATE_PUBLIC_BASE}/{object_key}` so Worker
-`head(updates/…)` and the download URL share the same key. The game
+(`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`) under the
+`updates/` prefix only. The public download URL is the prefix-restricted
+Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
+`PLAYTEST_UPDATE_PUBLIC_BASE/<channel>/<build_id>/<os>`), never an R2 public
+domain on the reports bucket. Report ZIPs stay admin-only. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
 pointer only after all three object checksums exist.
 
@@ -95,8 +98,10 @@ pointer only after all three object checksums exist.
 - Windows: copy the verified artifact to a sibling `*.new` and write
   `PokeWilds-update.cmd`. The game launches that helper and quits; the helper
   waits for the PID to exit, then moves the live `.exe` to `.old`, promotes
-  `*.new`, and starts the new binary. Next boot deletes `.old`. The running
-  image is never renamed in-process.
+  `*.new`, and starts the new binary. If promotion fails, the helper restores
+  `.old` before launch. `applied.json` is not written for a deferred Windows
+  apply, so a rolled-back install can still be offered UPDATE. Next boot
+  deletes `.old`. The running image is never renamed in-process.
 - Linux: unlink the running binary, write the new file, `chmod 0755`, relaunch.
 - macOS: unzip the new `.app` to a sibling `*.new`, swap with the live bundle,
   relaunch. Unsigned Gatekeeper "Open" stays a documented one-time step;

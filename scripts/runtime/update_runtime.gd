@@ -56,6 +56,10 @@ func update_channel() -> String:
 	return UpdateManifest.DEFAULT_CHANNEL
 
 
+func update_endpoint() -> String:
+	return _update_endpoint()
+
+
 func is_newer_build(latest: Dictionary, current: Dictionary, applied: Dictionary = {}) -> bool:
 	return UpdateManifest.is_newer(latest, current, applied)
 
@@ -107,8 +111,9 @@ func apply_available() -> Dictionary:
 		_busy = false
 		_trace("update_apply_refused", {"reason": str(applied.get("error", "apply_failed"))})
 		return applied
-	_write_json(APPLIED_PATH, {"build_id": _latest.get("build_id", ""),
-		"published_at": _latest.get("published_at", "")})
+	if not bool(applied.get("deferred", false)):
+		_write_json(APPLIED_PATH, {"build_id": _latest.get("build_id", ""),
+			"published_at": _latest.get("published_at", "")})
 	_clear_staging()
 	_trace("update_relaunching", {"build_id": str(_latest.get("build_id", ""))})
 	_relaunch(applied)
@@ -198,7 +203,7 @@ func _clear_staging() -> void:
 
 
 func _update_endpoint() -> String:
-	var raw := str(_bundle.load_build_info().get("endpoint", "")).strip_edges().trim_suffix("/")
+	var raw := str(_bundle.load_embedded_build_info().get("endpoint", "")).strip_edges().trim_suffix("/")
 	if not raw.to_lower().begins_with("https://") or raw.contains("@") or raw.contains("?") \
 			or raw.contains("#") or raw.contains("\\"):
 		return ""

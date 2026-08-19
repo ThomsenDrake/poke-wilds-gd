@@ -90,6 +90,12 @@ def artifact_key(channel: str, build_id: str, os_name: str) -> str:
     return f"updates/{channel}/{build_id}/{os_name}"
 
 
+def artifact_public_url(endpoint: str, channel: str, build_id: str, os_name: str,
+                        public_base: str = "") -> str:
+    base = public_base.rstrip("/") or f"{endpoint.rstrip('/')}/v1/updates/artifacts"
+    return f"{base}/{channel}/{build_id}/{os_name}"
+
+
 def _parse_build(value: object) -> dict:
     if not isinstance(value, dict):
         return {}

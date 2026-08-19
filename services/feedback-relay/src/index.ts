@@ -2,7 +2,7 @@ import { findOrCreateIssue } from "./github";
 import { badRequest, payloadTooLarge, RelayError } from "./errors";
 import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex, validateMetadata } from "./security";
 import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
-import { artifactKey, latestKey, parseChannel, parseManifest } from "./updates";
+import { artifactKey, latestKey, parseArtifactPath, parseChannel, parseManifest } from "./updates";
 
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
 const CLEANUP_PAGE_SIZE = 100;
@@ -25,6 +25,10 @@ export default {
       if (url.pathname.startsWith("/v1/admin/")) return await adminRoute(request, env, url);
       if (request.method === "GET" && url.pathname === "/v1/updates/latest") {
         return await latestUpdate(request, env, url);
+      }
+      const artifact = parseArtifactPath(url.pathname);
+      if (request.method === "GET" && artifact) {
+        return await serveUpdateArtifact(env, artifact.channel, artifact.buildId, artifact.os);
       }
       if (request.method === "POST" && url.pathname === "/v1/reports") return await createReport(request, env);
       return json({ ok: false, error: "not_found" }, 404);
@@ -265,6 +269,19 @@ async function adminRoute(request: Request, env: Env, url: URL): Promise<Respons
       "Cache-Control": "private, no-store" } });
   }
   return json({ ok: false, error: "not_found" }, 404);
+}
+
+async function serveUpdateArtifact(env: Env, channel: string, buildId: string, os: string): Promise<Response> {
+  const key = artifactKey(channel, buildId, os);
+  if (!key.startsWith("updates/")) return json({ ok: false, error: "not_found" }, 404);
+  const object = await env.REPORTS.get(key);
+  if (!object) return json({ ok: false, error: "not_found" }, 404);
+  return new Response(object.body, { status: 200, headers: {
+    "Content-Type": "application/octet-stream",
+    "Content-Disposition": `attachment; filename="PokeWilds-${os}"`,
+    "Cache-Control": "public, max-age=3600",
+    "X-Content-SHA256": object.customMetadata?.sha256 ?? "",
+  } });
 }
 
 async function latestUpdate(_request: Request, env: Env, url: URL): Promise<Response> {
