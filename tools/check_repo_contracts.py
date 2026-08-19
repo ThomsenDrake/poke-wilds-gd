@@ -1790,6 +1790,26 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             "non-Mistral fallback URL must omit reasoning_effort unless explicitly set "
             f"(got {reviewer._fallback_reasoning_effort(custom_effort)})"
         )
+    if '"mistral.ai" in ' in src:
+        issues.append(
+            "fallback host detection must parse the URL hostname, not substring-match mistral.ai"
+        )
+    if not reviewer._fallback_host_is_mistral(reviewer.DEFAULT_FALLBACK_BASE):
+        issues.append("DEFAULT_FALLBACK_BASE must classify as a Mistral hostname")
+    if reviewer._fallback_host_is_mistral("https://mistral.ai.proxy.example/v1"):
+        issues.append("a mistral.ai substring in a proxy hostname must not count as Mistral")
+    proxy_effort = reviewer.Config(reviewer._parse_args([]))
+    proxy_effort.fallback_base = "https://mistral.ai.proxy.example/v1"
+    proxy_effort.fallback_effort = ""
+    proxy_effort.fallback_seed_field = ""
+    if reviewer._fallback_reasoning_effort(proxy_effort) is not None:
+        issues.append("proxy hostname containing mistral.ai must omit reasoning_effort")
+    if reviewer._fallback_seed_key(proxy_effort) != "seed":
+        issues.append("proxy hostname containing mistral.ai must use OpenAI seed")
+    if 'return None, f"{list_key} not a list"' in src:
+        issues.append(
+            "_parse_with_repair must repair invalid JSON shapes, not return immediately"
+        )
     omit_effort = reviewer.Config(reviewer._parse_args([]))
     omit_effort.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
     omit_effort.fallback_effort = "off"

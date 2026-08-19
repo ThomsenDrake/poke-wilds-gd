@@ -71,7 +71,7 @@ reads the local PNG paths from the prompt and returns strict JSON. If that
 CLI is locally unavailable OR the live Luna request fails, the same
 Command Code review harness is pointed at an OpenAI-compatible HTTP
 endpoint (default `https://api.mistral.ai/v1`) running `mistral-medium-3-5`
-at reasoning effort `high` (seed field `random_seed` on mistral.ai, else `seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
+at reasoning effort `high` (seed field `random_seed` on a mistral.ai hostname, else `seed`) when `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY`
 is set (env only, NEVER logged); later backends are probed only after a
 higher-priority miss or live failure. A live Mistral failure then walks hosted
 `qwen3.8-max-preview` via the token-plan MaaS endpoint
@@ -118,6 +118,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 
 TOOLS = Path(__file__).resolve().parent
 ROOT = TOOLS.parent
@@ -965,6 +966,16 @@ def _openai_compatible_text(doc: dict) -> str:
     return str(c)
 
 
+def _fallback_host_is_mistral(base: str) -> bool:
+    """True only when the URL hostname is mistral.ai or a mistral.ai subdomain."""
+    raw = str(base or "").strip()
+    if not raw:
+        return False
+    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+    host = (parsed.hostname or "").lower().rstrip(".")
+    return host == "mistral.ai" or host.endswith(".mistral.ai")
+
+
 def _fallback_reasoning_effort(cfg: Config) -> str | None:
     """Mistral default is high; custom hosts omit unless an effort value is set.
 
@@ -976,7 +987,7 @@ def _fallback_reasoning_effort(cfg: Config) -> str | None:
         return None
     if override in FALLBACK_EFFORT_VALUES:
         return override
-    if "mistral.ai" in cfg.fallback_base.lower():
+    if _fallback_host_is_mistral(cfg.fallback_base):
         return FALLBACK_EFFORT
     return None
 
@@ -986,8 +997,7 @@ def _fallback_seed_key(cfg: Config) -> str:
     override = cfg.fallback_seed_field
     if override in ("seed", FALLBACK_SEED_FIELD):
         return override
-    host = cfg.fallback_base.lower()
-    if "mistral.ai" in host:
+    if _fallback_host_is_mistral(cfg.fallback_base):
         return FALLBACK_SEED_FIELD
     return "seed"
 
@@ -1092,15 +1102,17 @@ def _parse_with_repair(cfg: Config, backend: str, system: str, user_text: str,
     # "answers" there made every valid critique read as malformed (dead pass).
     def _valid(doc: object) -> bool:
         return isinstance(doc, dict) and isinstance(doc.get(list_key), list)
+    first_err: BaseException | None = None
     try:
         doc = _extract_json(content)
         if _valid(doc):
             return doc, "ok"
-        return None, f"{list_key} not a list"
+        first_err = ValueError(f"{list_key} not a list")
     except (ValueError, KeyError) as exc:
         first_err = exc
-    # ONE repair retry (mandatory on the prompt-instructed DashScope path; a
-    # defensive backstop on the grammar-constrained Ollama path).
+    # ONE repair retry (mandatory on the prompt-instructed DashScope / Mistral
+    # path; a defensive backstop on the grammar-constrained Ollama path).
+    # Wrong-shape JSON (valid object, missing/non-list answers) also repairs.
     repair_system = (system + "\n\nYour last reply was not valid JSON matching the schema. "
                      "Return ONLY the JSON object now. Error: %s" % first_err)
     try:
@@ -1592,10 +1604,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--fallback-effort", dest="fallback_effort", default=None,
                         help="fallback reasoning_effort: none|minimal|low|medium|high|xhigh, "
                              f"or off to omit (env VLM_FALLBACK_EFFORT; default auto: {FALLBACK_EFFORT} "
-                             "on mistral.ai, else omitted)")
+                             "on a mistral.ai hostname, else omitted)")
     parser.add_argument("--fallback-seed-field", dest="fallback_seed_field", default=None,
                         help="fallback seed JSON field: seed or random_seed "
-                             f"(env VLM_FALLBACK_SEED_FIELD; default auto: {FALLBACK_SEED_FIELD} on mistral.ai, else seed)")
+                             f"(env VLM_FALLBACK_SEED_FIELD; default auto: {FALLBACK_SEED_FIELD} on a mistral.ai hostname, else seed)")
     parser.add_argument("--command-code-model", dest="command_code_model", default=None,
                         help=f"Command Code model (env COMMAND_CODE_MODEL or {COMMAND_CODE_MODEL})")
     parser.add_argument("--command-code-effort", dest="command_code_effort", default=None,

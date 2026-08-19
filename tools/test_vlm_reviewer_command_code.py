@@ -237,6 +237,54 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertTrue(captured["headers"]["Authorization"].startswith("Bearer "))
         self.assertNotIn(cfg.fallback_key, str(captured["url"]))
 
+    def test_mistral_substring_proxy_uses_openai_compatible_fields(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = "https://mistral.ai.proxy.example/v1"
+        cfg.fallback_seed_field = ""
+        cfg.fallback_effort = ""
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured.update({"url": url, "body": body})
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "system", "user", [], 0.0, 7)
+        self.assertFalse(VLM._fallback_host_is_mistral(cfg.fallback_base))
+        self.assertTrue(VLM._fallback_host_is_mistral("https://api.mistral.ai/v1"))
+        self.assertTrue(VLM._fallback_host_is_mistral("https://mistral.ai/v1"))
+        self.assertEqual(captured["url"], "https://mistral.ai.proxy.example/v1/chat/completions")
+        self.assertEqual(captured["body"]["seed"], 7)
+        self.assertNotIn("random_seed", captured["body"])
+        self.assertNotIn("reasoning_effort", captured["body"])
+
+    def test_parse_with_repair_retries_wrong_shape_json(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        repaired = '{"answers":[{"question_id":"q1","verdict":"yes","note":"ok"}]}'
+        with mock.patch.object(VLM, "_call_model", return_value=repaired) as call:
+            doc, note = VLM._parse_with_repair(
+                cfg, "openai_compatible", "sys", "user", [], 0.0, 1, {},
+                '{"answer":[{"question_id":"q1","verdict":"yes","note":"ok"}]}',
+            )
+        self.assertEqual(note, "repaired")
+        self.assertIsInstance(doc, dict)
+        self.assertEqual(len(doc["answers"]), 1)
+        call.assert_called_once()
+        self.assertIn("answers not a list", call.call_args.args[2])
+
+    def test_parse_with_repair_retries_non_list_answers(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        repaired = '{"answers":[{"question_id":"q1","verdict":"yes","note":"ok"}]}'
+        with mock.patch.object(VLM, "_call_model", return_value=repaired) as call:
+            doc, note = VLM._parse_with_repair(
+                cfg, "openai_compatible", "sys", "user", [], 0.0, 1, {},
+                '{"answers":"yes"}',
+            )
+        self.assertEqual(note, "repaired")
+        self.assertEqual(doc["answers"][0]["question_id"], "q1")
+        call.assert_called_once()
+
     def test_custom_fallback_host_sends_openai_seed(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))
         cfg.fallback_key = "test-only-placeholder"
