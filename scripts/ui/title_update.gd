@@ -84,7 +84,7 @@ func _begin_apply() -> void:
 		return
 	_working = true
 	if _box != null and _box.has_method("show_message"):
-		_box.call("show_message", "Downloading update…", 30.0)
+		_box.call("show_message", "Downloading update…", 0.0)
 	var result: Dictionary = await _runtime.apply_available()
 	_working = false
 	if bool(result.get("ok", false)):

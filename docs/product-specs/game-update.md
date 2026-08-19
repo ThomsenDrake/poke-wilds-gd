@@ -17,7 +17,9 @@ the first row. `Z` opens a MessageBox confirm
 ("Download and install the latest build? Your save stays on this computer.").
 `X` cancels and stays on the title. Confirm downloads that OS's artifact into
 `user://updates/`, verifies SHA-256, stages a pending apply, swaps the install,
-and relaunches. Hash mismatch, a missing pending file, or an unwritable
+and relaunches. The title keeps a held "Downloading update…" toast for the
+whole apply (it does not auto-hide at 30s) and only then shows success hide
+or the fail banner. Hash mismatch, a missing pending file, or an unwritable
 install/user dir refuses apply, leaves the old binary in place, and shows a
 MessageBox. The updater never writes `user://godot_port_save.json*`.
 

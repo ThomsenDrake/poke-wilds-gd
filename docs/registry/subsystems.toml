@@ -572,7 +572,9 @@ quality_bucket = "ui"
 # handler name/signature preserved). NEW restyle seams for the app readers (the
 # app_bootstrap entry's note): stage_root() / row_texts() / selected_row_text()
 # / row_rect() on every restyled screen (+ the party screen's action_row_text()).
-# MessageBox rides the wave-1 textbox band (committed 36ffd71). Menu baseline
+# MessageBox rides the wave-1 textbox band (committed 36ffd71).
+# show_message(text, duration<=0) holds until hide_message so a long UPDATE
+# download cannot hide the banner while title input stays locked. Menu baseline
 # re-pins PENDING (visual_sweep_update). REVIEW-FIX (strict-review remedies):
 # menu_list_stage.gd's Rows (the greyed-row screens' widget) gains the
 # accessibility contract — per-row accessibility_name pinned at build (row
@@ -2086,6 +2088,7 @@ quality_bucket = "update"
 # (Windows rename, Linux unlink, macOS app swap), and sticky user:// identity
 # so a generic replace does not strip F-to-report. is_newer refuses an unstamped
 # current build (no downgrade); apply globalizes user:// before copy/unzip.
-# Editor/scenario boots skip
+# The download toast holds (duration 0) until apply finishes so title lock and
+# banner stay paired. Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
 # Godot binary. Saves stay in user://godot_port_save.json.

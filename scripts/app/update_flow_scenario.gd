@@ -8,6 +8,7 @@ var _ctx: Dictionary
 var _runner = SmokeScenarioRunner.new()
 var _failures: Array = []
 var _download_error := ""
+var _hold_download := false
 var _applied := false
 var _relaunched := false
 
@@ -35,9 +36,13 @@ func run(ctx: Dictionary) -> void:
 	_check(not _ctx.message_box.is_confirming(), "UPDATE cancel left the confirm open")
 	_check(title.visible, "UPDATE cancel hid the title")
 	_download_error = "hash_mismatch"
+	_hold_download = true
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
 	await SmokeTap.tap(get_tree(), "action_a")
+	await _wait_until(func(): return _ctx.message_box.is_holding())
+	_check(_ctx.message_box.is_holding(), "download toast hid while UPDATE still held title input")
+	_hold_download = false
 	await _wait_until(func(): return _runner.trace_log_has_since("update_apply_refused", 0))
 	_check(not _applied, "hash mismatch still applied")
 	_check(_runner.trace_log_has_since("update_apply_refused", 0), "hash mismatch did not trace update_apply_refused")
@@ -64,6 +69,10 @@ func run(ctx: Dictionary) -> void:
 func _transport(kind: String, _build = null, dest: String = "") -> Dictionary:
 	if kind == "latest":
 		return Checks.shared_latest()
+	for _i in range(30):
+		if not _hold_download:
+			break
+		await get_tree().process_frame
 	if _download_error == "hash_mismatch":
 		var file := FileAccess.open(dest, FileAccess.WRITE)
 		file.store_buffer(Checks.hash_mismatch_payload())
