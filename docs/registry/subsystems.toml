@@ -2098,6 +2098,7 @@ quality_bucket = "update"
 # {REPORTS bucket}/{updates/...} only.
 # Windows stages *.new + PokeWilds-update.cmd and swaps after exit;
 # a failed promote restores .old and deferred apply skips applied.json.
+# A negative helper PID refuses without quitting so the title can show failure.
 # Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
 # Update checks use the embedded endpoint, not persisted friend identity.
 # Linux copies and chmods *.new before the short promote/rollback.

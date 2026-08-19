@@ -100,7 +100,9 @@ pointer only after all three object checksums exist.
   waits for the PID to exit, then moves the live `.exe` to `.old`, promotes
   `*.new`, and starts the new binary. If promotion fails, the helper restores
   `.old` before launch. `applied.json` is not written for a deferred Windows
-  apply, so a rolled-back install can still be offered UPDATE. Next boot
+  apply, so a rolled-back install can still be offered UPDATE. If the helper
+  process cannot start (`create_process` returns a negative PID), the game
+  refuses, stays open, and shows the update-failed banner. Next boot
   deletes `.old`. The running image is never renamed in-process.
 - Linux: copy and `chmod 0755` the verified artifact to a sibling `*.new`,
   then promote it over the live path. If promotion fails, the previous

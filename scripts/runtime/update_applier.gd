@@ -41,12 +41,26 @@ static func apply(os_name: String, artifact: String, target: String) -> Dictiona
 			return {"ok": false, "error": "unknown_os"}
 
 
+static var _helper_starter: Callable
+
+
 static func launch_deferred(applied: Dictionary) -> bool:
 	var helper := str(applied.get("helper", ""))
-	if helper.is_empty():
+	if helper.is_empty() or not FileAccess.file_exists(helper):
 		return false
-	OS.create_process("cmd.exe", PackedStringArray(["/c", "start", "", helper]))
-	return true
+	var pid: int = _spawn_helper(helper)
+	return pid >= 0
+
+
+static func set_helper_starter_for_smoke(starter: Callable) -> void:
+	if OS.has_feature("editor"):
+		_helper_starter = starter
+
+
+static func _spawn_helper(helper: String) -> int:
+	if _helper_starter.is_valid():
+		return int(_helper_starter.call(helper))
+	return OS.create_process("cmd.exe", PackedStringArray(["/c", "start", "", helper]))
 
 
 static func _apply_windows(target: String, artifact: String) -> Dictionary:

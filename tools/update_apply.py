@@ -36,6 +36,15 @@ def cleanup_old(target: Path) -> None:
         old.unlink()
 
 
+def launch_deferred(applied: dict, *, create_process=None) -> bool:
+    helper = str(applied.get("helper", ""))
+    path = Path(helper)
+    if not helper or not path.is_file():
+        return False
+    starter = create_process or (lambda _path: -1)
+    return int(starter(path)) >= 0
+
+
 def complete_windows_swap(target: Path, staged: Path | None = None) -> dict:
     target = Path(target)
     staged = Path(staged) if staged is not None else Path(str(target) + ".new")

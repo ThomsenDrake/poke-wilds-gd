@@ -130,6 +130,17 @@ class UpdateApplyTests(unittest.TestCase):
             update_apply.cleanup_old(current)
             self.assertFalse(Path(finished["old_path"]).exists())
 
+    def test_windows_helper_launch_refuses_negative_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            helper = Path(raw) / "PokeWilds-update.cmd"
+            helper.write_text("@echo off\r\n", encoding="ascii")
+            applied = {"helper": str(helper)}
+            self.assertFalse(update_apply.launch_deferred(applied, create_process=lambda _path: -1))
+            self.assertTrue(update_apply.launch_deferred(applied, create_process=lambda _path: 42))
+            self.assertFalse(update_apply.launch_deferred({"helper": ""}, create_process=lambda _path: 42))
+            self.assertFalse(update_apply.launch_deferred(
+                {"helper": str(Path(raw) / "missing.cmd")}, create_process=lambda _path: 42))
+
     def test_macos_swaps_app_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

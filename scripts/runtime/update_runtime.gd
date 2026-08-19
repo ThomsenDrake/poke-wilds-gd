@@ -111,6 +111,10 @@ func apply_available() -> Dictionary:
 		_busy = false
 		_trace("update_apply_refused", {"reason": str(applied.get("error", "apply_failed"))})
 		return applied
+	if bool(applied.get("deferred", false)) and not _start_deferred(applied):
+		_busy = false
+		_trace("update_apply_refused", {"reason": "helper_launch_failed"})
+		return {"ok": false, "error": "helper_launch_failed"}
 	if not bool(applied.get("deferred", false)):
 		_write_json(APPLIED_PATH, {"build_id": _latest.get("build_id", ""),
 			"published_at": _latest.get("published_at", "")})
@@ -178,11 +182,17 @@ func _invoke_apply(os_name: String, artifact: String, target: String) -> Diction
 	return UpdateApplier.apply(os_name, artifact, target)
 
 
+func _start_deferred(applied: Dictionary) -> bool:
+	if _relauncher.is_valid():
+		return true
+	return UpdateApplier.launch_deferred(applied)
+
+
 func _relaunch(applied: Dictionary = {}) -> void:
 	if _relauncher.is_valid():
 		_relauncher.call()
 		return
-	if UpdateApplier.launch_deferred(applied):
+	if bool(applied.get("deferred", false)):
 		get_tree().quit()
 		return
 	OS.set_restart_on_exit(true)

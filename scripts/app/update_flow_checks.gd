@@ -41,6 +41,7 @@ static func reset_user_state() -> void:
 			INSTALL_PATH + ".old", "user://PokeWilds-update.cmd", "user://updates/applied.json",
 			"user://updates/pending.json"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	UpdateApplier.set_helper_starter_for_smoke(Callable())
 
 
 static func expect_skip(failures: Array, updater: Node) -> void:
@@ -151,6 +152,13 @@ static func apply_windows_fixture(failures: Array) -> void:
 	var helper_text: String = FileAccess.get_file_as_string(str(result.get("helper", "")))
 	_check(failures, helper_text.contains("if errorlevel 1"),
 		"windows helper does not roll back a failed promote")
+	UpdateApplier.set_helper_starter_for_smoke(func(_helper: String) -> int: return -1)
+	_check(failures, not UpdateApplier.launch_deferred(result),
+		"windows helper launch failure was treated as success")
+	UpdateApplier.set_helper_starter_for_smoke(func(_helper: String) -> int: return 1)
+	_check(failures, UpdateApplier.launch_deferred(result),
+		"windows helper launch success was refused")
+	UpdateApplier.set_helper_starter_for_smoke(Callable())
 
 
 static func expect_staging_cleared(failures: Array) -> void:
