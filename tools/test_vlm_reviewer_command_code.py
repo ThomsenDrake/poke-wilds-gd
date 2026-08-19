@@ -218,6 +218,8 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
     def test_fallback_request_sends_reasoning_effort_high(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))
         cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = VLM.DEFAULT_FALLBACK_BASE
+        cfg.fallback_effort = ""
         captured: dict = {}
 
         def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
@@ -240,6 +242,7 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         cfg.fallback_key = "test-only-placeholder"
         cfg.fallback_base = "https://example.test/v1"
         cfg.fallback_seed_field = ""
+        cfg.fallback_effort = ""
         captured: dict = {}
 
         def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
@@ -251,6 +254,38 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertEqual(captured["url"], "https://example.test/v1/chat/completions")
         self.assertEqual(captured["body"]["seed"], 7)
         self.assertNotIn("random_seed", captured["body"])
+        self.assertNotIn("reasoning_effort", captured["body"])
+
+    def test_custom_fallback_host_can_enable_reasoning_effort(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = "https://example.test/v1"
+        cfg.fallback_effort = "high"
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured["body"] = body
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "system", "user", [], 0.0, 1)
+        self.assertEqual(captured["body"]["reasoning_effort"], "high")
+
+    def test_mistral_fallback_can_omit_reasoning_effort(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.fallback_base = VLM.DEFAULT_FALLBACK_BASE
+        cfg.fallback_effort = "off"
+        captured: dict = {}
+
+        def fake_post(url: str, body: dict, headers: dict, timeout: int) -> dict:
+            captured["body"] = body
+            return {"choices": [{"message": {"content": '{"answers":[]}'}}]}
+
+        with mock.patch.object(VLM, "_post_json", side_effect=fake_post):
+            VLM._call_fallback(cfg, "system", "user", [], 0.0, 1)
+        self.assertNotIn("reasoning_effort", captured["body"])
+        self.assertEqual(captured["body"]["random_seed"], 1)
 
     def test_fallback_seed_field_override_wins_over_host(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))
@@ -273,6 +308,7 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         cfg.fallback_key = "super-secret-key"
         cfg.fallback_base = VLM.DEFAULT_FALLBACK_BASE
         cfg.fallback_seed_field = ""
+        cfg.fallback_effort = ""
         meta = cfg.describe()
         self.assertTrue(meta["fallback_key_present"])
         dumped = VLM.json.dumps(meta)

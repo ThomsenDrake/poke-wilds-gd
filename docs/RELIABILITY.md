@@ -481,7 +481,7 @@ Endpoint / secret configuration (flags win over env):
 | `VLM_MODEL` | `--model` | `qwen3-vl:8b` | Ollama tag (explicit, never `latest`); 30b/32b avoided on 24GB |
 | `VLM_FALLBACK_BASE_URL` | `--fallback-base` | `https://api.mistral.ai/v1` | OpenAI-compatible fallback endpoint used by the Command Code review harness when `cmd` / luna is locally unavailable or the live Luna request fails |
 | `VLM_FALLBACK_MODEL` | `--fallback-model` | `mistral-medium-3-5` | OpenAI-compatible fallback model (Mistral Medium 3.5) |
-| `VLM_FALLBACK_EFFORT` | `--fallback-effort` | `high` | Fallback reasoning effort sent as `reasoning_effort` on the OpenAI-compatible request |
+| `VLM_FALLBACK_EFFORT` | `--fallback-effort` | auto | Fallback `reasoning_effort`. Auto: `high` on a `mistral.ai` host, omitted on a custom OpenAI-compatible URL. Set `none`/`minimal`/`low`/`medium`/`high`/`xhigh` to send that value; `off`/`omit`/`disabled`/`-` drops the field (empty env still means auto — `pick()` cannot use empty as omit) |
 | `VLM_FALLBACK_SEED_FIELD` | `--fallback-seed-field` | auto | Fallback seed JSON field. Auto: `random_seed` when `VLM_FALLBACK_BASE_URL` is a `mistral.ai` host (Mistral rejects OpenAI `seed`), else OpenAI-compatible `seed`. Override with `seed` or `random_seed` |
 | `MISTRAL_API_KEY` / `VLM_FALLBACK_API_KEY` | — | (unset) | SECRET — env only, NEVER logged; `reviewer_meta` records `fallback_key_present` only. Fallback path is inert until one is set |
 | `OLLAMA_HOST` | `--ollama-host` | `http://127.0.0.1:11434` | Local Ollama base URL |

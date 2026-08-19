@@ -125,6 +125,8 @@ COMMAND_CODE_MODEL = "gpt-5.6-luna"
 COMMAND_CODE_EFFORT = "low"
 FALLBACK_MODEL = "mistral-medium-3-5"   # OpenAI-compatible Command Code harness fallback
 FALLBACK_EFFORT = "high"
+FALLBACK_EFFORT_VALUES = ("none", "minimal", "low", "medium", "high", "xhigh")
+FALLBACK_EFFORT_OMIT = ("off", "omit", "disabled", "-")
 FALLBACK_SEED_FIELD = "random_seed"     # Mistral chat-completions; rejects OpenAI `seed`
 DEFAULT_FALLBACK_BASE = "https://api.mistral.ai/v1"
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
@@ -197,7 +199,7 @@ class Config:
         self.command_code_model = str(pick("command_code_model", "COMMAND_CODE_MODEL", COMMAND_CODE_MODEL))
         self.command_code_effort = str(pick("command_code_effort", "COMMAND_CODE_EFFORT", COMMAND_CODE_EFFORT)).lower()
         self.fallback_model = str(pick("fallback_model", "VLM_FALLBACK_MODEL", FALLBACK_MODEL))
-        self.fallback_effort = str(pick("fallback_effort", "VLM_FALLBACK_EFFORT", FALLBACK_EFFORT)).lower()
+        self.fallback_effort = str(pick("fallback_effort", "VLM_FALLBACK_EFFORT", "")).strip().lower()
         self.fallback_base = str(pick("fallback_base", "VLM_FALLBACK_BASE_URL", DEFAULT_FALLBACK_BASE)).rstrip("/")
         self.fallback_seed_field = str(pick(
             "fallback_seed_field", "VLM_FALLBACK_SEED_FIELD", "")).strip().lower()
@@ -229,7 +231,8 @@ class Config:
         return {
             "runtime": self.runtime, "model": self.model, "command_code_model": self.command_code_model,
             "command_code_effort": self.command_code_effort,
-            "fallback_model": self.fallback_model, "fallback_effort": self.fallback_effort,
+            "fallback_model": self.fallback_model,
+            "fallback_effort": _fallback_reasoning_effort(self) or "omit",
             "fallback_base": self.fallback_base,
             "fallback_seed_field": _fallback_seed_key(self),
             "ollama_host": self.ollama_host,
@@ -872,6 +875,22 @@ def _openai_compatible_text(doc: dict) -> str:
     return str(c)
 
 
+def _fallback_reasoning_effort(cfg: Config) -> str | None:
+    """Mistral default is high; custom hosts omit unless an effort value is set.
+
+    ``off`` / ``omit`` / ``disabled`` / ``-`` drop the field. ``none`` is a valid
+    Mistral API value and is sent as-is.
+    """
+    override = cfg.fallback_effort
+    if override in FALLBACK_EFFORT_OMIT:
+        return None
+    if override in FALLBACK_EFFORT_VALUES:
+        return override
+    if "mistral.ai" in cfg.fallback_base.lower():
+        return FALLBACK_EFFORT
+    return None
+
+
 def _fallback_seed_key(cfg: Config) -> str:
     """Mistral chat-completions uses random_seed; other OpenAI-compatible hosts use seed."""
     override = cfg.fallback_seed_field
@@ -919,8 +938,9 @@ def _call_fallback(cfg: Config, system: str, user_text: str, images: list[str],
     if not cfg.fallback_key:
         raise RuntimeError("openai-compatible fallback key missing")
     extra = {}
-    if cfg.fallback_effort:
-        extra["reasoning_effort"] = cfg.fallback_effort
+    effort = _fallback_reasoning_effort(cfg)
+    if effort:
+        extra["reasoning_effort"] = effort
     return _call_openai_compatible(
         cfg, system, user_text, images, temperature, seed,
         base=cfg.fallback_base, model=cfg.fallback_model, key=cfg.fallback_key,
@@ -1458,7 +1478,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--fallback-model", dest="fallback_model", default=None,
                         help=f"OpenAI-compatible fallback model (env VLM_FALLBACK_MODEL or {FALLBACK_MODEL})")
     parser.add_argument("--fallback-effort", dest="fallback_effort", default=None,
-                        help=f"fallback reasoning effort (env VLM_FALLBACK_EFFORT or {FALLBACK_EFFORT})")
+                        help="fallback reasoning_effort: none|minimal|low|medium|high|xhigh, "
+                             f"or off to omit (env VLM_FALLBACK_EFFORT; default auto: {FALLBACK_EFFORT} "
+                             "on mistral.ai, else omitted)")
     parser.add_argument("--fallback-seed-field", dest="fallback_seed_field", default=None,
                         help="fallback seed JSON field: seed or random_seed "
                              f"(env VLM_FALLBACK_SEED_FIELD; default auto: {FALLBACK_SEED_FIELD} on mistral.ai, else seed)")

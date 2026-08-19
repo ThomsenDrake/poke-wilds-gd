@@ -1702,6 +1702,31 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         issues.append(
             "prior_backends must merge probe-skipped rows with live-call failures"
         )
+    if "_fallback_reasoning_effort(cfg)" not in src:
+        issues.append(
+            "openai-compatible fallback must choose reasoning_effort from the fallback host"
+        )
+    mistral_effort_cfg = reviewer.Config(reviewer._parse_args([]))
+    mistral_effort_cfg.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    mistral_effort_cfg.fallback_effort = ""
+    if reviewer._fallback_reasoning_effort(mistral_effort_cfg) != "high":
+        issues.append(
+            "default Mistral fallback must send reasoning_effort high "
+            f"(got {reviewer._fallback_reasoning_effort(mistral_effort_cfg)})"
+        )
+    custom_effort = reviewer.Config(reviewer._parse_args([]))
+    custom_effort.fallback_base = "https://example.test/v1"
+    custom_effort.fallback_effort = ""
+    if reviewer._fallback_reasoning_effort(custom_effort) is not None:
+        issues.append(
+            "non-Mistral fallback URL must omit reasoning_effort unless explicitly set "
+            f"(got {reviewer._fallback_reasoning_effort(custom_effort)})"
+        )
+    omit_effort = reviewer.Config(reviewer._parse_args([]))
+    omit_effort.fallback_base = reviewer.DEFAULT_FALLBACK_BASE
+    omit_effort.fallback_effort = "off"
+    if reviewer._fallback_reasoning_effort(omit_effort) is not None:
+        issues.append("VLM_FALLBACK_EFFORT=off must omit reasoning_effort")
     if "seed_key=_fallback_seed_key(cfg)" not in src:
         issues.append(
             "openai-compatible fallback must choose seed vs random_seed from the fallback host"
