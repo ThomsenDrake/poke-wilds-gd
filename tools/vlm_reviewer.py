@@ -89,12 +89,14 @@ dropped (full frames + SoM overlays always go). Ollama's grammar-constrained
 `format=<schema>` guarantees output SHAPE (one defensive validate/repair
 retry); the hosted path is prompt-instructed JSON so validate+repair is
 mandatory there. The per-call timeout (VLM_TIMEOUT, default 180) bounds each
-HTTP call; the pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
-invocation. The worst case (standalone Command Code probe 30s, or HTTP probe
-5s, plus n=2 + a repair retry per pass) can
-exceed the outer bound under a slow model -- the outer bound then kills the
-invocation and the pipeline records a TOOL ERROR (fail-closed, never a silent
-pass); for slow endpoints raise VLM_TIMEOUT and REVIEWER_TIMEOUT together.
+HTTP or cmd call. The pipeline's REVIEWER_TIMEOUT=300 bounds the whole plugin
+invocation; auto-walk attempts share that budget (VLM_OUTER_BUDGET, 20s emit
+reserve) so a Luna timeout cannot starve Mistral. The worst case (standalone
+Command Code probe 30s, or HTTP probe 5s, plus n=2 + a repair retry per pass)
+can still exceed the outer bound under a slow model -- the outer bound then
+kills the invocation and the pipeline records a TOOL ERROR (fail-closed, never
+a silent pass); for slow endpoints raise VLM_TIMEOUT and REVIEWER_TIMEOUT
+together.
 
 Stdlib-only. Reuses vision_review.default_reviewer / parse_rubric_questions /
 _shot_group via the sanctioned importlib pattern (never forked); geometry stays
@@ -112,6 +114,7 @@ import random
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -133,6 +136,9 @@ DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
 DEFAULT_DASHSCOPE_BASE = "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
 DEFAULT_DASHSCOPE_MODEL = "qwen3.8-max-preview"
 DEFAULT_TIMEOUT = 180                   # per call; reasoning models spend tokens thinking (keep headroom; < REVIEWER_TIMEOUT=300)
+DEFAULT_OUTER_BUDGET = 300              # must == vision_review.REVIEWER_TIMEOUT
+OUTER_RESERVE_S = 20                    # leave room to emit JSON before the plugin is killed
+MIN_BACKEND_TIMEOUT_S = 15
 SINGLE_PASS_BACKENDS = ("command_code", "openai_compatible")
 AUTO_BACKEND_ORDER = ("command_code", "openai_compatible", "dashscope", "ollama")
 PROBE_TIMEOUT = 5
@@ -142,6 +148,21 @@ MAX_TEXT = 1600                         # cap embedded text blocks so a large bu
 RUBRIC_REF = "docs/references/vision-review-rubric.md"
 
 EXIT_OK, EXIT_ERROR = 0, 2
+
+
+def _outer_budget_s() -> int:
+    raw = os.environ.get("VLM_OUTER_BUDGET", str(DEFAULT_OUTER_BUDGET))
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        return DEFAULT_OUTER_BUDGET
+
+
+def remaining_call_timeout(cfg: Config, started: float, now: float | None = None) -> int:
+    """Per-call timeout capped by the remaining reviewer-cmd wall budget."""
+    current = time.monotonic() if now is None else now
+    remaining = _outer_budget_s() - (current - started) - OUTER_RESERVE_S
+    return max(0, min(int(cfg.timeout), int(remaining)))
 
 
 def _command_code_probe_timeout() -> int:
@@ -251,6 +272,8 @@ class Config:
                                if self.independent_vote else
                                "determinism/repro guard (two identical greedy decodes at temperature 0)"),
             "order_shuffle": True, "per_call_timeout_s": self.timeout,
+            "outer_budget_s": _outer_budget_s(),
+            "outer_reserve_s": OUTER_RESERVE_S,
             "pixel_budget_note": "Qwen min/max_pixels is a model/server setting, not a per-request "
                                  "option; native-res crops carry the small-diff signal; crops with a "
                                  "side < 11px are dropped (the hosted endpoint rejects <=10px images)",
@@ -1359,9 +1382,11 @@ def _self_critique(public_ctx: dict, cfg: Config, backend: str, catalog: str,
 # --------------------------------------------------------------------------
 # orchestration
 # --------------------------------------------------------------------------
-def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], dict]:
+def run_review(public_ctx: dict, cfg: Config,
+               started: float | None = None) -> tuple[list[dict], list[dict], dict]:
     meta: dict = {"schema": SCHEMA, "generated_by": "tools/vlm_reviewer.py",
                   "config": cfg.describe()}
+    started = time.monotonic() if started is None else started
 
     det_findings, det_note, anchor_unverified, anchor_kind_ran = deterministic_findings(public_ctx, cfg)
     meta["deterministic"] = {"count": len(det_findings), "note": det_note,
@@ -1387,6 +1412,17 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
             if not ok:
                 skipped.append((backend, probe_reason))
                 continue
+            call_timeout = remaining_call_timeout(cfg, started)
+            if call_timeout < MIN_BACKEND_TIMEOUT_S:
+                tried.append({
+                    "backend": backend,
+                    "probe": probe_reason,
+                    "error": f"outer reviewer budget exhausted ({call_timeout}s left)",
+                    "call_timeout_s": call_timeout,
+                })
+                break
+            prior_timeout = cfg.timeout
+            cfg.timeout = call_timeout
             try:
                 answers, mmeta = run_model(public_ctx, cfg, backend)
                 _require_complete_model(cfg, answers, mmeta)
@@ -1401,9 +1437,12 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                     "backend": backend,
                     "probe": probe_reason,
                     "error": _model_call_error(cfg, exc),
+                    "call_timeout_s": call_timeout,
                 })
                 if cfg.runtime != "auto":
                     break
+            finally:
+                cfg.timeout = prior_timeout
         if not selected:
             answers = []
             if tried:

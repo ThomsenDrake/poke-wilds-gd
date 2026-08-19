@@ -1362,8 +1362,11 @@ def _run_cmd_reviewer(cmd: str, public_ctx: dict) -> tuple[list, list, set[str],
     complete reviewer_meta is returned for the required-review acceptance gate."""
     try:
         argv = shlex.split(cmd)
+        env = os.environ.copy()
+        env.setdefault("VLM_OUTER_BUDGET", str(REVIEWER_TIMEOUT))
         proc = subprocess.run(argv, input=json.dumps(public_ctx), capture_output=True,
-                              text=True, timeout=REVIEWER_TIMEOUT, shell=False)
+                              text=True, timeout=REVIEWER_TIMEOUT, shell=False,
+                              env=env)
     except (OSError, subprocess.SubprocessError) as exc:
         raise ValueError(f"reviewer-cmd failed: {exc}") from exc
     if proc.returncode != 0:

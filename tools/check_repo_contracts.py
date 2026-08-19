@@ -1682,6 +1682,21 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
             "vlm_reviewer fallback seed field must stay random_seed "
             f"(got {reviewer.FALLBACK_SEED_FIELD})"
         )
+    if reviewer.DEFAULT_OUTER_BUDGET != 300:
+        issues.append(
+            "vlm_reviewer DEFAULT_OUTER_BUDGET must stay 300 "
+            f"(got {reviewer.DEFAULT_OUTER_BUDGET})"
+        )
+    try:
+        vision = _load_tool("vision_review", Path(__file__).resolve().with_name("vision_review.py"))
+    except (OSError, RuntimeError) as exc:
+        issues.append(f"command code reviewer: cannot load vision_review.py: {exc}")
+        vision = None
+    if vision is not None and reviewer.DEFAULT_OUTER_BUDGET != vision.REVIEWER_TIMEOUT:
+        issues.append(
+            "vlm_reviewer DEFAULT_OUTER_BUDGET must equal vision_review.REVIEWER_TIMEOUT "
+            f"({reviewer.DEFAULT_OUTER_BUDGET} != {vision.REVIEWER_TIMEOUT})"
+        )
     if reviewer.AUTO_BACKEND_ORDER != (
         "command_code", "openai_compatible", "dashscope", "ollama"
     ):
@@ -1692,6 +1707,10 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
     src = tool_path.read_text(encoding="utf-8")
     if "candidates, skipped = probe_backends(cfg)" in src:
         issues.append("run_review must not eagerly probe every backend before the first call")
+    if "remaining_call_timeout(cfg, started)" not in src:
+        issues.append("run_review must cap each backend call by remaining_call_timeout")
+    if "VLM_OUTER_BUDGET" not in Path(__file__).resolve().with_name("vision_review.py").read_text(encoding="utf-8"):
+        issues.append("vision_review must export VLM_OUTER_BUDGET to the reviewer-cmd child")
     if "for backend in _candidate_order(cfg):" not in src:
         issues.append("run_review must walk _candidate_order and probe the next backend only as needed")
     if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:

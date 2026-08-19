@@ -538,6 +538,68 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
         self.assertIn("cmd CLI not found", meta["model"]["reason"])
         self.assertIn("model not pulled", meta["model"]["reason"])
 
+    def test_remaining_call_timeout_caps_to_outer_budget(self) -> None:
+        cfg = VLM.Config(VLM._parse_args([]))
+        cfg.timeout = 180
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False):
+            self.assertEqual(VLM.remaining_call_timeout(cfg, 0.0, now=0.0), 180)
+            self.assertEqual(VLM.remaining_call_timeout(cfg, 0.0, now=180.0), 100)
+            self.assertEqual(VLM.remaining_call_timeout(cfg, 0.0, now=290.0), 0)
+
+    def test_auto_shrinks_timeout_for_later_backend(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.timeout = 180
+        cfg.required = True
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+        seen: list[tuple[str, int]] = []
+
+        def fake_run_model(_ctx, call_cfg, backend):
+            seen.append((backend, call_cfg.timeout))
+            if backend == "command_code":
+                raise RuntimeError("luna timeout")
+            return answers_ok, {
+                "ran": True,
+                "backend": backend,
+                "questions_total": 1,
+                "passes_completed": 1,
+            }
+
+        clock = iter([0.0, 180.0])
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: next(clock, 180.0)), \
+                mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model):
+            _findings, _answers, meta = VLM.run_review({}, cfg, started=0.0)
+        self.assertEqual(seen, [("command_code", 180), ("openai_compatible", 100)])
+        self.assertEqual(meta["model"]["backend"], "openai_compatible")
+
+    def test_auto_skips_later_backend_when_outer_budget_exhausted(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        cfg.timeout = 180
+        cfg.required = True
+        seen: list[str] = []
+
+        def fake_run_model(_ctx, _cfg, backend):
+            seen.append(backend)
+            raise RuntimeError(f"{backend} down")
+
+        clock = iter([0.0, 290.0])
+        with mock.patch.dict(os.environ, {"VLM_OUTER_BUDGET": "300"}, clear=False), \
+                mock.patch.object(VLM.time, "monotonic", side_effect=lambda: next(clock, 290.0)), \
+                mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(True, "cmd CLI available")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")), \
+                mock.patch.object(VLM, "run_model", side_effect=fake_run_model):
+            with self.assertRaises(RuntimeError) as raised:
+                VLM.run_review({}, cfg, started=0.0)
+        self.assertEqual(seen, ["command_code"])
+        self.assertIn("outer reviewer budget exhausted", str(raised.exception))
+        self.assertIn("openai_compatible", str(raised.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
