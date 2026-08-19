@@ -78,8 +78,8 @@ higher-priority miss or live failure. A live Mistral failure then walks hosted
 (DEFAULT_DASHSCOPE_BASE) when DASHSCOPE_API_KEY is set; then local
 qwen3-vl:8b (Instruct) via Ollama's HTTP API when pulled; else required
 review fails closed. A pinned `--runtime` / `VLM_RUNTIME` does not walk.
-`reviewer_meta.prior_backends` records secret-free probe+error rows for
-every skipped candidate. The wrapper is PURE
+`reviewer_meta.prior_backends` records secret-free rows for probe-skipped
+backends and live-call failures. The wrapper is PURE
 STDLIB (urllib.request + json + base64; NO SDK, NO venv) and stays a CORE tool:
 OPTIONAL_TOOL_EXEMPTIONS remains pinned to exactly {vision_metrics.py}. An
 explicit model id is pinned, never `latest`. Hosted calls budget max_tokens=
@@ -442,6 +442,19 @@ def _model_pass_error_reason(tried: list[dict]) -> str:
         return f"model pass error: {tried[0]['error']}"
     parts = [f"{row['backend']}: {row['error']}" for row in tried]
     return "model pass error: " + "; ".join(parts)
+
+
+def _prior_backend_rows(
+    skipped: list[tuple[str, str]],
+    tried: list[dict],
+) -> list[dict]:
+    """Probe-skipped rows first, then live-call failures. Secret-free."""
+    rows = [
+        {"backend": backend, "probe": reason, "skipped": True}
+        for backend, reason in skipped
+    ]
+    rows.extend(tried)
+    return rows
 
 
 def _redact_secrets(cfg: Config, text: str) -> str:
@@ -1342,8 +1355,9 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                 answers, mmeta = run_model(public_ctx, cfg, backend)
                 _require_complete_model(cfg, answers, mmeta)
                 meta["model"] = mmeta
-                if tried:
-                    meta["model"]["prior_backends"] = list(tried)
+                prior = _prior_backend_rows(skipped, tried)
+                if prior:
+                    meta["model"]["prior_backends"] = prior
                 selected = True
                 break
             except Exception as exc:
@@ -1361,7 +1375,7 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                 meta["model"] = {
                     "ran": False,
                     "reason": reason,
-                    "prior_backends": tried,
+                    "prior_backends": _prior_backend_rows(skipped, tried),
                 }
                 if cfg.required:
                     raise RuntimeError(
@@ -1370,7 +1384,11 @@ def run_review(public_ctx: dict, cfg: Config) -> tuple[list[dict], list[dict], d
                       file=sys.stderr)
             else:
                 reason = _unavailable_reason(cfg, skipped)
-                meta["model"] = {"ran": False, "reason": reason}
+                meta["model"] = {
+                    "ran": False,
+                    "reason": reason,
+                    "prior_backends": _prior_backend_rows(skipped, []),
+                }
                 if cfg.required:
                     raise RuntimeError(f"required vision model unavailable: {reason}")
                 print(f"vlm_reviewer: model unavailable ({reason}); deterministic pass only",

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import re
 import socket
@@ -1649,8 +1650,21 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
         return [f"command code reviewer: cannot load vlm_reviewer.py: {exc}"]
 
     issues: list[str] = []
-    cfg = reviewer.Config(reviewer._parse_args([]))
-    argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    if reviewer.COMMAND_CODE_EFFORT != "low":
+        issues.append(
+            "vlm_reviewer COMMAND_CODE_EFFORT default must stay low "
+            f"(got {reviewer.COMMAND_CODE_EFFORT})"
+        )
+    saved_env = {
+        key: os.environ.pop(key)
+        for key in ("COMMAND_CODE_EFFORT", "COMMAND_CODE_MODEL")
+        if key in os.environ
+    }
+    try:
+        cfg = reviewer.Config(reviewer._parse_args([]))
+        argv = reviewer.command_code_argv("/bin/cmd", "prompt", cfg)
+    finally:
+        os.environ.update(saved_env)
     if "--auto-accept" in argv:
         issues.append("vlm_reviewer Command Code argv must not use --auto-accept")
     if reviewer.FALLBACK_MODEL != "mistral-medium-3-5":
@@ -1678,6 +1692,10 @@ def command_code_reviewer_issues(root: Path) -> list[str]:
     if 'cfg.runtime != "auto"' not in src or "prior_backends" not in src:
         issues.append(
             "auto runtime must record prior_backends and walk after a live call failure"
+        )
+    if "_prior_backend_rows(skipped, tried)" not in src:
+        issues.append(
+            "prior_backends must merge probe-skipped rows with live-call failures"
         )
     if 'required vision model failed: {reason}' not in src:
         issues.append(

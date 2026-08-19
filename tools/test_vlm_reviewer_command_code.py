@@ -155,11 +155,27 @@ class CommandCodeIncompleteRepairTests(unittest.TestCase):
 
 class OpenAICompatibleFallbackTests(unittest.TestCase):
     def test_default_argv_keeps_low_effort_on_luna(self) -> None:
-        cfg = VLM.Config(VLM._parse_args([]))
-        argv = VLM.command_code_argv("/bin/cmd", "prompt", cfg)
+        env = {key: value for key, value in os.environ.items()
+               if key not in {"COMMAND_CODE_EFFORT", "COMMAND_CODE_MODEL"}}
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = VLM.Config(VLM._parse_args([]))
+            argv = VLM.command_code_argv("/bin/cmd", "prompt", cfg)
         self.assertEqual(cfg.command_code_effort, "low")
         self.assertEqual(argv[argv.index("--effort") + 1], "low")
         self.assertEqual(argv[argv.index("--model") + 1], "gpt-5.6-luna")
+
+    def test_repo_contract_default_effort_ignores_env_override(self) -> None:
+        spec = importlib.util.spec_from_file_location(
+            "check_repo_contracts_under_test",
+            ROOT / "tools/check_repo_contracts.py",
+        )
+        assert spec is not None and spec.loader is not None
+        contracts = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(contracts)
+        with mock.patch.dict(os.environ, {"COMMAND_CODE_EFFORT": "high"}, clear=False):
+            issues = contracts.command_code_reviewer_issues(ROOT)
+        effort_issues = [item for item in issues if "effort low" in item]
+        self.assertEqual(effort_issues, [])
 
     def test_fallback_constants_are_mistral_medium_high_effort(self) -> None:
         self.assertEqual(VLM.FALLBACK_MODEL, "mistral-medium-3-5")
@@ -173,6 +189,31 @@ class OpenAICompatibleFallbackTests(unittest.TestCase):
             backend, reason = VLM.probe_availability(cfg)
         self.assertEqual(backend, "openai_compatible")
         self.assertIn("fallback key present", reason)
+
+    def test_prior_backends_includes_probe_skipped_command_code(self) -> None:
+        cfg = VLM.Config(VLM._parse_args(["--runtime", "auto"]))
+        cfg.fallback_key = "test-only-placeholder"
+        answers_ok = [{"question_id": "q1", "verdict": "yes", "note": "ok"}]
+        with mock.patch.object(VLM, "deterministic_findings", return_value=([], "ok", [], False)), \
+                mock.patch.object(VLM, "_command_code_available", return_value=(False, "cmd CLI not found")), \
+                mock.patch.object(VLM, "_model_in_tags", return_value=(False, "model not pulled")) as ollama_probe, \
+                mock.patch.object(
+                    VLM,
+                    "run_model",
+                    return_value=(answers_ok, {
+                        "ran": True,
+                        "backend": "openai_compatible",
+                        "questions_total": 1,
+                        "passes_completed": 1,
+                    }),
+                ):
+            _findings, _answers, meta = VLM.run_review({}, cfg)
+        self.assertEqual(meta["model"]["backend"], "openai_compatible")
+        self.assertEqual(
+            meta["model"]["prior_backends"],
+            [{"backend": "command_code", "probe": "cmd CLI not found", "skipped": True}],
+        )
+        ollama_probe.assert_not_called()
 
     def test_fallback_request_sends_reasoning_effort_high(self) -> None:
         cfg = VLM.Config(VLM._parse_args([]))
