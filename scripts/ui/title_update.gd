@@ -25,7 +25,8 @@ func setup(host: Control, runtime: Node, box: Node) -> void:
 func persist_and_maybe_check() -> void:
 	if _runtime == null:
 		return
-	_runtime.persist_identity()
+	if not _runtime.persist_identity():
+		return
 	if _runtime.should_check():
 		_runtime.start_check()
 

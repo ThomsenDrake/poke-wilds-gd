@@ -43,6 +43,7 @@ static func reset_user_state() -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	UpdateApplier.set_helper_starter_for_smoke(Callable())
 	UpdateApplier.set_chmod_runner_for_smoke(Callable())
+	UpdateIdentity.set_write_fail_for_smoke(false)
 
 
 static func expect_skip(failures: Array, updater: Node) -> void:
@@ -62,6 +63,21 @@ static func expect_update_row(failures: Array, title: Node, has_save: bool) -> v
 static func expect_selection_kept(failures: Array, title: Node, label: String) -> void:
 	_check(failures, title.entry_row_text(title.selected_entry()) == label,
 		"async UPDATE stole the title cursor from %s" % label)
+
+
+static func expect_identity_persist_refuse(failures: Array, updater: Node) -> void:
+	UpdateIdentity.set_path_for_smoke(IDENTITY_PATH)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(IDENTITY_PATH))
+	UpdateIdentity.set_write_fail_for_smoke(true)
+	if updater != null and updater.has_method("smoke_set_build_info"):
+		updater.smoke_set_build_info(friend_build())
+	_check(failures, updater != null and not updater.persist_identity(),
+		"identity persist failure was ignored")
+	_check(failures, UpdateIdentity.load_identity().is_empty(),
+		"failed persist still wrote playtest identity")
+	UpdateIdentity.set_write_fail_for_smoke(false)
+	if updater != null and updater.has_method("smoke_set_build_info"):
+		updater.smoke_set_build_info({})
 
 
 static func persist_friend(failures: Array) -> void:
@@ -169,6 +185,13 @@ static func apply_windows_fixture(failures: Array) -> void:
 	_check(failures, UpdateApplier.launch_deferred(result),
 		"windows helper launch success was refused")
 	UpdateApplier.set_helper_starter_for_smoke(Callable())
+
+
+static func expect_download_cleared(failures: Array) -> void:
+	_check(failures, not FileAccess.file_exists("user://updates/PokeWilds-linux.x86_64"),
+		"failed download left a partial artifact")
+	_check(failures, not FileAccess.file_exists("user://updates/pending.json"),
+		"failed download left pending.json")
 
 
 static func expect_staging_cleared(failures: Array) -> void:

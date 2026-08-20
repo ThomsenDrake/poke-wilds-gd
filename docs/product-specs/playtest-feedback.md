@@ -85,7 +85,9 @@ revocable opaque invite token in generated, ignored build metadata, plus
 A later shared update ([game-update.md](game-update.md)) does not re-embed that
 token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
 `channel` into `user://playtest_identity.json`, and `load_build_info()` prefers
-that persisted route for new `F` reports. Shared update checks read the
+that persisted route for new `F` reports. If the identity write fails, the
+shared update check and apply are refused so a tokenless replace cannot
+strip the friend route. Shared update checks read the
 embedded `endpoint` from `playtest_build.json` and do not follow the persisted
 friend relay. Editor smoke build-info overrides are
 not merged with disk identity. The relay

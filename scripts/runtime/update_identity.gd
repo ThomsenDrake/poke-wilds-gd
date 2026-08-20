@@ -5,6 +5,7 @@ const TMP_SUFFIX := ".tmp"
 const IDENTITY_KEYS := ["tester_id", "invite_token", "endpoint", "channel"]
 
 static var _path_override := ""
+static var _write_fail := false
 
 
 static func path() -> String:
@@ -14,6 +15,11 @@ static func path() -> String:
 static func set_path_for_smoke(value: String) -> void:
 	if OS.has_feature("editor"):
 		_path_override = value
+
+
+static func set_write_fail_for_smoke(fail: bool) -> void:
+	if OS.has_feature("editor"):
+		_write_fail = fail
 
 
 static func load_identity() -> Dictionary:
@@ -56,6 +62,8 @@ static func merge(embedded: Dictionary, persisted: Dictionary = {}) -> Dictionar
 
 
 static func _write(payload: Dictionary) -> bool:
+	if _write_fail:
+		return false
 	var target := path()
 	var temporary := target + TMP_SUFFIX
 	var file := FileAccess.open(temporary, FileAccess.WRITE)

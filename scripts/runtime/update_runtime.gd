@@ -34,8 +34,8 @@ func _ready() -> void:
 	UpdateApplier.cleanup_old(UpdateApplier.install_path())
 
 
-func persist_identity() -> void:
-	UpdateIdentity.persist_from(_bundle.load_build_info())
+func persist_identity() -> bool:
+	return UpdateIdentity.persist_from(_bundle.load_build_info())
 
 
 func should_check() -> bool:
@@ -70,7 +70,7 @@ func is_offerable_build(latest: Dictionary, current: Dictionary, applied: Dictio
 
 
 func start_check() -> void:
-	if not should_check() or _busy:
+	if not should_check() or _busy or not persist_identity():
 		return
 	_run_check()
 
@@ -97,6 +97,9 @@ func apply_available() -> Dictionary:
 	var build := UpdateManifest.build_for_os(_latest, os_name)
 	if not _available or build.is_empty():
 		return {"ok": false, "error": "not_available"}
+	if not persist_identity():
+		_trace("update_apply_refused", {"reason": "identity_persist_failed"})
+		return {"ok": false, "error": "identity_persist_failed"}
 	_busy = true
 	var downloaded := await _download_artifact(build)
 	if not bool(downloaded.get("ok", false)):
@@ -148,8 +151,9 @@ func _download_artifact(build: Dictionary) -> Dictionary:
 	if _transport.is_valid():
 		var transported = await _transport.call("download", build, dest)
 		if not transported is Dictionary:
-			return {"ok": false, "error": "download_failed"}
+			return _download_refused(dest, "download_failed")
 		if not bool(transported.get("ok", false)):
+			_discard_download(dest)
 			return transported
 		if bool(transported.get("verified", false)):
 			_write_json(PENDING_PATH, {"path": dest, "sha256": build.get("sha256", ""),
@@ -160,16 +164,15 @@ func _download_artifact(build: Dictionary) -> Dictionary:
 		var err := _http.request(str(build.get("url", "")), PackedStringArray(), HTTPClient.METHOD_GET)
 		if err != OK:
 			_http.download_file = ""
-			return {"ok": false, "error": "request_start_failed"}
+			return _download_refused(dest, "request_start_failed")
 		var response: Array = await _http.request_completed
 		_http.download_file = ""
 		if int(response[0]) != HTTPRequest.RESULT_SUCCESS or int(response[1]) != 200:
-			return {"ok": false, "error": "download_failed"}
+			return _download_refused(dest, "download_failed")
 	if not FileAccess.file_exists(dest):
 		return {"ok": false, "error": "pending_missing"}
 	if FileAccess.get_sha256(dest) != str(build.get("sha256", "")):
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(dest))
-		return {"ok": false, "error": "hash_mismatch"}
+		return _download_refused(dest, "hash_mismatch")
 	_write_json(PENDING_PATH, {"path": dest, "sha256": build.get("sha256", ""),
 		"build_id": _latest.get("build_id", "")})
 	return {"ok": true, "path": dest}
@@ -197,6 +200,15 @@ func _relaunch(applied: Dictionary = {}) -> void:
 		return
 	OS.set_restart_on_exit(true)
 	get_tree().quit()
+
+
+func _discard_download(dest: String) -> void:
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(dest))
+
+
+func _download_refused(dest: String, error: String) -> Dictionary:
+	_discard_download(dest)
+	return {"ok": false, "error": error}
 
 
 func _clear_staging() -> void:
@@ -264,6 +276,11 @@ func smoke_set_relauncher(relauncher: Callable) -> void:
 func smoke_force_check(enabled: bool) -> void:
 	if OS.has_feature("editor"):
 		_force_check = enabled
+
+
+func smoke_set_build_info(build: Dictionary) -> void:
+	if OS.has_feature("editor"):
+		_bundle.set_build_info_for_smoke(build)
 
 
 func smoke_set_latest(latest: Dictionary) -> void:

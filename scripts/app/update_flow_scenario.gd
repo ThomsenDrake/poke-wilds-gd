@@ -50,6 +50,7 @@ func run(ctx: Dictionary) -> void:
 	await get_tree().process_frame
 	_check(not _applied, "hash mismatch still applied")
 	_check(_runner.trace_log_has_since("update_apply_refused", refuse_from), "hash mismatch did not trace update_apply_refused")
+	Checks.expect_download_cleared(_failures)
 	_download_error = ""
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
@@ -57,6 +58,7 @@ func run(ctx: Dictionary) -> void:
 	await _wait_until(func(): return _applied and _relaunched, 40)
 	_check(_applied and _relaunched, "successful UPDATE did not apply and relaunch")
 	_check(not updater.latest_build().is_empty(), "shared latest was not staged on the updater")
+	Checks.expect_identity_persist_refuse(_failures, updater)
 	Checks.persist_friend(_failures)
 	Checks.expect_shared_channel(_failures, updater)
 	Checks.expect_embedded_update_endpoint(_failures, updater)

@@ -19,11 +19,12 @@ the first row. `Z` opens a MessageBox confirm
 `user://updates/`, verifies SHA-256, stages a pending apply, swaps the install,
 and relaunches. The title keeps a held "Downloading update…" toast for the
 whole apply (it does not auto-hide at 30s) and only then shows success hide
-or the fail banner. Hash mismatch, a missing pending file, or an unwritable
+or the fail banner. Hash mismatch, a missing pending file, a failed download, or an unwritable
 install/user dir refuses apply, leaves the old binary in place, and shows a
-MessageBox. A successful apply deletes `user://updates/pending.json` and the
-downloaded artifact (keeping `applied.json`) so later builds cannot pile up
-under unique filenames. The updater never writes `user://godot_port_save.json*`.
+MessageBox. Failed downloads delete the partial artifact so unique
+build-specific filenames cannot fill `user://`. A successful apply deletes
+`user://updates/pending.json` and the downloaded artifact (keeping
+`applied.json`) so later builds cannot pile up under unique filenames. The updater never writes `user://godot_port_save.json*`.
 
 Saves stay in Godot `user://` for `config/name="PokeWilds-Godot"`. Replacing
 the executable does not touch that path. The application name and macOS
@@ -48,7 +49,9 @@ on the update path.
 
 Feedback identity is sticky in `user://playtest_identity.json`. A friend
 package copies `tester_id` / `invite_token` / `endpoint` / `channel` on first
-run (atomic temp+rename). After a shared update, `load_build_info()` prefers
+run (atomic temp+rename). If that write fails, the title skips the latest
+check and refuses apply so a tokenless shared replace cannot strip F-to-report.
+After a shared update, `load_build_info()` prefers
 that persisted route for new `F` reports; the new embedded `playtest_build.json`
 supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
