@@ -60,8 +60,13 @@ def build_for_os(latest: dict, os_name: str) -> dict:
     return dict(build) if isinstance(build, dict) and build else {}
 
 
-def is_offerable(latest: dict, current: dict, applied: dict | None, os_name: str) -> bool:
-    return is_newer(latest, current, applied or {}) and bool(build_for_os(latest, os_name))
+def is_offerable(latest: dict, current: dict, applied: dict | None, os_name: str,
+                 schema_version: int | None = None) -> bool:
+    if not is_newer(latest, current, applied or {}) or not build_for_os(latest, os_name):
+        return False
+    if schema_version is None:
+        return True
+    return int(schema_version) >= int(latest.get("min_save_version", 0))
 
 
 def is_newer(latest: dict, current: dict, applied: dict | None = None) -> bool:

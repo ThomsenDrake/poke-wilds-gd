@@ -71,6 +71,8 @@ class UpdateManifestTests(unittest.TestCase):
         self.assertFalse(update_manifest.is_offerable(latest, older, {}, "Android"))
         self.assertFalse(update_manifest.is_offerable(latest, older, {}, "Web"))
         self.assertFalse(update_manifest.is_offerable(latest, older, {}, ""))
+        self.assertTrue(update_manifest.is_offerable(latest, older, {}, "Linux", 6))
+        self.assertFalse(update_manifest.is_offerable(latest, older, {}, "Linux", 5))
         self.assertEqual(update_manifest.build_for_os(latest, "Android"), {})
         self.assertEqual(update_manifest.os_key("Android"), "")
 

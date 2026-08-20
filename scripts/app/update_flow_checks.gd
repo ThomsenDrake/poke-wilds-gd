@@ -120,6 +120,18 @@ static func expect_os_gate(failures: Array, updater: Node) -> void:
 		"empty OS was offered UPDATE")
 
 
+static func expect_save_floor(failures: Array, updater: Node) -> void:
+	var latest := shared_latest()
+	_check(failures, updater != null and updater.is_offerable_build(latest, {}, {}, "Linux", 6),
+		"schema 6 was not offered a min_save_version 6 latest")
+	_check(failures, not updater.is_offerable_build(latest, {}, {}, "Linux", 5),
+		"schema 5 was offered a min_save_version 6 latest")
+	var high := shared_latest()
+	high["min_save_version"] = 99
+	_check(failures, not updater.is_offerable_build(high, {}, {}, "Linux", 6),
+		"schema 6 was offered a min_save_version 99 latest")
+
+
 static func hash_mismatch_payload() -> PackedByteArray:
 	return PackedByteArray([1, 2, 3, 4])
 

@@ -31,8 +31,12 @@ static func build_for_os(latest: Dictionary, os_name: String) -> Dictionary:
 
 
 static func is_offerable(latest: Dictionary, current: Dictionary, applied: Dictionary,
-		os_name: String) -> bool:
-	return is_newer(latest, current, applied) and not build_for_os(latest, os_name).is_empty()
+		os_name: String, schema_version: int = -1) -> bool:
+	if not is_newer(latest, current, applied) or build_for_os(latest, os_name).is_empty():
+		return false
+	if schema_version < 0:
+		return true
+	return schema_version >= int(latest.get("min_save_version", 0))
 
 
 static func parse(value) -> Dictionary:

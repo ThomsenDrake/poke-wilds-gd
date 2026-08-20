@@ -4,6 +4,7 @@ const UpdateManifest := preload("res://scripts/domain/update_manifest.gd")
 const UpdateIdentity := preload("res://scripts/runtime/update_identity.gd")
 const UpdateApplier := preload("res://scripts/runtime/update_applier.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
+const UpdateSaveFloor := preload("res://scripts/runtime/update_save_floor.gd")
 
 const UPDATES_DIR := "user://updates"
 const PENDING_PATH := "user://updates/pending.json"
@@ -65,8 +66,8 @@ func is_newer_build(latest: Dictionary, current: Dictionary, applied: Dictionary
 
 
 func is_offerable_build(latest: Dictionary, current: Dictionary, applied: Dictionary,
-		os_name: String) -> bool:
-	return UpdateManifest.is_offerable(latest, current, applied, os_name)
+		os_name: String, schema_version: int = -1) -> bool:
+	return UpdateManifest.is_offerable(latest, current, applied, os_name, schema_version)
 
 
 func start_check() -> void:
@@ -82,7 +83,8 @@ func _run_check() -> void:
 	_busy = false
 	_latest = latest
 	var os_name := OS.get_name()
-	_available = UpdateManifest.is_offerable(latest, _current(), _applied(), os_name)
+	_available = UpdateManifest.is_offerable(latest, _current(), _applied(), os_name,
+		UpdateSaveFloor.schema_version()) and UpdateSaveFloor.can_persist(latest)
 	if _available:
 		_trace("update_available", {"build_id": str(latest.get("build_id", "")),
 			"os": UpdateManifest.os_key(os_name)})
@@ -100,6 +102,9 @@ func apply_available() -> Dictionary:
 	if not persist_identity():
 		_trace("update_apply_refused", {"reason": "identity_persist_failed"})
 		return {"ok": false, "error": "identity_persist_failed"}
+	if not UpdateSaveFloor.persist_migrated(_latest):
+		_trace("update_apply_refused", {"reason": "save_migrate_failed"})
+		return {"ok": false, "error": "save_migrate_failed"}
 	_busy = true
 	var downloaded := await _download_artifact(build)
 	if not bool(downloaded.get("ok", false)):

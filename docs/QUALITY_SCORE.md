@@ -29,7 +29,8 @@ sibling `*.new` before the short promote/rollback, so a kill mid-copy
 cannot leave the install path empty. Linux refuses before promote when
 `chmod` fails. Staging publish endpoints select the staging REPORTS bucket. Identity
 persist failure blocks the latest check and apply. Failed downloads and failed applies delete
-the artifact and `pending.json`.
+the artifact and `pending.json`. UPDATE is refused when this schema is
+below `min_save_version`; apply persists a migrated save before replace.
 `feedback_reporting` scores stay unchanged: `load_build_info()` now prefers a
 persisted `user://playtest_identity.json` route after a generic replace.
 

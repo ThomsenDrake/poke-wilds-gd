@@ -73,6 +73,7 @@ func run(ctx: Dictionary) -> void:
 	Checks.expect_shared_channel(_failures, updater)
 	Checks.expect_embedded_update_endpoint(_failures, updater)
 	Checks.expect_os_gate(_failures, updater)
+	Checks.expect_save_floor(_failures, updater)
 	Checks.expect_no_downgrade(_failures, updater)
 	Checks.expect_staging_cleared(_failures)
 	Checks.apply_linux_fixture(_failures)
