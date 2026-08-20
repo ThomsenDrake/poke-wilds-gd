@@ -188,8 +188,8 @@ static func apply_windows_fixture(failures: Array) -> void:
 	_check(failures, FileAccess.file_exists(str(result.get("helper", ""))),
 		"windows apply did not write PokeWilds-update.cmd")
 	var helper_text: String = FileAccess.get_file_as_string(str(result.get("helper", "")))
-	_check(failures, helper_text.contains("if errorlevel 1"),
-		"windows helper does not roll back a failed promote")
+	_check(failures, helper_text.contains("%~dp0") and helper_text.contains("if errorlevel 1"),
+		"windows helper does not roll back with sibling %~dp0 paths")
 	UpdateApplier.set_helper_starter_for_smoke(func(_helper: String) -> int: return -1)
 	_check(failures, not UpdateApplier.launch_deferred(result),
 		"windows helper launch failure was treated as success")

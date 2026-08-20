@@ -108,14 +108,17 @@ pointer only after all three object checksums exist.
 `scripts/runtime/update_applier.gd` is the only OS-specific player code.
 
 - Windows: copy the verified artifact to a sibling `*.new` and write
-  `PokeWilds-update.cmd`. The game launches that helper and quits; the helper
-  waits for the PID to exit, then moves the live `.exe` to `.old`, promotes
-  `*.new`, and starts the new binary. If promotion fails, the helper restores
-  `.old` before launch. `applied.json` is not written for a deferred Windows
-  apply, so a rolled-back install can still be offered UPDATE. If the helper
-  process cannot start (`create_process` returns a negative PID), the game
-  refuses, stays open, and shows the update-failed banner. Next boot
-  deletes `.old`. The running image is never renamed in-process.
+  `PokeWilds-update.cmd`. The helper addresses the exe with `%~dp0` plus the
+  ASCII sibling name so `cmd.exe`'s OEM code page cannot mojibake a Unicode
+  install directory. A non-ASCII exe name refuses before quit. The game
+  launches that helper and quits; the helper waits for the PID to exit, then
+  moves the live `.exe` to `.old`, promotes `*.new`, and starts the new
+  binary. If promotion fails, the helper restores `.old` before launch.
+  `applied.json` is not written for a deferred Windows apply, so a rolled-back
+  install can still be offered UPDATE. If the helper process cannot start
+  (`create_process` returns a negative PID), the game refuses, stays open, and
+  shows the update-failed banner. Next boot deletes `.old`. The running image
+  is never renamed in-process.
 - Linux: copy and `chmod 0755` the verified artifact to a sibling `*.new`,
   then promote it over the live path. A failed `chmod` refuses before the
   live path is renamed. If promotion fails, the previous binary is restored
@@ -130,7 +133,8 @@ pointer only after all three object checksums exist.
 network). It covers no-update default entries, update-available first row,
 confirm/cancel, hash-mismatch refuse, scenario/editor check skip, identity
 persist across a fake new `build.json`, no UPDATE offer on an unknown OS,
-and no UPDATE offer when this running save schema is below `min_save_version`.
+no UPDATE offer when this running save schema is below `min_save_version`,
+and a Windows helper that uses `%~dp0` sibling names.
 Default title fixtures stay `CONTINUE` / `NEW GAME` so existing title
 baselines do not churn.
 

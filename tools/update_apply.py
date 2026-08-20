@@ -62,33 +62,42 @@ def _apply_windows(target: Path, artifact: Path) -> dict:
     if staged.exists():
         staged.unlink()
     shutil.copy2(artifact, staged)
+    body = _windows_helper_body(target, staged, os.getpid())
+    if not body:
+        staged.unlink(missing_ok=True)
+        return {"ok": False, "error": "helper_failed"}
     helper = target.with_name("PokeWilds-update.cmd")
-    helper.write_text(
-        _windows_helper_body(target, staged, os.getpid()),
-        encoding="ascii",
-        newline="\r\n",
-    )
+    helper.write_text(body, encoding="ascii", newline="\r\n")
     return {"ok": True, "deferred": True, "helper": str(helper), "old_path": str(target) + ".old"}
 
 
+def _ascii_file_name(path: Path) -> str:
+    name = path.name
+    if not name or not name.isascii() or any(char in name for char in "\"%/\\"):
+        return ""
+    return name
+
+
 def _windows_helper_body(target: Path, staged: Path, pid: int) -> str:
-    old = Path(str(target) + ".old")
+    name = _ascii_file_name(target)
+    if not name or _ascii_file_name(staged) != f"{name}.new":
+        return ""
     return "\r\n".join([
         "@echo off",
         ":wait",
         "timeout /t 1 /nobreak >nul",
         f'tasklist /FI "PID eq {pid}" | find "{pid}" >nul',
         "if not errorlevel 1 goto wait",
-        f'if exist "{target}" (',
-        f'move /y "{target}" "{old}"',
+        f'if exist "%~dp0{name}" (',
+        f'move /y "%~dp0{name}" "%~dp0{name}.old"',
         "if errorlevel 1 goto launch",
         ")",
-        f'move /y "{staged}" "{target}"',
+        f'move /y "%~dp0{name}.new" "%~dp0{name}"',
         "if errorlevel 1 (",
-        f'if exist "{old}" move /y "{old}" "{target}"',
+        f'if exist "%~dp0{name}.old" move /y "%~dp0{name}.old" "%~dp0{name}"',
         ")",
         ":launch",
-        f'if exist "{target}" start "" "{target}"',
+        f'if exist "%~dp0{name}" start "" "%~dp0{name}"',
         "",
     ])
 

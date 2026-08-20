@@ -74,6 +74,9 @@ static func _apply_windows(target: String, artifact: String) -> Dictionary:
 	_remove_path(staged)
 	if DirAccess.copy_absolute(artifact, staged) != OK:
 		return {"ok": false, "error": "write_failed"}
+	if _ascii_file_name(target).is_empty():
+		_remove_path(staged)
+		return {"ok": false, "error": "helper_failed"}
 	var helper := target.get_base_dir().path_join("PokeWilds-update.cmd")
 	var file := FileAccess.open(helper, FileAccess.WRITE)
 	if file == null:
@@ -84,24 +87,36 @@ static func _apply_windows(target: String, artifact: String) -> Dictionary:
 	return {"ok": true, "deferred": true, "helper": helper, "old_path": target + ".old"}
 
 
+static func _ascii_file_name(path: String) -> String:
+	var name := path.get_file()
+	if name.is_empty() or name.to_utf8_buffer().size() != name.length():
+		return ""
+	if name.contains("\"") or name.contains("%") or name.contains("/") or name.contains("\\"):
+		return ""
+	return name
+
+
 static func _windows_helper_body(target: String, staged: String, pid: int) -> String:
-	var old_path := target + ".old"
+	var name := _ascii_file_name(target)
+	if name.is_empty() or _ascii_file_name(staged) != name + ".new":
+		return ""
+	var prefix := "%~dp0" + name
 	var lines := PackedStringArray([
 		"@echo off",
 		":wait",
 		"timeout /t 1 /nobreak >nul",
 		"tasklist /FI \"PID eq %s\" | find \"%s\" >nul" % [str(pid), str(pid)],
 		"if not errorlevel 1 goto wait",
-		"if exist \"%s\" (" % target,
-		"move /y \"%s\" \"%s\"" % [target, old_path],
+		"if exist \"%s\" (" % prefix,
+		"move /y \"%s\" \"%s.old\"" % [prefix, prefix],
 		"if errorlevel 1 goto launch",
 		")",
-		"move /y \"%s\" \"%s\"" % [staged, target],
+		"move /y \"%s.new\" \"%s\"" % [prefix, prefix],
 		"if errorlevel 1 (",
-		"if exist \"%s\" move /y \"%s\" \"%s\"" % [old_path, old_path, target],
+		"if exist \"%s.old\" move /y \"%s.old\" \"%s\"" % [prefix, prefix, prefix],
 		")",
 		":launch",
-		"if exist \"%s\" start \"\" \"%s\"" % [target, target],
+		"if exist \"%s\" start \"\" \"%s\"" % [prefix, prefix],
 	])
 	return "\r\n".join(lines) + "\r\n"
 

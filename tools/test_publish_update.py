@@ -260,10 +260,36 @@ class PublishUpdateTests(unittest.TestCase):
 
     def test_windows_helper_restores_old_when_promote_fails(self) -> None:
         body = update_apply._windows_helper_body(
-            Path("C:/game/PokeWilds.exe"), Path("C:/game/PokeWilds.exe.new"), 42)
+            Path("C:/Users/\u00c9mile/game/PokeWilds.exe"),
+            Path("C:/Users/\u00c9mile/game/PokeWilds.exe.new"), 42)
         self.assertIn("if errorlevel 1 goto launch", body)
-        self.assertIn('move /y "C:/game/PokeWilds.exe.old" "C:/game/PokeWilds.exe"', body)
+        self.assertIn('move /y "%~dp0PokeWilds.exe.old" "%~dp0PokeWilds.exe"', body)
+        self.assertNotIn("\u00c9mile", body)
+        self.assertNotIn("C:/Users", body)
         self.assertIn(":launch", body)
+        body.encode("ascii")
+
+    def test_windows_helper_refuses_non_ascii_file_name(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw) / "Jos\u00e9"
+            root.mkdir()
+            current = root / "Pok\u00e9.exe"
+            artifact = root / "new.exe"
+            current.write_bytes(b"old")
+            artifact.write_bytes(b"new")
+            result = update_apply.apply("Windows", artifact, current)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["error"], "helper_failed")
+            self.assertEqual(current.read_bytes(), b"old")
+            self.assertFalse(Path(str(current) + ".new").exists())
+            current = root / "PokeWilds.exe"
+            current.write_bytes(b"old")
+            result = update_apply.apply("Windows", artifact, current)
+            self.assertTrue(result["ok"], result)
+            body = Path(result["helper"]).read_text(encoding="ascii")
+            self.assertIn("%~dp0PokeWilds.exe", body)
+            self.assertNotIn("Jos\u00e9", body)
+            self.assertTrue(body.isascii())
 
     def test_configured_r2_bucket_reads_reports_binding(self) -> None:
         with mock.patch.dict("os.environ", {}, clear=True):
