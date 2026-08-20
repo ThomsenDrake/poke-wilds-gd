@@ -42,6 +42,7 @@ static func apply(os_name: String, artifact: String, target: String) -> Dictiona
 
 
 static var _helper_starter: Callable
+static var _chmod_runner: Callable
 
 
 static func launch_deferred(applied: Dictionary) -> bool:
@@ -55,6 +56,11 @@ static func launch_deferred(applied: Dictionary) -> bool:
 static func set_helper_starter_for_smoke(starter: Callable) -> void:
 	if OS.has_feature("editor"):
 		_helper_starter = starter
+
+
+static func set_chmod_runner_for_smoke(runner: Callable) -> void:
+	if OS.has_feature("editor"):
+		_chmod_runner = runner
 
 
 static func _spawn_helper(helper: String) -> int:
@@ -107,7 +113,9 @@ static func _apply_linux(target: String, artifact: String) -> Dictionary:
 	if DirAccess.copy_absolute(artifact, staged) != OK:
 		_remove_path(staged)
 		return {"ok": false, "error": "write_failed"}
-	_chmod_executable(staged)
+	if not _chmod_executable(staged):
+		_remove_path(staged)
+		return {"ok": false, "error": "chmod_failed"}
 	_remove_path(old_path)
 	if FileAccess.file_exists(target) or DirAccess.dir_exists_absolute(target):
 		if DirAccess.rename_absolute(target, old_path) != OK:
@@ -155,8 +163,10 @@ static func _absolute(path: String) -> String:
 	return path
 
 
-static func _chmod_executable(target: String) -> void:
-	OS.execute("chmod", ["0755", target], [], false, true)
+static func _chmod_executable(target: String) -> bool:
+	if _chmod_runner.is_valid():
+		return bool(_chmod_runner.call(target))
+	return OS.execute("chmod", ["0755", target], [], false, true) == 0
 
 
 static func _find_app(root: String) -> String:

@@ -42,6 +42,7 @@ static func reset_user_state() -> void:
 			"user://updates/pending.json"]:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	UpdateApplier.set_helper_starter_for_smoke(Callable())
+	UpdateApplier.set_chmod_runner_for_smoke(Callable())
 
 
 static func expect_skip(failures: Array, updater: Node) -> void:
@@ -127,6 +128,15 @@ static func expect_no_downgrade(failures: Array, updater: Node) -> void:
 
 
 static func apply_linux_fixture(failures: Array) -> void:
+	write_install_fixture()
+	UpdateApplier.set_chmod_runner_for_smoke(func(_path: String) -> bool: return false)
+	var refused := UpdateApplier.apply("Linux", ARTIFACT_PATH, INSTALL_PATH)
+	_check(failures, not bool(refused.get("ok", false)), "linux apply ignored a chmod failure")
+	_check(failures, FileAccess.get_file_as_bytes(INSTALL_PATH) == PackedByteArray([9, 9, 9, 9]),
+		"linux apply promoted after chmod failed")
+	_check(failures, not FileAccess.file_exists(INSTALL_PATH + ".old"),
+		"linux chmod refuse moved the live binary to .old")
+	UpdateApplier.set_chmod_runner_for_smoke(Callable())
 	write_install_fixture()
 	var result := UpdateApplier.apply("Linux", ARTIFACT_PATH, INSTALL_PATH)
 	_check(failures, bool(result.get("ok", false)), "linux apply refused a user:// artifact path")

@@ -110,6 +110,21 @@ class UpdateApplyTests(unittest.TestCase):
             self.assertEqual(current.read_bytes(), b"old")
             self.assertFalse(Path(str(current) + ".new").exists())
 
+    def test_linux_refuses_when_chmod_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            current = root / "PokeWilds.x86_64"
+            artifact = root / "new.bin"
+            current.write_bytes(b"old")
+            artifact.write_bytes(b"new")
+            with mock.patch.object(Path, "chmod", side_effect=OSError("chmod failed")):
+                result = update_apply.apply("Linux", artifact, current)
+            self.assertFalse(result["ok"])
+            self.assertEqual(result["error"], "chmod_failed")
+            self.assertEqual(current.read_bytes(), b"old")
+            self.assertFalse(Path(str(current) + ".new").exists())
+            self.assertFalse(Path(str(current) + ".old").exists())
+
     def test_windows_stages_helper_and_swaps_after_exit(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -223,6 +238,24 @@ class PublishUpdateTests(unittest.TestCase):
                 "reports/friends-1/r1/bundle.zip", Path("/tmp/artifact.bin"), "c" * 64,
                 endpoint="https://relay.test")
 
+    def test_wrangler_put_uses_staging_bucket_for_staging_endpoint(self) -> None:
+        captured: list[list[str]] = []
+
+        def fake_run(cmd, check, cwd):  # noqa: ANN001
+            captured.append(cmd)
+            return mock.Mock()
+
+        staging = "https://poke-wilds-feedback-relay-staging.drake-t.workers.dev"
+        with mock.patch.dict("os.environ", {"PLAYTEST_UPDATE_R2_BUCKET": ""}, clear=False), \
+                mock.patch.object(publish_update.subprocess, "run", side_effect=fake_run):
+            url = publish_update.wrangler_put(
+                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64,
+                endpoint=staging)
+        self.assertEqual(url, f"{staging}/v1/updates/artifacts/playtest/b1/linux")
+        self.assertEqual(captured[0][4], "poke-wilds-feedback-private-staging/updates/playtest/b1/linux")
+        with self.assertRaises(RuntimeError):
+            publish_update.resolved_wrangler_env(staging, "production")
+
     def test_windows_helper_restores_old_when_promote_fails(self) -> None:
         body = update_apply._windows_helper_body(
             Path("C:/game/PokeWilds.exe"), Path("C:/game/PokeWilds.exe.new"), 42)
@@ -236,6 +269,16 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(
                 publish_update.configured_r2_bucket(environment="staging"),
                 "poke-wilds-feedback-private-staging",
+            )
+            self.assertEqual(
+                publish_update.resolved_wrangler_env(
+                    "https://poke-wilds-feedback-relay-staging.drake-t.workers.dev"),
+                "staging",
+            )
+            self.assertEqual(
+                publish_update.resolved_wrangler_env(
+                    "https://poke-wilds-feedback-relay.drake-t.workers.dev"),
+                "",
             )
 
 

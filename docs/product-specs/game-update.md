@@ -84,7 +84,10 @@ under R2 `updates/<channel>/<build_id>/<os>`.
 Publish uploads via the R2 S3 API / wrangler, never a Worker POST. Wrangler
 `r2 object put` uses `{bucket}/{object_key}` from the REPORTS binding
 (`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`) under the
-`updates/` prefix only. The public download URL is the prefix-restricted
+`updates/` prefix only. A staging relay host, `--wrangler-env staging`, or
+`PLAYTEST_UPDATE_WRANGLER_ENV=staging` selects
+`poke-wilds-feedback-private-staging`. An explicit production env with a
+staging endpoint is refused. The public download URL is the prefix-restricted
 Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
 `PLAYTEST_UPDATE_PUBLIC_BASE/<channel>/<build_id>/<os>`), never an R2 public
 domain on the reports bucket. Report ZIPs stay admin-only. The game
@@ -105,9 +108,9 @@ pointer only after all three object checksums exist.
   refuses, stays open, and shows the update-failed banner. Next boot
   deletes `.old`. The running image is never renamed in-process.
 - Linux: copy and `chmod 0755` the verified artifact to a sibling `*.new`,
-  then promote it over the live path. If promotion fails, the previous
-  binary is restored from `.old`. The live path is not removed until the
-  staged file is ready.
+  then promote it over the live path. A failed `chmod` refuses before the
+  live path is renamed. If promotion fails, the previous binary is restored
+  from `.old`. The live path is not removed until the staged file is ready.
 - macOS: unzip the new `.app` to a sibling `*.new`, swap with the live bundle,
   relaunch. Unsigned Gatekeeper "Open" stays a documented one-time step;
   codesign/notarization stay 0.

@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 
 from feedback_endpoint import open_no_redirect, validated_endpoint
@@ -120,11 +121,35 @@ def wrangler_object_path(bucket: str, key: str) -> str:
     return f"{bucket.strip().strip('/')}/{key.lstrip('/')}"
 
 
+def normalize_wrangler_env(name: str) -> str:
+    text = name.strip()
+    if text in ("", "production", "default"):
+        return ""
+    return text
+
+
+def infer_wrangler_env(endpoint: str) -> str:
+    host = (urllib.parse.urlparse(endpoint).hostname or "").lower()
+    if "feedback-relay-staging" in host or "-staging." in host:
+        return "staging"
+    return ""
+
+
+def resolved_wrangler_env(endpoint: str, explicit: str = "") -> str:
+    raw = explicit.strip() or os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", "").strip()
+    specified = bool(raw)
+    chosen = normalize_wrangler_env(raw)
+    inferred = infer_wrangler_env(endpoint)
+    if specified and inferred and chosen != inferred:
+        raise RuntimeError("wrangler env does not match the selected update endpoint")
+    return chosen if specified else inferred
+
+
 def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> str:
     override = os.environ.get("PLAYTEST_UPDATE_R2_BUCKET", "").strip()
     if override:
         return override
-    env_name = environment or os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", "").strip()
+    env_name = normalize_wrangler_env(environment or os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", ""))
     raw = text if text is not None else WRANGLER_CONFIG.read_text(encoding="utf-8")
     data = json.loads(raw)
     block = data.get("env", {}).get(env_name, data) if env_name else data
@@ -134,11 +159,13 @@ def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> s
     raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
 
 
-def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "") -> str:
+def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "",
+                 environment: str = "") -> str:
     parts = key.split("/")
     if len(parts) != 4 or parts[0] != "updates":
         raise RuntimeError("refusing to publish a non-updates object key")
-    object_path = wrangler_object_path(configured_r2_bucket(), key)
+    env_name = resolved_wrangler_env(endpoint, environment)
+    object_path = wrangler_object_path(configured_r2_bucket(environment=env_name), key)
     subprocess.run(["wrangler", "r2", "object", "put", object_path, "--file", str(path),
                     "--custom-metadata", f"sha256={digest}"], check=True, cwd=ROOT / "services" / "feedback-relay")
     return artifact_public_url(
@@ -152,6 +179,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--channel", default="playtest")
     parser.add_argument("--endpoint", default=os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""))
+    parser.add_argument("--wrangler-env", default=os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", ""))
     parser.add_argument("--allow-dirty", action="store_true")
     args = parser.parse_args()
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
@@ -165,7 +193,7 @@ def main() -> int:
             exported = export_shared(args.channel, endpoint, godot=godot_binary())
             builds = upload_artifacts(
                 exported, put_object=lambda key, dest, digest: wrangler_put(
-                    key, dest, digest, endpoint=endpoint))
+                    key, dest, digest, endpoint=endpoint, environment=args.wrangler_env))
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)

@@ -100,11 +100,16 @@ def _apply_linux(target: Path, artifact: Path) -> dict:
         staged.unlink()
     try:
         shutil.copy2(artifact, staged)
-        staged.chmod(0o755)
     except OSError:
         if staged.exists():
             staged.unlink()
         return {"ok": False, "error": "write_failed"}
+    try:
+        staged.chmod(0o755)
+    except OSError:
+        if staged.exists():
+            staged.unlink()
+        return {"ok": False, "error": "chmod_failed"}
     cleanup_old(target)
     try:
         if target.exists():

@@ -2101,7 +2101,9 @@ quality_bucket = "update"
 # A negative helper PID refuses without quitting so the title can show failure.
 # Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
 # Update checks use the embedded endpoint, not persisted friend identity.
-# Linux copies and chmods *.new before the short promote/rollback.
+# Linux copies and chmods *.new before the short promote/rollback;
+# a failed chmod refuses before the live path is renamed.
+# Staging publish endpoints select the staging REPORTS bucket.
 # Successful apply clears user://updates/ except applied.json.
 # Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live
