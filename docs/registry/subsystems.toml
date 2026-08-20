@@ -2091,7 +2091,7 @@ required_trace_events = [
 quality_bucket = "update"
 # Shared (not friend-specific) desktop updater: player-boot title UPDATE row,
 # public GET /v1/updates/latest?channel=playtest (never the persisted friend
-# feedback channel), admin checksum-gated publish, OS apply
+# feedback channel), admin publish after all three R2 artifacts exist, OS apply
 # (Windows rename, Linux stage-then-promote, macOS app swap), and sticky user:// identity
 # so a generic replace does not strip F-to-report. is_newer refuses an unstamped
 # current build (no downgrade); apply globalizes user:// before copy/unzip.

@@ -103,7 +103,7 @@ Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
 `PLAYTEST_UPDATE_PUBLIC_BASE/<channel>/<build_id>/<os>`), never an R2 public
 domain on the reports bucket. Report ZIPs stay admin-only. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
-pointer only after all three object checksums exist.
+pointer only after all three objects exist.
 
 ## Apply
 

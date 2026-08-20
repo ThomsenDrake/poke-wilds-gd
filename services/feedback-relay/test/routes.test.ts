@@ -489,7 +489,7 @@ describe("shared update routes", () => {
     const scoped = env(true);
     const body = new Uint8Array([7, 7, 7, 7]);
     const get = vi.fn(async (key: string) => key === "updates/playtest/b1/linux"
-      ? { body, customMetadata: { sha256: digest } } : null);
+      ? { body } : null);
     scoped.REPORTS = { get } as unknown as R2Bucket;
     const response = await worker.fetch(new Request("https://relay.test/v1/updates/artifacts/playtest/b1/linux"), scoped);
     expect(response.status).toBe(200);
@@ -520,7 +520,7 @@ describe("shared update routes", () => {
     expect(await response.json()).toMatchObject({ error: "unauthorized" });
   });
 
-  it("refuses publish when an OS checksum is missing", async () => {
+  it("refuses publish when an OS artifact is missing", async () => {
     const scoped = env(true);
     scoped.ADMIN_TOKEN = "a".repeat(32);
     scoped.REPORTS = { head: async () => null, put: vi.fn() } as unknown as R2Bucket;
@@ -530,33 +530,16 @@ describe("shared update routes", () => {
       body: JSON.stringify(manifest),
     }), scoped);
     expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ error: "checksum_missing" });
+    expect(await response.json()).toMatchObject({ error: "artifact_missing" });
     expect(scoped.REPORTS.put).not.toHaveBeenCalled();
   });
 
-  it("publishes when checksums are stored in cache-control", async () => {
+  it("publishes after all three artifacts exist", async () => {
     const scoped = env(true);
     scoped.ADMIN_TOKEN = "a".repeat(32);
     const put = vi.fn();
     scoped.REPORTS = {
-      head: async () => ({ httpMetadata: { cacheControl: `sha256=${digest}` } }),
-      put,
-    } as unknown as R2Bucket;
-    const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
-      body: JSON.stringify(manifest),
-    }), scoped);
-    expect(response.status).toBe(201);
-    expect(put).toHaveBeenCalled();
-  });
-
-  it("publishes after all three artifact checksums exist", async () => {
-    const scoped = env(true);
-    scoped.ADMIN_TOKEN = "a".repeat(32);
-    const put = vi.fn();
-    scoped.REPORTS = {
-      head: async () => ({ customMetadata: { sha256: digest } }),
+      head: async () => ({}),
       put,
     } as unknown as R2Bucket;
     const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {

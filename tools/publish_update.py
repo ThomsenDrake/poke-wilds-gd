@@ -84,7 +84,7 @@ def upload_artifacts(exported: dict, *, put_object) -> dict:
     builds = {}
     for os_name, artifact in exported["artifacts"].items():
         key = artifact_key(exported["channel"], exported["build_id"], os_name)
-        url = put_object(key, artifact["path"], artifact["sha256"])
+        url = put_object(key, artifact["path"])
         builds[os_name] = {
             "url": url, "sha256": artifact["sha256"], "bytes": artifact["bytes"],
             "filename": artifact["filename"],
@@ -159,7 +159,7 @@ def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> s
     raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
 
 
-def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "",
+def wrangler_put(key: str, path: Path, endpoint: str = "",
                  environment: str = "") -> str:
     parts = key.split("/")
     if len(parts) != 4 or parts[0] != "updates":
@@ -167,8 +167,7 @@ def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "",
     env_name = resolved_wrangler_env(endpoint, environment)
     object_path = wrangler_object_path(configured_r2_bucket(environment=env_name), key)
     subprocess.run(["wrangler", "r2", "object", "put", object_path, "--file", str(path),
-                    "--cache-control", f"sha256={digest}", "--remote"], check=True,
-                   cwd=ROOT / "services" / "feedback-relay")
+                    "--remote"], check=True, cwd=ROOT / "services" / "feedback-relay")
     return artifact_public_url(
         endpoint or os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""),
         parts[1], parts[2], parts[3],
@@ -193,8 +192,8 @@ def main() -> int:
         try:
             exported = export_shared(args.channel, endpoint, godot=godot_binary())
             builds = upload_artifacts(
-                exported, put_object=lambda key, dest, digest: wrangler_put(
-                    key, dest, digest, endpoint=endpoint, environment=args.wrangler_env))
+                exported, put_object=lambda key, dest: wrangler_put(
+                    key, dest, endpoint=endpoint, environment=args.wrangler_env))
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)

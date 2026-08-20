@@ -34,15 +34,6 @@ export function artifactKey(channel: string, buildId: string, os: string): strin
   return `updates/${channel}/${buildId}/${os}`;
 }
 
-export function objectSha256(object: { customMetadata?: Record<string, string>;
-  httpMetadata?: { cacheControl?: string } } | null | undefined): string {
-  const custom = String(object?.customMetadata?.sha256 ?? "").toLowerCase();
-  if (SHA256.test(custom)) return custom;
-  const cacheControl = String(object?.httpMetadata?.cacheControl ?? "");
-  const match = /(?:^|,\s*)sha256=([0-9a-f]{64})(?:$|,)/i.exec(cacheControl);
-  return match ? match[1].toLowerCase() : "";
-}
-
 export function parseChannel(value: string | null): string {
   const channel = value || "playtest";
   if (!CHANNEL.test(channel)) throw badRequest("invalid_channel");
