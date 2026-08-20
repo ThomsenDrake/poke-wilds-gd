@@ -280,7 +280,6 @@ async function serveUpdateArtifact(env: Env, channel: string, buildId: string, o
     "Content-Type": "application/octet-stream",
     "Content-Disposition": `attachment; filename="PokeWilds-${os}"`,
     "Cache-Control": "public, max-age=3600",
-    "X-Content-SHA256": object.customMetadata?.sha256 ?? "",
   } });
 }
 
@@ -297,11 +296,7 @@ async function publishUpdate(request: Request, env: Env): Promise<Response> {
   for (const os of Object.keys(manifest.builds)) {
     const key = artifactKey(manifest.channel, manifest.build_id, os);
     const object = await env.REPORTS.head(key);
-    const digest = object?.customMetadata?.sha256 ?? "";
-    if (!object) return json({ ok: false, error: "checksum_missing" }, 400);
-    if (digest !== manifest.builds[os as keyof typeof manifest.builds].sha256) {
-      return json({ ok: false, error: "checksum_missing" }, 400);
-    }
+    if (!object) return json({ ok: false, error: "artifact_missing" }, 400);
   }
   await env.REPORTS.put(latestKey(manifest.channel), JSON.stringify(manifest), {
     httpMetadata: { contentType: "application/json" },

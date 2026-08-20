@@ -183,6 +183,12 @@ class UpdateApplyTests(unittest.TestCase):
 
 
 class PublishUpdateTests(unittest.TestCase):
+    def _assert_remote_put(self, cmd: list[str], object_path: str) -> None:
+        self.assertEqual(cmd[:5], ["wrangler", "r2", "object", "put", object_path])
+        self.assertIn("--file", cmd)
+        self.assertIn("--remote", cmd)
+        self.assertNotIn("--cache-control", cmd)
+        self.assertNotIn("--custom-metadata", cmd)
     def test_dirty_tree_refuses_publish(self) -> None:
         parser = publish_update.argparse.ArgumentParser()
         parser.add_argument("--channel", default="playtest")
@@ -231,13 +237,13 @@ class PublishUpdateTests(unittest.TestCase):
             "PLAYTEST_UPDATE_R2_BUCKET": "poke-wilds-feedback-private",
         }, clear=False), mock.patch.object(publish_update.subprocess, "run", side_effect=fake_run):
             url = publish_update.wrangler_put(
-                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64,
+                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"),
                 endpoint="https://relay.test")
         self.assertEqual(url, "https://relay.test/v1/updates/artifacts/playtest/b1/linux")
-        self.assertEqual(captured[0][4], "poke-wilds-feedback-private/updates/playtest/b1/linux")
+        self._assert_remote_put(captured[0], "poke-wilds-feedback-private/updates/playtest/b1/linux")
         with self.assertRaises(RuntimeError):
             publish_update.wrangler_put(
-                "reports/friends-1/r1/bundle.zip", Path("/tmp/artifact.bin"), "c" * 64,
+                "reports/friends-1/r1/bundle.zip", Path("/tmp/artifact.bin"),
                 endpoint="https://relay.test")
 
     def test_wrangler_put_uses_staging_bucket_for_staging_endpoint(self) -> None:
@@ -251,10 +257,11 @@ class PublishUpdateTests(unittest.TestCase):
         with mock.patch.dict("os.environ", {"PLAYTEST_UPDATE_R2_BUCKET": ""}, clear=False), \
                 mock.patch.object(publish_update.subprocess, "run", side_effect=fake_run):
             url = publish_update.wrangler_put(
-                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"), "c" * 64,
+                "updates/playtest/b1/linux", Path("/tmp/artifact.bin"),
                 endpoint=staging)
         self.assertEqual(url, f"{staging}/v1/updates/artifacts/playtest/b1/linux")
-        self.assertEqual(captured[0][4], "poke-wilds-feedback-private-staging/updates/playtest/b1/linux")
+        self._assert_remote_put(
+            captured[0], "poke-wilds-feedback-private-staging/updates/playtest/b1/linux")
         with self.assertRaises(RuntimeError):
             publish_update.resolved_wrangler_env(staging, "production")
 
