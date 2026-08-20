@@ -13,7 +13,9 @@ gated suite stays byte-identical. Check failure is silent: the title still
 shows `CONTINUE` / `NEW GAME`.
 
 When a newer shared build exists for this OS, the title list gains `UPDATE` as
-the first row. `Z` opens a MessageBox confirm
+the first row. A fresh title (`begin_boot` / `show_title`) starts on that first
+row; an async `UPDATE` insert (`refresh_entries`) keeps the previously selected
+label so it cannot steal Z from `CONTINUE` / `NEW GAME`. `Z` opens a MessageBox confirm
 ("Download and install the latest build? Your save stays on this computer.").
 `X` cancels and stays on the title. Confirm downloads that OS's artifact into
 `user://updates/`, verifies SHA-256, stages a pending apply, swaps the install,

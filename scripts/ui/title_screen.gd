@@ -115,7 +115,7 @@ func selected_entry() -> int: return _rows.selected()
 func select_entry(index: int) -> void: _rows.select(index)
 func entry_row_text(index: int) -> String: return _rows.row_text(index)
 func refresh_entries() -> void:
-	if visible and not _in_splash: _rebuild_entries()
+	if visible and not _in_splash: _rebuild_entries(true)
 func smoke_updater() -> Node: return _updater
 func smoke_set_update_available(available: bool) -> void:
 	_update.smoke_set_available(available); refresh_entries()
@@ -154,8 +154,8 @@ func _is_any_action_pressed(event: InputEvent) -> bool:
 			return true
 	return false
 
-func _rebuild_entries() -> void:
-	TitleStage.rebuild_rows(_rows, _update.labels(_has_save))
+func _rebuild_entries(keep_selection: bool = false) -> void:
+	TitleStage.rebuild_rows(_rows, _update.labels(_has_save), keep_selection)
 
 func _activate_selected() -> void:
 	if _rows.row_count() == 0:
