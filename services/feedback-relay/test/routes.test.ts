@@ -534,6 +534,23 @@ describe("shared update routes", () => {
     expect(scoped.REPORTS.put).not.toHaveBeenCalled();
   });
 
+  it("publishes when checksums are stored in cache-control", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    const put = vi.fn();
+    scoped.REPORTS = {
+      head: async () => ({ httpMetadata: { cacheControl: `sha256=${digest}` } }),
+      put,
+    } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    }), scoped);
+    expect(response.status).toBe(201);
+    expect(put).toHaveBeenCalled();
+  });
+
   it("publishes after all three artifact checksums exist", async () => {
     const scoped = env(true);
     scoped.ADMIN_TOKEN = "a".repeat(32);

@@ -167,7 +167,8 @@ def wrangler_put(key: str, path: Path, digest: str, endpoint: str = "",
     env_name = resolved_wrangler_env(endpoint, environment)
     object_path = wrangler_object_path(configured_r2_bucket(environment=env_name), key)
     subprocess.run(["wrangler", "r2", "object", "put", object_path, "--file", str(path),
-                    "--custom-metadata", f"sha256={digest}"], check=True, cwd=ROOT / "services" / "feedback-relay")
+                    "--cache-control", f"sha256={digest}", "--remote"], check=True,
+                   cwd=ROOT / "services" / "feedback-relay")
     return artifact_public_url(
         endpoint or os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""),
         parts[1], parts[2], parts[3],

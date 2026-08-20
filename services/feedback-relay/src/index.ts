@@ -2,7 +2,7 @@ import { findOrCreateIssue } from "./github";
 import { badRequest, payloadTooLarge, RelayError } from "./errors";
 import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex, validateMetadata } from "./security";
 import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
-import { artifactKey, latestKey, parseArtifactPath, parseChannel, parseManifest } from "./updates";
+import { artifactKey, latestKey, objectSha256, parseArtifactPath, parseChannel, parseManifest } from "./updates";
 
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
 const CLEANUP_PAGE_SIZE = 100;
@@ -280,7 +280,7 @@ async function serveUpdateArtifact(env: Env, channel: string, buildId: string, o
     "Content-Type": "application/octet-stream",
     "Content-Disposition": `attachment; filename="PokeWilds-${os}"`,
     "Cache-Control": "public, max-age=3600",
-    "X-Content-SHA256": object.customMetadata?.sha256 ?? "",
+    "X-Content-SHA256": objectSha256(object),
   } });
 }
 
@@ -297,7 +297,7 @@ async function publishUpdate(request: Request, env: Env): Promise<Response> {
   for (const os of Object.keys(manifest.builds)) {
     const key = artifactKey(manifest.channel, manifest.build_id, os);
     const object = await env.REPORTS.head(key);
-    const digest = object?.customMetadata?.sha256 ?? "";
+    const digest = objectSha256(object);
     if (!object) return json({ ok: false, error: "checksum_missing" }, 400);
     if (digest !== manifest.builds[os as keyof typeof manifest.builds].sha256) {
       return json({ ok: false, error: "checksum_missing" }, 400);
