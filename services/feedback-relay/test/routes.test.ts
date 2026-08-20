@@ -473,6 +473,85 @@ async function uploadPayload(): Promise<{ metadata: Record<string, unknown>; bun
   return { bundle, metadata: { ...base, bundle_sha256: await sha256Hex(bundle), bundle_bytes: bundle.byteLength } };
 }
 
+describe("shared update routes", () => {
+  const digest = "c".repeat(64);
+  const manifest = {
+    schema_version: 1, channel: "playtest", published_at: "2026-08-19T18:00:00Z",
+    build_id: "playtest-abc1234567-20260819T180000Z", commit_sha: "b".repeat(40), min_save_version: 6,
+    builds: {
+      linux: { url: "https://cdn.test/linux", sha256: digest, bytes: 8, filename: "PokeWilds-linux.x86_64" },
+      windows: { url: "https://cdn.test/windows", sha256: digest, bytes: 8, filename: "PokeWilds-windows.exe" },
+      macos: { url: "https://cdn.test/macos", sha256: digest, bytes: 8, filename: "PokeWilds-macos.zip" },
+    },
+  };
+
+  it("serves a public artifact without exposing report objects", async () => {
+    const scoped = env(true);
+    const body = new Uint8Array([7, 7, 7, 7]);
+    const get = vi.fn(async (key: string) => key === "updates/playtest/b1/linux"
+      ? { body, customMetadata: { sha256: digest } } : null);
+    scoped.REPORTS = { get } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/updates/artifacts/playtest/b1/linux"), scoped);
+    expect(response.status).toBe(200);
+    expect(get).toHaveBeenCalledWith("updates/playtest/b1/linux");
+    expect(get).not.toHaveBeenCalledWith(expect.stringContaining("reports/"));
+    const missing = await worker.fetch(new Request("https://relay.test/v1/updates/artifacts/playtest/b1/reports"), scoped);
+    expect(missing.status).toBe(404);
+  });
+
+  it("serves a public latest manifest", async () => {
+    const scoped = env(true);
+    scoped.REPORTS = {
+      get: async (key: string) => key === "updates/playtest/latest.json"
+        ? { body: JSON.stringify(manifest) } : null,
+    } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/updates/latest?channel=playtest"), scoped);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ build_id: manifest.build_id, channel: "playtest" });
+  });
+
+  it("refuses unauthenticated manifest publish", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(manifest),
+    }), scoped);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ error: "unauthorized" });
+  });
+
+  it("refuses publish when an OS checksum is missing", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    scoped.REPORTS = { head: async () => null, put: vi.fn() } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    }), scoped);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "checksum_missing" });
+    expect(scoped.REPORTS.put).not.toHaveBeenCalled();
+  });
+
+  it("publishes after all three artifact checksums exist", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    const put = vi.fn();
+    scoped.REPORTS = {
+      head: async () => ({ customMetadata: { sha256: digest } }),
+      put,
+    } as unknown as R2Bucket;
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/updates", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
+      body: JSON.stringify(manifest),
+    }), scoped);
+    expect(response.status).toBe(201);
+    expect(put).toHaveBeenCalled();
+  });
+});
+
 function centralOffset(bytes: Uint8Array): number {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   for (let offset = bytes.byteLength - 22; offset >= 0; offset--) {

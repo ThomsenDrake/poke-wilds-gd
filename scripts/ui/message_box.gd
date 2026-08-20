@@ -2,11 +2,13 @@ extends Control
 
 # Toast plus a yes/no confirm, rendered as a Crystal GBC textbox band on a
 # transparent 160x144 stage (gbc_stage idiom). show_message() is the timed toast
-# (textbox_bg1 bottom band); show_confirm() holds until Z confirms or X cancels
+# (textbox_bg1 bottom band; duration <= 0 holds until hide_message);
+# show_confirm() holds until Z confirms or X cancels
 # (textbox_bg2 bottom band) and never auto-hides while confirming.
-# FROZEN API (scenarios read _label.text for toasts + is_confirming()): signals
-# confirmed/cancelled; show_message/show_confirm/is_confirming/hide_message and
-# the confirm suffix are byte-stable in meaning. The display carries z_index so
+# FROZEN API (scenarios read _label.text for toasts + is_confirming()/is_holding()):
+# signals confirmed/cancelled; show_message/show_confirm/is_confirming/is_holding/
+# hide_message and the confirm suffix are byte-stable in meaning. duration <= 0
+# holds until hide_message. The display carries z_index so
 # the band draws OVER later $UI siblings (StartMenu/StorageScreen/CampMenu)
 # without touching Main.tscn child order (visual_sweep_* read ../StorageScreen).
 
@@ -62,7 +64,10 @@ func show_message(text: String, duration_seconds: float = 2.0) -> void:
 	_set_band(false)
 	_label.text = _ascii_arrows(text)
 	visible = true
-	_timer.start(max(duration_seconds, 0.1))
+	if duration_seconds <= 0.0:
+		_timer.stop()
+	else:
+		_timer.start(max(duration_seconds, 0.1))
 
 
 func show_confirm(text: String, key_hint: String = "") -> void:
@@ -76,6 +81,10 @@ func show_confirm(text: String, key_hint: String = "") -> void:
 
 func is_confirming() -> bool:
 	return _confirming
+
+
+func is_holding() -> bool:
+	return visible and not _confirming and _timer.is_stopped()
 
 
 # Programmatic hide (battle start, menu close): clears the confirm silently;

@@ -21,6 +21,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario rng_joint_pin",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario save_stability",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario update_flow",
   "python3 tools/run_playtests.py",
 ]
 required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked", "ui_tree_dump_passed", "ui_tree_dump_failed", "legibility_soak_passed", "legibility_soak_failed"]
@@ -571,7 +572,9 @@ quality_bucket = "ui"
 # handler name/signature preserved). NEW restyle seams for the app readers (the
 # app_bootstrap entry's note): stage_root() / row_texts() / selected_row_text()
 # / row_rect() on every restyled screen (+ the party screen's action_row_text()).
-# MessageBox rides the wave-1 textbox band (committed 36ffd71). Menu baseline
+# MessageBox rides the wave-1 textbox band (committed 36ffd71).
+# show_message(text, duration<=0) holds until hide_message so a long UPDATE
+# download cannot hide the banner while title input stays locked. Menu baseline
 # re-pins PENDING (visual_sweep_update). REVIEW-FIX (strict-review remedies):
 # menu_list_stage.gd's Rows (the greyed-row screens' widget) gains the
 # accessibility contract — per-row accessibility_name pinned at build (row
@@ -609,6 +612,11 @@ validation_commands = [
 ]
 required_trace_events = ["splash_shown", "splash_closed", "title_shown", "title_continued", "title_new_game_chosen", "creation_confirmed"]
 quality_bucket = "bootstrap"
+# SHARED UPDATE ROW (2026-08-19): title_screen.gd stays under the 220 wall by
+# extracting UPDATE + confirm/progress into title_update.gd (owned by game_update).
+# Default CONTINUE / NEW GAME fixtures are unchanged unless a newer latest is injected.
+# Async UPDATE insert (refresh_entries) preserves the selected label;
+# a fresh show_title / begin_boot starts on the first row.
 # AGENT-NEUTRAL INTEGRATION Phase 4 (AccessKit semantic annotations):
 # gbc_widgets.gd + gbc_stage.gd now annotate every widget the shared library
 # builds with Godot 4.5+ accessibility PROPERTIES (accessibility_name /
@@ -2008,6 +2016,13 @@ validation_commands = [
 ]
 required_trace_events = ["feedback_capture_requested", "feedback_report_queued", "feedback_report_sent", "feedback_report_failed", "feedback_flow_passed", "feedback_flow_failed"]
 quality_bucket = "feedback"
+# SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
+# user://playtest_identity.json after a generic replace so F reports keep the
+# friend route; editor smoke overrides are not merged with disk identity.
+# load_embedded_build_info() is the unmerged stamp; update checks use that
+# endpoint, not the persisted friend host. Worker GET /v1/updates/artifacts
+# serves updates/ only and never reports/. Identity persist failure refuses
+# the shared update so a tokenless replace cannot strip F-to-report.
 # Packaged-player diagnostics: real F input captures before the pause-modal,
 # current-launch trace slicing prevents historical-log leakage, full save/UI/
 # screenshot state is checksummed into a private bundle, and a revocable
@@ -2039,3 +2054,65 @@ quality_bucket = "feedback"
 # both dry-runs gate the relay. The path-filtered GitHub Actions deployment then
 # applies D1 migrations, deploys and health-checks staging, and only after that
 # succeeds repeats the migration/deploy/health sequence for production.
+
+[[subsystems]]
+name = "game_update"
+status = "active"
+layer = "app"
+code_paths = [
+  "scripts/domain/update_manifest.gd",
+  "scripts/runtime/update_identity.gd",
+  "scripts/runtime/update_applier.gd",
+  "scripts/runtime/update_runtime.gd",
+  "scripts/runtime/update_save_floor.gd",
+  "scripts/ui/title_update.gd",
+  "scripts/app/update_flow_scenario.gd",
+  "scripts/app/update_flow_checks.gd",
+]
+scene_paths = []
+spec_doc = "docs/product-specs/game-update.md"
+validation_commands = [
+  "python3 tools/check_repo_contracts.py",
+  "python3 tools/check_architecture.py",
+  "python3 tools/test_publish_update.py",
+  "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario update_flow",
+  "cd services/feedback-relay && npm ci && npm run check",
+]
+required_trace_events = [
+  "update_check_started",
+  "update_available",
+  "update_verified",
+  "update_apply_started",
+  "update_apply_refused",
+  "update_relaunching",
+  "update_flow_passed",
+  "update_flow_failed",
+]
+quality_bucket = "update"
+# Shared (not friend-specific) desktop updater: player-boot title UPDATE row,
+# public GET /v1/updates/latest?channel=playtest (never the persisted friend
+# feedback channel), admin checksum-gated publish, OS apply
+# (Windows rename, Linux stage-then-promote, macOS app swap), and sticky user:// identity
+# so a generic replace does not strip F-to-report. is_newer refuses an unstamped
+# current build (no downgrade); apply globalizes user:// before copy/unzip.
+# The download toast holds (duration 0) until apply finishes so title lock and
+# banner stay paired. UPDATE is offerable only when is_newer and this OS has a
+# manifest artifact (unknown OS keeps CONTINUE / NEW GAME). Wrangler put uses
+# {REPORTS bucket}/{updates/...} only.
+# Windows stages *.new + PokeWilds-update.cmd and swaps after exit;
+# the helper uses %~dp0 + ASCII sibling names (no UTF-8 install path);
+# a failed promote restores .old and deferred apply skips applied.json.
+# A negative helper PID refuses without quitting so the title can show failure.
+# Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
+# Update checks use the embedded endpoint, not persisted friend identity.
+# Linux copies and chmods *.new before the short promote/rollback;
+# a failed chmod refuses before the live path is renamed.
+# Staging publish endpoints select the staging REPORTS bucket.
+# Identity persist failure skips the latest check and refuses apply.
+# Failed downloads and failed applies delete the artifact and pending.json.
+# UPDATE requires SAVE_VERSION >= min_save_version; apply persists a stale
+# on-disk save before replace.
+# Successful apply clears user://updates/ except applied.json.
+# Editor/scenario boots skip
+# the network check; update_flow injects transport and never touches the live
+# Godot binary. Saves stay in user://godot_port_save.json.

@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-29
+Last verified: 2026-08-19
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 
@@ -19,3 +19,4 @@ Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMe
 - Infinite world — the seamless infinite plane (successor to world chaining; climate-field biomes, chunk-hash scattering, save v6, seed choice): [infinite-world.md](infinite-world.md)
 - Vision fidelity and capture honesty: [vision-fidelity.md](vision-fidelity.md)
 - Packaged-playtest bug reporting: [playtest-feedback.md](playtest-feedback.md)
+- Shared cross-OS game updates: [game-update.md](game-update.md)

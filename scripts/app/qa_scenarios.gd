@@ -122,6 +122,7 @@ const SCENARIOS := {
 	# through the real screens — world + persistence witnesses (checks split into
 	# new_game_flow_checks.gd for the app budget; self-pinned, NOT a double-run consumer).
 	"new_game_flow": [preload("res://scripts/app/new_game_flow_scenario.gd"), "run", []],
+	"update_flow": [preload("res://scripts/app/update_flow_scenario.gd"), "run", []],
 	"visual_sweep_world_depth": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", []],
 	"visual_sweep_world_depth_update": [preload("res://scripts/app/visual_sweep_world_depth.gd"), "run_sweep", [{"mode": "update"}]],
 	# Far-field infinite-world sweep (shot 42, seed 2026072908): distant scatter. (The

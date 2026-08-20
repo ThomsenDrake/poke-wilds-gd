@@ -2,6 +2,7 @@ import { findOrCreateIssue } from "./github";
 import { badRequest, payloadTooLarge, RelayError } from "./errors";
 import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex, validateMetadata } from "./security";
 import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
+import { artifactKey, latestKey, parseArtifactPath, parseChannel, parseManifest } from "./updates";
 
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
 const CLEANUP_PAGE_SIZE = 100;
@@ -22,6 +23,13 @@ export default {
         });
       }
       if (url.pathname.startsWith("/v1/admin/")) return await adminRoute(request, env, url);
+      if (request.method === "GET" && url.pathname === "/v1/updates/latest") {
+        return await latestUpdate(request, env, url);
+      }
+      const artifact = parseArtifactPath(url.pathname);
+      if (request.method === "GET" && artifact) {
+        return await serveUpdateArtifact(env, artifact.channel, artifact.buildId, artifact.os);
+      }
       if (request.method === "POST" && url.pathname === "/v1/reports") return await createReport(request, env);
       return json({ ok: false, error: "not_found" }, 404);
     } catch (error) {
@@ -227,6 +235,9 @@ async function adminRoute(request: Request, env: Env, url: URL): Promise<Respons
   const presented = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   const configured = env.ADMIN_TOKEN ?? "";
   if (configured.length < 32 || !presented || !constantTimeEqual(presented, configured)) return json({ ok: false, error: "unauthorized" }, 401);
+  if (request.method === "PUT" && url.pathname === "/v1/admin/updates") {
+    return await publishUpdate(request, env);
+  }
   if (request.method === "POST" && url.pathname === "/v1/admin/invites") {
     const body = await request.json() as Record<string, unknown>;
     const testerId = String(body.tester_id ?? "");
@@ -258,6 +269,44 @@ async function adminRoute(request: Request, env: Env, url: URL): Promise<Respons
       "Cache-Control": "private, no-store" } });
   }
   return json({ ok: false, error: "not_found" }, 404);
+}
+
+async function serveUpdateArtifact(env: Env, channel: string, buildId: string, os: string): Promise<Response> {
+  const key = artifactKey(channel, buildId, os);
+  if (!key.startsWith("updates/")) return json({ ok: false, error: "not_found" }, 404);
+  const object = await env.REPORTS.get(key);
+  if (!object) return json({ ok: false, error: "not_found" }, 404);
+  return new Response(object.body, { status: 200, headers: {
+    "Content-Type": "application/octet-stream",
+    "Content-Disposition": `attachment; filename="PokeWilds-${os}"`,
+    "Cache-Control": "public, max-age=3600",
+    "X-Content-SHA256": object.customMetadata?.sha256 ?? "",
+  } });
+}
+
+async function latestUpdate(_request: Request, env: Env, url: URL): Promise<Response> {
+  const channel = parseChannel(url.searchParams.get("channel"));
+  const object = await env.REPORTS.get(latestKey(channel));
+  if (!object) return json({ ok: false, error: "not_found" }, 404);
+  return new Response(object.body, { status: 200, headers: { "Content-Type": "application/json",
+    "Cache-Control": "no-store" } });
+}
+
+async function publishUpdate(request: Request, env: Env): Promise<Response> {
+  const manifest = parseManifest(await request.json());
+  for (const os of Object.keys(manifest.builds)) {
+    const key = artifactKey(manifest.channel, manifest.build_id, os);
+    const object = await env.REPORTS.head(key);
+    const digest = object?.customMetadata?.sha256 ?? "";
+    if (!object) return json({ ok: false, error: "checksum_missing" }, 400);
+    if (digest !== manifest.builds[os as keyof typeof manifest.builds].sha256) {
+      return json({ ok: false, error: "checksum_missing" }, 400);
+    }
+  }
+  await env.REPORTS.put(latestKey(manifest.channel), JSON.stringify(manifest), {
+    httpMetadata: { contentType: "application/json" },
+  });
+  return json({ ok: true, build_id: manifest.build_id, channel: manifest.channel }, 201);
 }
 
 function json(value: unknown, status = 200, extra: Record<string, string> = {}): Response {
