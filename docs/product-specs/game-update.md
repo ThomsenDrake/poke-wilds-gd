@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-19
+Last verified: 2026-08-20
 Review cadence days: 14
 Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot
 
@@ -24,7 +24,10 @@ install/user dir refuses apply, leaves the old binary in place, and shows a
 MessageBox. Failed downloads and failed applies delete the artifact and
 `pending.json` so unique build-specific filenames cannot fill `user://`.
 A successful apply deletes `user://updates/pending.json` and the
-downloaded artifact (keeping `applied.json`). The updater never writes `user://godot_port_save.json*`.
+downloaded artifact (keeping `applied.json`). The title check does not
+write a save. Confirm persists a below-floor on-disk save (the in-memory
+migration) before download so replace cannot leave disk below
+`min_save_version`; persist failure refuses apply.
 
 Saves stay in Godot `user://` for `config/name="PokeWilds-Godot"`. Replacing
 the executable does not touch that path. The application name and macOS
@@ -126,7 +129,8 @@ pointer only after all three object checksums exist.
 `update_flow` drives the title `UPDATE` row through an injected transport (no
 network). It covers no-update default entries, update-available first row,
 confirm/cancel, hash-mismatch refuse, scenario/editor check skip, identity
-persist across a fake new `build.json`, and no UPDATE offer on an unknown OS.
+persist across a fake new `build.json`, no UPDATE offer on an unknown OS,
+and no UPDATE offer when this running save schema is below `min_save_version`.
 Default title fixtures stay `CONTINUE` / `NEW GAME` so existing title
 baselines do not churn.
 
