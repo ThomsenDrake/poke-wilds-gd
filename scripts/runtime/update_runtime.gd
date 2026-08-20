@@ -111,10 +111,12 @@ func apply_available() -> Dictionary:
 	var artifact := ProjectSettings.globalize_path(str(downloaded.get("path", "")))
 	var applied := _invoke_apply(os_name, artifact, UpdateApplier.install_path())
 	if not bool(applied.get("ok", false)):
+		_clear_staging()
 		_busy = false
 		_trace("update_apply_refused", {"reason": str(applied.get("error", "apply_failed"))})
 		return applied
 	if bool(applied.get("deferred", false)) and not _start_deferred(applied):
+		_clear_staging()
 		_busy = false
 		_trace("update_apply_refused", {"reason": "helper_launch_failed"})
 		return {"ok": false, "error": "helper_launch_failed"}

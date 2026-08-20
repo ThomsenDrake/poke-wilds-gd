@@ -189,9 +189,9 @@ static func apply_windows_fixture(failures: Array) -> void:
 
 static func expect_download_cleared(failures: Array) -> void:
 	_check(failures, not FileAccess.file_exists("user://updates/PokeWilds-linux.x86_64"),
-		"failed download left a partial artifact")
+		"refused update left a downloaded artifact")
 	_check(failures, not FileAccess.file_exists("user://updates/pending.json"),
-		"failed download left pending.json")
+		"refused update left pending.json")
 
 
 static func expect_staging_cleared(failures: Array) -> void:

@@ -21,10 +21,10 @@ and relaunches. The title keeps a held "Downloading update…" toast for the
 whole apply (it does not auto-hide at 30s) and only then shows success hide
 or the fail banner. Hash mismatch, a missing pending file, a failed download, or an unwritable
 install/user dir refuses apply, leaves the old binary in place, and shows a
-MessageBox. Failed downloads delete the partial artifact so unique
-build-specific filenames cannot fill `user://`. A successful apply deletes
-`user://updates/pending.json` and the downloaded artifact (keeping
-`applied.json`) so later builds cannot pile up under unique filenames. The updater never writes `user://godot_port_save.json*`.
+MessageBox. Failed downloads and failed applies delete the artifact and
+`pending.json` so unique build-specific filenames cannot fill `user://`.
+A successful apply deletes `user://updates/pending.json` and the
+downloaded artifact (keeping `applied.json`). The updater never writes `user://godot_port_save.json*`.
 
 Saves stay in Godot `user://` for `config/name="PokeWilds-Godot"`. Replacing
 the executable does not touch that path. The application name and macOS

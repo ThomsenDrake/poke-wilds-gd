@@ -2106,7 +2106,7 @@ quality_bucket = "update"
 # a failed chmod refuses before the live path is renamed.
 # Staging publish endpoints select the staging REPORTS bucket.
 # Identity persist failure skips the latest check and refuses apply.
-# Failed downloads delete the partial artifact.
+# Failed downloads and failed applies delete the artifact and pending.json.
 # Successful apply clears user://updates/ except applied.json.
 # Editor/scenario boots skip
 # the network check; update_flow injects transport and never touches the live

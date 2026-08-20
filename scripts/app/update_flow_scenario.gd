@@ -8,6 +8,7 @@ var _ctx: Dictionary
 var _runner = SmokeScenarioRunner.new()
 var _failures: Array = []
 var _download_error := ""
+var _apply_error := ""
 var _hold_download := false
 var _applied := false
 var _relaunched := false
@@ -52,6 +53,15 @@ func run(ctx: Dictionary) -> void:
 	_check(_runner.trace_log_has_since("update_apply_refused", refuse_from), "hash mismatch did not trace update_apply_refused")
 	Checks.expect_download_cleared(_failures)
 	_download_error = ""
+	_apply_error = "write_failed"
+	var apply_refuse_from := _runner.trace_log_line_count()
+	title.select_entry(0)
+	await SmokeTap.tap(get_tree(), "action_a")
+	await SmokeTap.tap(get_tree(), "action_a")
+	await _wait_until(func(): return _runner.trace_log_has_since("update_apply_refused", apply_refuse_from), 60)
+	_check(not _applied, "apply refuse still applied")
+	Checks.expect_download_cleared(_failures)
+	_apply_error = ""
 	title.select_entry(0)
 	await SmokeTap.tap(get_tree(), "action_a")
 	await SmokeTap.tap(get_tree(), "action_a")
@@ -95,6 +105,8 @@ func _transport(kind: String, _build = null, dest: String = "") -> Dictionary:
 
 
 func _apply(_os_name: String, _artifact: String, _target: String) -> Dictionary:
+	if not _apply_error.is_empty():
+		return {"ok": false, "error": _apply_error}
 	_applied = true
 	return {"ok": true}
 
