@@ -20,10 +20,10 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const SnapshotCapture := preload("res://scripts/app/snapshot_capture.gd")
-const CreationRender := preload("res://scripts/ui/creation_screen_render.gd") # the step-label seams live here (creation_screen.gd's 220-wall extraction)
+const PlayAgentClimb := preload("res://scripts/app/play_agent_climb.gd")
 
-const PIN := 2026080701 # seed_for_smoke pin: the starter shiny draw rides this stream
-const WORLD_SEED := 2026080702 # typed into the creation seed digit row (no RANDOM ambiguity)
+const PIN := PlayAgentClimb.PIN
+const WORLD_SEED := PlayAgentClimb.WORLD_SEED
 const STEP_HOLD_FRAMES := 30 # bound on waiting for the held direction key to start a step
 
 var _ctx: Dictionary = {}
@@ -40,7 +40,7 @@ func run(ctx: Dictionary) -> void:
 	Input.use_accumulated_input = true # caller-owned toggle; _restore clears it on every exit path
 	_player().input_enabled = false # the screens must own the injected keys (the new_game_flow precedent)
 	_runtime().seed_for_smoke(PIN)
-	await _drive_creation()
+	await PlayAgentClimb.new().drive(self, _ctx, _runner, _failures)
 	if _failures.is_empty():
 		await _drive_overworld_step()
 	if _failures.is_empty():
@@ -49,64 +49,6 @@ func run(ctx: Dictionary) -> void:
 		await _capture_snapshot()
 	_restore()
 	_finish()
-
-# Title -> NEW GAME -> save-wipe confirm -> creation steps -> GO (the part-4
-# seam of new_game_flow_checks, with NAME/AVATAR kept at their defaults via
-# the empty OK confirm / the cursor-cell-0 confirm).
-func _drive_creation() -> void:
-	var title := _title()
-	var creation := _creation()
-	var cursor := _runner.trace_log_line_count()
-	title.begin_boot(true) # has_save: NEW GAME rides the real save-wipe confirm gate
-	await _tap("action_a") # splash skip
-	if not _expect(not title.get_node("Splash").visible, "injection witness: the splash skip did not run"):
-		return
-	if not _expect(title.entry_labels() == ["CONTINUE", "NEW GAME"], "the with-save entries %s != [CONTINUE, NEW GAME]" % str(title.entry_labels())):
-		return
-	_expect(_runner.trace_log_has_since("title_shown", cursor, {"has_save": true}), "no title_shown{has_save:true} trace since begin_boot")
-	await _tap("move_down") # CONTINUE -> NEW GAME
-	if not _expect(title.entry_row_text(title.selected_entry()) == "NEW GAME", "the cursor did not land on NEW GAME"):
-		return
-	await _tap("action_a") # NEW GAME -> the MessageBox save-wipe confirm
-	if not _expect(_message_box().is_confirming(), "injection witness: NEW GAME did not open the save-wipe confirm"):
-		return
-	await _tap("action_a") # the confirm answer runs the title -> creation swap
-	_expect(_runner.trace_log_has_since("title_new_game_chosen", cursor), "no title_new_game_chosen trace after the confirmed NEW GAME")
-	if not _expect(creation.visible and not title.visible, "injection witness: the confirm did not swap title -> creation"):
-		return
-	var value_label: Label = CreationRender.step_value_label(creation)
-	await _tap("move_left") # RANDOM -> the in-stage seed digit row
-	if not _expect(CreationRender.seed_edit_active(creation), "injection witness: move_left did not open the seed digit row"):
-		return
-	for character in str(WORLD_SEED): # unicode digit events (the digit row reads unicode 48-57)
-		await SmokeTap.tap_digit(get_tree(), int(character))
-	await _tap("action_a") # the digit row's Z commit stores the typed seed
-	if not _expect(value_label.text == str(WORLD_SEED), "the seed step shows '%s', not the typed %d" % [value_label.text, WORLD_SEED]):
-		return
-	await _tap("action_a") # SEED -> SHINY (the 1/256 default stands)
-	await _tap("action_a") # SHINY -> NAME
-	await _tap("action_a") # NAME opens the NameEntry grid
-	if not _expect(creation._name_entry.visible, "injection witness: Z did not open the NameEntry grid"):
-		return
-	if not await SmokeTap.flush(get_tree(), "move_right", 27): # cell 0 (A) -> cell 27 (OK); the empty confirm keeps DEFAULT_PLAYER_NAME
-		_failures.append("injection: no key event is bound to move_right")
-		return
-	await _tap("action_a") # OK confirms back to the step
-	if not _expect(not creation._name_entry.visible, "injection witness: OK did not close the NameEntry grid"):
-		return
-	await _tap("action_a") # NAME -> AVATAR (the overlay is done)
-	await _tap("action_a") # AVATAR opens the picker
-	if not _expect(creation._avatar_picker.visible, "injection witness: Z did not open the AvatarPicker"):
-		return
-	await _tap("action_a") # confirm the default avatar (cursor cell 0)
-	await _tap("action_a") # AVATAR -> GO
-	if not _expect(CreationRender.step_title_label(creation).text == "Go!", "the flow landed on '%s', not the GO step" % CreationRender.step_title_label(creation).text):
-		return
-	var go_cursor := _runner.trace_log_line_count()
-	await _tap("action_a") # GO -> the generating beat -> creation_confirmed
-	await get_tree().create_timer(0.9).timeout # the 0.6s GenTimer beat + headroom
-	_expect(_runner.trace_log_has_since("creation_confirmed", go_cursor, {"world_seed": WORLD_SEED}), "no creation_confirmed{world_seed:%d} since the GO press" % WORLD_SEED)
-	_expect(_runner.trace_log_has_since("world_rebuilt", go_cursor), "no world_rebuilt since the GO press (main._enter_world did not run)")
 
 # One REAL overworld step: the held direction key rides the avatar's
 # Input.is_action_pressed poll in _process — the player-facing movement path.
@@ -162,9 +104,6 @@ func _restore() -> void: # EVERY exit path: accumulated input off, avatar drivab
 	_title().hide_screen()
 	_creation().close_screen()
 
-func _tap(action: String) -> void:
-	await SmokeTap.tap(get_tree(), action)
-
 static func _direction_action(direction: Vector2i) -> String:
 	match direction:
 		Vector2i.UP: return "move_up"
@@ -179,7 +118,6 @@ func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; retu
 
 func _title() -> Control: return _ctx["title_screen"]
 func _creation() -> Control: return _ctx["creation_screen"]
-func _message_box() -> Node: return _ctx["message_box"]
 func _world() -> Node: return _ctx["world"]
 func _player() -> Node: return _ctx["player"]
 func _runtime() -> Node: return _ctx["runtime"]
