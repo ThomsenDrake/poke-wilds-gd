@@ -97,7 +97,9 @@ extractable and is protected by revocation, cohort scoping, per-minute edge
 limiting, and D1 daily limits—not as a durable secret. Re-registering a
 revoked `tester_id` returns `invite_revoked` and does not clear `revoked_at`,
 so a later playtest publish cannot silently revive a compromised cohort
-token. Rotate `PLAYTEST_COHORT_INVITE_TOKEN` instead. GitHub App and maintainer
+token. `playtest-release` waits for the production Worker that contains
+that check (`feedback-relay-deploy` success plus `/healthz` `version_tag`)
+before `register_invite`. Rotate `PLAYTEST_COHORT_INVITE_TOKEN` instead. GitHub App and maintainer
 credentials exist only as Worker secrets.
 The relay endpoint must be HTTPS without embedded credentials, a query, a fragment, or
 an empty/malformed explicit port;
@@ -183,6 +185,8 @@ follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
 `export_presets.cfg` so a preset-only main commit still publishes. A tag
 and a later `workflow_run` for the same SHA skip a second publish. Tag and
 dispatch still require a successful `playtests-headless` run for that SHA.
+The publisher also refuses to register the cohort invite until production
+`/healthz` reports the latest relay-touching commit.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
@@ -356,6 +357,8 @@ class PublishUpdateTests(unittest.TestCase):
             receipt = Path(raw) / "receipt.json"
             with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
                     mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                    mock.patch.object(publish_update, "assert_production_relay",
+                                      side_effect=lambda *_args, **_kwargs: order.append("relay")), \
                     mock.patch.object(publish_update, "register_invite", side_effect=fake_register), \
                     mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
                     mock.patch.object(publish_update, "write_publish_receipt",
@@ -373,10 +376,90 @@ class PublishUpdateTests(unittest.TestCase):
                     }, clear=False), \
                     mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
                 self.assertEqual(publish_update.main(), 0)
-        self.assertEqual(order, ["register", "export"])
+        self.assertEqual(order, ["relay", "register", "export"])
         write_receipt.assert_called_once()
         upload.assert_called_once()
         publish.assert_called_once()
+
+    def test_required_relay_commit_uses_the_latest_relay_touching_sha(self) -> None:
+        captured: list[tuple[str, ...]] = []
+
+        def fake_run(*args: str) -> str:
+            captured.append(args)
+            return "r" * 40
+
+        self.assertEqual(publish_update.required_relay_commit(git_run=fake_run), "r" * 40)
+        self.assertEqual(captured[0][:4], ("git", "log", "-1", "--format=%H"))
+        self.assertIn("services/feedback-relay", captured[0])
+        self.assertIn(".github/workflows/feedback-relay-deploy.yml", captured[0])
+        with self.assertRaises(RuntimeError):
+            publish_update.required_relay_commit(git_run=lambda *_args: "")
+
+    def test_assert_production_relay_refuses_a_stale_worker(self) -> None:
+        captured: list[str] = []
+
+        class FakeResponse:
+            status = 200
+
+            def read(self) -> bytes:
+                return b'{"ok":true,"environment":"production","report_schema":1,"version_tag":"old"}'
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        def fake_open(request, timeout):  # noqa: ANN001
+            captured.append(request.full_url)
+            return FakeResponse()
+
+        with self.assertRaises(RuntimeError) as ctx:
+            publish_update.assert_production_relay(
+                "https://relay.test", "new" * 10, urlopen=fake_open)
+        self.assertIn("stale production relay", str(ctx.exception))
+        self.assertEqual(captured, ["https://relay.test/healthz"])
+        health = publish_update.assert_production_relay(
+            "https://relay.test", "old", urlopen=fake_open)
+        self.assertEqual(health["version_tag"], "old")
+        self.assertFalse(publish_update.production_relay_matches(
+            {"ok": True, "environment": "staging", "report_schema": 1, "version_tag": "old"},
+            "old",
+        ))
+
+    def test_publish_refuses_register_when_production_relay_is_stale(self) -> None:
+        def boom(*_args, **_kwargs):  # noqa: ANN001
+            raise RuntimeError("refusing stale production relay; wanted version_tag x")
+
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                mock.patch.object(publish_update, "assert_production_relay", side_effect=boom), \
+                mock.patch.object(publish_update, "register_invite") as register_invite, \
+                mock.patch.object(publish_update, "export_shared") as export_shared, \
+                mock.patch.object(publish_update, "build_metadata_lock"), \
+                mock.patch.dict("os.environ", {
+                    "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                    "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                    "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
+                }, clear=False), \
+                mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
+            with self.assertRaises(RuntimeError):
+                publish_update.main()
+        register_invite.assert_not_called()
+        export_shared.assert_not_called()
+
+    def test_require_production_relay_cli_prints_the_matched_sha(self) -> None:
+        sha = "d" * 40
+        with mock.patch.object(publish_update, "required_relay_commit", return_value=sha), \
+                mock.patch.object(publish_update, "assert_production_relay") as assert_relay, \
+                mock.patch.dict("os.environ", {
+                    "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                }, clear=False), \
+                mock.patch("sys.argv", ["publish_update.py", "--require-production-relay"]), \
+                mock.patch("sys.stdout", new_callable=StringIO) as stdout:
+            self.assertEqual(publish_update.main(), 0)
+        assert_relay.assert_called_once_with("https://relay.test", sha)
+        self.assertIn(f"production_relay={sha}", stdout.getvalue())
 
     def test_already_published_commit_matches_latest_sha(self) -> None:
         sha = "a" * 40

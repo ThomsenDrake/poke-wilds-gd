@@ -73,6 +73,37 @@ jobs:
           line="$(python3 tools/publish_update.py --channel "${CHANNEL}" --already-published | tail -n 1)"
           echo "$line"
           echo "$line" >> "$GITHUB_OUTPUT"
+      - name: Require the production relay for this SHA
+        if: steps.latest.outputs.already_published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}
+        run: |
+          sha="$(python3 -c 'import sys; sys.path.insert(0, "tools"); import publish_update; print(publish_update.required_relay_commit())')"
+          head="$(git rev-parse HEAD)"
+          attempts=1
+          if [ "$sha" = "$head" ]; then
+            attempts=24
+          fi
+          for attempt in $(seq 1 "$attempts"); do
+            count="$(gh run list --workflow feedback-relay-deploy --commit "$sha" --status success --json databaseId --jq 'length')"
+            if [ "${count:-0}" -ge 1 ]; then
+              if python3 tools/publish_update.py --channel "${CHANNEL}" --require-production-relay; then
+                exit 0
+              fi
+            fi
+            failed="$(gh run list --workflow feedback-relay-deploy --commit "$sha" --status failure --json databaseId --jq 'length')"
+            if [ "${failed:-0}" -ge 1 ]; then
+              echo "refusing stale production relay ${sha}; feedback-relay-deploy failed" >&2
+              exit 1
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "waiting for production relay ${sha} (attempt ${attempt}/${attempts})"
+              sleep 30
+            fi
+          done
+          echo "refusing stale production relay ${sha}; no successful feedback-relay-deploy" >&2
+          exit 1
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.latest.outputs.already_published != 'true'
         with:

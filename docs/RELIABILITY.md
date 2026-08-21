@@ -290,7 +290,12 @@ commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
 commit. `workflow_dispatch` always republishes so a rotated cohort token
 can land without a new commit, but tag and dispatch still require a
-successful `playtests-headless` run for that SHA. Per-friend
+successful `playtests-headless` run for that SHA. Before
+`register_invite`, the publisher also requires a successful
+`feedback-relay-deploy` for the latest relay-touching commit (HEAD when
+this SHA changed the Worker) and production `/healthz` `version_tag` for
+that commit, so a delayed or failed production deploy cannot hit the old
+upsert that cleared `revoked_at`. Per-friend
 `package_playtest.py` stays off that path.
 `POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)
 and never clears `revoked_at` on upsert.

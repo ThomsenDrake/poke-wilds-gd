@@ -9,7 +9,10 @@ Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
 Revoked cohort re-register (2026-08-21): `POST /v1/admin/invites` returns
 `invite_revoked` and does not clear `revoked_at`, so a later playtest
-publish cannot silently revive a compromised shared invite. Scores unchanged.
+publish cannot silently revive a compromised shared invite.
+`playtest-release` also waits for that production Worker (`/healthz`
+`version_tag` plus a successful `feedback-relay-deploy`) before
+`register_invite`. Scores unchanged.
 
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on
 the `playtest` channel is refreshed from the new embed so a rotated

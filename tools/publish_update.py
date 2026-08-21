@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 import urllib.parse
 import urllib.request
 
@@ -31,6 +32,10 @@ from update_manifest import artifact_key, artifact_public_url, parse
 
 ROOT = Path(__file__).resolve().parents[1]
 WRANGLER_CONFIG = ROOT / "services" / "feedback-relay" / "wrangler.jsonc"
+RELAY_PATHS = (
+    "services/feedback-relay",
+    ".github/workflows/feedback-relay-deploy.yml",
+)
 STABLE_RELEASE_ASSETS = {
     "linux": "PokeWilds-linux.x86_64",
     "windows": "PokeWilds-windows.exe",
@@ -245,6 +250,64 @@ def already_published_commit(latest: dict, sha: str) -> bool:
     return bool(wanted) and str(latest.get("commit_sha", "")).strip().lower() == wanted
 
 
+def required_relay_commit(*, git_run=run) -> str:
+    """Latest commit that deployed Worker code. Equals HEAD when this SHA changed it."""
+    sha = git_run("git", "log", "-1", "--format=%H", "--", *RELAY_PATHS)
+    if not sha:
+        raise RuntimeError("refusing playtest publish; no relay commit on this branch")
+    return sha
+
+
+def fetch_healthz(endpoint: str, *, urlopen=open_no_redirect) -> dict:
+    base = validated_endpoint(endpoint)
+    request = urllib.request.Request(
+        f"{base}/healthz",
+        method="GET",
+        headers={"User-Agent": USER_AGENT},
+    )
+    with urlopen(request, timeout=15) as response:
+        if response.status != 200:
+            raise RuntimeError(f"healthz returned HTTP {response.status}")
+        data = json.loads(response.read().decode())
+    if not isinstance(data, dict):
+        raise RuntimeError("healthz is not a JSON object")
+    return data
+
+
+def production_relay_matches(health: dict, sha: str) -> bool:
+    wanted = sha.strip()
+    return bool(
+        wanted
+        and health.get("ok") is True
+        and health.get("environment") == "production"
+        and health.get("report_schema") == 1
+        and str(health.get("version_tag") or "").strip() == wanted
+    )
+
+
+def assert_production_relay(endpoint: str, sha: str, *, urlopen=open_no_redirect,
+                            attempts: int = 1, delay: float = 0.0) -> dict:
+    """Refuse register_invite until production /healthz reports this Worker SHA."""
+    last_error = "unreachable"
+    for attempt in range(max(1, attempts)):
+        try:
+            health = fetch_healthz(endpoint, urlopen=urlopen)
+        except (OSError, RuntimeError, json.JSONDecodeError, ValueError) as exc:
+            last_error = str(exc)
+        else:
+            if production_relay_matches(health, sha):
+                return health
+            last_error = (
+                f"version_tag={health.get('version_tag')!r} "
+                f"environment={health.get('environment')!r}"
+            )
+        if attempt + 1 < attempts and delay > 0:
+            time.sleep(delay)
+    raise RuntimeError(
+        f"refusing stale production relay; wanted version_tag {sha}, {last_error}"
+    )
+
+
 def stage_github_release_from_latest(latest: dict, dest_dir: Path, *,
                                      urlopen=open_no_redirect) -> list[Path]:
     """Copy already-published artifacts onto the stable GitHub Release names."""
@@ -303,6 +366,11 @@ def main() -> int:
         action="store_true",
         help="Print already_published=true|false for HEAD vs the channel latest and exit",
     )
+    parser.add_argument(
+        "--require-production-relay",
+        action="store_true",
+        help="Refuse unless production /healthz version_tag is the latest relay commit",
+    )
     args = parser.parse_args()
     if args.already_published:
         if not args.endpoint:
@@ -316,6 +384,13 @@ def main() -> int:
             return 0
         print(f"already_published={'true' if already_published_commit(latest, sha) else 'false'}")
         return 0
+    if args.require_production_relay:
+        if not args.endpoint:
+            parser.error("set PLAYTEST_FEEDBACK_ENDPOINT")
+        sha = required_relay_commit()
+        assert_production_relay(args.endpoint, sha)
+        print(f"production_relay={sha}")
+        return 0
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
@@ -328,6 +403,7 @@ def main() -> int:
     with build_metadata_lock():
         try:
             if cohort:
+                assert_production_relay(endpoint, required_relay_commit())
                 register_invite(endpoint, admin_token, cohort)
             exported = export_shared(
                 args.channel, endpoint, godot=godot_binary(), cohort=cohort)
