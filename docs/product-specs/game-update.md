@@ -129,7 +129,8 @@ and a later `workflow_run` for the same SHA do not publish twice: if
 `latest.json` already has that `commit_sha`, export is skipped and a `v*`
 rerun attaches the already-published artifacts (checked against the
 manifest SHA-256 and size). `workflow_dispatch` always republishes so a
-cohort-token rotation can land without a new commit. The
+cohort-token rotation can land without a new commit. Tag and dispatch
+still require a successful `playtests-headless` run for that SHA. The
 `playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs

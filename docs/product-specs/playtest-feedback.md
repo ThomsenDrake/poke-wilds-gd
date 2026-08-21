@@ -178,7 +178,8 @@ key stays out. A public receipt lists the three OS artifacts without tokens.
 names so a rerun `--clobber`s the previous assets. Wrangler/R2 selection
 follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
 `export_presets.cfg` so a preset-only main commit still publishes. A tag
-and a later `workflow_run` for the same SHA skip a second publish.
+and a later `workflow_run` for the same SHA skip a second publish. Tag and
+dispatch still require a successful `playtests-headless` run for that SHA.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable

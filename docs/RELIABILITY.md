@@ -289,7 +289,8 @@ asset names and uploads `--clobber` when the GitHub Release already exists.
 commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
 commit. `workflow_dispatch` always republishes so a rotated cohort token
-can land without a new commit. Per-friend
+can land without a new commit, but tag and dispatch still require a
+successful `playtests-headless` run for that SHA. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport; it pins
 friend-wins-after-UPDATE (explicit `identity_kind=friend`, including a

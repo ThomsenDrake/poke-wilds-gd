@@ -821,6 +821,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "group: playtest-release-playtest",
         "  CHANNEL: playtest",
         "refusing stale playtest publish",
+        "refusing unvalidated playtest publish",
+        "gh run list --workflow playtests-headless",
         "wanted=\"$(git rev-parse HEAD)\"",
         "git rev-parse origin/main",
         "  cancel-in-progress: false",
@@ -887,9 +889,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
     if _yaml_mapping_block(text, "permissions:") != [
         "permissions:",
         "  contents: write",
+        "  actions: read",
     ]:
         issues.append(
-            f"{PLAYTEST_RELEASE_WORKFLOW} workflow permissions must be exactly contents: write"
+            f"{PLAYTEST_RELEASE_WORKFLOW} workflow permissions must be contents: write and actions: read"
         )
     workflow_keys = [
         line.split(":", 1)[0]
