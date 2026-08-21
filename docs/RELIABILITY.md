@@ -286,7 +286,9 @@ workflow does not accept a dispatch channel or wrangler-env override;
 R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
 asset names and uploads `--clobber` when the GitHub Release already exists.
 `playtests-headless` includes `export_presets.cfg` so a preset-only main
-commit still reaches this publisher. Per-friend
+commit still reaches this publisher. A tag and a later `workflow_run` for
+the same SHA skip a second publish when `latest.json` already has that
+commit. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport; it pins
 friend-wins-after-UPDATE and refreshes a persisted shared-cohort token from

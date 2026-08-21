@@ -223,6 +223,48 @@ def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> s
     raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
 
 
+def fetch_latest(endpoint: str, channel: str, *, urlopen=open_no_redirect) -> dict:
+    base = validated_endpoint(endpoint)
+    request = urllib.request.Request(
+        f"{base}/v1/updates/latest?channel={urllib.parse.quote(channel)}",
+        method="GET",
+        headers={"User-Agent": USER_AGENT},
+    )
+    with urlopen(request, timeout=20) as response:
+        if response.status != 200:
+            raise RuntimeError(f"latest returned HTTP {response.status}")
+        data = json.loads(response.read().decode())
+    if not isinstance(data, dict):
+        raise RuntimeError("latest is not a JSON object")
+    return data
+
+
+def already_published_commit(latest: dict, sha: str) -> bool:
+    wanted = sha.strip().lower()
+    return bool(wanted) and str(latest.get("commit_sha", "")).strip().lower() == wanted
+
+
+def stage_github_release_from_latest(latest: dict, dest_dir: Path, *,
+                                     urlopen=open_no_redirect) -> list[Path]:
+    """Copy already-published artifacts onto the stable GitHub Release names."""
+    builds = latest.get("builds") or {}
+    missing = set(STABLE_RELEASE_ASSETS) - set(builds)
+    if missing:
+        raise RuntimeError(f"latest is missing OS artifacts: {sorted(missing)}")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    staged: list[Path] = []
+    for os_name, stable_name in STABLE_RELEASE_ASSETS.items():
+        url = str(builds[os_name].get("url", "")).strip()
+        if not url.startswith("https://"):
+            raise RuntimeError(f"latest {os_name} artifact URL is not HTTPS")
+        dest = dest_dir / stable_name
+        request = urllib.request.Request(url, method="GET", headers={"User-Agent": USER_AGENT})
+        with urlopen(request, timeout=120) as response:
+            dest.write_bytes(response.read())
+        staged.append(dest)
+    return staged
+
+
 def wrangler_put(key: str, path: Path, endpoint: str = "",
                  environment: str = "") -> str:
     parts = key.split("/")
@@ -250,7 +292,24 @@ def main() -> int:
         action="store_true",
         help="Refuse tokenless shared builds so new testers can still F-report",
     )
+    parser.add_argument(
+        "--already-published",
+        action="store_true",
+        help="Print already_published=true|false for HEAD vs the channel latest and exit",
+    )
     args = parser.parse_args()
+    if args.already_published:
+        if not args.endpoint:
+            parser.error("set PLAYTEST_FEEDBACK_ENDPOINT")
+        sha = run("git", "rev-parse", "HEAD")
+        try:
+            latest = fetch_latest(args.endpoint, args.channel)
+        except Exception as exc:
+            print(f"latest lookup failed: {exc}", file=sys.stderr)
+            print("already_published=false")
+            return 0
+        print(f"already_published={'true' if already_published_commit(latest, sha) else 'false'}")
+        return 0
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")

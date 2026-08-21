@@ -376,6 +376,78 @@ class PublishUpdateTests(unittest.TestCase):
         upload.assert_called_once()
         publish.assert_called_once()
 
+    def test_already_published_commit_matches_latest_sha(self) -> None:
+        sha = "a" * 40
+        self.assertTrue(publish_update.already_published_commit({"commit_sha": sha}, sha))
+        self.assertTrue(publish_update.already_published_commit({"commit_sha": sha.upper()}, sha))
+        self.assertFalse(publish_update.already_published_commit({"commit_sha": "b" * 40}, sha))
+        self.assertFalse(publish_update.already_published_commit({}, sha))
+        self.assertFalse(publish_update.already_published_commit({"commit_sha": sha}, ""))
+
+    def test_fetch_latest_reads_the_public_channel_pointer(self) -> None:
+        captured: list[str] = []
+
+        class FakeResponse:
+            status = 200
+
+            def read(self) -> bytes:
+                return b'{"commit_sha":"%s","channel":"playtest"}' % (b"c" * 40)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        def fake_open(request, timeout):  # noqa: ANN001
+            captured.append(request.full_url)
+            return FakeResponse()
+
+        latest = publish_update.fetch_latest("https://relay.test", "playtest", urlopen=fake_open)
+        self.assertEqual(latest["commit_sha"], "c" * 40)
+        self.assertEqual(captured, ["https://relay.test/v1/updates/latest?channel=playtest"])
+
+    def test_stage_github_release_from_latest_uses_stable_names(self) -> None:
+        payloads = {
+            "linux": b"L",
+            "windows": b"W",
+            "macos": b"M",
+        }
+
+        class FakeResponse:
+            def __init__(self, body: bytes) -> None:
+                self._body = body
+
+            def read(self) -> bytes:
+                return self._body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        def fake_open(request, timeout):  # noqa: ANN001
+            os_name = request.full_url.rsplit("/", 1)[-1]
+            return FakeResponse(payloads[os_name])
+
+        latest = {
+            "builds": {
+                os_name: {"url": f"https://relay.test/v1/updates/artifacts/playtest/b1/{os_name}"}
+                for os_name in payloads
+            }
+        }
+        with tempfile.TemporaryDirectory() as raw:
+            dest = Path(raw)
+            staged = publish_update.stage_github_release_from_latest(
+                latest, dest, urlopen=fake_open)
+            self.assertEqual(
+                [path.name for path in staged],
+                list(publish_update.STABLE_RELEASE_ASSETS.values()),
+            )
+            for os_name, stable_name in publish_update.STABLE_RELEASE_ASSETS.items():
+                self.assertEqual((dest / stable_name).read_bytes(), payloads[os_name])
+
     def test_release_workflow_contract_accepts_the_committed_file(self) -> None:
         import check_repo_contracts
         root = Path(__file__).resolve().parents[1]
