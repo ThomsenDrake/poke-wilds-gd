@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-19
+Last verified: 2026-08-21
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools
 
@@ -154,6 +154,8 @@ Created-game dungeon journey (2026-08-12): `app_bootstrap`'s real title/creation
 Collapsed-poll C+Z leak (2026-08-13): `app_bootstrap`'s `input_router.poll` drops `context_ok` after a same-frame `build_toggle` so C+Z cannot harvest while opening the overlay (the pre-collapse `poll_build_toggle` then re-read `is_active()` order). `building_loop`'s `dig_silence` part G pins it. Scores unchanged: same-frame regression fix + existing-scenario part, not new behavior.
 
 Collapsed-poll Enter-close latch leak (2026-08-13): `app_bootstrap`'s `input_router.poll` clears callback-raised `_ui_ate_press` before return so Enter-close via `_toggle_menu`/`hide_menu` cannot swallow the next frame's first press (the pre-collapse context poll owned that reset). `input_gate` part F pins a latch raised during poll and a next-frame Enter. Scores unchanged: same-frame regression fix + existing-scenario part, not new behavior.
+
+Unattended hunt clip inbox (2026-08-21): `app_bootstrap` extracts the live-play climb-out so `play_agent` and a standalone `hunt_soak` share title → NEW GAME → GO. The hunt is not a `PLAYTEST_SCENARIOS` / default `verify_all` lane. Scores unchanged: optional hunt + shared climb-out, not boot behavior.
 
 Cloud Dummy-audio leak gate (2026-08-14): `session_runtime` music/cry playback now also returns early when `GODOT_AUDIO_DRIVER=Dummy` (the playtest/Cloud driver). Dummy still "plays" and holds the OGG chain at quit — the same leak class as headless — which miss-002 `ERROR:` capture would otherwise false-red after ALSA is silenced. `music_track_selected` still emits before the gate. Scores unchanged: verification honesty, not game behavior.
 
