@@ -79,10 +79,27 @@ class HuntSoakLauncherTests(unittest.TestCase):
             )
             with mock.patch.object(HUNT.subprocess, "Popen", side_effect=OSError("no godot")):
                 report = HUNT.run_hunt(project, "missing-godot", 1)
-            self.assertTrue(report["ok"])
-            self.assertEqual(report["inbox"], str(run))
+            self.assertFalse(report["ok"])
+            self.assertIsNone(report["inbox"])
             keeps = json.loads((run / "index.json").read_text(encoding="utf-8"))["keeps"]
             self.assertEqual(keeps[0]["tag"], "coded")
+            self.assertFalse((project / ".godot-smoke" / "scenario.json").exists())
+            self.assertFalse((project / ".godot-smoke" / "hunt-request.json").exists())
+
+    def test_launch_failure_does_not_reuse_prior_inbox(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "project.godot").write_text("", encoding="utf-8")
+            prior = project / ".godot-smoke" / "hunt-inbox" / "20260821-140000"
+            prior.mkdir(parents=True)
+            (prior / "index.json").write_text(
+                json.dumps({"run_id": prior.name, "keeps": []}),
+                encoding="utf-8",
+            )
+            with mock.patch.object(HUNT.subprocess, "Popen", side_effect=OSError("no godot")):
+                report = HUNT.run_hunt(project, "missing-godot", 1)
+            self.assertFalse(report["ok"])
+            self.assertIsNone(report["inbox"])
 
 
 if __name__ == "__main__":

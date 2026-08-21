@@ -84,6 +84,16 @@ def write_request(project: Path, minutes: int) -> Path:
     return path
 
 
+def cleanup_request(project: Path) -> None:
+    smoke = project / ".godot-smoke"
+    for name in ("scenario.json", "hunt-request.json"):
+        path = smoke / name
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def latest_run_dir(project: Path) -> Path | None:
     root = project / ".godot-smoke" / "hunt-inbox"
     runs_path = root / "runs.json"
@@ -119,58 +129,62 @@ def run_hunt(
 ) -> dict:
     if force_headless():
         return _skipped_report(skip_reason())
+    before = latest_run_dir(project)
     write_request(project, minutes)
     timeout = max(60, minutes * 60 + 30)
     proc: subprocess.Popen | None = None
     try:
-        proc = subprocess.Popen(
-            [godot_bin, "--path", str(project)],
-            cwd=str(project),
-        )
-    except OSError as exc:
+        try:
+            proc = subprocess.Popen(
+                [godot_bin, "--path", str(project)],
+                cwd=str(project),
+            )
+        except OSError as exc:
+            return {
+                "scenario": SCENARIO,
+                "skipped": False,
+                "ok": False,
+                "error": str(exc),
+                "inbox": None,
+            }
+
+        def _stop(_signum=None, _frame=None) -> None:
+            if proc and proc.poll() is None:
+                proc.terminate()
+
+        signal.signal(signal.SIGINT, _stop)
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _stop()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
         inbox = latest_run_dir(project)
-        return {
+        new_run = inbox is not None and inbox != before
+        report = {
             "scenario": SCENARIO,
             "skipped": False,
-            "ok": inbox is not None,
-            "error": str(exc),
-            "inbox": str(inbox) if inbox else None,
+            "ok": new_run,
+            "inbox": str(inbox) if new_run else None,
+            "minutes": minutes,
         }
-
-    def _stop(_signum=None, _frame=None) -> None:
-        if proc and proc.poll() is None:
-            proc.terminate()
-
-    signal.signal(signal.SIGINT, _stop)
-    try:
-        proc.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _stop()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-    inbox = latest_run_dir(project)
-    report = {
-        "scenario": SCENARIO,
-        "skipped": False,
-        "ok": inbox is not None,
-        "inbox": str(inbox) if inbox else None,
-        "minutes": minutes,
-    }
-    if inbox and reviewer is not None:
-        index_path = inbox / "index.json"
-        if index_path.is_file():
-            payload = json.loads(index_path.read_text(encoding="utf-8"))
-            rows = list(payload.get("keeps") or [])
-            verdicts = reviewer(rows)
-            payload["keeps"] = apply_model_keeps(rows, verdicts)
-            index_path.write_text(json.dumps(payload), encoding="utf-8")
-            report["model"] = "judged"
-    elif inbox:
-        report["model"] = "skipped"
-        report["model_reason"] = "no Command Code reviewer configured"
-    return report
+        if new_run and reviewer is not None:
+            index_path = inbox / "index.json"
+            if index_path.is_file():
+                payload = json.loads(index_path.read_text(encoding="utf-8"))
+                rows = list(payload.get("keeps") or [])
+                verdicts = reviewer(rows)
+                payload["keeps"] = apply_model_keeps(rows, verdicts)
+                index_path.write_text(json.dumps(payload), encoding="utf-8")
+                report["model"] = "judged"
+        elif new_run:
+            report["model"] = "skipped"
+            report["model_reason"] = "no Command Code reviewer configured"
+        return report
+    finally:
+        cleanup_request(project)
 
 
 def main(argv: list[str] | None = None) -> int:
