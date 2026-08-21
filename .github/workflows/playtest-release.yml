@@ -173,6 +173,12 @@ jobs:
             echo "expected 3 stable GitHub Release assets, got ${#files[@]}" >&2
             exit 1
           fi
+          for expected in PokeWilds-linux.x86_64 PokeWilds-windows.exe PokeWilds-macos.zip; do
+            printf '%s\n' "${files[@]}" | grep -q "/${expected}$" || {
+              echo "missing stable GitHub Release asset ${expected}" >&2
+              exit 1
+            }
+          done
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
           else
