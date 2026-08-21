@@ -10,6 +10,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
+import urllib.error
 import zipfile
 
 import publish_update
@@ -525,6 +526,52 @@ class PublishUpdateTests(unittest.TestCase):
         latest = publish_update.fetch_latest("https://relay.test", "playtest", urlopen=fake_open)
         self.assertEqual(latest["commit_sha"], "c" * 40)
         self.assertEqual(captured, ["https://relay.test/v1/updates/latest?channel=playtest"])
+
+    def test_fetch_latest_treats_404_as_not_found(self) -> None:
+        def fake_open(request, timeout):  # noqa: ANN001
+            raise urllib.error.HTTPError(request.full_url, 404, "not found", {}, None)
+
+        with self.assertRaises(publish_update.LatestNotFound):
+            publish_update.fetch_latest("https://relay.test", "playtest", urlopen=fake_open)
+
+        def fake_down(request, timeout):  # noqa: ANN001
+            raise urllib.error.HTTPError(request.full_url, 503, "down", {}, None)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            publish_update.fetch_latest("https://relay.test", "playtest", urlopen=fake_down)
+        self.assertIn("HTTP 503", str(ctx.exception))
+
+    def test_already_published_cli_treats_not_found_as_unpublished(self) -> None:
+        with mock.patch.object(publish_update, "run", return_value="a" * 40), \
+                mock.patch.object(publish_update, "fetch_latest",
+                                  side_effect=publish_update.LatestNotFound("latest is not published")), \
+                mock.patch.dict("os.environ", {
+                    "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                }, clear=False), \
+                mock.patch("sys.argv", ["publish_update.py", "--already-published"]), \
+                mock.patch("sys.stdout", new_callable=StringIO) as stdout:
+            self.assertEqual(publish_update.main(), 0)
+        self.assertIn("already_published=false", stdout.getvalue())
+
+    def test_already_published_cli_fails_closed_on_lookup_errors(self) -> None:
+        errors = (
+            TimeoutError("timed out"),
+            RuntimeError("latest returned HTTP 503"),
+            json.JSONDecodeError("bad", "x", 0),
+        )
+        for exc in errors:
+            with self.subTest(error=type(exc).__name__):
+                with mock.patch.object(publish_update, "run", return_value="a" * 40), \
+                        mock.patch.object(publish_update, "fetch_latest", side_effect=exc), \
+                        mock.patch.dict("os.environ", {
+                            "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                        }, clear=False), \
+                        mock.patch("sys.argv", ["publish_update.py", "--already-published"]), \
+                        mock.patch("sys.stdout", new_callable=StringIO) as stdout, \
+                        mock.patch("sys.stderr", new_callable=StringIO) as stderr:
+                    self.assertEqual(publish_update.main(), 1)
+                self.assertNotIn("already_published=false", stdout.getvalue())
+                self.assertIn("latest lookup failed", stderr.getvalue())
 
     def test_stage_github_release_from_latest_uses_stable_names(self) -> None:
         payloads = {

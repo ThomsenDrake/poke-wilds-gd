@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -229,6 +230,10 @@ def configured_r2_bucket(text: str | None = None, *, environment: str = "") -> s
     raise RuntimeError("wrangler.jsonc has no REPORTS bucket_name")
 
 
+class LatestNotFound(RuntimeError):
+    """Authoritative empty GET /v1/updates/latest pointer."""
+
+
 def fetch_latest(endpoint: str, channel: str, *, urlopen=open_no_redirect) -> dict:
     base = validated_endpoint(endpoint)
     request = urllib.request.Request(
@@ -236,10 +241,17 @@ def fetch_latest(endpoint: str, channel: str, *, urlopen=open_no_redirect) -> di
         method="GET",
         headers={"User-Agent": USER_AGENT},
     )
-    with urlopen(request, timeout=20) as response:
-        if response.status != 200:
-            raise RuntimeError(f"latest returned HTTP {response.status}")
-        data = json.loads(response.read().decode())
+    try:
+        with urlopen(request, timeout=20) as response:
+            if response.status == 404:
+                raise LatestNotFound("latest is not published")
+            if response.status != 200:
+                raise RuntimeError(f"latest returned HTTP {response.status}")
+            data = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise LatestNotFound("latest is not published") from exc
+        raise RuntimeError(f"latest returned HTTP {exc.code}") from exc
     if not isinstance(data, dict):
         raise RuntimeError("latest is not a JSON object")
     return data
@@ -394,10 +406,12 @@ def main() -> int:
         sha = run("git", "rev-parse", "HEAD")
         try:
             latest = fetch_latest(args.endpoint, args.channel)
-        except Exception as exc:
-            print(f"latest lookup failed: {exc}", file=sys.stderr)
+        except LatestNotFound:
             print("already_published=false")
             return 0
+        except (OSError, TimeoutError, RuntimeError, json.JSONDecodeError, ValueError) as exc:
+            print(f"latest lookup failed: {exc}", file=sys.stderr)
+            return 1
         print(f"already_published={'true' if already_published_commit(latest, sha) else 'false'}")
         return 0
     if args.require_production_relay:

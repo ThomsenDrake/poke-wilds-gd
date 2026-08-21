@@ -128,15 +128,18 @@ channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 and a later `workflow_run` for the same SHA do not publish twice: if
 `latest.json` already has that `commit_sha`, export is skipped and a `v*`
 rerun attaches the already-published artifacts (checked against the
-manifest SHA-256 and size). `workflow_dispatch` always republishes so a
+manifest SHA-256 and size). A transient or malformed `latest` lookup
+fails the job instead of republishing. `workflow_dispatch` always republishes so a
 cohort-token rotation can land without a new commit. Tag and dispatch
 still require a successful `playtests-headless` run for that SHA.
 Registering the cohort invite additionally requires the production
 relay for that SHA: a successful `feedback-relay-deploy` run whose
 deployed SHA contains the latest relay-touching commit (a later manual
 `main` deploy is accepted) and `/healthz` `version_tag` for that
-deployed SHA, so a delayed production deploy cannot revive a revoked
-invite through the previous Worker. The
+deployed SHA. The publisher retries while that ancestor deploy is still
+pending, and a successful `feedback-relay-deploy` retriggers the release
+when headless already passed, so a delayed production deploy cannot
+revive a revoked invite through the previous Worker. The
 `playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs

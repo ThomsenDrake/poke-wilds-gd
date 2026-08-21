@@ -288,13 +288,17 @@ asset names and uploads `--clobber` when the GitHub Release already exists.
 `playtests-headless` includes `export_presets.cfg` so a preset-only main
 commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
-commit. `workflow_dispatch` always republishes so a rotated cohort token
+commit. A timeout, 5xx, or malformed `latest` lookup fails closed instead
+of treating the miss as unpublished. `workflow_dispatch` always republishes so a rotated cohort token
 can land without a new commit, but tag and dispatch still require a
 successful `playtests-headless` run for that SHA. Before
 `register_invite`, the publisher also requires a successful
 `feedback-relay-deploy` for a production Worker whose `/healthz`
 `version_tag` contains the latest relay-touching commit (the live tag may
-be a later manual deploy of `main`), so a delayed or failed production
+be a later manual deploy of `main`). The publisher retries while that
+ancestor deploy is still queued or in progress, and a successful
+`feedback-relay-deploy` can retrigger the release after headless already
+passed, so a delayed or failed production
 deploy cannot hit the old upsert that cleared `revoked_at`. Per-friend
 `package_playtest.py` stays off that path.
 `POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)

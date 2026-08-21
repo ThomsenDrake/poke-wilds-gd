@@ -13,7 +13,8 @@ publish cannot silently revive a compromised shared invite.
 `playtest-release` also waits for that production Worker (`/healthz`
 `version_tag` containing the latest relay-touching commit, plus a
 successful `feedback-relay-deploy` for the live tag) before
-`register_invite`. Scores unchanged.
+`register_invite`. Transient `latest` lookups fail closed, and the
+publisher retries a still-pending ancestor relay deploy. Scores unchanged.
 
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on
 the `playtest` channel is refreshed from the new embed so a rotated

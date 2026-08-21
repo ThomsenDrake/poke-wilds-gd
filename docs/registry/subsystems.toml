@@ -2020,7 +2020,8 @@ quality_bucket = "feedback"
 # revoked tester_id (invite_revoked) and does not clear revoked_at, so a
 # later playtest publish cannot silently revive a compromised cohort token.
 # playtest-release waits for production /healthz version_tag containing
-# the latest relay-touching commit before register_invite.
+# the latest relay-touching commit before register_invite, retries a
+# pending ancestor deploy, and fails closed on a transient latest lookup.
 # SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
 # user://playtest_identity.json after a generic replace so F reports keep the
 # friend route; editor smoke overrides are not merged with disk identity.

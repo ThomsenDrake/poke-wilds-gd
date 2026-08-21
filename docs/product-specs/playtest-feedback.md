@@ -187,7 +187,10 @@ follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
 and a later `workflow_run` for the same SHA skip a second publish. Tag and
 dispatch still require a successful `playtests-headless` run for that SHA.
 The publisher also refuses to register the cohort invite until production
-`/healthz` reports a Worker that contains the latest relay-touching commit.
+`/healthz` reports a Worker that contains the latest relay-touching commit,
+retries while that ancestor deploy is still pending, and can retrigger
+after `feedback-relay-deploy` succeeds. A transient `latest` lookup fails
+closed instead of republishing the same SHA.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable
