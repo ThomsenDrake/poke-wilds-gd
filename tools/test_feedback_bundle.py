@@ -424,6 +424,24 @@ class FeedbackBundleTests(unittest.TestCase):
             timeout=10,
         )
 
+    def test_windows_private_registry_preserves_non_ascii_account_identity(self) -> None:
+        runner = mock.Mock()
+        account = "DÖMÄIN\\Jörg"
+        with mock.patch.object(package_playtest, "_windows_account_identity", return_value=account):
+            package_playtest._secure_private_file(
+                Path("private.json"),
+                platform="nt",
+                runner=runner,
+            )
+        runner.assert_called_once_with(
+            ["icacls", "private.json", "/inheritance:r", "/grant:r", f"{account}:(F)"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+
     def test_windows_private_registry_timeout_is_bounded(self) -> None:
         runner = mock.Mock(side_effect=subprocess.TimeoutExpired("icacls", 10))
         with self.assertRaisesRegex(RuntimeError, "timed out securing"):
