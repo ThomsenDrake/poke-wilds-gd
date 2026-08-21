@@ -277,10 +277,11 @@ export one artifact per OS without a friend token, upload via R2 (never a Worker
 wrangler `r2 object put` is `{bucket}/{object_key}`, public URL stays the object key),
 and publish `GET /v1/updates/latest` only after all three objects exist.
 CI (`playtest-release`) runs that publisher with `--require-cohort` after a green
-`playtests-headless` on `main` (also `v*` tags and `workflow_dispatch`): official
-4.6.1 export templates, all three desktop presets, a stable accountless cohort
-invite from `PLAYTEST_COHORT_INVITE_TOKEN`, and a public receipt that must not
-mention tokens. Per-friend `package_playtest.py` stays off that path.
+same-repo `push` `playtests-headless` on current `origin/main` (also `v*` tags
+and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
+presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
+and a public receipt that must not mention tokens. Channel publishes serialize
+and refuse a stale main SHA. Per-friend `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
