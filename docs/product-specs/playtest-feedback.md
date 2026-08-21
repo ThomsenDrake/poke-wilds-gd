@@ -94,7 +94,10 @@ friend relay. Editor smoke build-info overrides are
 not merged with disk identity. The relay
 stores only the token hash and private nickname. The package token is treated as
 extractable and is protected by revocation, cohort scoping, per-minute edge
-limiting, and D1 daily limits—not as a durable secret. GitHub App and maintainer
+limiting, and D1 daily limits—not as a durable secret. Re-registering a
+revoked `tester_id` returns `invite_revoked` and does not clear `revoked_at`,
+so a later playtest publish cannot silently revive a compromised cohort
+token. Rotate `PLAYTEST_COHORT_INVITE_TOKEN` instead. GitHub App and maintainer
 credentials exist only as Worker secrets.
 The relay endpoint must be HTTPS without embedded credentials, a query, a fragment, or
 an empty/malformed explicit port;

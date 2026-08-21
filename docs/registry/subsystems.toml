@@ -2016,6 +2016,9 @@ validation_commands = [
 ]
 required_trace_events = ["feedback_capture_requested", "feedback_report_queued", "feedback_report_sent", "feedback_report_failed", "feedback_flow_passed", "feedback_flow_failed"]
 quality_bucket = "feedback"
+# SHARED UPDATE IDENTITY (2026-08-21): POST /v1/admin/invites refuses a
+# revoked tester_id (invite_revoked) and does not clear revoked_at, so a
+# later playtest publish cannot silently revive a compromised cohort token.
 # SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
 # user://playtest_identity.json after a generic replace so F reports keep the
 # friend route; editor smoke overrides are not merged with disk identity.

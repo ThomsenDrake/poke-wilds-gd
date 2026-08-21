@@ -292,6 +292,8 @@ commit. `workflow_dispatch` always republishes so a rotated cohort token
 can land without a new commit, but tag and dispatch still require a
 successful `playtests-headless` run for that SHA. Per-friend
 `package_playtest.py` stays off that path.
+`POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)
+and never clears `revoked_at` on upsert.
 `update_flow` is a headless playtest with an injected transport; it pins
 friend-wins-after-UPDATE (explicit `identity_kind=friend`, including a
 playtest-channel friend package) and refreshes a persisted shared-cohort
