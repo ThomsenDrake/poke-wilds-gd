@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import errno
 from pathlib import Path
 import tempfile
 import unittest
 from unittest import mock
 
+import import_pokeapi
 import setup_worktree
 
 
@@ -36,6 +38,18 @@ class SetupWorktreeTests(unittest.TestCase):
         prepare_cache.assert_not_called()
         import_resources.assert_not_called()
 
+    def test_setup_lock_refuses_a_concurrent_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            common_git_dir = Path(tmp)
+            with setup_worktree._setup_lock(common_git_dir, 0, dry_run=False):
+                with self.assertRaisesRegex(setup_worktree.SetupError, "Timed out waiting"):
+                    with setup_worktree._setup_lock(common_git_dir, 0, dry_run=False):
+                        self.fail("the second lock owner must not enter")
+
+    def test_setup_lock_does_not_retry_non_contention_errors(self) -> None:
+        error = OSError(errno.EBADF, "bad descriptor")
+        self.assertFalse(setup_worktree._setup_lock_contended(error))
+
     def test_full_import_silences_progress_but_preserves_errors(self) -> None:
         root = Path("/tmp/worktree")
         with mock.patch.object(setup_worktree, "_run") as run_command:
@@ -51,13 +65,16 @@ class SetupWorktreeTests(unittest.TestCase):
         self.assertFalse(setup_worktree.is_supported_godot_version("4.6-stable"))
         self.assertFalse(setup_worktree.is_supported_godot_version("4.7.0.stable"))
 
-    def test_api_cache_requires_the_importer_sentinel(self) -> None:
+    def test_api_cache_requires_the_sentinel_and_completion_marker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.assertFalse(setup_worktree._api_cache_complete(root))
             sentinel = root / setup_worktree.POKEAPI_SENTINEL
             sentinel.parent.mkdir(parents=True)
             sentinel.write_text("{}", encoding="utf-8")
+            self.assertFalse(setup_worktree._api_cache_complete(root))
+            marker = root / setup_worktree.POKEAPI_COMPLETE_MARKER
+            marker.write_text("complete\n", encoding="utf-8")
             self.assertTrue(setup_worktree._api_cache_complete(root))
 
     def test_pinned_api_cache_requires_matching_setup_stamp(self) -> None:
@@ -70,6 +87,8 @@ class SetupWorktreeTests(unittest.TestCase):
             sentinel = root / setup_worktree.POKEAPI_SENTINEL
             sentinel.parent.mkdir(parents=True)
             sentinel.write_text("{}", encoding="utf-8")
+            marker = root / setup_worktree.POKEAPI_COMPLETE_MARKER
+            marker.write_text("complete\n", encoding="utf-8")
             self.assertFalse(setup_worktree._pinned_api_cache_ready(root))
             stamp = root / setup_worktree.POKEAPI_STAMP
             stamp.write_text(pin_sha + "\n", encoding="utf-8")
@@ -122,12 +141,107 @@ class SetupWorktreeTests(unittest.TestCase):
             self.assertEqual((source / "value.txt").read_text(encoding="utf-8"), "source")
             self.assertEqual((target / "value.txt").read_text(encoding="utf-8"), "target")
 
+    def test_pinned_cache_publish_falls_back_when_windows_rename_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "extracted"
+            target = root / "api-data"
+            source.mkdir()
+            (source / "sentinel.json").write_text("{}", encoding="utf-8")
+            with mock.patch.object(
+                import_pokeapi.shutil.os,
+                "rename",
+                side_effect=PermissionError(5, "injected Windows rename refusal"),
+            ):
+                import_pokeapi._move_cache_directory(source, target)
+            self.assertFalse(source.exists())
+            self.assertEqual((target / "sentinel.json").read_text(encoding="utf-8"), "{}")
+            self.assertEqual(
+                (target / import_pokeapi.CACHE_COMPLETE_MARKER).read_text(encoding="utf-8"),
+                "complete\n",
+            )
+
+    def test_pinned_cache_publish_refuses_a_surviving_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "extracted"
+            target = root / "api-data"
+            source.mkdir()
+            target.mkdir()
+            (source / "new.json").write_text("{}", encoding="utf-8")
+            (target / "old.json").write_text("{}", encoding="utf-8")
+            with self.assertRaises(FileExistsError):
+                import_pokeapi._move_cache_directory(source, target)
+            self.assertTrue(source.exists())
+            self.assertTrue((target / "old.json").exists())
+            self.assertFalse((target / source.name).exists())
+
+    def test_interrupted_cache_copy_never_gets_a_completion_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "extracted"
+            target = root / "api-data"
+            source.mkdir()
+            (source / "sentinel.json").write_text("{}", encoding="utf-8")
+
+            def interrupt_copy(_source, destination, **_kwargs):
+                partial = Path(destination)
+                partial.mkdir()
+                (partial / "partial.json").write_text("{}", encoding="utf-8")
+                raise OSError("injected interrupted copy")
+
+            with (
+                mock.patch.object(
+                    import_pokeapi.shutil.os,
+                    "rename",
+                    side_effect=PermissionError(5, "refused"),
+                ),
+                mock.patch.object(import_pokeapi.shutil, "copytree", side_effect=interrupt_copy),
+                self.assertRaisesRegex(OSError, "interrupted copy"),
+            ):
+                import_pokeapi._move_cache_directory(source, target)
+            self.assertTrue(source.exists())
+            self.assertTrue((target / "partial.json").exists())
+            self.assertFalse((target / import_pokeapi.CACHE_COMPLETE_MARKER).exists())
+
+    def test_interrupted_cache_cleanup_invalidates_the_old_marker_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "api-data"
+            sentinel = cache / "data/api/v2/pokemon/index.json"
+            sentinel.parent.mkdir(parents=True)
+            sentinel.write_text("{}", encoding="utf-8")
+            removable = cache / "data/api/v2/move/index.json"
+            removable.parent.mkdir(parents=True)
+            removable.write_text("{}", encoding="utf-8")
+            marker = cache / import_pokeapi.CACHE_COMPLETE_MARKER
+            marker.write_text("complete\n", encoding="utf-8")
+
+            def interrupt_cleanup(_path, **_kwargs):
+                removable.unlink()
+                raise OSError("injected interrupted cleanup")
+
+            with (
+                mock.patch.object(import_pokeapi.shutil, "rmtree", side_effect=interrupt_cleanup),
+                self.assertRaisesRegex(OSError, "interrupted cleanup"),
+            ):
+                import_pokeapi._remove_cache_directory(cache)
+
+            self.assertTrue(sentinel.exists())
+            self.assertFalse(marker.exists())
+            with self.assertRaises(import_pokeapi.CacheMissing):
+                import_pokeapi.ApiData(cache)
+
     def test_shared_writable_cache_symlink_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             shared = root / "shared"
             shared.mkdir()
-            (root / ".godot").symlink_to(shared, target_is_directory=True)
+            try:
+                (root / ".godot").symlink_to(shared, target_is_directory=True)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows symlink creation requires Developer Mode or elevation")
+                raise
             with self.assertRaises(setup_worktree.SetupError) as raised:
                 setup_worktree._refuse_shared_cache_links(root)
             self.assertEqual(raised.exception.code, "shared_cache_symlink_refused")

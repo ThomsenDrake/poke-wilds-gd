@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
-import fcntl
+import errno
 import hashlib
 import json
 import os
@@ -25,12 +25,18 @@ import sys
 import time
 from typing import Iterator
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
 MIN_PYTHON = (3, 12)
 GODOT_VERSION_RE = re.compile(r"^4\.6\.1\.")
 POKEAPI_SENTINEL = Path("tools/.cache/api-data/data/api/v2/pokemon/index.json")
+POKEAPI_COMPLETE_MARKER = Path("tools/.cache/api-data/.complete")
 POKEAPI_STAMP = Path("tools/.cache/setup-pin.sha")
 STATIC_CHECKS = (
     "check_repo_contracts.py",
@@ -189,7 +195,7 @@ def _check_versions(godot_value: str) -> str:
 
 
 def _api_cache_complete(root: Path) -> bool:
-    return (root / POKEAPI_SENTINEL).is_file()
+    return (root / POKEAPI_SENTINEL).is_file() and (root / POKEAPI_COMPLETE_MARKER).is_file()
 
 
 def _pin_sha(root: Path) -> str:
@@ -336,14 +342,24 @@ def _setup_lock(common_git_dir: Path, timeout: float, *, dry_run: bool) -> Itera
         yield
         return
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a+", encoding="utf-8") as handle:
+    with lock_path.open("a+b") as handle:
         deadline = time.monotonic() + timeout
         announced = False
         while True:
             try:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if os.name == "nt":
+                    handle.seek(0)
+                    if not handle.read(1):
+                        handle.write(b"\0")
+                        handle.flush()
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
-            except BlockingIOError:
+            except OSError as exc:
+                if not _setup_lock_contended(exc):
+                    raise
                 if not announced:
                     print(f"Another worktree setup is running; waiting for {lock_path}...")
                     announced = True
@@ -358,7 +374,17 @@ def _setup_lock(common_git_dir: Path, timeout: float, *, dry_run: bool) -> Itera
         try:
             yield
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            if os.name == "nt":
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _setup_lock_contended(exc: OSError) -> bool:
+    if os.name == "nt":
+        return isinstance(exc, PermissionError) and exc.errno == errno.EACCES
+    return isinstance(exc, BlockingIOError)
 
 
 def _modified_tracked_paths(root: Path) -> set[str]:

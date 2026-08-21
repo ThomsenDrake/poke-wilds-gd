@@ -89,11 +89,62 @@ def load_registry() -> dict:
     return json.loads(REGISTRY.read_text(encoding="utf-8"))
 
 
+def _windows_account_identity() -> str:
+    """Return the current Windows account without a console-code-page round trip."""
+    import ctypes
+    from ctypes import wintypes
+
+    name_sam_compatible = 2
+    get_username_ex = ctypes.WinDLL("secur32", use_last_error=True).GetUserNameExW
+    get_username_ex.argtypes = (
+        wintypes.ULONG,
+        wintypes.LPWSTR,
+        ctypes.POINTER(wintypes.ULONG),
+    )
+    get_username_ex.restype = wintypes.BOOL
+
+    size = wintypes.ULONG(0)
+    get_username_ex(name_sam_compatible, None, ctypes.byref(size))
+    if not size.value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    account_buffer = ctypes.create_unicode_buffer(size.value)
+    if not get_username_ex(name_sam_compatible, account_buffer, ctypes.byref(size)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return account_buffer.value.strip()
+
+
+def _secure_private_file(path: Path, *, platform: str | None = None,
+                         identity: str | None = None, runner=subprocess.run) -> None:
+    """Restrict a private file to its owner on POSIX and Windows."""
+    platform = os.name if platform is None else platform
+    if platform != "nt":
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        return
+    try:
+        account = identity or _windows_account_identity()
+    except OSError as exc:
+        raise RuntimeError("could not identify the Windows account for the private invite registry") from exc
+    if not account:
+        raise RuntimeError("could not identify the Windows account for the private invite registry")
+    try:
+        runner(
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{account}:(F)"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("timed out securing the private invite registry") from exc
+
+
 def save_registry(registry: dict) -> None:
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     temporary = REGISTRY.with_name(f".{REGISTRY.name}.{os.getpid()}.tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
     try:
+        _secure_private_file(temporary)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             json.dump(registry, handle, indent=2)

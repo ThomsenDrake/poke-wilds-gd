@@ -69,6 +69,7 @@ PIN_FILE = ROOT / "tools/api_data_pin.json"
 OVERRIDES_FILE = ROOT / "tools/import_overrides.json"
 CACHE_DIR = ROOT / "tools/.cache"
 CACHE_API_DATA = CACHE_DIR / "api-data"
+CACHE_COMPLETE_MARKER = ".complete"
 
 CATALOG_DIR = ROOT / "assets/data/catalog"
 IMPORT_REPORT = ROOT / "docs/generated/pokeapi-import.md"
@@ -692,7 +693,8 @@ class ApiData:
 
     def __init__(self, root: Path):
         self.root = root
-        if not (root / "data/api/v2/pokemon/index.json").exists():
+        if not (root / CACHE_COMPLETE_MARKER).is_file() \
+                or not (root / "data/api/v2/pokemon/index.json").is_file():
             raise CacheMissing(
                 "api-data cache missing or incomplete at %s\n"
                 "Run: python3 tools/import_pokeapi.py --refresh" % root
@@ -1995,6 +1997,23 @@ def load_pin() -> dict:
         return json.load(handle)
 
 
+def _move_cache_directory(source: Path, destination: Path) -> None:
+    """Publish an extracted cache with Windows' copy/remove fallback."""
+    if destination.exists():
+        raise FileExistsError(f"cache destination still exists: {destination}")
+    shutil.move(str(source), str(destination))
+    (destination / CACHE_COMPLETE_MARKER).write_text("complete\n", encoding="utf-8")
+
+
+def _remove_cache_directory(path: Path) -> None:
+    """Invalidate a published cache before destructive cleanup."""
+    try:
+        (path / CACHE_COMPLETE_MARKER).unlink()
+    except FileNotFoundError:
+        pass
+    shutil.rmtree(path, ignore_errors=True)
+
+
 def _download_and_extract(pin: dict) -> None:
     tarball = CACHE_DIR / ("api-data-%s.tar.gz" % pin["sha"])
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -2013,12 +2032,16 @@ def _download_and_extract(pin: dict) -> None:
             archive.extractall(extract_to)
     # Strip the single top-level api-data-<sha>/ directory.
     children = list(extract_to.iterdir())
-    shutil.rmtree(CACHE_API_DATA, ignore_errors=True)
+    _remove_cache_directory(CACHE_API_DATA)
     if len(children) == 1 and children[0].is_dir():
-        children[0].rename(CACHE_API_DATA)
+        # ``Path.rename`` can fail with WinError 5 for an extracted non-empty
+        # directory even when the destination does not exist. ``shutil.move``
+        # preserves the atomic rename on platforms that support it and falls
+        # back to copy/remove on Windows when the native rename is refused.
+        _move_cache_directory(children[0], CACHE_API_DATA)
         shutil.rmtree(extract_to, ignore_errors=True)
     else:
-        extract_to.rename(CACHE_API_DATA)
+        _move_cache_directory(extract_to, CACHE_API_DATA)
     print("extracted to %s" % CACHE_API_DATA.relative_to(ROOT))
 
 
