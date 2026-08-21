@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-19
+Last verified: 2026-08-21
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
 # Playtest Feedback
 
@@ -85,7 +85,8 @@ revocable opaque invite token in generated, ignored build metadata, plus
 A later shared update ([game-update.md](game-update.md)) does not re-embed that
 token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
 `channel` into `user://playtest_identity.json`, and `load_build_info()` prefers
-that persisted route for new `F` reports. If the identity write fails, the
+that persisted friend route for new `F` reports. A persisted shared-cohort
+route is refreshed from the new embed when the cohort token rotates. If the identity write fails, the
 shared update check and apply are refused so a tokenless replace cannot
 strip the friend route. Shared update checks read the
 embedded `endpoint` from `playtest_build.json` and do not follow the persisted
@@ -93,7 +94,13 @@ friend relay. Editor smoke build-info overrides are
 not merged with disk identity. The relay
 stores only the token hash and private nickname. The package token is treated as
 extractable and is protected by revocation, cohort scoping, per-minute edge
-limiting, and D1 daily limits—not as a durable secret. GitHub App and maintainer
+limiting, and D1 daily limits—not as a durable secret. Re-registering a
+revoked `tester_id` returns `invite_revoked` and does not clear `revoked_at`,
+so a later playtest publish cannot silently revive a compromised cohort
+token. `playtest-release` waits for the production Worker that contains
+that check (`feedback-relay-deploy` success plus `/healthz` `version_tag`
+that contains the latest relay-touching commit, including a later manual
+`main` deploy) before `register_invite`. Rotate `PLAYTEST_COHORT_INVITE_TOKEN` instead. GitHub App and maintainer
 credentials exist only as Worker secrets.
 The relay endpoint must be HTTPS without embedded credentials, a query, a fragment, or
 an empty/malformed explicit port;
@@ -158,6 +165,37 @@ Production and staging infrastructure were provisioned before this port. Their
 end-to-end canaries opened issues #32 and #33 and those issues were closed after
 successful verification; routine source validation must not redeploy or create
 replacement canary issues.
+
+Automated shared releases for all three presets are owned by
+`.github/workflows/playtest-release.yml`. That workflow publishes one Linux,
+Windows, and macOS artifact through `tools/publish_update.py --require-cohort`
+and embeds a stable cohort invite (`PLAYTEST_COHORT_INVITE_TOKEN`) so a friend
+who never received a first-contact package can still `F`-report without a
+GitHub account. It does not mint per-friend tokens, does not run
+`package_playtest.py`, and never prints the cohort or admin credential.
+Existing `user://playtest_identity.json` friend routes still win after UPDATE.
+A persisted shared-cohort identity is refreshed from the new embed when
+`PLAYTEST_COHORT_INVITE_TOKEN` rotates. Friend packages persist
+`identity_kind=friend` and cannot use `--channel playtest`.
+The `playtest-release` GitHub environment holds the publish endpoint, admin
+token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
+key stays out. A public receipt lists the three OS artifacts without tokens.
+`v*` tags also attach those binaries to a GitHub Release under stable
+names so a rerun `--clobber`s the previous assets. Wrangler/R2 selection
+follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
+`export_presets.cfg` and `services/feedback-relay/**` so a preset-only or
+relay-only main commit still publishes. A tag
+and a later `workflow_run` for the same SHA skip a second publish. Tag and
+dispatch still require a successful `playtests-headless` run for that SHA
+and wait while that gate is still pending. A later `workflow_run` attaches
+the GitHub Release when HEAD points at a `v*` tag, after a green gate,
+and refuses a previous `latest` pointer that is not this SHA.
+The publisher also refuses to register the cohort invite until production
+`/healthz` reports a Worker that contains the latest relay-touching commit,
+retries while that ancestor deploy is still pending, and can retrigger
+after `feedback-relay-deploy` succeeds. A transient `latest` lookup fails
+closed instead of republishing the same SHA. `origin/main` is rechecked
+immediately before writing the manifest.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable

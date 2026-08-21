@@ -20,9 +20,11 @@ on:
       - "README.md"
       - "assets/**"
       - "docs/**"
+      - "export_presets.cfg"
       - "project.godot"
       - "scenes/**"
       - "scripts/**"
+      - "services/feedback-relay/**"
       - "tools/**"
   pull_request:
     paths:
@@ -33,9 +35,11 @@ on:
       - "README.md"
       - "assets/**"
       - "docs/**"
+      - "export_presets.cfg"
       - "project.godot"
       - "scenes/**"
       - "scripts/**"
+      - "services/feedback-relay/**"
       - "tools/**"
   workflow_dispatch:
 

@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-19
+Last verified: 2026-08-21
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -276,7 +276,44 @@ Shared updates (`tools/publish_update.py`) reuse that lock and dirty-tree refuse
 export one artifact per OS without a friend token, upload via R2 (never a Worker POST;
 wrangler `r2 object put` is `{bucket}/{object_key}`, public URL stays the object key),
 and publish `GET /v1/updates/latest` only after all three objects exist.
-`update_flow` is a headless playtest with an injected transport.
+CI (`playtest-release`) runs that publisher with `--require-cohort` after a green
+same-repo `push` `playtests-headless` on current `origin/main` (also `v*` tags
+and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
+presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
+and a public receipt that must not mention tokens. Channel publishes serialize
+and refuse a stale playtest HEAD (workflow_run, tag, or dispatch),
+including a second `origin/main` check immediately before
+`latest.json` is written. The
+workflow does not accept a dispatch channel or wrangler-env override;
+R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
+asset names and uploads `--clobber` when the GitHub Release already exists.
+`playtests-headless` includes `export_presets.cfg` and
+`services/feedback-relay/**` so a preset-only or relay-only main
+commit still reaches this publisher. A tag and a later `workflow_run` for
+the same SHA skip a second publish when `latest.json` already has that
+commit. A timeout, 5xx, or malformed `latest` lookup fails closed instead
+of treating the miss as unpublished. `workflow_dispatch` always republishes so a rotated cohort token
+can land without a new commit, but tag and dispatch still require a
+successful `playtests-headless` run for that SHA; a tag or dispatch
+waits while that gate is still queued or in progress. A later
+`workflow_run` on the same SHA still attaches a `v*` GitHub Release
+when HEAD points at that tag, but only after a green headless gate and
+only when `latest.commit_sha` is this SHA. Before
+`register_invite`, the publisher also requires a successful
+`feedback-relay-deploy` for a production Worker whose `/healthz`
+`version_tag` contains the latest relay-touching commit (the live tag may
+be a later manual deploy of `main`). The publisher retries while that
+ancestor deploy is still queued or in progress, and a successful
+`feedback-relay-deploy` can retrigger the release after headless already
+passed, so a delayed or failed production
+deploy cannot hit the old upsert that cleared `revoked_at`. Per-friend
+`package_playtest.py` stays off that path.
+`POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)
+and never clears `revoked_at` on upsert.
+`update_flow` is a headless playtest with an injected transport; it pins
+friend-wins-after-UPDATE (explicit `identity_kind=friend`, including a
+playtest-channel friend package) and refreshes a persisted shared-cohort
+token from the new embed. `package_playtest.py` refuses `--channel playtest`.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from

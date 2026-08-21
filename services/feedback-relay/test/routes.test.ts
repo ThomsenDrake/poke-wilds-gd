@@ -37,6 +37,55 @@ describe("feedback report route boundaries", () => {
     });
   });
 
+  it("refuses to reactivate a revoked invite", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    const ran: string[] = [];
+    scoped.DB = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => ({ revoked_at: "2026-08-21T00:00:00Z" }),
+          run: async () => { ran.push(sql); },
+        }),
+      }),
+    } as unknown as D1Database;
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/invites", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tester_id: "PKMN-EEVEE-TEST", nickname: "shared-playtest",
+        token_hash: "c".repeat(64), cohort_id: "playtest",
+      }),
+    }), scoped);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "invite_revoked" });
+    expect(ran).toEqual([]);
+  });
+
+  it("does not clear revoked_at when re-registering an active invite", async () => {
+    const scoped = env(true);
+    scoped.ADMIN_TOKEN = "a".repeat(32);
+    const sqls: string[] = [];
+    scoped.DB = {
+      prepare: (sql: string) => ({
+        bind: () => ({
+          first: async () => ({ revoked_at: null }),
+          run: async () => { sqls.push(sql); },
+        }),
+      }),
+    } as unknown as D1Database;
+    const response = await worker.fetch(new Request("https://relay.test/v1/admin/invites", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${"a".repeat(32)}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tester_id: "PKMN-EEVEE-TEST", nickname: "shared-playtest",
+        token_hash: "c".repeat(64), cohort_id: "playtest",
+      }),
+    }), scoped);
+    expect(response.status).toBe(201);
+    expect(sqls.join("\n")).not.toContain("revoked_at=NULL");
+  });
+
   it("fails closed for missing, short, or empty admin credentials", async () => {
     for (const [secret, header] of [["", "Bearer x"], ["short", "Bearer short"], ["a".repeat(32), "Bearer "]] as const) {
       const scoped = env(true);

@@ -269,6 +269,17 @@ class FeedbackBundleTests(unittest.TestCase):
         invite_for.assert_not_called()
         register_invite.assert_not_called()
 
+    def test_friend_packages_cannot_use_the_shared_playtest_channel(self) -> None:
+        with mock.patch.dict("os.environ", {
+            "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+            "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+        }, clear=False), mock.patch("sys.argv", [
+            "package_playtest.py", "--friend", "Ada", "--target", "linux",
+            "--channel", "playtest",
+        ]):
+            with self.assertRaises(SystemExit):
+                package_playtest.main()
+
     def test_packaging_lock_preserves_active_build_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

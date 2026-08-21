@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-20
+Last verified: 2026-08-21
 Review cadence days: 14
-Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot
+Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot, .github/workflows/playtest-release.yml
 
 # Game Update
 
@@ -50,17 +50,24 @@ Publish writes **one artifact per OS** with public build metadata only:
 `channel`, `build_id`, `commit_sha`, `version`, `endpoint`, `published_at`.
 No per-friend `invite_token` rides the update binary. Friend-specific
 `tools/package_playtest.py` stays optional first-contact packaging and is not
-on the update path.
+on the update path. CI shared publishes (`playtest-release`) may embed one
+stable cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN` so a tester who never
+received a friend package can still `F`-report; persisted friend identity
+still wins. `--require-cohort` refuses a tokenless distributed export.
 
 Feedback identity is sticky in `user://playtest_identity.json`. A friend
 package copies `tester_id` / `invite_token` / `endpoint` / `channel` on first
 run (atomic temp+rename). If that write fails, the title skips the latest
 check and refuses apply so a tokenless shared replace cannot strip F-to-report.
 After a shared update, `load_build_info()` prefers
-that persisted route for new `F` reports; the new embedded `playtest_build.json`
+that persisted **friend** route for new `F` reports; the new embedded `playtest_build.json`
 supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
-identity wins when present. Editor smoke build-info overrides are not merged
+identity (`identity_kind=friend`, or a non-`playtest` channel on older
+files) wins when present. A persisted shared-cohort identity is refreshed
+from the new embed so rotating `PLAYTEST_COHORT_INVITE_TOKEN` does not leave
+revoked tokens on disk. `package_playtest.py` refuses `--channel playtest`.
+Editor smoke build-info overrides are not merged
 with disk identity. The latest check always queries the shared `playtest`
 channel and the **embedded** relay `endpoint`; the persisted friend `channel`
 and `endpoint` are only for `F` reports.
@@ -97,13 +104,57 @@ Publish uploads via the R2 S3 API / wrangler, never a Worker POST. Wrangler
 (`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`) under the
 `updates/` prefix only. A staging relay host, `--wrangler-env staging`, or
 `PLAYTEST_UPDATE_WRANGLER_ENV=staging` selects
-`poke-wilds-feedback-private-staging`. An explicit production env with a
-staging endpoint is refused. The public download URL is the prefix-restricted
+`poke-wilds-feedback-private-staging`. An explicit env that does not match
+the endpoint (production→staging or staging→production) is refused. The public download URL is the prefix-restricted
 Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
 `PLAYTEST_UPDATE_PUBLIC_BASE/<channel>/<build_id>/<os>`), never an R2 public
 domain on the reports bucket. Report ZIPs stay admin-only. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
 pointer only after all three objects exist.
+
+## CI release
+
+`.github/workflows/playtest-release.yml` exports all three desktop presets
+on a Linux runner (official Godot 4.6.1 export templates; codesign stays 0)
+and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
+successful same-repo `push` `playtests-headless` run on `main` (PR
+`workflow_run` events are refused before checkout), a `v*` tag, and
+`workflow_dispatch`. The workflow publishes only the runtime `playtest`
+channel (no dispatch channel override) and infers the Wrangler/R2
+environment from `PLAYTEST_FEEDBACK_ENDPOINT` (no dispatch wrangler
+override). Automatic publishes serialize on that
+channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
+`origin/main`, so a late older run cannot overwrite `latest.json`. The
+publisher repeats that comparison immediately before writing the
+manifest, after relay wait and export. A tag
+and a later `workflow_run` for the same SHA do not publish twice: if
+`latest.json` already has that `commit_sha`, export is skipped and a `v*`
+rerun attaches the already-published artifacts (checked against the
+manifest SHA-256 and size). A transient or malformed `latest` lookup
+fails the job instead of republishing. `workflow_dispatch` always republishes so a
+cohort-token rotation can land without a new commit. Tag and dispatch
+still require a successful `playtests-headless` run for that SHA and
+wait while that gate is still queued or in progress.
+Registering the cohort invite additionally requires the production
+relay for that SHA: a successful `feedback-relay-deploy` run whose
+deployed SHA contains the latest relay-touching commit (a later manual
+`main` deploy is accepted) and `/healthz` `version_tag` for that
+deployed SHA. The publisher retries while that ancestor deploy is still
+pending, and a successful `feedback-relay-deploy` retriggers the release
+when headless already passed, so a delayed production deploy cannot
+revive a revoked invite through the previous Worker. The
+`playtest-release` GitHub environment holds the
+publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
+It never receives the GitHub App private key and never runs
+`package_playtest.py`. A public `receipt.json` lists the three OS artifacts
+without tokens. `v*` tags also attach those binaries to a GitHub Release
+(including a later `workflow_run` when HEAD points at that tag, after a
+green headless gate, and only when `latest.commit_sha` is this SHA)
+under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
+`PokeWilds-macos.zip`) so a rerun `--clobber`s the previous assets instead
+of failing `gh release create` or stacking timestamped copies. A main
+commit that only changes `export_presets.cfg` or `services/feedback-relay/**`
+still runs `playtests-headless` so this publisher can fire.
 
 ## Apply
 

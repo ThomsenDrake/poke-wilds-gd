@@ -247,7 +247,12 @@ async function adminRoute(request: Request, env: Env, url: URL): Promise<Respons
     if (!/^[A-Z0-9-]{3,24}$/.test(testerId) || !nickname || !/^[0-9a-f]{64}$/.test(tokenHash) || !/^[a-z0-9-]{1,40}$/.test(cohortId)) {
       return json({ ok: false, error: "invalid_invite" }, 400);
     }
-    await env.DB.prepare("INSERT INTO invites(tester_id,nickname,token_hash,cohort_id) VALUES(?,?,?,?) ON CONFLICT(tester_id) DO UPDATE SET nickname=excluded.nickname,token_hash=excluded.token_hash,cohort_id=excluded.cohort_id,revoked_at=NULL")
+    const existing = await env.DB.prepare("SELECT revoked_at FROM invites WHERE tester_id=?")
+      .bind(testerId).first<{ revoked_at: string | null }>();
+    if (existing?.revoked_at) {
+      return json({ ok: false, error: "invite_revoked" }, 409);
+    }
+    await env.DB.prepare("INSERT INTO invites(tester_id,nickname,token_hash,cohort_id) VALUES(?,?,?,?) ON CONFLICT(tester_id) DO UPDATE SET nickname=excluded.nickname,token_hash=excluded.token_hash,cohort_id=excluded.cohort_id")
       .bind(testerId, nickname, tokenHash, cohortId).run();
     return json({ ok: true, tester_id: testerId }, 201);
   }

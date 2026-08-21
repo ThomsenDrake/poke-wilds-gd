@@ -232,6 +232,7 @@ def build_package(args: argparse.Namespace, admin_token: str) -> tuple[Path, str
                 "build_id": build_id, "channel": args.channel, "endpoint": endpoint,
                 "published_at": published_at,
                 "tester_id": invite["tester_id"], "invite_token": invite["token"],
+                "identity_kind": "friend",
             }, indent=2) + "\n", encoding="utf-8")
             output_dir = ROOT / "dist" / "playtest" / invite["tester_id"]
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -252,6 +253,8 @@ def main() -> int:
     parser.add_argument("--endpoint", default=os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""))
     parser.add_argument("--allow-dirty", action="store_true", help="Local validation only; never use for distributed builds")
     args = parser.parse_args()
+    if args.channel.strip() == "playtest":
+        parser.error("friend packages cannot use the shared playtest channel")
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")

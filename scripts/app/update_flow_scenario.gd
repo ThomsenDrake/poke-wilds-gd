@@ -3,6 +3,7 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const Checks := preload("res://scripts/app/update_flow_checks.gd")
+const UpdateIdentity := preload("res://scripts/runtime/update_identity.gd")
 
 var _ctx: Dictionary
 var _runner = SmokeScenarioRunner.new()
@@ -71,6 +72,7 @@ func run(ctx: Dictionary) -> void:
 	_check(_applied and _relaunched, "successful UPDATE did not apply and relaunch")
 	_check(not updater.latest_build().is_empty(), "shared latest was not staged on the updater")
 	Checks.expect_identity_persist_refuse(_failures, updater)
+	_check_cohort_refresh()
 	Checks.persist_friend(_failures)
 	Checks.expect_shared_channel(_failures, updater)
 	Checks.expect_embedded_update_endpoint(_failures, updater)
@@ -123,6 +125,35 @@ func _wait_until(check: Callable, frames: int = 20) -> void:
 		if check.call():
 			return
 		await get_tree().process_frame
+
+
+func _check_cohort_refresh() -> void:
+	UpdateIdentity.set_path_for_smoke(Checks.IDENTITY_PATH)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Checks.IDENTITY_PATH))
+	var old := {"channel": "playtest", "endpoint": "https://relay.test",
+		"invite_token": "old-cohort", "tester_id": "PKMN-OLD"}
+	var rotated := {"channel": "playtest", "endpoint": "https://relay.test",
+		"invite_token": "new-cohort", "tester_id": "PKMN-NEW", "build_id": "playtest-newbuild"}
+	_check(UpdateIdentity.persist_from(old), "old cohort identity did not persist")
+	var merged := UpdateIdentity.merge(rotated, UpdateIdentity.load_identity())
+	_check(str(merged.get("invite_token", "")) == "new-cohort", "rotated cohort token did not replace persisted cohort")
+	_check(UpdateIdentity.persist_from(rotated), "rotated cohort identity did not persist")
+	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "new-cohort",
+		"disk kept the revoked cohort token")
+	_check(UpdateIdentity.persist_from(Checks.friend_build()), "friend identity did not persist after cohort")
+	_check(UpdateIdentity.persist_from(rotated), "friend persist-from after shared embed failed")
+	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "friend-token",
+		"shared persist overwrote friend identity")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Checks.IDENTITY_PATH))
+	var friend_playtest := {"channel": "playtest", "endpoint": "https://relay.test",
+		"invite_token": "friend-on-playtest", "tester_id": "PKMN-FRIEND",
+		"identity_kind": "friend"}
+	_check(UpdateIdentity.persist_from(friend_playtest), "playtest-channel friend did not persist")
+	_check(str(UpdateIdentity.merge(rotated, UpdateIdentity.load_identity()).get("invite_token", ""))
+		== "friend-on-playtest", "kind=friend on playtest channel lost to cohort merge")
+	_check(UpdateIdentity.persist_from(rotated), "kind=friend persist-from after cohort embed failed")
+	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "friend-on-playtest",
+		"kind=friend on playtest channel was overwritten")
 
 
 func _check(ok: bool, reason: String) -> void:

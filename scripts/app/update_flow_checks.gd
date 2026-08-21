@@ -12,7 +12,7 @@ const DIGEST_C := "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 const FRIEND := {
 	"channel": "friends-1", "build_id": "friends-old", "commit_sha": COMMIT_A,
 	"published_at": "2026-08-01T00:00:00Z", "endpoint": "https://relay.test",
-	"invite_token": "friend-token", "tester_id": "PKMN-EEVEE-TEST",
+	"invite_token": "friend-token", "tester_id": "PKMN-EEVEE-TEST", "identity_kind": "friend",
 }
 const SHARED := {
 	"schema_version": 1, "channel": "playtest", "published_at": "2026-08-19T18:00:00Z",

@@ -95,6 +95,7 @@ POKEAPI_CI_CONSUMERS = {
 }
 
 FEEDBACK_RELAY_DEPLOY_WORKFLOW = ".github/workflows/feedback-relay-deploy.yml"
+PLAYTEST_RELEASE_WORKFLOW = ".github/workflows/playtest-release.yml"
 
 
 def _workflow_step_blocks(text: str) -> list[list[str]]:
@@ -787,6 +788,147 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
     return issues
 
 
+def playtest_release_workflow_issues(root: Path) -> list[str]:
+    """Pin the shared three-OS playtest release + accountless cohort contract."""
+    path = root / PLAYTEST_RELEASE_WORKFLOW
+    if not path.exists():
+        return [f"Missing playtest release workflow: {PLAYTEST_RELEASE_WORKFLOW}"]
+    text = _active_yaml_text(path.read_text(encoding="utf-8"))
+    issues: list[str] = []
+    required = (
+        "name: playtest-release",
+        "  workflow_dispatch:",
+        '      - "v*"',
+        "  workflow_run:",
+        "      - playtests-headless",
+        "      - feedback-relay-deploy",
+        "      - completed",
+        "      - main",
+        "  GODOT_VERSION: 4.6.1-stable",
+        "    environment: playtest-release",
+        "python3 tools/publish_update.py --channel \"${CHANNEL}\" --require-cohort",
+        "PLAYTEST_COHORT_INVITE_TOKEN: ${{ secrets.PLAYTEST_COHORT_INVITE_TOKEN }}",
+        "PLAYTEST_FEEDBACK_ADMIN_TOKEN: ${{ secrets.PLAYTEST_FEEDBACK_ADMIN_TOKEN }}",
+        "PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}",
+        "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
+        "CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
+        "Godot_v${GODOT_VERSION}_export_templates.tpz",
+        "export_templates/4.6.1.stable",
+        "GODOT_BIN=\"$HOME/godot-bin/godot\"",
+        "github.event.workflow_run.conclusion == 'success'",
+        "github.event.workflow_run.event == 'push'",
+        "github.event.workflow_run.head_repository.full_name == github.repository",
+        "ref: ${{ github.event.workflow_run.head_sha || github.ref }}",
+        "group: playtest-release-playtest",
+        "  CHANNEL: playtest",
+        "refusing stale playtest publish",
+        "Recheck origin/main before publish",
+        "refusing unvalidated playtest publish",
+        "gh run list --workflow playtests-headless",
+        "wanted=\"$(git rev-parse HEAD)\"",
+        "git rev-parse origin/main",
+        "  cancel-in-progress: false",
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+        "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "run: npm ci",
+        "gh release create",
+        "gh release upload",
+        "gh release view",
+        "Resolve a v* tag on this SHA",
+        "waiting for playtests-headless",
+        "steps.release.outputs.tag",
+        "RELEASE_TAG",
+        "steps.gate.outputs.skip_publish != 'true'",
+        "assert_latest_matches_commit",
+        "--clobber",
+        "stage_github_release_assets",
+        "stage_github_release_from_latest",
+        "--already-published",
+        "already_published",
+        "github.event_name != 'workflow_dispatch'",
+        "github.event.workflow_run.name != 'playtests-headless'",
+        "Require the production relay for this SHA",
+        "--require-production-relay",
+        "gh run list --workflow feedback-relay-deploy",
+        "refusing stale production relay",
+        "production_relay=",
+        "run_count \"$tag\" success",
+        "set -o pipefail",
+        "skip_publish",
+        "in_progress",
+        "waiting",
+        "PokeWilds-linux.x86_64",
+        "Linux, Windows, and macOS",
+        "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",
+        "receipt must not mention invite tokens",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(
+                f"{PLAYTEST_RELEASE_WORKFLOW} is missing release contract: {fragment}"
+            )
+    if "package_playtest.py" in text or "--friend" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must publish shared updates, not per-friend packages"
+        )
+    if "description: Shared update channel" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must not take a dispatch channel; the runtime queries playtest"
+        )
+    if "wrangler_env:" in text or "github.event.inputs.wrangler_env" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must infer wrangler env from PLAYTEST_FEEDBACK_ENDPOINT"
+        )
+    headless_path = root / ".github/workflows/playtests-headless.yml"
+    if not headless_path.exists():
+        issues.append("Missing playtests-headless workflow")
+    else:
+        headless = _active_yaml_text(headless_path.read_text(encoding="utf-8"))
+        if headless.count('      - "export_presets.cfg"') < 2:
+            issues.append(
+                "playtests-headless.yml must include export_presets.cfg on push and pull_request"
+            )
+        if headless.count('      - "services/feedback-relay/**"') < 2:
+            issues.append(
+                "playtests-headless.yml must include services/feedback-relay/** on push and pull_request"
+            )
+    if "GITHUB_PRIVATE_KEY" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must not receive the GitHub App private key"
+        )
+    for leaked in (
+        "echo \"$PLAYTEST_COHORT_INVITE_TOKEN\"",
+        "echo $PLAYTEST_COHORT_INVITE_TOKEN",
+        "echo \"$PLAYTEST_FEEDBACK_ADMIN_TOKEN\"",
+        "echo $PLAYTEST_FEEDBACK_ADMIN_TOKEN",
+    ):
+        if leaked in text:
+            issues.append(
+                f"{PLAYTEST_RELEASE_WORKFLOW} must not print credential {leaked}"
+            )
+    if _yaml_mapping_block(text, "permissions:") != [
+        "permissions:",
+        "  contents: write",
+        "  actions: read",
+    ]:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} workflow permissions must be contents: write and actions: read"
+        )
+    workflow_keys = [
+        line.split(":", 1)[0]
+        for line in text.splitlines()
+        if line and not line[0].isspace() and re.match(r"^[A-Za-z0-9_-]+:", line)
+    ]
+    if workflow_keys != ["name", "on", "permissions", "concurrency", "env", "jobs"]:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must contain only its contracted workflow keys"
+        )
+    return issues
+
+
 def _is_battle_shot(stem: str) -> bool:
     """Shot naming convention is NN_name; battle shots are pinned to 09-12."""
     digits = ""
@@ -1041,6 +1183,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(core_tools_stdlib_issues(root))
     issues.extend(pokeapi_ci_cache_issues(root))
     issues.extend(feedback_relay_deploy_issues(root))
+    issues.extend(playtest_release_workflow_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
