@@ -7,6 +7,7 @@ import configparser
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 import warnings
@@ -376,9 +377,62 @@ class FeedbackBundleTests(unittest.TestCase):
             registry = Path(raw) / ".playtest" / "invites.json"
             with mock.patch.object(package_playtest, "REGISTRY", registry):
                 package_playtest.save_registry({"schema_version": 1, "friends": {}})
-            self.assertEqual(stat.S_IMODE(registry.stat().st_mode), stat.S_IRUSR | stat.S_IWUSR)
+            if package_playtest.os.name != "nt":
+                self.assertEqual(stat.S_IMODE(registry.stat().st_mode), stat.S_IRUSR | stat.S_IWUSR)
             self.assertEqual(json.loads(registry.read_text(encoding="utf-8")), {"schema_version": 1, "friends": {}})
             self.assertEqual(list(registry.parent.glob(".*.tmp")), [])
+
+    def test_private_registry_is_secured_before_contents_are_written(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            registry = Path(raw) / ".playtest" / "invites.json"
+
+            def assert_empty(path: Path) -> None:
+                self.assertEqual(path.read_bytes(), b"")
+
+            with (
+                mock.patch.object(package_playtest, "REGISTRY", registry),
+                mock.patch.object(package_playtest, "_secure_private_file", side_effect=assert_empty),
+            ):
+                package_playtest.save_registry({"schema_version": 1, "friends": {}})
+            self.assertEqual(json.loads(registry.read_text(encoding="utf-8")), {"schema_version": 1, "friends": {}})
+
+    def test_private_registry_acl_failure_removes_the_temporary_file(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            registry = Path(raw) / ".playtest" / "invites.json"
+            with (
+                mock.patch.object(package_playtest, "REGISTRY", registry),
+                mock.patch.object(package_playtest, "_secure_private_file", side_effect=RuntimeError("timeout")),
+                self.assertRaisesRegex(RuntimeError, "timeout"),
+            ):
+                package_playtest.save_registry({"schema_version": 1, "friends": {}})
+            self.assertEqual(list(registry.parent.glob(".*.tmp")), [])
+
+    def test_windows_private_registry_removes_inheritance_and_grants_only_the_owner(self) -> None:
+        runner = mock.Mock()
+        package_playtest._secure_private_file(
+            Path("private.json"),
+            platform="nt",
+            identity=r"DOMAIN\Player",
+            runner=runner,
+        )
+        runner.assert_called_once_with(
+            ["icacls", "private.json", "/inheritance:r", "/grant:r", r"DOMAIN\Player:(F)"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+
+    def test_windows_private_registry_timeout_is_bounded(self) -> None:
+        runner = mock.Mock(side_effect=subprocess.TimeoutExpired("icacls", 10))
+        with self.assertRaisesRegex(RuntimeError, "timed out securing"):
+            package_playtest._secure_private_file(
+                Path("private.json"),
+                platform="nt",
+                identity=r"DOMAIN\Player",
+                runner=runner,
+            )
 
     def test_invite_registration_identifies_the_package_client(self) -> None:
         invite = {"tester_id": "PKMN-EEVEE-ABCDEF", "token": "private", "nickname": "Friend", "cohort_id": "friends-1"}

@@ -89,11 +89,40 @@ def load_registry() -> dict:
     return json.loads(REGISTRY.read_text(encoding="utf-8"))
 
 
+def _secure_private_file(path: Path, *, platform: str | None = None,
+                         identity: str | None = None, runner=subprocess.run) -> None:
+    """Restrict a private file to its owner on POSIX and Windows."""
+    platform = os.name if platform is None else platform
+    if platform != "nt":
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+        return
+    try:
+        account = identity or subprocess.check_output(
+            ["whoami"], text=True, encoding="utf-8", timeout=10
+        ).strip()
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("timed out identifying the Windows account") from exc
+    if not account:
+        raise RuntimeError("could not identify the Windows account for the private invite registry")
+    try:
+        runner(
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{account}:(F)"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("timed out securing the private invite registry") from exc
+
+
 def save_registry(registry: dict) -> None:
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     temporary = REGISTRY.with_name(f".{REGISTRY.name}.{os.getpid()}.tmp")
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR)
     try:
+        _secure_private_file(temporary)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = -1
             json.dump(registry, handle, indent=2)

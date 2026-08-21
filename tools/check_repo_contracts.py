@@ -1595,13 +1595,17 @@ def cloud_env_display_issues(root: Path) -> list[str]:
         x11 = Path(tmp) / "X11-unix"
         x11.mkdir()
         sock = x11 / "X99"
-        listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         which = cloud.shutil.which
         cloud.shutil.which = lambda _name: None
         try:
-            listener.bind(str(sock))
-            if not cloud.display_alive(":99", x11_dir=x11):
-                issues.append("display_alive socket fallback missed a live X99 socket")
+            if hasattr(socket, "AF_UNIX"):
+                listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    listener.bind(str(sock))
+                    if not cloud.display_alive(":99", x11_dir=x11):
+                        issues.append("display_alive socket fallback missed a live X99 socket")
+                finally:
+                    listener.close()
             if cloud.display_alive(":1", x11_dir=x11):
                 issues.append("display_alive socket fallback must not treat a missing X1 as live")
             (x11 / "X1").write_text("", encoding="utf-8")
@@ -1609,7 +1613,6 @@ def cloud_env_display_issues(root: Path) -> list[str]:
                 issues.append("display_alive must require an X11 unix socket, not a regular file")
         finally:
             cloud.shutil.which = which
-            listener.close()
 
         env_file = Path(tmp) / "cloud.env"
         env_file.write_text(
