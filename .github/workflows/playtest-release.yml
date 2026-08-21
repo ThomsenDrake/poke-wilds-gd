@@ -53,6 +53,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Skip a SHA that is already latest
+        if: github.event_name != 'workflow_dispatch'
         id: latest
         env:
           PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}

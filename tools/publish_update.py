@@ -257,10 +257,15 @@ def stage_github_release_from_latest(latest: dict, dest_dir: Path, *,
         url = str(builds[os_name].get("url", "")).strip()
         if not url.startswith("https://"):
             raise RuntimeError(f"latest {os_name} artifact URL is not HTTPS")
+        expected_digest = str(builds[os_name].get("sha256", "")).strip().lower()
+        expected_bytes = int(builds[os_name].get("bytes", 0) or 0)
         dest = dest_dir / stable_name
         request = urllib.request.Request(url, method="GET", headers={"User-Agent": USER_AGENT})
         with urlopen(request, timeout=120) as response:
-            dest.write_bytes(response.read())
+            body = response.read()
+        if hashlib.sha256(body).hexdigest() != expected_digest or len(body) != expected_bytes:
+            raise RuntimeError(f"latest {os_name} artifact does not match the manifest")
+        dest.write_bytes(body)
         staged.append(dest)
     return staged
 

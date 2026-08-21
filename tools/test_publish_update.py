@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -433,8 +434,12 @@ class PublishUpdateTests(unittest.TestCase):
 
         latest = {
             "builds": {
-                os_name: {"url": f"https://relay.test/v1/updates/artifacts/playtest/b1/{os_name}"}
-                for os_name in payloads
+                os_name: {
+                    "url": f"https://relay.test/v1/updates/artifacts/playtest/b1/{os_name}",
+                    "sha256": hashlib.sha256(body).hexdigest(),
+                    "bytes": len(body),
+                }
+                for os_name, body in payloads.items()
             }
         }
         with tempfile.TemporaryDirectory() as raw:
@@ -447,6 +452,10 @@ class PublishUpdateTests(unittest.TestCase):
             )
             for os_name, stable_name in publish_update.STABLE_RELEASE_ASSETS.items():
                 self.assertEqual((dest / stable_name).read_bytes(), payloads[os_name])
+            latest["builds"]["linux"]["sha256"] = "0" * 64
+            with self.assertRaises(RuntimeError):
+                publish_update.stage_github_release_from_latest(
+                    latest, dest, urlopen=fake_open)
 
     def test_release_workflow_contract_accepts_the_committed_file(self) -> None:
         import check_repo_contracts

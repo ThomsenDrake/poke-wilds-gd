@@ -288,7 +288,8 @@ asset names and uploads `--clobber` when the GitHub Release already exists.
 `playtests-headless` includes `export_presets.cfg` so a preset-only main
 commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
-commit. Per-friend
+commit. `workflow_dispatch` always republishes so a rotated cohort token
+can land without a new commit. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport; it pins
 friend-wins-after-UPDATE and refreshes a persisted shared-cohort token from

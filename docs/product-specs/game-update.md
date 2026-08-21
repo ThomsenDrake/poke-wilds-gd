@@ -126,7 +126,9 @@ channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 `origin/main`, so a late older run cannot overwrite `latest.json`. A tag
 and a later `workflow_run` for the same SHA do not publish twice: if
 `latest.json` already has that `commit_sha`, export is skipped and a `v*`
-rerun attaches the already-published artifacts. The
+rerun attaches the already-published artifacts (checked against the
+manifest SHA-256 and size). `workflow_dispatch` always republishes so a
+cohort-token rotation can land without a new commit. The
 `playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs

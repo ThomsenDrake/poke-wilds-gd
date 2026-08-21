@@ -838,6 +838,7 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "stage_github_release_from_latest",
         "--already-published",
         "already_published",
+        "github.event_name != 'workflow_dispatch'",
         "PokeWilds-linux.x86_64",
         "Linux, Windows, and macOS",
         "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",
