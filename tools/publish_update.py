@@ -178,7 +178,7 @@ def resolved_wrangler_env(endpoint: str, explicit: str = "") -> str:
     specified = bool(raw)
     chosen = normalize_wrangler_env(raw)
     inferred = infer_wrangler_env(endpoint)
-    if specified and inferred and chosen != inferred:
+    if specified and chosen != inferred:
         raise RuntimeError("wrangler env does not match the selected update endpoint")
     return chosen if specified else inferred
 

@@ -831,6 +831,9 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         "run: npm ci",
         "gh release create",
+        "gh release upload",
+        "gh release view",
+        "--clobber",
         "Linux, Windows, and macOS",
         "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",
         "receipt must not mention invite tokens",
@@ -847,6 +850,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
     if "description: Shared update channel" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must not take a dispatch channel; the runtime queries playtest"
+        )
+    if "wrangler_env:" in text or "github.event.inputs.wrangler_env" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must infer wrangler env from PLAYTEST_FEEDBACK_ENDPOINT"
         )
     if "GITHUB_PRIVATE_KEY" in text:
         issues.append(

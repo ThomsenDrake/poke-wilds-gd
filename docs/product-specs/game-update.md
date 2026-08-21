@@ -100,8 +100,8 @@ Publish uploads via the R2 S3 API / wrangler, never a Worker POST. Wrangler
 (`poke-wilds-feedback-private`, or `PLAYTEST_UPDATE_R2_BUCKET`) under the
 `updates/` prefix only. A staging relay host, `--wrangler-env staging`, or
 `PLAYTEST_UPDATE_WRANGLER_ENV=staging` selects
-`poke-wilds-feedback-private-staging`. An explicit production env with a
-staging endpoint is refused. The public download URL is the prefix-restricted
+`poke-wilds-feedback-private-staging`. An explicit env that does not match
+the endpoint (production→staging or staging→production) is refused. The public download URL is the prefix-restricted
 Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
 `PLAYTEST_UPDATE_PUBLIC_BASE/<channel>/<build_id>/<os>`), never an R2 public
 domain on the reports bucket. Report ZIPs stay admin-only. The game
@@ -116,14 +116,17 @@ and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
 successful same-repo `push` `playtests-headless` run on `main` (PR
 `workflow_run` events are refused before checkout), a `v*` tag, and
 `workflow_dispatch`. The workflow publishes only the runtime `playtest`
-channel (no dispatch channel override). Automatic publishes serialize on that
+channel (no dispatch channel override) and infers the Wrangler/R2
+environment from `PLAYTEST_FEEDBACK_ENDPOINT` (no dispatch wrangler
+override). Automatic publishes serialize on that
 channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 `origin/main`, so a late older run cannot overwrite `latest.json`. The
 `playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
-without tokens. `v*` tags also attach those binaries to a GitHub Release.
+without tokens. `v*` tags also attach those binaries to a GitHub Release;
+a rerun of an existing tag uploads `--clobber` instead of failing `gh release create`.
 
 ## Apply
 

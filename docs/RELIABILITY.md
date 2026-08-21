@@ -282,7 +282,9 @@ and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
 presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
 and a public receipt that must not mention tokens. Channel publishes serialize
 and refuse a stale playtest HEAD (workflow_run, tag, or dispatch). The
-workflow does not accept a dispatch channel override. Per-friend
+workflow does not accept a dispatch channel or wrangler-env override;
+R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun uploads `--clobber`
+when the GitHub Release already exists. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport.
 Relay changes additionally require

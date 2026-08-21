@@ -389,6 +389,11 @@ class PublishUpdateTests(unittest.TestCase):
             captured[0], "poke-wilds-feedback-private-staging/updates/playtest/b1/linux")
         with self.assertRaises(RuntimeError):
             publish_update.resolved_wrangler_env(staging, "production")
+        production = "https://poke-wilds-feedback-relay.drake-t.workers.dev"
+        with self.assertRaises(RuntimeError):
+            publish_update.resolved_wrangler_env(production, "staging")
+        self.assertEqual(publish_update.resolved_wrangler_env(staging, "staging"), "staging")
+        self.assertEqual(publish_update.resolved_wrangler_env(production, "production"), "")
 
     def test_windows_helper_restores_old_when_promote_fails(self) -> None:
         body = update_apply._windows_helper_body(

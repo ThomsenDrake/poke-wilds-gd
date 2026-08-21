@@ -7,11 +7,6 @@ name: playtest-release
 
 on:
   workflow_dispatch:
-    inputs:
-      wrangler_env:
-        description: Wrangler environment (empty = production)
-        default: ""
-        type: string
   push:
     tags:
       - "v*"
@@ -122,7 +117,6 @@ jobs:
           PLAYTEST_FEEDBACK_ADMIN_TOKEN: ${{ secrets.PLAYTEST_FEEDBACK_ADMIN_TOKEN }}
           PLAYTEST_COHORT_INVITE_TOKEN: ${{ secrets.PLAYTEST_COHORT_INVITE_TOKEN }}
           PLAYTEST_COHORT_NICKNAME: ${{ vars.PLAYTEST_COHORT_NICKNAME || 'shared-playtest' }}
-          PLAYTEST_UPDATE_WRANGLER_ENV: ${{ github.event.inputs.wrangler_env || '' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
@@ -163,6 +157,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mapfile -t files < <(find dist/updates -type f ! -name receipt.json ! -name playtest_build.json)
-          gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
-            --title "PokeWilds ${GITHUB_REF_NAME}" \
-            --notes "Shared Linux, Windows, and macOS playtest builds. F reporting stays accountless; existing friend identity is preserved across UPDATE."
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
+              --title "PokeWilds ${GITHUB_REF_NAME}" \
+              --notes "Shared Linux, Windows, and macOS playtest builds. F reporting stays accountless; existing friend identity is preserved across UPDATE."
+          fi
