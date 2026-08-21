@@ -148,12 +148,13 @@ publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
 without tokens. `v*` tags also attach those binaries to a GitHub Release
-(including a later `workflow_run` when HEAD points at that tag)
+(including a later `workflow_run` when HEAD points at that tag, after a
+green headless gate, and only when `latest.commit_sha` is this SHA)
 under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
 `PokeWilds-macos.zip`) so a rerun `--clobber`s the previous assets instead
 of failing `gh release create` or stacking timestamped copies. A main
-commit that only changes `export_presets.cfg` still runs `playtests-headless`
-so this publisher can fire.
+commit that only changes `export_presets.cfg` or `services/feedback-relay/**`
+still runs `playtests-headless` so this publisher can fire.
 
 ## Apply
 

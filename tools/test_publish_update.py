@@ -560,6 +560,10 @@ class PublishUpdateTests(unittest.TestCase):
         self.assertFalse(publish_update.already_published_commit({"commit_sha": "b" * 40}, sha))
         self.assertFalse(publish_update.already_published_commit({}, sha))
         self.assertFalse(publish_update.already_published_commit({"commit_sha": sha}, ""))
+        publish_update.assert_latest_matches_commit({"commit_sha": sha}, sha)
+        with self.assertRaises(RuntimeError) as ctx:
+            publish_update.assert_latest_matches_commit({"commit_sha": "b" * 40}, sha)
+        self.assertIn("latest commit", str(ctx.exception))
 
     def test_fetch_latest_reads_the_public_channel_pointer(self) -> None:
         captured: list[str] = []

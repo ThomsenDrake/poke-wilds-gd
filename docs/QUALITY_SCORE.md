@@ -17,7 +17,9 @@ successful `feedback-relay-deploy` for the live tag) before
 publisher retries a still-pending ancestor relay deploy. `origin/main`
 is rechecked immediately before writing `latest.json`. Tag publishes wait
 for a still-running headless gate, and a later `workflow_run` still
-attaches a `v*` GitHub Release. Scores unchanged.
+attaches a `v*` GitHub Release only after a green gate and only when
+`latest.commit_sha` is this SHA. Relay-only main commits now run
+`playtests-headless`. Scores unchanged.
 
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on
 the `playtest` channel is refreshed from the new embed so a rotated

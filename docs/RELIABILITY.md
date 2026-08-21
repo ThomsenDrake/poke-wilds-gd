@@ -287,7 +287,8 @@ including a second `origin/main` check immediately before
 workflow does not accept a dispatch channel or wrangler-env override;
 R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
 asset names and uploads `--clobber` when the GitHub Release already exists.
-`playtests-headless` includes `export_presets.cfg` so a preset-only main
+`playtests-headless` includes `export_presets.cfg` and
+`services/feedback-relay/**` so a preset-only or relay-only main
 commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
 commit. A timeout, 5xx, or malformed `latest` lookup fails closed instead
@@ -296,7 +297,8 @@ can land without a new commit, but tag and dispatch still require a
 successful `playtests-headless` run for that SHA; a tag or dispatch
 waits while that gate is still queued or in progress. A later
 `workflow_run` on the same SHA still attaches a `v*` GitHub Release
-when HEAD points at that tag. Before
+when HEAD points at that tag, but only after a green headless gate and
+only when `latest.commit_sha` is this SHA. Before
 `register_invite`, the publisher also requires a successful
 `feedback-relay-deploy` for a production Worker whose `/healthz`
 `version_tag` contains the latest relay-touching commit (the live tag may

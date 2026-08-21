@@ -841,6 +841,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "waiting for playtests-headless",
         "steps.release.outputs.tag",
         "RELEASE_TAG",
+        "steps.gate.outputs.skip_publish != 'true'",
+        "assert_latest_matches_commit",
         "--clobber",
         "stage_github_release_assets",
         "stage_github_release_from_latest",
@@ -888,6 +890,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         if headless.count('      - "export_presets.cfg"') < 2:
             issues.append(
                 "playtests-headless.yml must include export_presets.cfg on push and pull_request"
+            )
+        if headless.count('      - "services/feedback-relay/**"') < 2:
+            issues.append(
+                "playtests-headless.yml must include services/feedback-relay/** on push and pull_request"
             )
     if "GITHUB_PRIVATE_KEY" in text:
         issues.append(

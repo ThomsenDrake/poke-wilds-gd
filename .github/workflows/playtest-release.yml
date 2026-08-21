@@ -289,7 +289,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Attach tagged binaries to a GitHub Release
-        if: steps.release.outputs.tag != ''
+        if: steps.release.outputs.tag != '' && steps.gate.outputs.skip_publish != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}
@@ -309,6 +309,8 @@ jobs:
           else:
               latest = publish_update.fetch_latest(
                   os.environ["PLAYTEST_FEEDBACK_ENDPOINT"], os.environ["CHANNEL"])
+              publish_update.assert_latest_matches_commit(
+                  latest, publish_update.run("git", "rev-parse", "HEAD"))
               staged = publish_update.stage_github_release_from_latest(latest, dest)
           for path in staged:
               print(path)

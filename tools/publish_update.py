@@ -262,6 +262,15 @@ def already_published_commit(latest: dict, sha: str) -> bool:
     return bool(wanted) and str(latest.get("commit_sha", "")).strip().lower() == wanted
 
 
+def assert_latest_matches_commit(latest: dict, sha: str) -> None:
+    """Refuse to attach a GitHub Release from a latest pointer that is not HEAD."""
+    if not already_published_commit(latest, sha):
+        got = str(latest.get("commit_sha", "")).strip() or "missing"
+        raise RuntimeError(
+            f"refusing to attach a GitHub Release; latest commit {got} is not {sha}"
+        )
+
+
 def assert_current_main(*, git_run=run) -> str:
     """Refuse to publish if origin/main moved past this SHA during the job."""
     git_run("git", "fetch", "--no-tags", "origin", "main")
