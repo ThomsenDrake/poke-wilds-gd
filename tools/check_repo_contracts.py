@@ -818,8 +818,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "github.event.workflow_run.event == 'push'",
         "github.event.workflow_run.head_repository.full_name == github.repository",
         "ref: ${{ github.event.workflow_run.head_sha || github.ref }}",
-        "group: playtest-release-${{ github.event.inputs.channel || 'playtest' }}",
-        "refusing stale main run",
+        "group: playtest-release-playtest",
+        "  CHANNEL: playtest",
+        "refusing stale playtest publish",
+        "wanted=\"$(git rev-parse HEAD)\"",
         "git rev-parse origin/main",
         "  cancel-in-progress: false",
         "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
@@ -841,6 +843,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
     if "package_playtest.py" in text or "--friend" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must publish shared updates, not per-friend packages"
+        )
+    if "description: Shared update channel" in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must not take a dispatch channel; the runtime queries playtest"
         )
     if "GITHUB_PRIVATE_KEY" in text:
         issues.append(

@@ -115,9 +115,11 @@ on a Linux runner (official Godot 4.6.1 export templates; codesign stays 0)
 and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
 successful same-repo `push` `playtests-headless` run on `main` (PR
 `workflow_run` events are refused before checkout), a `v*` tag, and
-`workflow_dispatch`. Automatic publishes serialize per channel and refuse a
-workflow-run SHA that is no longer `origin/main`, so a late older run cannot
-overwrite `latest.json`. The `playtest-release` GitHub environment holds the
+`workflow_dispatch`. The workflow publishes only the runtime `playtest`
+channel (no dispatch channel override). Automatic publishes serialize on that
+channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
+`origin/main`, so a late older run cannot overwrite `latest.json`. The
+`playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts

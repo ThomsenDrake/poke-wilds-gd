@@ -8,10 +8,6 @@ name: playtest-release
 on:
   workflow_dispatch:
     inputs:
-      channel:
-        description: Shared update channel
-        default: playtest
-        type: string
       wrangler_env:
         description: Wrangler environment (empty = production)
         default: ""
@@ -31,12 +27,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: playtest-release-${{ github.event.inputs.channel || 'playtest' }}
+  group: playtest-release-playtest
   cancel-in-progress: false
 
 env:
   GODOT_VERSION: 4.6.1-stable
-  CHANNEL: ${{ github.event.inputs.channel || 'playtest' }}
+  CHANNEL: playtest
 
 jobs:
   publish:
@@ -49,14 +45,13 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
-      - name: Refuse a stale main workflow_run
-        if: github.event_name == 'workflow_run'
+      - name: Refuse a stale playtest publish
         run: |
           git fetch --no-tags origin main
           current="$(git rev-parse origin/main)"
-          wanted="${{ github.event.workflow_run.head_sha }}"
+          wanted="$(git rev-parse HEAD)"
           if [ "$current" != "$wanted" ]; then
-            echo "refusing stale main run ${wanted}; origin/main is ${current}" >&2
+            echo "refusing stale playtest publish ${wanted}; origin/main is ${current}" >&2
             exit 1
           fi
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
