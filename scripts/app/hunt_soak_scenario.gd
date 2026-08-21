@@ -34,6 +34,7 @@ func run(ctx: Dictionary) -> void:
 	if not _failures.is_empty():
 		_restore()
 		return
+	_player().input_enabled = true
 	_keeps.begin_run(_runtime())
 	var deadline: int = Time.get_ticks_msec() + _budget_ms()
 	while Time.get_ticks_msec() < deadline:
@@ -68,7 +69,6 @@ func _hunt_step() -> bool:
 	if not started:
 		return false
 	await player.tile_changed
-	player.input_enabled = false
 	var landed: Vector2i = player.tile_position
 	var key := "%d,%d" % [landed.x, landed.y]
 	_visited[key] = int(_visited.get(key, 0)) + 1
