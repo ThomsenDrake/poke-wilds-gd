@@ -66,7 +66,13 @@ def registry_paths(registry: list[dict]) -> set[str]:
 
 
 def docs_markdown(root: Path = ROOT) -> list[Path]:
-    return sorted((root / "docs").rglob("*.md"))
+    # Compound-engineering ideation/plan artifacts are not quality docs.
+    skip_parts = {"plans", "ideation"}
+    return sorted(
+        path
+        for path in (root / "docs").rglob("*.md")
+        if not skip_parts.intersection(path.relative_to(root / "docs").parts)
+    )
 
 
 def parse_metadata(path: Path) -> dict[str, str]:

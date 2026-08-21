@@ -135,6 +135,9 @@ section that is its machine-readable source instead of restating paths.
   scripted play agent can drive the windowed transport through the same
   scenario seams; `tools/commandcode_play_agent.py` is the repo's optional
   reference driver (windowed-only), never part of the contract.
+- **Hunt off-fixture clips — optional** (manifest `[hunt_soak]`). Start
+  `python3 tools/hunt_soak.py` and walk away. The ranked inbox lands under
+  `.godot-smoke/hunt-inbox/`. Not a `verify_all` lane. Headless SKIP-with-reason.
 
 ## Error-as-directive
 

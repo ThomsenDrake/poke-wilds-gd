@@ -58,6 +58,16 @@ scenario = "play_agent"
 windowed_only = true
 optional = true
 
+[hunt_soak]
+# OPTIONAL unattended hunt: a standalone windowed soak that writes a ranked
+# clip inbox. Not a PLAYTEST_SCENARIOS / default verify_all lane. Model
+# findings stay quarantine-forever. Windowed-only by design.
+driver_path = "tools/hunt_soak.py"
+scenario = "hunt_soak"
+inbox_dir = ".godot-smoke/hunt-inbox"
+windowed_only = true
+optional = true
+
 [traces]
 # One JSON object per line, record shape {event, ts_msec, source, payload}.
 # Appended by the emitter below and mirrored on stdout (both harness transports
