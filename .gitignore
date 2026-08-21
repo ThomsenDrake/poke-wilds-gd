@@ -44,3 +44,6 @@ tools/.cache/
 # NOTE: the filename uses a narrow no-break space (U+202F) before "PM" — matched exactly here.
 Screenshot 2026-07-18 at 4.12.58 PM.png
 Screenshot 2026-07-18 at 4.12.58 PM.png.import
+
+# Compound Engineering local scratch (skill working files; not artifacts).
+.context/compound-engineering/
