@@ -21,6 +21,8 @@ from package_playtest import (
     USER_AGENT,
     build_metadata_lock,
     godot_binary,
+    public_tester_id,
+    register_invite,
     run,
     worktree_is_dirty,
 )
@@ -55,14 +57,50 @@ def write_shared_build_info(channel: str, endpoint: str, commit: str, version: s
     BUILD_INFO.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def export_shared(channel: str, endpoint: str, *, godot: str, runner=subprocess.run) -> dict:
+def cohort_from_env(channel: str) -> dict | None:
+    """Return the shared accountless invite, or None when CI/local publish is tokenless."""
+    token = os.environ.get("PLAYTEST_COHORT_INVITE_TOKEN", "").strip()
+    if not token:
+        return None
+    nickname = os.environ.get("PLAYTEST_COHORT_NICKNAME", "shared-playtest").strip()
+    return {
+        "tester_id": public_tester_id(token),
+        "token": token,
+        "nickname": nickname or "shared-playtest",
+        "cohort_id": channel,
+    }
+
+
+def write_publish_receipt(exported: dict, path: Path | None = None) -> Path:
+    """Write public artifact metadata. Never include invite tokens or file paths."""
+    dest = path or (
+        ROOT / "dist" / "updates" / exported["build_id"] / "receipt.json"
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "channel": exported["channel"],
+        "build_id": exported["build_id"],
+        "commit_sha": exported["commit_sha"],
+        "version": exported["version"],
+        "published_at": exported["published_at"],
+        "artifacts": {
+            os_name: {key: artifact[key] for key in ("filename", "sha256", "bytes")}
+            for os_name, artifact in exported["artifacts"].items()
+        },
+    }
+    dest.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return dest
+
+
+def export_shared(channel: str, endpoint: str, *, godot: str, runner=subprocess.run,
+                  cohort: dict | None = None) -> dict:
     commit = run("git", "rev-parse", "HEAD")
     version = run("git", "describe", "--tags", "--always")
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     build_id = f"{channel}-{commit[:10]}-{published_at.replace(':', '').replace('-', '')}"
     output_dir = ROOT / "dist" / "updates" / build_id
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_shared_build_info(channel, endpoint, commit, version, build_id, published_at, None)
+    write_shared_build_info(channel, endpoint, commit, version, build_id, published_at, cohort)
     artifacts = {}
     for os_name, (preset, extension) in TARGETS.items():
         output = output_dir / f"PokeWilds-{build_id}-{os_name}{extension}"
@@ -181,6 +219,11 @@ def main() -> int:
     parser.add_argument("--endpoint", default=os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""))
     parser.add_argument("--wrangler-env", default=os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", ""))
     parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument(
+        "--require-cohort",
+        action="store_true",
+        help="Refuse tokenless shared builds so new testers can still F-report",
+    )
     args = parser.parse_args()
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:
@@ -188,16 +231,24 @@ def main() -> int:
     endpoint = validated_endpoint(args.endpoint)
     if not args.allow_dirty and worktree_is_dirty():
         parser.error("worktree is dirty; commit or ignore every release input first")
+    cohort = cohort_from_env(args.channel)
+    if args.require_cohort and not cohort:
+        parser.error("PLAYTEST_COHORT_INVITE_TOKEN is required for distributed shared builds")
     with build_metadata_lock():
         try:
-            exported = export_shared(args.channel, endpoint, godot=godot_binary())
+            if cohort:
+                register_invite(endpoint, admin_token, cohort)
+            exported = export_shared(
+                args.channel, endpoint, godot=godot_binary(), cohort=cohort)
+            write_publish_receipt(exported)
             builds = upload_artifacts(
                 exported, put_object=lambda key, dest: wrangler_put(
                     key, dest, endpoint=endpoint, environment=args.wrangler_env))
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)
-    print(f"published shared {args.channel} update {exported['build_id']}")
+    suffix = f" cohort {cohort['tester_id']}" if cohort else ""
+    print(f"published shared {args.channel} update {exported['build_id']}{suffix}")
     return 0
 
 

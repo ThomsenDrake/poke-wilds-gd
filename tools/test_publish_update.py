@@ -226,6 +226,131 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(metadata["tester_id"], "UNASSIGNED")
             self.assertEqual(metadata["channel"], "playtest")
 
+    def test_export_embeds_a_cohort_invite_not_a_friend_name(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+
+            def fake_run(cmd, check, cwd):  # noqa: ANN001
+                Path(cmd[-1]).write_bytes(b"bin")
+                return mock.Mock()
+
+            cohort = {
+                "tester_id": "PKMN-EEVEE-ABCDEF",
+                "token": "secret-cohort-token",
+                "nickname": "shared-playtest",
+                "cohort_id": "playtest",
+            }
+            with mock.patch.object(publish_update, "run", side_effect=["a" * 40, "v1"]), \
+                    mock.patch.object(publish_update, "ROOT", root), \
+                    mock.patch.object(publish_update, "BUILD_INFO",
+                                      root / "generated" / "playtest_build.json"):
+                publish_update.export_shared(
+                    "playtest", "https://relay.test", godot="godot",
+                    runner=fake_run, cohort=cohort)
+            metadata = json.loads((root / "generated" / "playtest_build.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["invite_token"], "secret-cohort-token")
+            self.assertEqual(metadata["tester_id"], "PKMN-EEVEE-ABCDEF")
+            self.assertEqual(metadata["channel"], "playtest")
+            self.assertNotIn("nickname", metadata)
+
+    def test_cohort_from_env_derives_the_public_handle(self) -> None:
+        token = "stable-shared-token"
+        with mock.patch.dict("os.environ", {
+            "PLAYTEST_COHORT_INVITE_TOKEN": token,
+            "PLAYTEST_COHORT_NICKNAME": "shared-playtest",
+        }, clear=False):
+            cohort = publish_update.cohort_from_env("playtest")
+        self.assertIsNotNone(cohort)
+        assert cohort is not None
+        self.assertEqual(cohort["token"], token)
+        self.assertEqual(cohort["cohort_id"], "playtest")
+        self.assertEqual(cohort["nickname"], "shared-playtest")
+        self.assertTrue(cohort["tester_id"].startswith("PKMN-"))
+        with mock.patch.dict("os.environ", {"PLAYTEST_COHORT_INVITE_TOKEN": ""}, clear=False):
+            self.assertIsNone(publish_update.cohort_from_env("playtest"))
+
+    def test_require_cohort_refuses_a_tokenless_distributed_build(self) -> None:
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                mock.patch.dict("os.environ", {
+                    "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                    "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                    "PLAYTEST_COHORT_INVITE_TOKEN": "",
+                }, clear=False):
+            with self.assertRaises(SystemExit):
+                with mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
+                    publish_update.main()
+
+    def test_receipt_lists_all_three_os_without_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            dest = Path(raw) / "receipt.json"
+            exported = {
+                "channel": "playtest",
+                "build_id": "playtest-abc1234567-20260821T000000Z",
+                "commit_sha": "b" * 40,
+                "version": "v1",
+                "published_at": "2026-08-21T00:00:00Z",
+                "artifacts": {
+                    "linux": {"filename": "PokeWilds-linux.x86_64", "sha256": "c" * 64,
+                              "bytes": 8, "path": Path("/secret/linux")},
+                    "windows": {"filename": "PokeWilds-windows.exe", "sha256": "d" * 64,
+                                "bytes": 9, "path": Path("/secret/windows")},
+                    "macos": {"filename": "PokeWilds-macos.zip", "sha256": "e" * 64,
+                              "bytes": 10, "path": Path("/secret/macos")},
+                },
+            }
+            path = publish_update.write_publish_receipt(exported, dest)
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(set(receipt["artifacts"]), {"linux", "windows", "macos"})
+            dumped = path.read_text(encoding="utf-8")
+            self.assertNotIn("invite", dumped)
+            self.assertNotIn("token", dumped)
+            self.assertNotIn("/secret/", dumped)
+
+    def test_publish_registers_the_cohort_invite_before_export(self) -> None:
+        order: list[str] = []
+
+        def fake_register(*_args, **_kwargs):  # noqa: ANN001
+            order.append("register")
+
+        def fake_export(*_args, **_kwargs):  # noqa: ANN001
+            order.append("export")
+            return {
+                "channel": "playtest", "build_id": "b1", "commit_sha": "c" * 40,
+                "version": "v1", "published_at": "2026-08-21T00:00:00Z",
+                "artifacts": {},
+            }
+
+        with tempfile.TemporaryDirectory() as raw:
+            receipt = Path(raw) / "receipt.json"
+            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                    mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                    mock.patch.object(publish_update, "register_invite", side_effect=fake_register), \
+                    mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                    mock.patch.object(publish_update, "write_publish_receipt",
+                                      return_value=receipt) as write_receipt, \
+                    mock.patch.object(publish_update, "upload_artifacts",
+                                      return_value={}) as upload, \
+                    mock.patch.object(publish_update, "publish_manifest") as publish, \
+                    mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
+                    mock.patch.object(publish_update, "build_metadata_lock"), \
+                    mock.patch.object(publish_update, "BUILD_INFO", Path(raw) / "playtest_build.json"), \
+                    mock.patch.dict("os.environ", {
+                        "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                        "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                        "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
+                    }, clear=False), \
+                    mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
+                self.assertEqual(publish_update.main(), 0)
+        self.assertEqual(order, ["register", "export"])
+        write_receipt.assert_called_once()
+        upload.assert_called_once()
+        publish.assert_called_once()
+
+    def test_release_workflow_contract_accepts_the_committed_file(self) -> None:
+        import check_repo_contracts
+        root = Path(__file__).resolve().parents[1]
+        self.assertEqual(check_repo_contracts.playtest_release_workflow_issues(root), [])
+
     def test_wrangler_put_prefixes_configured_bucket(self) -> None:
         captured: list[list[str]] = []
 

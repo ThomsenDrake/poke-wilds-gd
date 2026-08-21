@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-20
+Last verified: 2026-08-21
 Review cadence days: 14
-Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot
+Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot, .github/workflows/playtest-release.yml
 
 # Game Update
 
@@ -50,7 +50,10 @@ Publish writes **one artifact per OS** with public build metadata only:
 `channel`, `build_id`, `commit_sha`, `version`, `endpoint`, `published_at`.
 No per-friend `invite_token` rides the update binary. Friend-specific
 `tools/package_playtest.py` stays optional first-contact packaging and is not
-on the update path.
+on the update path. CI shared publishes (`playtest-release`) may embed one
+stable cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN` so a tester who never
+received a friend package can still `F`-report; persisted friend identity
+still wins. `--require-cohort` refuses a tokenless distributed export.
 
 Feedback identity is sticky in `user://playtest_identity.json`. A friend
 package copies `tester_id` / `invite_token` / `endpoint` / `channel` on first
@@ -104,6 +107,18 @@ Worker route `GET /v1/updates/artifacts/<channel>/<build_id>/<os>` (or
 domain on the reports bucket. Report ZIPs stay admin-only. The game
 trusts only the manifest SHA-256. `PUT /v1/admin/updates` writes the latest
 pointer only after all three objects exist.
+
+## CI release
+
+`.github/workflows/playtest-release.yml` exports all three desktop presets
+on a Linux runner (official Godot 4.6.1 export templates; codesign stays 0)
+and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
+successful `playtests-headless` run on `main`, a `v*` tag, and
+`workflow_dispatch`. The `playtest-release` GitHub environment holds the
+publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
+It never receives the GitHub App private key and never runs
+`package_playtest.py`. A public `receipt.json` lists the three OS artifacts
+without tokens. `v*` tags also attach those binaries to a GitHub Release.
 
 ## Apply
 
