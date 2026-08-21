@@ -204,6 +204,33 @@ class SetupWorktreeTests(unittest.TestCase):
             self.assertTrue((target / "partial.json").exists())
             self.assertFalse((target / import_pokeapi.CACHE_COMPLETE_MARKER).exists())
 
+    def test_interrupted_cache_cleanup_invalidates_the_old_marker_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / "api-data"
+            sentinel = cache / "data/api/v2/pokemon/index.json"
+            sentinel.parent.mkdir(parents=True)
+            sentinel.write_text("{}", encoding="utf-8")
+            removable = cache / "data/api/v2/move/index.json"
+            removable.parent.mkdir(parents=True)
+            removable.write_text("{}", encoding="utf-8")
+            marker = cache / import_pokeapi.CACHE_COMPLETE_MARKER
+            marker.write_text("complete\n", encoding="utf-8")
+
+            def interrupt_cleanup(_path, **_kwargs):
+                removable.unlink()
+                raise OSError("injected interrupted cleanup")
+
+            with (
+                mock.patch.object(import_pokeapi.shutil, "rmtree", side_effect=interrupt_cleanup),
+                self.assertRaisesRegex(OSError, "interrupted cleanup"),
+            ):
+                import_pokeapi._remove_cache_directory(cache)
+
+            self.assertTrue(sentinel.exists())
+            self.assertFalse(marker.exists())
+            with self.assertRaises(import_pokeapi.CacheMissing):
+                import_pokeapi.ApiData(cache)
+
     def test_shared_writable_cache_symlink_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -2005,6 +2005,15 @@ def _move_cache_directory(source: Path, destination: Path) -> None:
     (destination / CACHE_COMPLETE_MARKER).write_text("complete\n", encoding="utf-8")
 
 
+def _remove_cache_directory(path: Path) -> None:
+    """Invalidate a published cache before destructive cleanup."""
+    try:
+        (path / CACHE_COMPLETE_MARKER).unlink()
+    except FileNotFoundError:
+        pass
+    shutil.rmtree(path, ignore_errors=True)
+
+
 def _download_and_extract(pin: dict) -> None:
     tarball = CACHE_DIR / ("api-data-%s.tar.gz" % pin["sha"])
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -2023,7 +2032,7 @@ def _download_and_extract(pin: dict) -> None:
             archive.extractall(extract_to)
     # Strip the single top-level api-data-<sha>/ directory.
     children = list(extract_to.iterdir())
-    shutil.rmtree(CACHE_API_DATA, ignore_errors=True)
+    _remove_cache_directory(CACHE_API_DATA)
     if len(children) == 1 and children[0].is_dir():
         # ``Path.rename`` can fail with WinError 5 for an extracted non-empty
         # directory even when the destination does not exist. ``shutil.move``
