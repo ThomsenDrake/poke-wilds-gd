@@ -422,10 +422,42 @@ class PublishUpdateTests(unittest.TestCase):
         health = publish_update.assert_production_relay(
             "https://relay.test", "old", urlopen=fake_open)
         self.assertEqual(health["version_tag"], "old")
-        self.assertFalse(publish_update.production_relay_matches(
+        self.assertFalse(publish_update.production_relay_covers(
             {"ok": True, "environment": "staging", "report_schema": 1, "version_tag": "old"},
             "old",
         ))
+
+    def test_commit_contains_accepts_a_descendant_sha(self) -> None:
+        head = publish_update.run("git", "rev-parse", "HEAD")
+        parent = publish_update.run("git", "rev-parse", "HEAD^")
+        self.assertTrue(publish_update.commit_contains(parent, head))
+        self.assertTrue(publish_update.commit_contains(head, head))
+        self.assertFalse(publish_update.commit_contains(head, parent))
+        self.assertFalse(publish_update.commit_contains("", head))
+
+    def test_assert_production_relay_accepts_a_newer_descendant_worker(self) -> None:
+        head = publish_update.run("git", "rev-parse", "HEAD")
+        parent = publish_update.run("git", "rev-parse", "HEAD^")
+        payload = (
+            b'{"ok":true,"environment":"production","report_schema":1,"version_tag":"%s"}'
+            % head.encode()
+        )
+
+        class FakeResponse:
+            status = 200
+
+            def read(self) -> bytes:
+                return payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+        health = publish_update.assert_production_relay(
+            "https://relay.test", parent, urlopen=lambda request, timeout: FakeResponse())
+        self.assertEqual(health["version_tag"], head)
 
     def test_publish_refuses_register_when_production_relay_is_stale(self) -> None:
         def boom(*_args, **_kwargs):  # noqa: ANN001
@@ -449,17 +481,19 @@ class PublishUpdateTests(unittest.TestCase):
         export_shared.assert_not_called()
 
     def test_require_production_relay_cli_prints_the_matched_sha(self) -> None:
-        sha = "d" * 40
-        with mock.patch.object(publish_update, "required_relay_commit", return_value=sha), \
-                mock.patch.object(publish_update, "assert_production_relay") as assert_relay, \
+        required = "d" * 40
+        live = "e" * 40
+        with mock.patch.object(publish_update, "required_relay_commit", return_value=required), \
+                mock.patch.object(publish_update, "assert_production_relay",
+                                  return_value={"version_tag": live}) as assert_relay, \
                 mock.patch.dict("os.environ", {
                     "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
                 }, clear=False), \
                 mock.patch("sys.argv", ["publish_update.py", "--require-production-relay"]), \
                 mock.patch("sys.stdout", new_callable=StringIO) as stdout:
             self.assertEqual(publish_update.main(), 0)
-        assert_relay.assert_called_once_with("https://relay.test", sha)
-        self.assertIn(f"production_relay={sha}", stdout.getvalue())
+        assert_relay.assert_called_once_with("https://relay.test", required)
+        self.assertIn(f"production_relay={live}", stdout.getvalue())
 
     def test_already_published_commit_matches_latest_sha(self) -> None:
         sha = "a" * 40

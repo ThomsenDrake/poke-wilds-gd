@@ -845,6 +845,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "--require-production-relay",
         "gh run list --workflow feedback-relay-deploy",
         "refusing stale production relay",
+        "production_relay=",
+        "--commit \"$tag\"",
         "PokeWilds-linux.x86_64",
         "Linux, Windows, and macOS",
         "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",

@@ -132,10 +132,11 @@ manifest SHA-256 and size). `workflow_dispatch` always republishes so a
 cohort-token rotation can land without a new commit. Tag and dispatch
 still require a successful `playtests-headless` run for that SHA.
 Registering the cohort invite additionally requires the production
-relay for that SHA: a successful `feedback-relay-deploy` run for the
-latest relay-touching commit and `/healthz` `version_tag` for that
-commit, so a delayed production deploy cannot revive a revoked invite
-through the previous Worker. The
+relay for that SHA: a successful `feedback-relay-deploy` run whose
+deployed SHA contains the latest relay-touching commit (a later manual
+`main` deploy is accepted) and `/healthz` `version_tag` for that
+deployed SHA, so a delayed production deploy cannot revive a revoked
+invite through the previous Worker. The
 `playtest-release` GitHub environment holds the
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs

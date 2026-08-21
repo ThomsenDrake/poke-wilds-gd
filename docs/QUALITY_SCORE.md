@@ -11,7 +11,8 @@ Revoked cohort re-register (2026-08-21): `POST /v1/admin/invites` returns
 `invite_revoked` and does not clear `revoked_at`, so a later playtest
 publish cannot silently revive a compromised shared invite.
 `playtest-release` also waits for that production Worker (`/healthz`
-`version_tag` plus a successful `feedback-relay-deploy`) before
+`version_tag` containing the latest relay-touching commit, plus a
+successful `feedback-relay-deploy` for the live tag) before
 `register_invite`. Scores unchanged.
 
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on

@@ -274,20 +274,36 @@ def fetch_healthz(endpoint: str, *, urlopen=open_no_redirect) -> dict:
     return data
 
 
-def production_relay_matches(health: dict, sha: str) -> bool:
-    wanted = sha.strip()
+def commit_contains(ancestor: str, descendant: str, *, runner=subprocess.run) -> bool:
+    """True when descendant is ancestor or a later commit that includes it."""
+    wanted = ancestor.strip()
+    tag = descendant.strip()
+    if not wanted or not tag:
+        return False
+    if wanted == tag:
+        return True
+    result = runner(
+        ["git", "merge-base", "--is-ancestor", wanted, tag],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    return result.returncode == 0
+
+
+def production_relay_covers(health: dict, sha: str, *, contains=commit_contains) -> bool:
+    tag = str(health.get("version_tag") or "").strip()
     return bool(
-        wanted
+        sha.strip()
         and health.get("ok") is True
         and health.get("environment") == "production"
         and health.get("report_schema") == 1
-        and str(health.get("version_tag") or "").strip() == wanted
+        and contains(sha, tag)
     )
 
 
 def assert_production_relay(endpoint: str, sha: str, *, urlopen=open_no_redirect,
-                            attempts: int = 1, delay: float = 0.0) -> dict:
-    """Refuse register_invite until production /healthz reports this Worker SHA."""
+                            contains=commit_contains, attempts: int = 1,
+                            delay: float = 0.0) -> dict:
+    """Refuse register_invite until production /healthz includes this relay SHA."""
     last_error = "unreachable"
     for attempt in range(max(1, attempts)):
         try:
@@ -295,7 +311,7 @@ def assert_production_relay(endpoint: str, sha: str, *, urlopen=open_no_redirect
         except (OSError, RuntimeError, json.JSONDecodeError, ValueError) as exc:
             last_error = str(exc)
         else:
-            if production_relay_matches(health, sha):
+            if production_relay_covers(health, sha, contains=contains):
                 return health
             last_error = (
                 f"version_tag={health.get('version_tag')!r} "
@@ -304,7 +320,7 @@ def assert_production_relay(endpoint: str, sha: str, *, urlopen=open_no_redirect
         if attempt + 1 < attempts and delay > 0:
             time.sleep(delay)
     raise RuntimeError(
-        f"refusing stale production relay; wanted version_tag {sha}, {last_error}"
+        f"refusing stale production relay; wanted version_tag containing {sha}, {last_error}"
     )
 
 
@@ -369,7 +385,7 @@ def main() -> int:
     parser.add_argument(
         "--require-production-relay",
         action="store_true",
-        help="Refuse unless production /healthz version_tag is the latest relay commit",
+        help="Refuse unless production /healthz version_tag contains the latest relay commit",
     )
     args = parser.parse_args()
     if args.already_published:
@@ -388,8 +404,9 @@ def main() -> int:
         if not args.endpoint:
             parser.error("set PLAYTEST_FEEDBACK_ENDPOINT")
         sha = required_relay_commit()
-        assert_production_relay(args.endpoint, sha)
-        print(f"production_relay={sha}")
+        health = assert_production_relay(args.endpoint, sha)
+        tag = str(health.get("version_tag") or sha).strip()
+        print(f"production_relay={tag}")
         return 0
     admin_token = os.environ.get("PLAYTEST_FEEDBACK_ADMIN_TOKEN", "")
     if not args.endpoint or not admin_token:

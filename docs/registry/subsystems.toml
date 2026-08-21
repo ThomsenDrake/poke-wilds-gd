@@ -2019,8 +2019,8 @@ quality_bucket = "feedback"
 # SHARED UPDATE IDENTITY (2026-08-21): POST /v1/admin/invites refuses a
 # revoked tester_id (invite_revoked) and does not clear revoked_at, so a
 # later playtest publish cannot silently revive a compromised cohort token.
-# playtest-release waits for production /healthz version_tag of the latest
-# relay-touching commit before register_invite.
+# playtest-release waits for production /healthz version_tag containing
+# the latest relay-touching commit before register_invite.
 # SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
 # user://playtest_identity.json after a generic replace so F reports keep the
 # friend route; editor smoke overrides are not merged with disk identity.
@@ -2115,7 +2115,8 @@ quality_bucket = "update"
 # Staging publish endpoints select the staging REPORTS bucket.
 # CI playtest-release exports linux/windows/macos via publish_update
 # --require-cohort and embeds a stable accountless cohort invite after
-# production /healthz reports the latest relay-touching Worker.
+# production /healthz reports a Worker that contains the latest
+# relay-touching commit.
 # Identity persist failure skips the latest check and refuses apply.
 # Friend user:// identity (identity_kind=friend) still wins after UPDATE;
 # a playtest-channel cohort identity is refreshed when the embedded cohort
