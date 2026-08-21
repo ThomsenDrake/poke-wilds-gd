@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import urllib.parse
@@ -30,6 +31,11 @@ from update_manifest import artifact_key, artifact_public_url, parse
 
 ROOT = Path(__file__).resolve().parents[1]
 WRANGLER_CONFIG = ROOT / "services" / "feedback-relay" / "wrangler.jsonc"
+STABLE_RELEASE_ASSETS = {
+    "linux": "PokeWilds-linux.x86_64",
+    "windows": "PokeWilds-windows.exe",
+    "macos": "PokeWilds-macos.zip",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -90,6 +96,26 @@ def write_publish_receipt(exported: dict, path: Path | None = None) -> Path:
     }
     dest.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     return dest
+
+
+def stage_github_release_assets(receipt_path: Path, dest_dir: Path) -> list[Path]:
+    """Copy timestamped artifacts to stable GitHub Release names so --clobber replaces."""
+    doc = json.loads(receipt_path.read_text(encoding="utf-8"))
+    artifacts = doc.get("artifacts") or {}
+    missing = set(STABLE_RELEASE_ASSETS) - set(artifacts)
+    if missing:
+        raise RuntimeError(f"receipt is missing OS artifacts: {sorted(missing)}")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    staged: list[Path] = []
+    src_dir = receipt_path.parent
+    for os_name, stable_name in STABLE_RELEASE_ASSETS.items():
+        source = src_dir / str(artifacts[os_name]["filename"])
+        if not source.is_file():
+            raise RuntimeError(f"missing release artifact {source.name}")
+        dest = dest_dir / stable_name
+        shutil.copy2(source, dest)
+        staged.append(dest)
+    return staged
 
 
 def export_shared(channel: str, endpoint: str, *, godot: str, runner=subprocess.run,

@@ -170,9 +170,10 @@ Existing `user://playtest_identity.json` friend routes still win after UPDATE.
 The `playtest-release` GitHub environment holds the publish endpoint, admin
 token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
 key stays out. A public receipt lists the three OS artifacts without tokens.
-`v*` tags also attach those binaries to a GitHub Release; a rerun of
-an existing tag uploads `--clobber` instead of failing `gh release create`.
-Wrangler/R2 selection follows `PLAYTEST_FEEDBACK_ENDPOINT`.
+`v*` tags also attach those binaries to a GitHub Release under stable
+names so a rerun `--clobber`s the previous assets. Wrangler/R2 selection
+follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
+`export_presets.cfg` so a preset-only main commit still publishes.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable

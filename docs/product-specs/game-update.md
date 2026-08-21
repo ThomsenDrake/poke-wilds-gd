@@ -125,8 +125,12 @@ channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
-without tokens. `v*` tags also attach those binaries to a GitHub Release;
-a rerun of an existing tag uploads `--clobber` instead of failing `gh release create`.
+without tokens. `v*` tags also attach those binaries to a GitHub Release
+under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
+`PokeWilds-macos.zip`) so a rerun `--clobber`s the previous assets instead
+of failing `gh release create` or stacking timestamped copies. A main
+commit that only changes `export_presets.cfg` still runs `playtests-headless`
+so this publisher can fire.
 
 ## Apply
 

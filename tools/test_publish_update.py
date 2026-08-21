@@ -306,6 +306,36 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertNotIn("token", dumped)
             self.assertNotIn("/secret/", dumped)
 
+    def test_stage_github_release_assets_uses_stable_names(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            src = Path(raw) / "build"
+            dest = Path(raw) / "stage"
+            src.mkdir()
+            receipt = src / "receipt.json"
+            names = {
+                "linux": "PokeWilds-playtest-abc-20260821T000000Z-linux.x86_64",
+                "windows": "PokeWilds-playtest-abc-20260821T000000Z-windows.exe",
+                "macos": "PokeWilds-playtest-abc-20260821T000000Z-macos.zip",
+            }
+            payloads = {os_name: os_name.encode() for os_name in names}
+            for os_name, filename in names.items():
+                (src / filename).write_bytes(payloads[os_name])
+            receipt.write_text(json.dumps({
+                "channel": "playtest",
+                "build_id": "playtest-abc-20260821T000000Z",
+                "artifacts": {
+                    os_name: {"filename": filename, "sha256": "a" * 64, "bytes": 1}
+                    for os_name, filename in names.items()
+                },
+            }), encoding="utf-8")
+            staged = publish_update.stage_github_release_assets(receipt, dest)
+            self.assertEqual(
+                [path.name for path in staged],
+                list(publish_update.STABLE_RELEASE_ASSETS.values()),
+            )
+            for os_name, stable_name in publish_update.STABLE_RELEASE_ASSETS.items():
+                self.assertEqual((dest / stable_name).read_bytes(), payloads[os_name])
+
     def test_publish_registers_the_cohort_invite_before_export(self) -> None:
         order: list[str] = []
 

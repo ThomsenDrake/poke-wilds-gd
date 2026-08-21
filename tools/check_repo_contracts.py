@@ -834,6 +834,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "gh release upload",
         "gh release view",
         "--clobber",
+        "stage_github_release_assets",
+        "PokeWilds-linux.x86_64",
         "Linux, Windows, and macOS",
         "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",
         "receipt must not mention invite tokens",
@@ -855,6 +857,15 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must infer wrangler env from PLAYTEST_FEEDBACK_ENDPOINT"
         )
+    headless_path = root / ".github/workflows/playtests-headless.yml"
+    if not headless_path.exists():
+        issues.append("Missing playtests-headless workflow")
+    else:
+        headless = _active_yaml_text(headless_path.read_text(encoding="utf-8"))
+        if headless.count('      - "export_presets.cfg"') < 2:
+            issues.append(
+                "playtests-headless.yml must include export_presets.cfg on push and pull_request"
+            )
     if "GITHUB_PRIVATE_KEY" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must not receive the GitHub App private key"

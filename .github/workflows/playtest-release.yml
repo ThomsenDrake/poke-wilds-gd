@@ -156,7 +156,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mapfile -t files < <(find dist/updates -type f ! -name receipt.json ! -name playtest_build.json)
+          stage="$(mktemp -d)"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/tools"
+          export RELEASE_STAGE="$stage"
+          mapfile -t files < <(python3 - <<'EOF'
+          from pathlib import Path
+          import os
+          import publish_update
+          for path in publish_update.stage_github_release_assets(
+              Path(os.environ["RECEIPT_PATH"]), Path(os.environ["RELEASE_STAGE"])
+          ):
+              print(path)
+          EOF
+          )
+          if [ "${#files[@]}" -ne 3 ]; then
+            echo "expected 3 stable GitHub Release assets, got ${#files[@]}" >&2
+            exit 1
+          fi
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
           else

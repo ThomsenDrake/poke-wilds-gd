@@ -283,8 +283,10 @@ presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
 and a public receipt that must not mention tokens. Channel publishes serialize
 and refuse a stale playtest HEAD (workflow_run, tag, or dispatch). The
 workflow does not accept a dispatch channel or wrangler-env override;
-R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun uploads `--clobber`
-when the GitHub Release already exists. Per-friend
+R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
+asset names and uploads `--clobber` when the GitHub Release already exists.
+`playtests-headless` includes `export_presets.cfg` so a preset-only main
+commit still reaches this publisher. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport.
 Relay changes additionally require
