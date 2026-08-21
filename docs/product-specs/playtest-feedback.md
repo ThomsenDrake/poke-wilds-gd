@@ -85,7 +85,8 @@ revocable opaque invite token in generated, ignored build metadata, plus
 A later shared update ([game-update.md](game-update.md)) does not re-embed that
 token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
 `channel` into `user://playtest_identity.json`, and `load_build_info()` prefers
-that persisted route for new `F` reports. If the identity write fails, the
+that persisted friend route for new `F` reports. A persisted shared-cohort
+route is refreshed from the new embed when the cohort token rotates. If the identity write fails, the
 shared update check and apply are refused so a tokenless replace cannot
 strip the friend route. Shared update checks read the
 embedded `endpoint` from `playtest_build.json` and do not follow the persisted
@@ -167,6 +168,8 @@ who never received a first-contact package can still `F`-report without a
 GitHub account. It does not mint per-friend tokens, does not run
 `package_playtest.py`, and never prints the cohort or admin credential.
 Existing `user://playtest_identity.json` friend routes still win after UPDATE.
+A persisted shared-cohort identity is refreshed from the new embed when
+`PLAYTEST_COHORT_INVITE_TOKEN` rotates.
 The `playtest-release` GitHub environment holds the publish endpoint, admin
 token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
 key stays out. A public receipt lists the three OS artifacts without tokens.

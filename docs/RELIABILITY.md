@@ -288,7 +288,9 @@ asset names and uploads `--clobber` when the GitHub Release already exists.
 `playtests-headless` includes `export_presets.cfg` so a preset-only main
 commit still reaches this publisher. Per-friend
 `package_playtest.py` stays off that path.
-`update_flow` is a headless playtest with an injected transport.
+`update_flow` is a headless playtest with an injected transport; it pins
+friend-wins-after-UPDATE and refreshes a persisted shared-cohort token from
+the new embed.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from

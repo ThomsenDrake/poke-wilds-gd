@@ -2111,6 +2111,8 @@ quality_bucket = "update"
 # CI playtest-release exports linux/windows/macos via publish_update
 # --require-cohort and embeds a stable accountless cohort invite.
 # Identity persist failure skips the latest check and refuses apply.
+# Friend user:// identity still wins after UPDATE; a playtest-channel
+# cohort identity is refreshed when the embedded cohort token rotates.
 # Failed downloads and failed applies delete the artifact and pending.json.
 # UPDATE requires SAVE_VERSION >= min_save_version; apply persists a stale
 # on-disk save before replace.

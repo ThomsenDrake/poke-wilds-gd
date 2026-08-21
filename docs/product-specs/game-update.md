@@ -60,10 +60,13 @@ package copies `tester_id` / `invite_token` / `endpoint` / `channel` on first
 run (atomic temp+rename). If that write fails, the title skips the latest
 check and refuses apply so a tokenless shared replace cannot strip F-to-report.
 After a shared update, `load_build_info()` prefers
-that persisted route for new `F` reports; the new embedded `playtest_build.json`
+that persisted **friend** route for new `F` reports; the new embedded `playtest_build.json`
 supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
-identity wins when present. Editor smoke build-info overrides are not merged
+identity (`channel` other than `playtest`) wins when present. A persisted
+shared-cohort identity (`channel=playtest`) is refreshed from the new embed
+so rotating `PLAYTEST_COHORT_INVITE_TOKEN` does not leave revoked tokens on
+disk. Editor smoke build-info overrides are not merged
 with disk identity. The latest check always queries the shared `playtest`
 channel and the **embedded** relay `endpoint`; the persisted friend `channel`
 and `endpoint` are only for `F` reports.
