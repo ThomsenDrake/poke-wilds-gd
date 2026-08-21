@@ -124,7 +124,9 @@ channel (no dispatch channel override) and infers the Wrangler/R2
 environment from `PLAYTEST_FEEDBACK_ENDPOINT` (no dispatch wrangler
 override). Automatic publishes serialize on that
 channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
-`origin/main`, so a late older run cannot overwrite `latest.json`. A tag
+`origin/main`, so a late older run cannot overwrite `latest.json`. The
+publisher repeats that comparison immediately before writing the
+manifest, after relay wait and export. A tag
 and a later `workflow_run` for the same SHA do not publish twice: if
 `latest.json` already has that `commit_sha`, export is skipped and a `v*`
 rerun attaches the already-published artifacts (checked against the

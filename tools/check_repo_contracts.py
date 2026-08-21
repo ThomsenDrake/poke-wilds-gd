@@ -822,6 +822,7 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "group: playtest-release-playtest",
         "  CHANNEL: playtest",
         "refusing stale playtest publish",
+        "Recheck origin/main before publish",
         "refusing unvalidated playtest publish",
         "gh run list --workflow playtests-headless",
         "wanted=\"$(git rev-parse HEAD)\"",

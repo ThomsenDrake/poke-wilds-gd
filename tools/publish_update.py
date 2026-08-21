@@ -262,6 +262,18 @@ def already_published_commit(latest: dict, sha: str) -> bool:
     return bool(wanted) and str(latest.get("commit_sha", "")).strip().lower() == wanted
 
 
+def assert_current_main(*, git_run=run) -> str:
+    """Refuse to publish if origin/main moved past this SHA during the job."""
+    git_run("git", "fetch", "--no-tags", "origin", "main")
+    current = git_run("git", "rev-parse", "origin/main")
+    wanted = git_run("git", "rev-parse", "HEAD")
+    if current != wanted:
+        raise RuntimeError(
+            f"refusing stale playtest publish {wanted}; origin/main is {current}"
+        )
+    return wanted
+
+
 def required_relay_commit(*, git_run=run) -> str:
     """Latest commit that deployed Worker code. Equals HEAD when this SHA changed it."""
     sha = git_run("git", "log", "-1", "--format=%H", "--", *RELAY_PATHS)
@@ -433,6 +445,7 @@ def main() -> int:
         parser.error("PLAYTEST_COHORT_INVITE_TOKEN is required for distributed shared builds")
     with build_metadata_lock():
         try:
+            assert_current_main()
             if cohort:
                 assert_production_relay(endpoint, required_relay_commit())
                 register_invite(endpoint, admin_token, cohort)
@@ -442,6 +455,7 @@ def main() -> int:
             builds = upload_artifacts(
                 exported, put_object=lambda key, dest: wrangler_put(
                     key, dest, endpoint=endpoint, environment=args.wrangler_env))
+            assert_current_main()
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)

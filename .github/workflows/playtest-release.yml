@@ -198,6 +198,16 @@ jobs:
             echo "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report" >&2
             exit 1
           fi
+      - name: Recheck origin/main before publish
+        if: steps.latest.outputs.already_published != 'true'
+        run: |
+          git fetch --no-tags origin main
+          current="$(git rev-parse origin/main)"
+          wanted="$(git rev-parse HEAD)"
+          if [ "$current" != "$wanted" ]; then
+            echo "refusing stale playtest publish ${wanted}; origin/main is ${current}" >&2
+            exit 1
+          fi
       - name: Publish shared Linux, Windows, and macOS updates
         if: steps.latest.outputs.already_published != 'true'
         env:

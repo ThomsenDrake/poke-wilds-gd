@@ -281,7 +281,9 @@ same-repo `push` `playtests-headless` on current `origin/main` (also `v*` tags
 and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
 presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
 and a public receipt that must not mention tokens. Channel publishes serialize
-and refuse a stale playtest HEAD (workflow_run, tag, or dispatch). The
+and refuse a stale playtest HEAD (workflow_run, tag, or dispatch),
+including a second `origin/main` check immediately before
+`latest.json` is written. The
 workflow does not accept a dispatch channel or wrangler-env override;
 R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
 asset names and uploads `--clobber` when the GitHub Release already exists.

@@ -358,6 +358,7 @@ class PublishUpdateTests(unittest.TestCase):
             receipt = Path(raw) / "receipt.json"
             with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
                     mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                    mock.patch.object(publish_update, "assert_current_main"), \
                     mock.patch.object(publish_update, "assert_production_relay",
                                       side_effect=lambda *_args, **_kwargs: order.append("relay")), \
                     mock.patch.object(publish_update, "register_invite", side_effect=fake_register), \
@@ -381,6 +382,61 @@ class PublishUpdateTests(unittest.TestCase):
         write_receipt.assert_called_once()
         upload.assert_called_once()
         publish.assert_called_once()
+
+    def test_assert_current_main_refuses_when_origin_main_moved(self) -> None:
+        def fake_run(*args: str) -> str:
+            if args[:3] == ("git", "rev-parse", "origin/main"):
+                return "b" * 40
+            if args[:3] == ("git", "rev-parse", "HEAD"):
+                return "a" * 40
+            return ""
+
+        with self.assertRaises(RuntimeError) as ctx:
+            publish_update.assert_current_main(git_run=fake_run)
+        self.assertIn("stale playtest publish", str(ctx.exception))
+        self.assertEqual(
+            publish_update.assert_current_main(
+                git_run=lambda *args: "a" * 40 if "rev-parse" in args else ""),
+            "a" * 40,
+        )
+
+    def test_publish_refuses_manifest_when_main_moves(self) -> None:
+        checks = {"n": 0}
+
+        def fake_main(*_args, **_kwargs):  # noqa: ANN001
+            checks["n"] += 1
+            if checks["n"] > 1:
+                raise RuntimeError("refusing stale playtest publish a; origin/main is b")
+            return "a" * 40
+
+        with tempfile.TemporaryDirectory() as raw:
+            receipt = Path(raw) / "receipt.json"
+            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                    mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                    mock.patch.object(publish_update, "assert_current_main", side_effect=fake_main), \
+                    mock.patch.object(publish_update, "assert_production_relay"), \
+                    mock.patch.object(publish_update, "register_invite"), \
+                    mock.patch.object(publish_update, "export_shared", return_value={
+                        "channel": "playtest", "build_id": "b1", "commit_sha": "c" * 40,
+                        "version": "v1", "published_at": "2026-08-21T00:00:00Z",
+                        "artifacts": {},
+                    }), \
+                    mock.patch.object(publish_update, "write_publish_receipt", return_value=receipt), \
+                    mock.patch.object(publish_update, "upload_artifacts", return_value={}) as upload, \
+                    mock.patch.object(publish_update, "publish_manifest") as publish, \
+                    mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
+                    mock.patch.object(publish_update, "build_metadata_lock"), \
+                    mock.patch.object(publish_update, "BUILD_INFO", Path(raw) / "playtest_build.json"), \
+                    mock.patch.dict("os.environ", {
+                        "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                        "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                        "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
+                    }, clear=False), \
+                    mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
+                with self.assertRaises(RuntimeError):
+                    publish_update.main()
+        upload.assert_called_once()
+        publish.assert_not_called()
 
     def test_required_relay_commit_uses_the_latest_relay_touching_sha(self) -> None:
         captured: list[tuple[str, ...]] = []
@@ -466,6 +522,7 @@ class PublishUpdateTests(unittest.TestCase):
 
         with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
                 mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
+                mock.patch.object(publish_update, "assert_current_main"), \
                 mock.patch.object(publish_update, "assert_production_relay", side_effect=boom), \
                 mock.patch.object(publish_update, "register_invite") as register_invite, \
                 mock.patch.object(publish_update, "export_shared") as export_shared, \
