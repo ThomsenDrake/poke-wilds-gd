@@ -51,6 +51,16 @@ jobs:
             echo "refusing stale playtest publish ${wanted}; origin/main is ${current}" >&2
             exit 1
           fi
+      - name: Resolve a v* tag on this SHA
+        id: release
+        run: |
+          git fetch --tags --force origin
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1 || true)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
       - name: Require a green playtests-headless run for this SHA
         if: github.event_name != 'workflow_run' || github.event.workflow_run.name != 'playtests-headless'
         id: gate
@@ -59,16 +69,43 @@ jobs:
           TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
           sha="$(git rev-parse HEAD)"
-          count="$(gh run list --workflow playtests-headless --commit "$sha" --status success --json databaseId --jq 'length')"
-          if [ "${count:-0}" -ge 1 ]; then
-            echo "skip_publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          run_headless() {
+            local n
+            n="$(gh run list --workflow playtests-headless --commit "$1" --status "$2" --json databaseId --jq 'length')"
+            echo "${n:-0}"
+          }
+          pending_headless() {
+            local total=0 status
+            for status in in_progress queued waiting pending requested; do
+              total=$((total + $(run_headless "$sha" "$status")))
+            done
+            echo "$total"
+          }
+          attempts=1
+          if [ "$TRIGGER_WORKFLOW" != "feedback-relay-deploy" ]; then
+            attempts=60
           fi
-          if [ "$TRIGGER_WORKFLOW" = "feedback-relay-deploy" ]; then
-            echo "skip_publish=true" >> "$GITHUB_OUTPUT"
-            echo "skipping playtest publish ${sha}; no successful playtests-headless run"
-            exit 0
-          fi
+          for attempt in $(seq 1 "$attempts"); do
+            if [ "$(run_headless "$sha" success)" -ge 1 ]; then
+              echo "skip_publish=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if [ "$TRIGGER_WORKFLOW" = "feedback-relay-deploy" ]; then
+              echo "skip_publish=true" >> "$GITHUB_OUTPUT"
+              echo "skipping playtest publish ${sha}; no successful playtests-headless run"
+              exit 0
+            fi
+            pending="$(pending_headless)"
+            failed="$(run_headless "$sha" failure)"
+            if [ "$pending" -lt 1 ] && [ "$failed" -ge 1 ]; then
+              echo "refusing unvalidated playtest publish ${sha}; no successful playtests-headless run" >&2
+              exit 1
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "waiting for playtests-headless ${sha} (attempt ${attempt}/${attempts})"
+              sleep 30
+            fi
+          done
           echo "refusing unvalidated playtest publish ${sha}; no successful playtests-headless run" >&2
           exit 1
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -252,10 +289,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Attach tagged binaries to a GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.release.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           stage="$(mktemp -d)"
           export PYTHONPATH="${GITHUB_WORKSPACE}/tools"
@@ -286,10 +324,10 @@ jobs:
               exit 1
             }
           done
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
-              --title "PokeWilds ${GITHUB_REF_NAME}" \
+            gh release create "${RELEASE_TAG}" "${files[@]}" \
+              --title "PokeWilds ${RELEASE_TAG}" \
               --notes "Shared Linux, Windows, and macOS playtest builds. F reporting stays accountless; existing friend identity is preserved across UPDATE."
           fi

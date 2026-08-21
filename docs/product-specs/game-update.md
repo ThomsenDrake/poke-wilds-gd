@@ -133,7 +133,8 @@ rerun attaches the already-published artifacts (checked against the
 manifest SHA-256 and size). A transient or malformed `latest` lookup
 fails the job instead of republishing. `workflow_dispatch` always republishes so a
 cohort-token rotation can land without a new commit. Tag and dispatch
-still require a successful `playtests-headless` run for that SHA.
+still require a successful `playtests-headless` run for that SHA and
+wait while that gate is still queued or in progress.
 Registering the cohort invite additionally requires the production
 relay for that SHA: a successful `feedback-relay-deploy` run whose
 deployed SHA contains the latest relay-touching commit (a later manual
@@ -147,6 +148,7 @@ publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
 without tokens. `v*` tags also attach those binaries to a GitHub Release
+(including a later `workflow_run` when HEAD points at that tag)
 under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
 `PokeWilds-macos.zip`) so a rerun `--clobber`s the previous assets instead
 of failing `gh release create` or stacking timestamped copies. A main

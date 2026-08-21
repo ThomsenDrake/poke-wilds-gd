@@ -15,7 +15,9 @@ publish cannot silently revive a compromised shared invite.
 successful `feedback-relay-deploy` for the live tag) before
 `register_invite`. Transient `latest` lookups fail closed, and the
 publisher retries a still-pending ancestor relay deploy. `origin/main`
-is rechecked immediately before writing `latest.json`. Scores unchanged.
+is rechecked immediately before writing `latest.json`. Tag publishes wait
+for a still-running headless gate, and a later `workflow_run` still
+attaches a `v*` GitHub Release. Scores unchanged.
 
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on
 the `playtest` channel is refreshed from the new embed so a rotated

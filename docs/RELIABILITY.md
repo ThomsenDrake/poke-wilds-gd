@@ -293,7 +293,10 @@ the same SHA skip a second publish when `latest.json` already has that
 commit. A timeout, 5xx, or malformed `latest` lookup fails closed instead
 of treating the miss as unpublished. `workflow_dispatch` always republishes so a rotated cohort token
 can land without a new commit, but tag and dispatch still require a
-successful `playtests-headless` run for that SHA. Before
+successful `playtests-headless` run for that SHA; a tag or dispatch
+waits while that gate is still queued or in progress. A later
+`workflow_run` on the same SHA still attaches a `v*` GitHub Release
+when HEAD points at that tag. Before
 `register_invite`, the publisher also requires a successful
 `feedback-relay-deploy` for a production Worker whose `/healthz`
 `version_tag` contains the latest relay-touching commit (the live tag may
