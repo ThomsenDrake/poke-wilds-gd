@@ -3,6 +3,9 @@ extends RefCounted
 const IDENTITY_PATH := "user://playtest_identity.json"
 const TMP_SUFFIX := ".tmp"
 const IDENTITY_KEYS := ["tester_id", "invite_token", "endpoint", "channel"]
+const KIND_KEY := "identity_kind"
+const KIND_FRIEND := "friend"
+const KIND_COHORT := "cohort"
 const SHARED_CHANNEL := "playtest"
 
 static var _path_override := ""
@@ -35,6 +38,9 @@ static func load_identity() -> Dictionary:
 		if text.is_empty():
 			return {}
 		out[key] = text
+	var kind := str((parsed as Dictionary).get(KIND_KEY, "")).strip_edges()
+	if kind == KIND_FRIEND or kind == KIND_COHORT:
+		out[KIND_KEY] = kind
 	return out
 
 
@@ -50,6 +56,7 @@ static func persist_from(embedded: Dictionary) -> bool:
 		if text.is_empty():
 			return false
 		payload[key] = text
+	payload[KIND_KEY] = _identity_kind(embedded)
 	return _write(payload)
 
 
@@ -65,8 +72,17 @@ static func merge(embedded: Dictionary, persisted: Dictionary = {}) -> Dictionar
 	return out
 
 
+static func _identity_kind(record: Dictionary) -> String:
+	var kind := str(record.get(KIND_KEY, "")).strip_edges()
+	if kind == KIND_FRIEND or kind == KIND_COHORT:
+		return kind
+	if str(record.get("channel", "")).strip_edges() != SHARED_CHANNEL:
+		return KIND_FRIEND
+	return KIND_COHORT
+
+
 static func _is_friend_identity(stored: Dictionary) -> bool:
-	return not stored.is_empty() and str(stored.get("channel", "")).strip_edges() != SHARED_CHANNEL
+	return not stored.is_empty() and _identity_kind(stored) == KIND_FRIEND
 
 
 static func _same_route(stored: Dictionary, embedded: Dictionary) -> bool:

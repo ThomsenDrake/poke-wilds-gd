@@ -144,6 +144,16 @@ func _check_cohort_refresh() -> void:
 	_check(UpdateIdentity.persist_from(rotated), "friend persist-from after shared embed failed")
 	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "friend-token",
 		"shared persist overwrote friend identity")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Checks.IDENTITY_PATH))
+	var friend_playtest := {"channel": "playtest", "endpoint": "https://relay.test",
+		"invite_token": "friend-on-playtest", "tester_id": "PKMN-FRIEND",
+		"identity_kind": "friend"}
+	_check(UpdateIdentity.persist_from(friend_playtest), "playtest-channel friend did not persist")
+	_check(str(UpdateIdentity.merge(rotated, UpdateIdentity.load_identity()).get("invite_token", ""))
+		== "friend-on-playtest", "kind=friend on playtest channel lost to cohort merge")
+	_check(UpdateIdentity.persist_from(rotated), "kind=friend persist-from after cohort embed failed")
+	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "friend-on-playtest",
+		"kind=friend on playtest channel was overwritten")
 
 
 func _check(ok: bool, reason: String) -> void:

@@ -63,10 +63,11 @@ After a shared update, `load_build_info()` prefers
 that persisted **friend** route for new `F` reports; the new embedded `playtest_build.json`
 supplies version/commit/build_id. Shared builds may embed a cohort invite so a
 player who never had a friend package can still report. Persisted friend
-identity (`channel` other than `playtest`) wins when present. A persisted
-shared-cohort identity (`channel=playtest`) is refreshed from the new embed
-so rotating `PLAYTEST_COHORT_INVITE_TOKEN` does not leave revoked tokens on
-disk. Editor smoke build-info overrides are not merged
+identity (`identity_kind=friend`, or a non-`playtest` channel on older
+files) wins when present. A persisted shared-cohort identity is refreshed
+from the new embed so rotating `PLAYTEST_COHORT_INVITE_TOKEN` does not leave
+revoked tokens on disk. `package_playtest.py` refuses `--channel playtest`.
+Editor smoke build-info overrides are not merged
 with disk identity. The latest check always queries the shared `playtest`
 channel and the **embedded** relay `endpoint`; the persisted friend `channel`
 and `endpoint` are only for `F` reports.

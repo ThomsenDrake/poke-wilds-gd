@@ -292,8 +292,9 @@ commit. `workflow_dispatch` always republishes so a rotated cohort token
 can land without a new commit. Per-friend
 `package_playtest.py` stays off that path.
 `update_flow` is a headless playtest with an injected transport; it pins
-friend-wins-after-UPDATE and refreshes a persisted shared-cohort token from
-the new embed.
+friend-wins-after-UPDATE (explicit `identity_kind=friend`, including a
+playtest-channel friend package) and refreshes a persisted shared-cohort
+token from the new embed. `package_playtest.py` refuses `--channel playtest`.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from

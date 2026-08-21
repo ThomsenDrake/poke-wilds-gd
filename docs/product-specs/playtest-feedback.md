@@ -169,7 +169,8 @@ GitHub account. It does not mint per-friend tokens, does not run
 `package_playtest.py`, and never prints the cohort or admin credential.
 Existing `user://playtest_identity.json` friend routes still win after UPDATE.
 A persisted shared-cohort identity is refreshed from the new embed when
-`PLAYTEST_COHORT_INVITE_TOKEN` rotates.
+`PLAYTEST_COHORT_INVITE_TOKEN` rotates. Friend packages persist
+`identity_kind=friend` and cannot use `--channel playtest`.
 The `playtest-release` GitHub environment holds the publish endpoint, admin
 token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
 key stays out. A public receipt lists the three OS artifacts without tokens.

@@ -10,7 +10,9 @@ Scores use `0-3` where `3` means strong, mechanically supported coverage.
 Shared-cohort token rotation (2026-08-21): persisted `user://` identity on
 the `playtest` channel is refreshed from the new embed so a rotated
 `PLAYTEST_COHORT_INVITE_TOKEN` does not leave revoked tokens on disk.
-Friend (`friends-1`) identity still wins after UPDATE. Scores unchanged.
+Friend identity (`identity_kind=friend`) still wins after UPDATE, including
+a playtest-channel friend package. `package_playtest.py` refuses
+`--channel playtest`. Scores unchanged.
 
 Shared playtest CI releases (2026-08-21): `playtest-release` exports Linux,
 Windows, and macOS after a green `playtests-headless` on `main` (also `v*`

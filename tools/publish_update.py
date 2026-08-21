@@ -58,6 +58,7 @@ def write_shared_build_info(channel: str, endpoint: str, commit: str, version: s
         "published_at": published_at,
         "tester_id": (cohort or {}).get("tester_id", "UNASSIGNED"),
         "invite_token": (cohort or {}).get("token", ""),
+        "identity_kind": "cohort" if cohort else "",
     }
     BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
     BUILD_INFO.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

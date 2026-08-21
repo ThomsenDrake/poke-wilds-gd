@@ -252,6 +252,7 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(metadata["invite_token"], "secret-cohort-token")
             self.assertEqual(metadata["tester_id"], "PKMN-EEVEE-ABCDEF")
             self.assertEqual(metadata["channel"], "playtest")
+            self.assertEqual(metadata["identity_kind"], "cohort")
             self.assertNotIn("nickname", metadata)
 
     def test_cohort_from_env_derives_the_public_handle(self) -> None:
