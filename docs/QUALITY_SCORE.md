@@ -7,6 +7,16 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Friend-build packaging runbook (2026-08-23):
+[playtest-feedback.md](product-specs/playtest-feedback.md) now has
+§ Maintainer: send a friend build. Never use Godot Export Project (empty
+relay embed → `feedback_not_configured`). Shared cohort ships via
+`playtest-release` after a green `playtests-headless` SHA; confirm the job
+exported (a 17s `already_published=true` skip is not a publish). Per-friend
+first contact stays `package_playtest.py` on a clean tree with production
+creds. `feedback_reporting` scores unchanged: ops runbook, not player
+behavior.
+
 Craft-state spawn pin (2026-08-23): `visual_sweep_baselines.craft_state` now
 calls `RegistrySupport.pin_craft_world` before `find_walkable_spawn`, so the
 landmark resolver reads the spec seed instead of the boot wall-clock
