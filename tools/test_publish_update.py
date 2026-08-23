@@ -805,6 +805,10 @@ class PublishUpdateTests(unittest.TestCase):
         self.assertEqual(check_repo_contracts.ce_unified_plan_issues(root), [])
         source = (root / "tools/check_repo_contracts.py").read_text(encoding="utf-8")
         self.assertNotIn('if rel.startswith("docs/plans/"):', source)
+        self.assertIn(
+            'return rel.startswith("docs/plans/") and (',
+            source,
+        )
 
     def test_ce_unified_plan_contract_refuses_unlabeled_and_broken_links(self) -> None:
         import check_repo_contracts
@@ -827,6 +831,34 @@ class PublishUpdateTests(unittest.TestCase):
             issues = "\n".join(check_repo_contracts.ce_unified_plan_issues(dest_root))
         self.assertIn("must declare artifact_contract", issues)
         self.assertIn("Broken internal link", issues)
+
+    def test_ce_metadata_exemption_is_scoped_to_docs_plans(self) -> None:
+        import check_repo_contracts
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            labeled = (
+                "---\n"
+                "artifact_contract: ce-unified-plan/v1\n"
+                "artifact_readiness: implementation-ready\n"
+                "execution: code\n"
+                "---\n\n"
+                "# Labeled\n"
+            )
+            plan = dest_root / "docs" / "plans" / "ok.md"
+            spec = dest_root / "docs" / "product-specs" / "ok.md"
+            plan.parent.mkdir(parents=True)
+            spec.parent.mkdir(parents=True)
+            notes = dest_root / "docs" / "plans" / "notes.md"
+            plan.write_text(labeled, encoding="utf-8")
+            spec.write_text(labeled, encoding="utf-8")
+            notes.write_text("# notes\n", encoding="utf-8")
+            self.assertTrue(
+                check_repo_contracts._is_ce_unified_plan(plan, "docs/plans/ok.md"))
+            self.assertFalse(
+                check_repo_contracts._is_ce_unified_plan(
+                    spec, "docs/product-specs/ok.md"))
+            self.assertFalse(
+                check_repo_contracts._is_ce_unified_plan(notes, "docs/plans/notes.md"))
 
     def test_playtest_workflow_contract_refuses_v_star_and_missing_prerelease(self) -> None:
         import check_repo_contracts

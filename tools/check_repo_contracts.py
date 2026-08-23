@@ -1114,8 +1114,10 @@ def _yaml_frontmatter(path: Path) -> dict[str, str]:
     return fields
 
 
-def _is_ce_unified_plan(path: Path) -> bool:
-    return _yaml_frontmatter(path).get("artifact_contract") == CE_UNIFIED_PLAN_CONTRACT
+def _is_ce_unified_plan(path: Path, rel: str) -> bool:
+    return rel.startswith("docs/plans/") and (
+        _yaml_frontmatter(path).get("artifact_contract") == CE_UNIFIED_PLAN_CONTRACT
+    )
 
 
 def ce_unified_plan_issues(root: Path) -> list[str]:
@@ -1362,7 +1364,7 @@ def run(root: Path | None = None) -> list[str]:
 
     for path in docs_markdown(root):
         rel = relative_path(path, root)
-        if _is_ce_unified_plan(path):
+        if _is_ce_unified_plan(path, rel):
             continue
         metadata = parse_metadata(path)
         missing_fields = [field for field in METADATA_FIELDS if field not in metadata]
