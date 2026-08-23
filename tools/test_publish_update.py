@@ -354,6 +354,17 @@ class PublishUpdateTests(unittest.TestCase):
         self.assertNotIn("invite", dumped)
         self.assertNotIn("token", dumped)
 
+    def test_embed_public_refuses_playtest_flags_and_a_dirty_tree(self) -> None:
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False):
+            for flag in ("--require-cohort", "--already-published", "--require-production-relay"):
+                with self.assertRaises(SystemExit):
+                    with mock.patch("sys.argv", ["publish_update.py", "--embed-public", flag]):
+                        publish_update.main()
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=True):
+            with self.assertRaises(SystemExit):
+                with mock.patch("sys.argv", ["publish_update.py", "--embed-public"]):
+                    publish_update.main()
+
     def test_embed_public_succeeds_when_relay_env_is_unset(self) -> None:
         env = {
             key: value for key, value in os.environ.items()
@@ -802,7 +813,8 @@ class PublishUpdateTests(unittest.TestCase):
             dest.parent.mkdir(parents=True)
             dest.write_text(
                 text.replace('      - "playtest-*"', '      - "v*"').replace(
-                    "              --prerelease \\\n", ""),
+                    "              --prerelease \\\n", "").replace(
+                    '            gh release edit "${RELEASE_TAG}" --prerelease\n', ""),
                 encoding="utf-8",
             )
             issues = check_repo_contracts.playtest_release_workflow_issues(dest_root)

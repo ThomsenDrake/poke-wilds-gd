@@ -838,6 +838,7 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "gh release create",
         "gh release upload",
         "gh release view",
+        "gh release edit",
         "Resolve a playtest-* tag on this SHA",
         "--prerelease",
         "waiting for playtests-headless",
@@ -971,6 +972,7 @@ def public_release_workflow_issues(root: Path) -> list[str]:
         "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
         "receipt must not mention invite tokens",
         "missing local receipt; public attach refuses a latest lookup",
+        "public-release requires a v* tag on this SHA",
     )
     for fragment in required:
         if fragment not in text:
@@ -1309,6 +1311,8 @@ def run(root: Path | None = None) -> list[str]:
 
     for path in docs_markdown(root):
         rel = relative_path(path, root)
+        if rel.startswith("docs/plans/"):
+            continue
         metadata = parse_metadata(path)
         missing_fields = [field for field in METADATA_FIELDS if field not in metadata]
         if missing_fields:

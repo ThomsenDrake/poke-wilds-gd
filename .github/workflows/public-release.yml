@@ -39,6 +39,11 @@ jobs:
           fi
           tag="$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1 || true)"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      - name: Refuse dispatch without a v* tag
+        if: steps.release.outputs.tag == ''
+        run: |
+          echo "public-release requires a v* tag on this SHA" >&2
+          exit 1
       - name: Require a green playtests-headless run for this SHA
         if: steps.release.outputs.tag != ''
         id: gate

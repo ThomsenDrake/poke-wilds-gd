@@ -30,6 +30,7 @@ func _public_stamp_contract() -> void:
 	_controller.smoke_set_transport(Callable(self, "_unexpected_transport"))
 	await SmokeTap.tap(_tree, "feedback_report")
 	_check(not _dialog.visible, "public stamp opened feedback")
+	_check(not _tree.paused, "public stamp paused the tree")
 	_check(str(_controller.smoke_state().get("report_id", "")) == "",
 		"public stamp captured a report")
 	_check(_unexpected_transport_calls == 0, "public stamp reached the upload transport")
