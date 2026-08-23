@@ -2125,6 +2125,9 @@ quality_bucket = "update"
 # --require-cohort and embeds a stable accountless cohort invite after
 # production /healthz reports a Worker that contains the latest
 # relay-touching commit.
+# PUBLIC RELEASE (2026-08-23): public-release.yml exports the same three
+# desktop names through publish_update --embed-public (empty endpoint and
+# invite, local receipt only, no playtest-release environment or relay).
 # Identity persist failure skips the latest check and refuses apply.
 # Friend user:// identity (identity_kind=friend) still wins after UPDATE;
 # a playtest-channel cohort identity is refreshed when the embedded cohort

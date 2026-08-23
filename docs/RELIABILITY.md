@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-23
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
 
 # Reliability
 
@@ -310,6 +310,12 @@ ancestor deploy is still queued or in progress, and a successful
 passed, so a delayed or failed production
 deploy cannot hit the old upsert that cleared `revoked_at`. Per-friend
 `package_playtest.py` stays off that path.
+Public Latest uses a second workflow (`.github/workflows/public-release.yml`)
+and `publish_update.py --embed-public`: empty endpoint and empty invite,
+local-receipt GitHub assets only, no relay wait, and no playtest
+environment or Cloudflare secrets. `--embed-public` ignores
+`PLAYTEST_FEEDBACK_ENDPOINT`, the admin token, and
+`PLAYTEST_COHORT_INVITE_TOKEN` when those variables are set.
 `POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)
 and never clears `revoked_at` on upsert.
 `update_flow` is a headless playtest with an injected transport; it pins
