@@ -83,9 +83,11 @@ func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 		if entry.is_empty():
 			return false
 		party.append(runtime.pokemon_rules.create_pokemon_instance(entry, int(entry_spec[1]), Callable(runtime.catalog, "get_move")))
-	var spawn: Vector2i = runtime._world_gen.find_walkable_spawn(int(spec["world_seed"]))
+	var spec_seed: int = int(spec["world_seed"])
+	RegistrySupport.pin_craft_world(runtime, spec_seed) # before spawn: session seed + empty mutations
+	var spawn: Vector2i = runtime._world_gen.find_walkable_spawn(spec_seed)
 	var payload := {
-		"version": 2, "world_seed": spec["world_seed"],
+		"version": 2, "world_seed": spec_seed,
 		"player_x": spawn.x, "player_y": spawn.y,
 		"party": party, "bag": spec["bag"].duplicate(),
 		"time_of_day_minutes": spec["time_of_day"], "total_steps": 0,
@@ -94,10 +96,7 @@ func craft_state(ctx: Dictionary, runner, spec: Dictionary) -> bool:
 	runtime.save_store.write_payload(payload)
 	var normalized := party.map(func(m): return runtime.pokemon_rules.normalize_loaded_mon(m))
 	runtime.session.apply_loaded_state(payload, normalized)
-	# Wipe leftover clears+placements so the crafted world is a pure function of the seed.
-	runtime._world_gen.clear_overrides()
-	runtime._world_gen.clear_placements()
-	ctx["world"].rebuild(int(spec["world_seed"]))
+	ctx["world"].rebuild(spec_seed)
 	runner.teleport_player(ctx["world"], ctx["player"], runtime, spawn)
 	ctx["world"].set_time_of_day(int(spec["time_of_day"]))
 	ctx["message_box"].hide_message()

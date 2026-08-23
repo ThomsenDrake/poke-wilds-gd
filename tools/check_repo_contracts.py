@@ -1190,6 +1190,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(miss_postmortem_issues(root))
     issues.extend(sim_rng_setup_issues(root))
     issues.extend(world_depth_rng_issues(root))
+    issues.extend(craft_state_pin_issues(root))
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
@@ -1574,6 +1575,64 @@ def world_depth_rng_issues(root: Path) -> list[str]:
                 f"{relative_path(path, root)}: constructs RandomNumberGenerator.new(); "
                 "world-depth domain + runtime are rng-free (pure SplitMix hashes of "
                 "(world_seed, coords) — world-depth.md § Determinism)")
+    return issues
+
+
+CRAFT_STATE_REL = Path("scripts") / "app" / "visual_sweep_baselines.gd"
+PIN_HELPER_REL = Path("scripts") / "app" / "visual_sweep_registry_support.gd"
+
+
+def _gd_func_body(text: str, name: str) -> str | None:
+    """Return the source of `func name(...)` through the next top-level func, or None."""
+    match = re.search(rf"(?:static\s+)?func\s+{re.escape(name)}\s*\(", text)
+    if match is None:
+        return None
+    rest = text[match.start():]
+    nxt = re.search(r"\n(?:static\s+)?func\s+", rest[1:])
+    return rest if nxt is None else rest[: nxt.start() + 1]
+
+
+def craft_state_pin_issues(root: Path) -> list[str]:
+    """S6b craft-path pin: craft_state must call pin_craft_world BEFORE
+    find_walkable_spawn, and the helper must write session.world_seed. A boot
+    leftover seed previously flaked encounter_config double-run cmp on
+    biome_entered tiles while both scenario passes stayed green."""
+    issues: list[str] = []
+    craft = root / CRAFT_STATE_REL
+    helper = root / PIN_HELPER_REL
+    if not craft.exists():
+        return [f"{CRAFT_STATE_REL} is missing"]
+    if not helper.exists():
+        return [f"{PIN_HELPER_REL} is missing"]
+    craft_body = _gd_func_body(craft.read_text(encoding="utf-8"), "craft_state")
+    if craft_body is None:
+        return [f"{CRAFT_STATE_REL}: craft_state() is missing"]
+    pin_at = craft_body.find("pin_craft_world")
+    spawn_at = craft_body.find("find_walkable_spawn")
+    if pin_at < 0:
+        issues.append(
+            f"{CRAFT_STATE_REL}: craft_state must call pin_craft_world before "
+            "find_walkable_spawn (S6b craft-path pin)"
+        )
+    elif spawn_at < 0:
+        issues.append(
+            f"{CRAFT_STATE_REL}: craft_state must call find_walkable_spawn after "
+            "pin_craft_world (S6b craft-path pin)"
+        )
+    elif pin_at > spawn_at:
+        issues.append(
+            f"{CRAFT_STATE_REL}: pin_craft_world must precede find_walkable_spawn "
+            "in craft_state (S6b craft-path pin)"
+        )
+    helper_text = helper.read_text(encoding="utf-8")
+    helper_body = _gd_func_body(helper_text, "pin_craft_world")
+    if helper_body is None:
+        issues.append(f"{PIN_HELPER_REL}: pin_craft_world() is missing")
+    elif "session.world_seed" not in helper_body:
+        issues.append(
+            f"{PIN_HELPER_REL}: pin_craft_world must write session.world_seed "
+            "(landmark resolver reads the session, not generator setup)"
+        )
     return issues
 
 

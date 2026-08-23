@@ -21,3 +21,13 @@ static func crafted_state_for(registry: Dictionary, sweep: String, base: Diction
 	var crafted: Dictionary = base.duplicate(true)
 	crafted["world_seed"] = registry_seed_for(registry, sweep)
 	return crafted
+
+
+# Pin the live session + generator to spec_seed BEFORE find_walkable_spawn. The
+# landmark resolver reads session.world_seed (not the generator's setup seed), so
+# a boot wall-clock leftover would pick a different beach spawn across S6b runs.
+static func pin_craft_world(runtime: Object, spec_seed: int) -> void:
+	runtime.session.world_seed = spec_seed
+	runtime.session.landmark_state = {}
+	runtime._world_gen.clear_overrides()
+	runtime._world_gen.clear_placements()
