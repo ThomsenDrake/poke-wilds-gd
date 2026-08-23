@@ -10,7 +10,7 @@ PokeWilds is an open Pokémon survival sandbox. There are no gyms, trainers, or 
 2. Download the file for your computer: `PokeWilds-windows.exe`, `PokeWilds-macos.zip`, or `PokeWilds-linux.x86_64`.
 3. Do not download the Source code zip or tar.gz. Those are project files, not the game, and they will not run it.
 
-If you downloaded the macOS zip, unzip it. On Linux, mark `PokeWilds-linux.x86_64` as a program first (`chmod +x PokeWilds-linux.x86_64`). Then open the Windows, macOS, or Linux game file.
+If you downloaded the macOS zip, unzip it. On macOS, Control-click the app, choose Open, and confirm the warning — this build is not signed. On Linux, mark `PokeWilds-linux.x86_64` as a program first (`chmod +x PokeWilds-linux.x86_64`). Then open the Windows, macOS, or Linux game file.
 
 ## Keys
 

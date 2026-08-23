@@ -1030,6 +1030,7 @@ def player_readme_issues(root: Path) -> list[str]:
         "PokeWilds-macos.zip",
         "PokeWilds-linux.x86_64",
         "chmod +x PokeWilds-linux.x86_64",
+        "Control-click",
         "Source code",
         "no gyms",
         "WASD",
