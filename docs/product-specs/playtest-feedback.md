@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-21
+Last verified: 2026-08-23
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
@@ -165,6 +165,32 @@ Production and staging infrastructure were provisioned before this port. Their
 end-to-end canaries opened issues #32 and #33 and those issues were closed after
 successful verification; routine source validation must not redeploy or create
 replacement canary issues.
+
+### Maintainer: send a friend build
+
+Never use Godot's Export Project. A bare export embeds `build_id=local`,
+`commit_sha=unknown`, and empty `endpoint` / `invite_token`; `F` then returns
+`feedback_not_configured` (issues #48 / #50). Use one of these paths on a
+**green** `main` (`playtests-headless` success for that SHA):
+
+Shared cohort (several friends, one binary per OS) — after green headless,
+`playtest-release` runs `publish_update.py --require-cohort` and writes Linux /
+Windows / macOS artifacts. Confirm the job actually exported (a 17s
+`already_published=true` skip is **not** a publish). Distribute the three OS
+files from the workflow artifact or `GET /v1/updates/latest?channel=playtest`.
+A `v*` tag is optional and only attaches a GitHub Release.
+
+Per-friend first contact (clean committed tree, production relay creds):
+
+```bash
+export PLAYTEST_FEEDBACK_ENDPOINT="https://<production-relay>"
+export PLAYTEST_FEEDBACK_ADMIN_TOKEN="<admin-bearer>"
+python3 tools/package_playtest.py --friend "Name" --target macos|windows|linux
+```
+
+`--allow-dirty` is for local validation only. `--channel playtest` is refused
+(that channel is CI cohort). Send only the file under
+`dist/playtest/PKMN-…/`. Do not share `.playtest/invites.json`.
 
 Automated shared releases for all three presets are owned by
 `.github/workflows/playtest-release.yml`. That workflow publishes one Linux,

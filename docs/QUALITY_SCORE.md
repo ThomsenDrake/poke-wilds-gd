@@ -1,11 +1,29 @@
 Status: current
-Last verified: 2026-08-21
+Last verified: 2026-08-23
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools
 
 # Quality Score
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
+
+Friend-build packaging runbook (2026-08-23):
+[playtest-feedback.md](product-specs/playtest-feedback.md) now has
+§ Maintainer: send a friend build. Never use Godot Export Project (empty
+relay embed → `feedback_not_configured`). Shared cohort ships via
+`playtest-release` after a green `playtests-headless` SHA; confirm the job
+exported (a 17s `already_published=true` skip is not a publish). Per-friend
+first contact stays `package_playtest.py` on a clean tree with production
+creds. `feedback_reporting` scores unchanged: ops runbook, not player
+behavior.
+
+Craft-state spawn pin (2026-08-23): `visual_sweep_baselines.craft_state` now
+calls `RegistrySupport.pin_craft_world` before `find_walkable_spawn`, so the
+landmark resolver reads the spec seed instead of the boot wall-clock
+`session.world_seed`. That closes the S6b `encounter_config` double-run flake
+(`biome_entered` tiles diverged across two passing runs).
+`check_repo_contracts.craft_state_pin_issues` refuses a later reorder.
+`app_bootstrap` scores unchanged: verification pin, not player behavior.
 
 Revoked cohort re-register (2026-08-21): `POST /v1/admin/invites` returns
 `invite_revoked` and does not clear `revoked_at`, so a later playtest

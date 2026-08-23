@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-07-22
+Last verified: 2026-08-23
 Review cadence days: 30
 Source paths: tools/graduation_ledger.py, tools/check_repo_contracts.py, docs/references/vision-review-rubric.md, docs/registry/art-anchors.toml, docs/product-specs/vision-fidelity.md, docs/generated/miss-postmortems.json
 

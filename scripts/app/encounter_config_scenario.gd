@@ -8,10 +8,10 @@ extends Node
 # encounter tile and never off one; (c) ANYWHERE — it fires on a non-encounter walkable tile;
 # (d) ROUND-TRIP — a non-default setting survives save -> reload exactly, and switching back
 # to OFF drops the additive key (byte-preservation — the v4 golden carries none). Determinism:
-# the world is CRAFTED on the pinned seed (the overworld_mons craft_state precedent — explicit
-# world_seed, synchronous rebuild + teleport, NEVER new_game, so no frame-deferred sync lands
-# a wall-clock-tainted event in the double-run window); seed_for_smoke pins the avatar trigger
-# stream the rolls ride; tiles ride world.get_tile_logic (generator, not the render cache);
+# the world is CRAFTED on the pinned seed (overworld_mons craft_state precedent — explicit
+# world_seed, pin_craft_world before spawn so landmark_resolver cannot consult the boot
+# wall-clock session seed, synchronous rebuild + teleport, NEVER new_game); seed_for_smoke
+# pins the avatar trigger stream; tiles ride world.get_tile_logic (not the render cache);
 # the forced-battle seam + main's encounter handler are owned for the run (overworld_mons
 # bridge precedent). Emits encounter_config_passed/failed (miss-002).
 
