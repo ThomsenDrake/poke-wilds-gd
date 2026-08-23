@@ -154,6 +154,12 @@ func _check_cohort_refresh() -> void:
 	_check(UpdateIdentity.persist_from(rotated), "kind=friend persist-from after cohort embed failed")
 	_check(str(UpdateIdentity.load_identity().get("invite_token", "")) == "friend-on-playtest",
 		"kind=friend on playtest channel was overwritten")
+	var public_stamp := {"channel": "public", "endpoint": "", "invite_token": "",
+		"tester_id": "UNASSIGNED"}
+	var public_merged := UpdateIdentity.merge(public_stamp, old)
+	_check(str(public_merged.get("invite_token", "")) == "" \
+		and str(public_merged.get("endpoint", "")) == "",
+		"public stamp restored persisted cohort")
 
 
 func _check(ok: bool, reason: String) -> void:

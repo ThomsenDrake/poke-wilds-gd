@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-21
+Last verified: 2026-08-23
 Review cadence days: 14
 Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot, .github/workflows/playtest-release.yml
 
@@ -8,7 +8,10 @@ Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity
 ## Player contract
 
 A packaged desktop build checks a **shared** latest channel (not a per-friend
-binary) on player boot. Scenario/editor boots skip the network check so the
+binary) on player boot. A public stamp with an empty unmerged endpoint skips
+the network check. `UpdateIdentity.merge` does not copy
+`user://playtest_identity.json` onto an embed that has no invite and no
+endpoint. Scenario/editor boots skip the network check so the
 gated suite stays byte-identical. Check failure is silent: the title still
 shows `CONTINUE` / `NEW GAME`.
 

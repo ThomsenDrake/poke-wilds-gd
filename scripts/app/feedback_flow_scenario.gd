@@ -2,9 +2,7 @@ extends Node
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const ResilienceChecks := preload("res://scripts/app/feedback_flow_resilience_checks.gd")
 
-# Release-feedback journey: real F input across player-facing screens, text
-# focus suppression, pause restoration, and a fully parsed private ZIP through
-# the reporter's transport seam. No network or GitHub issue is touched.
+# Release-feedback journey: real F input, focus gate, pause restore, parsed ZIP.
 
 var _ctx: Dictionary
 var _failures: Array[String] = []
@@ -19,6 +17,7 @@ const INSTALL_ID_TEST_PATH := "user://feedback-flow-install-id.txt"
 func run(ctx: Dictionary) -> void:
 	_ctx = ctx
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_controller().smoke_set_build_info(_scenario_build("invited"))
 	await _text_focus_guard()
 	await _screen_capture("title", func() -> void: _ctx.title_screen.show_title(), func() -> void: _ctx.title_screen.visible = false)
 	await _screen_capture("menu", Callable(self, "_open_menu_with_overlay"),

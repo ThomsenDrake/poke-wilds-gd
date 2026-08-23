@@ -1,14 +1,20 @@
 Status: current
-Last verified: 2026-08-21
+Last verified: 2026-08-23
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_stamp_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
 # Playtest Feedback
 
 ## Player contract
 
-In a packaged desktop build, `F` opens a pause-modal bug report from title,
-overworld, menu (including storage, camp, and waystone), or battle. If a `LineEdit` or `TextEdit` already owns keyboard
+In an invited packaged desktop build, `F` opens a pause-modal bug report from title,
+overworld, menu (including storage, camp, and waystone), or battle.
+On a public packaged desktop build whose unmerged embed has no invite and no
+endpoint, `F` does nothing: no pause, dialog, toast, capture, or
+`feedback_capture_requested`. A tokenless embed does not restore
+`user://playtest_identity.json`. A tokenless Godot Export matches that public
+stamp. An invite with a missing endpoint still opens the dialog and returns
+`feedback_not_configured` without writing the outbox. If a `LineEdit` or `TextEdit` already owns keyboard
 focus, `F` remains text and does not open the report. The report captures the
 screen, screenshot, UI tree, in-memory save, runtime/game summaries, current-session
 trace, and sanitized engine-log tail before the modal becomes visible, then presents one

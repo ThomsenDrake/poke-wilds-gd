@@ -1994,6 +1994,7 @@ code_paths = [
   "scripts/app/feedback_controller.gd",
   "scripts/app/feedback_flow_scenario.gd",
   "scripts/app/feedback_flow_resilience_checks.gd",
+  "scripts/app/feedback_flow_stamp_checks.gd",
   "scripts/ui/feedback_dialog.gd",
   "scripts/runtime/feedback_snapshot.gd",
   "scripts/runtime/feedback_bundle.gd",
@@ -2022,6 +2023,9 @@ quality_bucket = "feedback"
 # playtest-release waits for production /healthz version_tag containing
 # the latest relay-touching commit before register_invite, retries a
 # pending ancestor deploy, and fails closed on a transient latest lookup.
+# PUBLIC STAMP (2026-08-23): empty invite plus empty endpoint is a public
+# build. FeedbackController returns before capture so F is silent. merge()
+# does not restore user://playtest_identity.json onto that stamp.
 # SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
 # user://playtest_identity.json after a generic replace so F reports keep the
 # friend route; editor smoke overrides are not merged with disk identity.
@@ -2111,6 +2115,9 @@ quality_bucket = "update"
 # A negative helper PID refuses without quitting so the title can show failure.
 # Public downloads are GET /v1/updates/artifacts/... (updates/ prefix only).
 # Update checks use the embedded endpoint, not persisted friend identity.
+# A public stamp (empty invite and empty endpoint) does not restore
+# persisted playtest identity, so title UPDATE cannot inherit a prior
+# playtest relay.
 # Linux copies and chmods *.new before the short promote/rollback;
 # a failed chmod refuses before the live path is renamed.
 # Staging publish endpoints select the staging REPORTS bucket.

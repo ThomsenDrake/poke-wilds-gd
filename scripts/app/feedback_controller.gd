@@ -30,8 +30,16 @@ func _input(event: InputEvent) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
 		return
+	if _is_public_stamp():
+		return
 	_begin_capture()
 	get_viewport().set_input_as_handled()
+
+
+func _is_public_stamp() -> bool:
+	var embed: Dictionary = _reporter.embedded_build_info()
+	return str(embed.get("invite_token", "")).strip_edges().is_empty() \
+		and str(embed.get("endpoint", "")).strip_edges().is_empty()
 
 
 func _begin_capture() -> void:
