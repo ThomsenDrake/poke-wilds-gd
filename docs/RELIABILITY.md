@@ -279,7 +279,7 @@ export one artifact per OS without a friend token, upload via R2 (never a Worker
 wrangler `r2 object put` is `{bucket}/{object_key}`, public URL stays the object key),
 and publish `GET /v1/updates/latest` only after all three objects exist.
 CI (`playtest-release`) runs that publisher with `--require-cohort` after a green
-same-repo `push` `playtests-headless` on current `origin/main` (also `v*` tags
+same-repo `push` `playtests-headless` on current `origin/main` (also `playtest-*` tags
 and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
 presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
 and a public receipt that must not mention tokens. Channel publishes serialize
@@ -287,7 +287,7 @@ and refuse a stale playtest HEAD (workflow_run, tag, or dispatch),
 including a second `origin/main` check immediately before
 `latest.json` is written. The
 workflow does not accept a dispatch channel or wrangler-env override;
-R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `v*` rerun stages stable
+R2 follows `PLAYTEST_FEEDBACK_ENDPOINT`. A `playtest-*` rerun stages stable
 asset names and uploads `--clobber` when the GitHub Release already exists.
 `playtests-headless` includes `export_presets.cfg` and
 `services/feedback-relay/**` so a preset-only or relay-only main
@@ -298,7 +298,7 @@ of treating the miss as unpublished. `workflow_dispatch` always republishes so a
 can land without a new commit, but tag and dispatch still require a
 successful `playtests-headless` run for that SHA; a tag or dispatch
 waits while that gate is still queued or in progress. A later
-`workflow_run` on the same SHA still attaches a `v*` GitHub Release
+`workflow_run` on the same SHA still attaches a `playtest-*` prerelease GitHub Release
 when HEAD points at that tag, but only after a green headless gate and
 only when `latest.commit_sha` is this SHA. Before
 `register_invite`, the publisher also requires a successful

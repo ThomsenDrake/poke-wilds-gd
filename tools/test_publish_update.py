@@ -791,6 +791,24 @@ class PublishUpdateTests(unittest.TestCase):
         self.assertEqual(check_repo_contracts.playtest_release_workflow_issues(root), [])
         self.assertEqual(check_repo_contracts.public_release_workflow_issues(root), [])
 
+    def test_playtest_workflow_contract_refuses_v_star_and_missing_prerelease(self) -> None:
+        import check_repo_contracts
+        root = Path(__file__).resolve().parents[1]
+        text = (root / ".github/workflows/playtest-release.yml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            dest = dest_root / ".github/workflows/playtest-release.yml"
+            dest.parent.mkdir(parents=True)
+            dest.write_text(
+                text.replace('      - "playtest-*"', '      - "v*"').replace(
+                    "              --prerelease \\\n", ""),
+                encoding="utf-8",
+            )
+            issues = check_repo_contracts.playtest_release_workflow_issues(dest_root)
+        joined = "\n".join(issues)
+        self.assertIn("must not trigger on v*", joined)
+        self.assertIn("--prerelease", joined)
+
     def test_wrangler_put_prefixes_configured_bucket(self) -> None:
         captured: list[list[str]] = []
 

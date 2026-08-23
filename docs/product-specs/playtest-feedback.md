@@ -186,15 +186,16 @@ A persisted shared-cohort identity is refreshed from the new embed when
 The `playtest-release` GitHub environment holds the publish endpoint, admin
 token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
 key stays out. A public receipt lists the three OS artifacts without tokens.
-`v*` tags also attach those binaries to a GitHub Release under stable
-names so a rerun `--clobber`s the previous assets. Wrangler/R2 selection
+`playtest-*` tags also attach those binaries to a GitHub Release as a
+prerelease under stable names so a rerun `--clobber`s the previous assets
+and the tag cannot become Latest. Wrangler/R2 selection
 follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
 `export_presets.cfg` and `services/feedback-relay/**` so a preset-only or
 relay-only main commit still publishes. A tag
 and a later `workflow_run` for the same SHA skip a second publish. Tag and
 dispatch still require a successful `playtests-headless` run for that SHA
 and wait while that gate is still pending. A later `workflow_run` attaches
-the GitHub Release when HEAD points at a `v*` tag, after a green gate,
+the GitHub Release when HEAD points at a `playtest-*` tag, after a green gate,
 and refuses a previous `latest` pointer that is not this SHA.
 The publisher also refuses to register the cohort invite until production
 `/healthz` reports a Worker that contains the latest relay-touching commit,

@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "playtest-*"
   workflow_run:
     workflows:
       - playtests-headless
@@ -51,15 +51,15 @@ jobs:
             echo "refusing stale playtest publish ${wanted}; origin/main is ${current}" >&2
             exit 1
           fi
-      - name: Resolve a v* tag on this SHA
+      - name: Resolve a playtest-* tag on this SHA
         id: release
         run: |
           git fetch --tags --force origin
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/playtest-* ]]; then
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          tag="$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1 || true)"
+          tag="$(git tag --points-at HEAD | grep -E '^playtest-' | sort -V | tail -n 1 || true)"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
       - name: Require a green playtests-headless run for this SHA
         if: github.event_name != 'workflow_run' || github.event.workflow_run.name != 'playtests-headless'
@@ -330,6 +330,7 @@ jobs:
             gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber
           else
             gh release create "${RELEASE_TAG}" "${files[@]}" \
+              --prerelease \
               --title "PokeWilds ${RELEASE_TAG}" \
               --notes "Shared Linux, Windows, and macOS playtest builds. F reporting stays accountless; existing friend identity is preserved across UPDATE."
           fi

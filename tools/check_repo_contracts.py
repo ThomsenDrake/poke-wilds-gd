@@ -799,7 +799,7 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
     required = (
         "name: playtest-release",
         "  workflow_dispatch:",
-        '      - "v*"',
+        '      - "playtest-*"',
         "  workflow_run:",
         "      - playtests-headless",
         "      - feedback-relay-deploy",
@@ -838,7 +838,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "gh release create",
         "gh release upload",
         "gh release view",
-        "Resolve a v* tag on this SHA",
+        "Resolve a playtest-* tag on this SHA",
+        "--prerelease",
         "waiting for playtests-headless",
         "steps.release.outputs.tag",
         "RELEASE_TAG",
@@ -871,6 +872,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
             issues.append(
                 f"{PLAYTEST_RELEASE_WORKFLOW} is missing release contract: {fragment}"
             )
+    if '      - "v*"' in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must not trigger on v*; public-release owns that namespace"
+        )
     if "package_playtest.py" in text or "--friend" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must publish shared updates, not per-friend packages"

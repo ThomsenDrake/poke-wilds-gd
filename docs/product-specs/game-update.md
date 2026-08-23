@@ -121,7 +121,7 @@ pointer only after all three objects exist.
 on a Linux runner (official Godot 4.6.1 export templates; codesign stays 0)
 and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
 successful same-repo `push` `playtests-headless` run on `main` (PR
-`workflow_run` events are refused before checkout), a `v*` tag, and
+`workflow_run` events are refused before checkout), a `playtest-*` tag, and
 `workflow_dispatch`. The workflow publishes only the runtime `playtest`
 channel (no dispatch channel override) and infers the Wrangler/R2
 environment from `PLAYTEST_FEEDBACK_ENDPOINT` (no dispatch wrangler
@@ -131,7 +131,7 @@ channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 publisher repeats that comparison immediately before writing the
 manifest, after relay wait and export. A tag
 and a later `workflow_run` for the same SHA do not publish twice: if
-`latest.json` already has that `commit_sha`, export is skipped and a `v*`
+`latest.json` already has that `commit_sha`, export is skipped and a `playtest-*`
 rerun attaches the already-published artifacts (checked against the
 manifest SHA-256 and size). A transient or malformed `latest` lookup
 fails the job instead of republishing. `workflow_dispatch` always republishes so a
@@ -150,7 +150,8 @@ revive a revoked invite through the previous Worker. The
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
-without tokens. `v*` tags also attach those binaries to a GitHub Release
+without tokens. `playtest-*` tags also attach those binaries to a
+prerelease GitHub Release
 (including a later `workflow_run` when HEAD points at that tag, after a
 green headless gate, and only when `latest.commit_sha` is this SHA)
 under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,

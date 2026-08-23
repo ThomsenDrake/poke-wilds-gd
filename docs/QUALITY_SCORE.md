@@ -17,7 +17,7 @@ successful `feedback-relay-deploy` for the live tag) before
 publisher retries a still-pending ancestor relay deploy. `origin/main`
 is rechecked immediately before writing `latest.json`. Tag publishes wait
 for a still-running headless gate, and a later `workflow_run` still
-attaches a `v*` GitHub Release only after a green gate and only when
+attaches a `playtest-*` prerelease GitHub Release only after a green gate and only when
 `latest.commit_sha` is this SHA. Relay-only main commits now run
 `playtests-headless`. Scores unchanged.
 
@@ -29,7 +29,7 @@ a playtest-channel friend package. `package_playtest.py` refuses
 `--channel playtest`. Scores unchanged.
 
 Shared playtest CI releases (2026-08-21): `playtest-release` exports Linux,
-Windows, and macOS after a green `playtests-headless` on `main` (also `v*`
+Windows, and macOS after a green `playtests-headless` on `main` (also `playtest-*`
 tags and `workflow_dispatch`) through `publish_update.py --require-cohort`.
 The shared binary may embed one stable cohort invite so friends can `F`-report
 without a GitHub account or a first-contact package; persisted friend identity
