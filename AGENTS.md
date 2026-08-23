@@ -17,7 +17,7 @@ Use this file as the table of contents, not the encyclopedia.
 - Design principles: `docs/design-docs/`
 - Product behavior and supported gameplay slice: `docs/product-specs/`
 - Godot/DAP and trace contracts: `docs/references/`
-- Active and completed execution plans: `docs/exec-plans/`
+- Execution plans: `docs/exec-plans/`; CE unified plans: `docs/plans/`
 - Generated maintenance output: `docs/generated/`
 
 ## Canonical Commands

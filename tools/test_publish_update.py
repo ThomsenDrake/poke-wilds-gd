@@ -802,6 +802,31 @@ class PublishUpdateTests(unittest.TestCase):
         self.assertEqual(check_repo_contracts.playtest_release_workflow_issues(root), [])
         self.assertEqual(check_repo_contracts.public_release_workflow_issues(root), [])
         self.assertEqual(check_repo_contracts.player_readme_issues(root), [])
+        self.assertEqual(check_repo_contracts.ce_unified_plan_issues(root), [])
+        source = (root / "tools/check_repo_contracts.py").read_text(encoding="utf-8")
+        self.assertNotIn('if rel.startswith("docs/plans/"):', source)
+
+    def test_ce_unified_plan_contract_refuses_unlabeled_and_broken_links(self) -> None:
+        import check_repo_contracts
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            plans = dest_root / "docs" / "plans"
+            plans.mkdir(parents=True)
+            (plans / "notes.md").write_text("# notes\n", encoding="utf-8")
+            (plans / "ok.md").write_text(
+                "---\n"
+                "title: Ok\n"
+                "artifact_contract: ce-unified-plan/v1\n"
+                "artifact_readiness: implementation-ready\n"
+                "execution: code\n"
+                "---\n\n"
+                "# Ok\n\n"
+                "[missing](./nope.md)\n",
+                encoding="utf-8",
+            )
+            issues = "\n".join(check_repo_contracts.ce_unified_plan_issues(dest_root))
+        self.assertIn("must declare artifact_contract", issues)
+        self.assertIn("Broken internal link", issues)
 
     def test_playtest_workflow_contract_refuses_v_star_and_missing_prerelease(self) -> None:
         import check_repo_contracts

@@ -1088,6 +1088,57 @@ def player_readme_issues(root: Path) -> list[str]:
         issues.append("AGENTS.md must point at STRATEGY.md")
     if "docs/product-specs/" not in agents_text:
         issues.append("AGENTS.md must point at docs/product-specs/")
+    if "docs/plans/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/plans/")
+    if "docs/exec-plans/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/exec-plans/")
+    return issues
+
+
+CE_UNIFIED_PLAN_CONTRACT = "ce-unified-plan/v1"
+CE_UNIFIED_PLAN_FIELDS = ("artifact_contract", "artifact_readiness", "execution")
+
+
+def _yaml_frontmatter(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---"):
+        return {}
+    fields: dict[str, str] = {}
+    for line in text.splitlines()[1:]:
+        if line.strip() == "---":
+            break
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def _is_ce_unified_plan(path: Path) -> bool:
+    return _yaml_frontmatter(path).get("artifact_contract") == CE_UNIFIED_PLAN_CONTRACT
+
+
+def ce_unified_plan_issues(root: Path) -> list[str]:
+    """Validate CE unified plans. docs/plans/ is not a metadata-free dump."""
+    plans_root = root / "docs" / "plans"
+    if not plans_root.is_dir():
+        return []
+    issues: list[str] = []
+    for path in sorted(plans_root.rglob("*.md")):
+        rel = relative_path(path, root)
+        fields = _yaml_frontmatter(path)
+        if fields.get("artifact_contract") != CE_UNIFIED_PLAN_CONTRACT:
+            issues.append(
+                f"{rel} must declare artifact_contract: {CE_UNIFIED_PLAN_CONTRACT}; "
+                "repo Status metadata belongs in docs/exec-plans/"
+            )
+            continue
+        missing = [field for field in CE_UNIFIED_PLAN_FIELDS if not fields.get(field)]
+        if missing:
+            issues.append(f"{rel} is missing CE plan fields: {', '.join(missing)}")
+        for target in internal_links(path):
+            if not resolve_link(path, target, root).exists():
+                issues.append(f"Broken internal link in {rel}: {target}")
     return issues
 
 
@@ -1311,7 +1362,7 @@ def run(root: Path | None = None) -> list[str]:
 
     for path in docs_markdown(root):
         rel = relative_path(path, root)
-        if rel.startswith("docs/plans/"):
+        if _is_ce_unified_plan(path):
             continue
         metadata = parse_metadata(path)
         missing_fields = [field for field in METADATA_FIELDS if field not in metadata]
@@ -1350,6 +1401,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(playtest_release_workflow_issues(root))
     issues.extend(public_release_workflow_issues(root))
     issues.extend(player_readme_issues(root))
+    issues.extend(ce_unified_plan_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
