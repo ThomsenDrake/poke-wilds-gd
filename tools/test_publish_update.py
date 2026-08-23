@@ -790,6 +790,7 @@ class PublishUpdateTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         self.assertEqual(check_repo_contracts.playtest_release_workflow_issues(root), [])
         self.assertEqual(check_repo_contracts.public_release_workflow_issues(root), [])
+        self.assertEqual(check_repo_contracts.player_readme_issues(root), [])
 
     def test_playtest_workflow_contract_refuses_v_star_and_missing_prerelease(self) -> None:
         import check_repo_contracts

@@ -1015,6 +1015,80 @@ def public_release_workflow_issues(root: Path) -> list[str]:
     return issues
 
 
+def player_readme_issues(root: Path) -> list[str]:
+    """Pin the player storefront README and the agent-map rewire."""
+    readme_path = root / "README.md"
+    if not readme_path.exists():
+        return ["Missing README.md"]
+    text = readme_path.read_text(encoding="utf-8")
+    issues: list[str] = []
+    required = (
+        "https://github.com/ThomsenDrake/poke-wilds-gd/releases/latest",
+        "PokeWilds-windows.exe",
+        "PokeWilds-macos.zip",
+        "PokeWilds-linux.x86_64",
+        "Source code",
+        "no gyms",
+        "WASD",
+        "`Z`",
+        "`X`",
+        "`Enter`",
+        "`C`",
+        "SheerSt",
+        "unofficial",
+        "Nintendo",
+        "Game Freak",
+        "many bugs",
+        "Heart Tower",
+        "docs/generated/showcase/08_biome_vista.png",
+        "docs/generated/showcase/03_ruins_exterior.png",
+        "docs/generated/showcase/07_pen_eggs.png",
+        "Explore",
+        "harvest",
+        "build",
+        "camp",
+        "craft",
+        "rest",
+        "fish",
+        "breed",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(f"README.md is missing player-page contract: {fragment}")
+    forbidden = (
+        "`F`",
+        "playtest",
+        "invite",
+        "reporting",
+        "verify_all",
+        "Start Here",
+        "CONTROLS.md",
+        "scripts/app",
+        "playtest-",
+        "05_heart_tower",
+    )
+    lowered = text.lower()
+    for fragment in forbidden:
+        if fragment.lower() in lowered:
+            issues.append(f"README.md must not mention {fragment}")
+    if re.search(r"github.com/ThomsenDrake/poke-wilds-gd/releases(?!/latest)", text):
+        issues.append("README.md must not link /releases; Latest only")
+    if not re.search(r"!\[[^\]]+\]\(", text):
+        issues.append("README.md showcase images must have nonempty alt text")
+    agents_path = root / "AGENTS.md"
+    if not agents_path.exists():
+        issues.append("Missing AGENTS.md")
+        return issues
+    agents_text = agents_path.read_text(encoding="utf-8")
+    if "Repo overview: [README.md](README.md)" in agents_text:
+        issues.append("AGENTS.md must not list README.md as repo overview")
+    if "STRATEGY.md" not in agents_text:
+        issues.append("AGENTS.md must point at STRATEGY.md")
+    if "docs/product-specs/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/product-specs/")
+    return issues
+
+
 def _is_battle_shot(stem: str) -> bool:
     """Shot naming convention is NN_name; battle shots are pinned to 09-12."""
     digits = ""
@@ -1271,6 +1345,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(feedback_relay_deploy_issues(root))
     issues.extend(playtest_release_workflow_issues(root))
     issues.extend(public_release_workflow_issues(root))
+    issues.extend(player_readme_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
