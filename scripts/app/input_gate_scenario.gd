@@ -8,19 +8,14 @@ extends Node
 # Z-on-Demolish re-fired the context route on the bare former campfire tile).
 # input_router.gd's GENERALIZED closed/confirm latch (bind_ui_consumers) now
 # swallows poll on the closing/confirming frame for EVERY overlay;
-# input_gate_menu_checks.gd covers the other leak paths (start-menu CLOSE,
-# MessageBox NEW GAME confirm, inert FIELD MOVE, Enter-close over-suppression). This scenario drives REAL
-# input-phase events — never direct runtime calls — to prove both camp races
-# are gone: (A) Enter with the camp menu open closes ONLY the camp menu (start
-# menu stays shut, no menu_opened trace, avatar cleanly re-enabled); (B) Z on
-# Demolish demolishes the campfire and nothing else (no build mode, no
-# structure_placed / materials_consumed / field_move_used, the bag delta is
-# exactly the refund). Injection: Input.use_accumulated_input buffers each
-# parsed event for the NEXT iteration's input phase — _unhandled_input first,
-# then same-iteration polls with just_pressed true (the bug frame). Press and
-# release land in SEPARATE iterations so a poll ever sees just_pressed (smoke
-# _press injects press+release in one frame and never fires a poll); every tap
-# carries an INJECTION WITNESS so degraded delivery fails red, never vacuous.
+# input_gate_menu_checks.gd covers the other leak paths. This scenario drives
+# REAL input-phase events — never direct runtime calls — to prove both camp
+# races are gone: (A) Enter with the camp menu open closes ONLY the camp menu;
+# (B) Z on Demolish demolishes the campfire and nothing else. Injection:
+# Input.use_accumulated_input buffers each parsed event for the NEXT iteration's
+# input phase. Press and release land in SEPARATE iterations so a poll ever sees
+# just_pressed (smoke _press injects both in one frame and never fires a poll);
+# every tap carries an INJECTION WITNESS so degraded delivery fails red.
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const InputGateMenuChecks := preload("res://scripts/app/input_gate_menu_checks.gd")
@@ -41,6 +36,9 @@ func run(ctx: Dictionary) -> void:
 	Input.use_accumulated_input = true
 	var runtime = _runtime()
 	runtime.seed_for_smoke(SEED)
+	runtime.new_game() # boot world is wall-clock; part E's cut scan must be a function of SEED
+	_world().rebuild(runtime.get_world_seed())
+	_runner.resync_player_tile(_world(), _player(), runtime)
 	var saved_chance: float = _player().encounter_chance
 	_player().encounter_chance = 0.0
 	var party_before: Array = _runner.swap_party(runtime, ["BULBASAUR", "MACHOP", "SANDSHREW"]) # cut + build + dig

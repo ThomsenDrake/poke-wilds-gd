@@ -1047,7 +1047,9 @@ quality_bucket = "storage"
 # input_gate regression scenario); the input-driven checks extract into the NEW
 # scripts/app/smoke_tap.gd (shared real-input-phase tap injection), scripts/app/
 # input_gate_menu_checks.gd (the start-CLOSE / Enter-close over-suppression /
-# NEW-GAME-confirm / inert-FIELD-MOVE leak paths, wired into input_gate_scenario),
+# NEW-GAME-confirm / inert-FIELD-MOVE leak paths, wired into input_gate_scenario;
+# 2026-08-24: input_gate self-pins new_game + rebuild + resync so part E's cut
+# scan is a function of SEED, not the boot wall-clock world),
 # and scripts/app/storage_release_mouse_check.gd
 # (the S2 release-confirm mouse-bypass group, wired into storage_flow_party_checks);
 # scripts/ui/party_screen.gd (menu_ui-owned) extracts

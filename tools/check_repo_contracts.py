@@ -1413,6 +1413,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(sim_rng_setup_issues(root))
     issues.extend(world_depth_rng_issues(root))
     issues.extend(craft_state_pin_issues(root))
+    issues.extend(input_gate_world_pin_issues(root))
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
@@ -1854,6 +1855,64 @@ def craft_state_pin_issues(root: Path) -> list[str]:
         issues.append(
             f"{PIN_HELPER_REL}: pin_craft_world must write session.world_seed "
             "(landmark resolver reads the session, not generator setup)"
+        )
+    return issues
+
+
+INPUT_GATE_SCENARIO_REL = Path("scripts") / "app" / "input_gate_scenario.gd"
+INPUT_GATE_MENU_REL = Path("scripts") / "app" / "input_gate_menu_checks.gd"
+
+
+def input_gate_world_pin_issues(root: Path) -> list[str]:
+    """input_gate part E site scan must pin a world, then search it.
+
+    seed_for_smoke alone left the boot wall-clock world in place, so
+    `_find_cut_tile` sometimes found no cut-gated tile within its rings
+    (2026-08-24 main red on fe09a973). new_game + view rebuild + avatar
+    resync make the scan a function of SEED. MAX is the not-found sentinel
+    because (0,0) is a real tile.
+    """
+    issues: list[str] = []
+    scenario = root / INPUT_GATE_SCENARIO_REL
+    menu = root / INPUT_GATE_MENU_REL
+    if not scenario.exists():
+        return [f"{INPUT_GATE_SCENARIO_REL} is missing"]
+    if not menu.exists():
+        return [f"{INPUT_GATE_MENU_REL} is missing"]
+    run_body = _gd_func_body(scenario.read_text(encoding="utf-8"), "run")
+    if run_body is None:
+        return [f"{INPUT_GATE_SCENARIO_REL}: run() is missing"]
+    seed_at = run_body.find("seed_for_smoke")
+    new_at = run_body.find("new_game")
+    rebuild_at = run_body.find("rebuild")
+    resync_at = run_body.find("resync_player_tile")
+    if seed_at < 0:
+        issues.append(
+            f"{INPUT_GATE_SCENARIO_REL}: run must call seed_for_smoke "
+            "(input_gate world pin)"
+        )
+    elif new_at < 0 or new_at < seed_at:
+        issues.append(
+            f"{INPUT_GATE_SCENARIO_REL}: run must call new_game after "
+            "seed_for_smoke (input_gate world pin)"
+        )
+    elif rebuild_at < 0 or rebuild_at < new_at:
+        issues.append(
+            f"{INPUT_GATE_SCENARIO_REL}: run must rebuild the view after "
+            "new_game (input_gate world pin)"
+        )
+    elif resync_at < 0 or resync_at < rebuild_at:
+        issues.append(
+            f"{INPUT_GATE_SCENARIO_REL}: run must resync_player_tile after "
+            "rebuild (input_gate world pin)"
+        )
+    find_body = _gd_func_body(menu.read_text(encoding="utf-8"), "_find_cut_tile")
+    if find_body is None:
+        issues.append(f"{INPUT_GATE_MENU_REL}: _find_cut_tile() is missing")
+    elif "Vector2i.MAX" not in find_body:
+        issues.append(
+            f"{INPUT_GATE_MENU_REL}: _find_cut_tile must return Vector2i.MAX "
+            "on not-found ((0,0) is a real tile)"
         )
     return issues
 

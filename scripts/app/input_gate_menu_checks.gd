@@ -99,7 +99,7 @@ func _part_e_inert_field_move_leaves_the_tree() -> void:
 	var runtime = _runtime()
 	var player = _player()
 	var cut_tile := _find_cut_tile(player.tile_position)
-	if not _expect(cut_tile != Vector2i.ZERO, "E: site: no cut-gated tile with a walkable stand neighbor within 16 rings"):
+	if not _expect(cut_tile != Vector2i.MAX, "E: site: no cut-gated tile with a walkable stand neighbor within 40 rings"):
 		return
 	var spot: Dictionary = _runner.stand_spot(_world(), cut_tile)
 	_runner.teleport_player(_world(), player, runtime, spot["from_tile"])
@@ -191,13 +191,13 @@ func _flush_down(count: int) -> void:
 	SmokeTap.inject_release("move_down")
 
 
-func _find_cut_tile(center: Vector2i) -> Vector2i: # first cut gate with a stand spot, ring by ring
-	for ring in range(1, 17):
+func _find_cut_tile(center: Vector2i) -> Vector2i: # first cut gate with a stand spot; MAX = not found
+	for ring in range(1, 41):
 		for tile in _runner.ring_around(center, ring):
 			var logic: Dictionary = _world().get_tile_logic(tile)
 			if str(logic.get("requires_field_move", "")) == "cut" and not _runner.stand_spot(_world(), tile).is_empty():
 				return tile
-	return Vector2i.ZERO
+	return Vector2i.MAX
 
 
 func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; returns ok for witness early-returns
