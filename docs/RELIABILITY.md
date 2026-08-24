@@ -1,9 +1,17 @@
 Status: current
 Last verified: 2026-08-24
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/legibility_lib.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json, LICENSING.md, THIRD_PARTY.md
 
 # Reliability
+
+## Licensing posture
+
+Owner-documented in [`LICENSING.md`](../LICENSING.md). Original PokeWilds
+Godot code and documentation are `AGPL-3.0-or-later`. Upstream PokeWilds
+material and Pokémon intellectual property are not licensed by this
+project. [`THIRD_PARTY.md`](../THIRD_PARTY.md) is provenance only. This is
+not a runtime gate and does not change `verify_all`.
 
 ## Worktree setup
 

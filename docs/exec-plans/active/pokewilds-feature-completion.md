@@ -1,7 +1,7 @@
 Status: active
-Last verified: 2026-08-11
+Last verified: 2026-08-24
 Review cadence days: 14
-Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, scripts, scenes, tools, .github/workflows/repo-contracts.yml, .github/workflows/playtests-headless.yml
+Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, LICENSING.md, THIRD_PARTY.md, scripts, scenes, tools, .github/workflows/repo-contracts.yml, .github/workflows/playtests-headless.yml
 
 # PokeWilds Feature Completion
 
@@ -233,7 +233,7 @@ Every phase is delivered as one or more **slices**, and a slice is not done unti
 - **Localization wiring**: the dump ships ES/FR/DE/PT-BR properties (unused — `pokemon_catalog.gd:6-10` hardcodes English; no `TranslationServer` usage). Wire a translation layer over the parsed catalogs; locale selection in the start menu.
 - **Missing display names**: 104/990 species render as humanized slugs — source or generate proper names.
 - **Determinism pinning**: FastNoiseLite output is stable per engine version but not contractually pinned across upgrades. Add a golden-hash scenario (`worldgen_golden`) asserting fixed seeds produce fixed tile hashes; record the engine version (4.6.1) in RELIABILITY. An engine upgrade then fails loudly instead of silently regenerating worlds and stranding saves.
-- **Licensing decision**: ~55k ripped Gen 2 sprites + 1.5k audio ride in the vendored `assets/source/` snapshot with no upstream LICENSE (`THIRD_PARTY.md` disclaims, not clears). Decide and document the distribution posture: private fan project only, or asset-replacement path for public distribution. This is a project-owner decision; the plan's job is to force it before any release.
+- **Licensing decision** — LANDED 2026-08-24: owner posture is [`LICENSING.md`](../../../LICENSING.md). Original PokeWilds Godot code and documentation are `AGPL-3.0-or-later`. Upstream PokeWilds material is not relicensed. Pokémon intellectual property is not licensed. [`THIRD_PARTY.md`](../../../THIRD_PARTY.md) keeps vendored provenance only. This is an honest layered disclaimer, not a clearance and not an asset-replacement path. Redistributors remain responsible for third-party rights. Remaining Phase 9 work (localization, display names, golden-hash, quality 3s) is unchanged.
 - **Quality pass**: every `QUALITY_SCORE.md` row to 3/3/3/3; close all tech-debt-tracker items; archive completed superpowers plans into `docs/exec-plans/completed/` (currently empty).
 - **README & docs refresh**: README "Current slice" matches reality; `docs/exec-plans/completed/` gets the finished phase plans.
 - Optional stretch: in-game Pokédex (exceeds the original; only if time allows).
@@ -291,7 +291,7 @@ The rewrite is **finished** when:
 - `tools/verify_all.py` (Workstream L.1, landed) is green on HEAD, with a fresh report stamped with the HEAD sha — mechanized by its R1 refusal, which refuses to certify a report whose `head_sha` ≠ HEAD (never a silent pass).
 - Every `QUALITY_SCORE.md` row is 3/3/3/3; tech-debt-tracker has no `blocker`/`major` items.
 - Vision review shows zero unaddressed defects; pixel lint graduated and gating.
-- The licensing decision is documented; README, specs, registry, and RELIABILITY describe the game that actually exists.
+- The licensing decision is documented in `LICENSING.md`; README, specs, registry, and RELIABILITY describe the game that actually exists.
 
 ## Risks
 
@@ -302,7 +302,7 @@ The rewrite is **finished** when:
 | **Worldgen determinism across engine upgrades** | Phase 9 golden-hash scenario pins it; the asset snapshot is vendored in-tree (pinned by commit) |
 | **Overworld-Pokémon design risk** (Phase 6 inverts the current encounter model) | Spec + prototype the entity layer before implementation; keep grass encounters as the background source |
 | **Scope creep in world chaining** | Explicitly deferrable past Phase 9; landmarks/legendaries stand alone |
-| **Licensing** | Phase 9 forces a documented decision before any distribution |
+| **Licensing** | Documented in `LICENSING.md`: AGPL only on original work; upstream and Pokémon IP are not licensed by this project |
 | **Playtest determinism as systems interact** | Every phase extends the seeded soak with its invariants (Workstream L.6); crafted-state baselines keep visuals honest |
 
 ## First sprint (suggested cut)

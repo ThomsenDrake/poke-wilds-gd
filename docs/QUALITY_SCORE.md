@@ -1,11 +1,18 @@
 Status: current
 Last verified: 2026-08-24
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools, LICENSING.md, THIRD_PARTY.md
 
 # Quality Score
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
+
+Licensing posture (2026-08-24):
+[LICENSING.md](../LICENSING.md) is the owner decision. Original PokeWilds
+Godot code and documentation stay `AGPL-3.0-or-later`. Upstream PokeWilds
+material and Pokémon intellectual property are not licensed by this
+project. `THIRD_PARTY.md` is provenance only. Scores unchanged: legal
+posture, not player behavior.
 
 Missing Godot `.uid` sidecar (2026-08-24): `feedback_flow_stamp_checks.gd`
 had no committed `.uid`. CI `--import` wrote one, and `playtest-release`
