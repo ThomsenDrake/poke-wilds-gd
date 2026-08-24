@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-23
+Last verified: 2026-08-24
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools
 
@@ -16,6 +16,13 @@ exported (a 17s `already_published=true` skip is not a publish). Per-friend
 first contact stays `package_playtest.py` on a clean tree with production
 creds. `feedback_reporting` scores unchanged: ops runbook, not player
 behavior.
+
+input_gate world pin (2026-08-24): `input_gate` now calls `new_game` + view
+rebuild + avatar resync after `seed_for_smoke`, so part E's cut-tile scan
+reads the pinned world instead of the boot wall-clock leftover. That closes
+the `no cut-gated tile within 16 rings` flake on `fe09a973`.
+`check_repo_contracts.input_gate_world_pin_issues` refuses a later drop.
+`app_bootstrap` scores unchanged: verification pin, not player behavior.
 
 Craft-state spawn pin (2026-08-23): `visual_sweep_baselines.craft_state` now
 calls `RegistrySupport.pin_craft_world` before `find_walkable_spawn`, so the

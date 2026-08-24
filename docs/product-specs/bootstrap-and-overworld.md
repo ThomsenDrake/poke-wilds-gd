@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-23
+Last verified: 2026-08-24
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/TitleScreen.tscn, scenes/ui/CreationScreen.tscn, scripts/app/main.gd, scripts/app/main_smoke_context.gd, scripts/app/input_router.gd, scripts/app/input_gate_scenario.gd, scripts/app/input_gate_menu_checks.gd, scripts/app/battle_end_input_scenario.gd, scripts/app/smoke_tap.gd, scripts/app/smoke_scenario_loader.gd, scripts/app/smoke_scenarios.gd, scripts/app/phase0_scenarios.gd, scripts/app/new_game_flow_scenario.gd, scripts/app/new_game_flow_checks.gd, scripts/app/new_game_flow_geo.gd, scripts/app/snapshot_capture.gd, scripts/app/visual_sweep.gd, scripts/app/visual_sweep_baselines.gd, scripts/app/visual_sweep_registry_support.gd, scripts/app/visual_sweep_title.gd, scripts/app/render_introspection.gd, scripts/app/ui_tree_dump_scenario.gd, scripts/app/legibility_soak_scenario.gd, scripts/app/legibility_soak_checks.gd, scripts/app/dig_silence_scenario.gd, scripts/ui/title_screen.gd, scripts/ui/creation_screen.gd, scripts/ui/name_entry.gd, scripts/ui/avatar_picker.gd, scripts/ui/gbc_stage.gd, scripts/ui/gbc_widgets.gd, scripts/ui/gbc_digit_row.gd, scripts/ui/title_screen_stage.gd, scripts/ui/creation_screen_stage.gd, scripts/ui/creation_screen_render.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/runtime/player_sprite_frames.gd, scripts/runtime/music_router.gd, scripts/runtime/structure_layer.gd, scripts/domain/world_generator.gd, scripts/domain/world_overrides.gd, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd, scripts/domain/day_phase.gd, scripts/ui/title_update.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd
 
@@ -224,6 +224,10 @@ Two scenario-side additions, both verification-only (no game behavior changes):
 The smoke-only `GameRuntime.seed_for_smoke(seed)` seam now resets the `PokemonRules` creation-order nonce together with the encounter, battle, and avatar-trigger RNGs. This makes a scenario's crafted Pokémon independent of whether boot loaded an existing save or created a starter first; `save_stability` deliberately advances creation order before reseeding, so removing the reset fails against the unchanged golden fixture. Real player runs never call this seam.
 
 The dungeon world-generation audit now receives the live catalog plus the shared battle-viability predicate and rejects empty, absent, or sprite-incomplete curated encounter scopes. Runtime selection defensively filters those same authored candidates; an invalid tokened scope yields no encounter instead of an unrelated catalog fallback. Dungeon roaming remains suppressed, while chamber contact and ordinary Z stay active player encounter routes, and a loaded off-map/blocked dungeon tile normalizes to the authored spawn.
+
+## input_gate world pin (2026-08-24)
+
+`input_gate` now self-pins the world the `breed_flow` / `battle_end_input` way (`seed_for_smoke` then `new_game` + view rebuild + avatar resync) before parts A–E run. `seed_for_smoke` alone left the boot wall-clock world in place, so part E's `_find_cut_tile` scan sometimes found no cut-gated tile near spawn. The not-found sentinel is `Vector2i.MAX` because `(0,0)` is a real tile. `check_repo_contracts.input_gate_world_pin_issues` refuses a later drop of that pin.
 
 ## Craft-state spawn pin (S6b, 2026-08-23)
 
