@@ -1,9 +1,11 @@
 Status: completed
-Last verified: 2026-08-09
+Last verified: 2026-08-24
 Review cadence days: 14
 Source paths: assets/source, THIRD_PARTY.md, docs/references/source-assets.md, README.md, docs/registry/art-anchors.toml, docs/registry/subsystems.toml
 
 # Source Asset Vendoring
+
+Re-verified 2026-08-24: `assets/source/` is still the vendored v0.8.11 snapshot (no `pokewilds/` submodule); `THIRD_PARTY.md` and `docs/references/source-assets.md` still own provenance. No re-vendor since 2026-08-09.
 
 ## Goal
 

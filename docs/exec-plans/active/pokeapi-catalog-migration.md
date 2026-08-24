@@ -1,9 +1,11 @@
 Status: active
-Last verified: 2026-08-09
+Last verified: 2026-08-24
 Review cadence days: 14
 Source paths: scripts/data/pokemon_catalog.gd, docs/registry/subsystems.toml, docs/references/source-assets.md, docs/product-specs/bootstrap-and-overworld.md, README.md, tools/verify_all.py
 
 # PokeAPI Catalog Migration
+
+Re-verified 2026-08-24: catalog still loads from `assets/data/catalog/`; `tools/import_pokeapi.py --check` remains the S4.5 static step; source paths above still exist. No runtime-half rollback.
 
 ## Goal
 
