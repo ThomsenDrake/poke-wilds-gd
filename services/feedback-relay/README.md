@@ -33,6 +33,12 @@ the four migration/deploy steps; lockfile installation, checks, dry-runs, and he
 probes cannot read it. Each deploy tags the Worker version with `GITHUB_SHA`;
 the health probe requires the Worker's version-metadata binding to return that
 tag and the same version ID recorded by Wrangler's structured deploy output.
+A local `wrangler deploy` that omits `--tag <git-sha>` publishes a Worker
+whose `/healthz` `version_tag` is empty. `playtest-release` then refuses,
+because it requires `version_tag` to contain the latest relay-touching
+commit. Recover by dispatching `feedback-relay-deploy` on `main`, or by
+pushing another relay-path change to `main`. Do not retag production with
+an untagged local deploy.
 Third-party GitHub Actions are pinned to full commit SHAs; dependency installation
 continues to use the committed npm lockfile.
 
