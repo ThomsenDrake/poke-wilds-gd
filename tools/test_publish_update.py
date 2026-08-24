@@ -796,6 +796,21 @@ class PublishUpdateTests(unittest.TestCase):
                 publish_update.stage_github_release_from_latest(
                     latest, dest, urlopen=fake_open)
 
+    def test_godot_script_uid_contract_accepts_the_committed_tree(self) -> None:
+        import check_repo_contracts
+        root = Path(__file__).resolve().parents[1]
+        self.assertEqual(check_repo_contracts.godot_script_uid_issues(root), [])
+        with tempfile.TemporaryDirectory() as raw:
+            dest = Path(raw)
+            script = dest / "scripts" / "app" / "missing.gd"
+            script.parent.mkdir(parents=True)
+            script.write_text("extends RefCounted\n", encoding="utf-8")
+            issues = check_repo_contracts.godot_script_uid_issues(dest)
+        self.assertEqual(
+            issues,
+            ["Missing committed Godot uid sidecar: scripts/app/missing.gd.uid"],
+        )
+
     def test_release_workflow_contract_accepts_the_committed_file(self) -> None:
         import check_repo_contracts
         root = Path(__file__).resolve().parents[1]

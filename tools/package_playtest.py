@@ -48,7 +48,22 @@ def run(*args: str) -> str:
 
 def worktree_is_dirty() -> bool:
     """Include untracked exportable resources; ignored private/output paths stay hidden."""
-    return bool(run("git", "status", "--porcelain"))
+    return bool(dirty_worktree_status())
+
+
+def dirty_worktree_status() -> str:
+    return run("git", "status", "--porcelain")
+
+
+def dirty_worktree_error() -> str:
+    """Name the dirty paths so a CI import sidecar is diagnosable."""
+    status = dirty_worktree_status()
+    if not status:
+        return "worktree is dirty; commit or ignore every release input first"
+    return (
+        "worktree is dirty; commit or ignore every release input first:\n"
+        + status
+    )
 
 
 def validated_endpoint(endpoint: str) -> str:
@@ -259,7 +274,7 @@ def main() -> int:
     if not args.endpoint or not admin_token:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
     if not args.allow_dirty and worktree_is_dirty():
-        parser.error("worktree is dirty; commit or ignore every release input first")
+        parser.error(dirty_worktree_error())
     output, tester_id = build_package(args, admin_token)
     print(f"created {tester_id} {args.target} package: {output}")
     return 0

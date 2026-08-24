@@ -302,7 +302,12 @@ class FeedbackBundleTests(unittest.TestCase):
     def test_release_cleanliness_check_includes_untracked_files(self) -> None:
         with mock.patch.object(package_playtest, "run", return_value="?? scenes/untracked.tscn") as status:
             self.assertTrue(package_playtest.worktree_is_dirty())
-        status.assert_called_once_with("git", "status", "--porcelain")
+            self.assertIn(
+                "?? scenes/untracked.tscn",
+                package_playtest.dirty_worktree_error(),
+            )
+        self.assertEqual(status.call_count, 2)
+        status.assert_called_with("git", "status", "--porcelain")
 
     def test_desktop_export_presets_embed_project_data(self) -> None:
         parser = configparser.ConfigParser()

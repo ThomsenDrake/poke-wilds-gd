@@ -7,6 +7,12 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Missing Godot `.uid` sidecar (2026-08-24): `feedback_flow_stamp_checks.gd`
+had no committed `.uid`. CI `--import` wrote one, and `playtest-release`
+then refused a dirty tree before export. `check_repo_contracts.godot_script_uid_issues`
+refuses a later drop; dirty-tree errors now print `git status --porcelain`.
+`feedback_reporting` scores unchanged: release-hygiene pin, not player behavior.
+
 Friend-build packaging runbook (2026-08-23):
 [playtest-feedback.md](product-specs/playtest-feedback.md) now has
 § Maintainer: send a friend build. Never use Godot Export Project (empty
