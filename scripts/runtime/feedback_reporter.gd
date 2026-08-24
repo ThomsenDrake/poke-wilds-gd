@@ -251,6 +251,10 @@ func set_install_id_path_for_smoke(path: String) -> void:
 		_bundle.set_install_id_path_for_smoke(path)
 
 
+func embedded_build_info() -> Dictionary:
+	return _bundle.load_embedded_build_info()
+
+
 func set_build_info_for_smoke(build: Dictionary) -> void:
 	if OS.has_feature("editor"):
 		_bundle.set_build_info_for_smoke(build)

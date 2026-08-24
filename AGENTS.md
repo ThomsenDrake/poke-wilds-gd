@@ -4,7 +4,7 @@ Use this file as the table of contents, not the encyclopedia.
 
 ## Read First
 
-- Repo overview: [README.md](README.md)
+- Product direction and slice: [STRATEGY.md](STRATEGY.md), [docs/product-specs/](docs/product-specs/)
 - Layer rules and allowed dependencies: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Subsystem registry: [docs/registry/subsystems.toml](docs/registry/subsystems.toml)
 - Agent surface (machine-readable manifest + integration guide): [docs/registry/agent-surface.toml](docs/registry/agent-surface.toml), [docs/references/agent-integration.md](docs/references/agent-integration.md)
@@ -17,7 +17,7 @@ Use this file as the table of contents, not the encyclopedia.
 - Design principles: `docs/design-docs/`
 - Product behavior and supported gameplay slice: `docs/product-specs/`
 - Godot/DAP and trace contracts: `docs/references/`
-- Active and completed execution plans: `docs/exec-plans/`
+- Execution plans: `docs/exec-plans/`; CE unified plans: `docs/plans/`
 - Generated maintenance output: `docs/generated/`
 
 ## Canonical Commands

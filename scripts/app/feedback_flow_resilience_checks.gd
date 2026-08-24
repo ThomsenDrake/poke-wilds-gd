@@ -9,6 +9,7 @@ const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const TraceLogger := preload("res://scripts/core/trace_logger.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+const StampChecks := preload("res://scripts/app/feedback_flow_stamp_checks.gd")
 const OUTBOX_DIR := "user://feedback_outbox"
 const ENGINE_TAIL_TEST_PATH := "user://feedback-flow-engine-tail.log"
 
@@ -17,7 +18,6 @@ var _dialog: Control
 var _tree: SceneTree
 var _failures: Array[String] = []
 var _transport_calls := 0
-var _unexpected_transport_calls := 0
 var _sent_cleanup_calls := 0
 
 
@@ -29,7 +29,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_redaction_contract()
 	_trace_truncation_contract()
 	_engine_log_tail_contract()
-	await _missing_configuration_contract()
+	_failures.append_array(await StampChecks.new().run(_controller, _dialog, _tree))
 	_controller.smoke_set_build_info({"channel": "scenario-blocked", "build_id": "scenario-blocked",
 		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/blocked",
 		"invite_token": "scenario-token-blocked", "tester_id": "T-SCENARIO-BLOCKED"})
@@ -101,32 +101,6 @@ func _sent_cleanup_contract() -> void:
 	await _controller.smoke_retry(report_id)
 	_check(_sent_cleanup_calls == 1, "quarantined sent report uploaded again")
 	for suffix in [".sent-cleanup-failed.json", ".sent-cleanup-failed.zip"]: _remove(stem + suffix)
-
-
-func _missing_configuration_contract() -> void:
-	_controller.smoke_set_build_info({})
-	_controller.smoke_set_transport(Callable(self, "_unexpected_transport"))
-	await SmokeTap.tap(_tree, "feedback_report")
-	_check(_dialog.visible, "unconfigured-build check could not open feedback")
-	var report_id := str(_controller.smoke_state().get("report_id", ""))
-	var quiet_runtime := QuietRuntime.new()
-	var result: Dictionary = await _controller.smoke_submit(
-		"This build has no relay configuration.", quiet_runtime)
-	quiet_runtime.free()
-	_check(result.get("status") == "unsaved" and result.get("reason") == "feedback_not_configured",
-		"unconfigured build did not return the truthful unsaved result")
-	await SmokeTap.tap_key(_tree, Key.KEY_ESCAPE)
-	var stem := "%s/%s" % [OUTBOX_DIR, report_id]
-	_check(_unexpected_transport_calls == 0, "unconfigured build reached the upload transport")
-	_check(not FileAccess.file_exists(stem + ".json") and not FileAccess.file_exists(stem + ".zip") \
-		and not FileAccess.file_exists(stem + ".zip.tmp") \
-		and not FileAccess.file_exists(stem + ".route"),
-		"unconfigured build committed a permanently unsendable outbox entry")
-
-
-func _unexpected_transport(_prepared: Dictionary) -> Dictionary:
-	_unexpected_transport_calls += 1
-	return {"status": "queued", "reason": "unexpected_transport"}
 
 
 func _redaction_contract() -> void:

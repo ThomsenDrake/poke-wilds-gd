@@ -66,6 +66,9 @@ static func merge(embedded: Dictionary, persisted: Dictionary = {}) -> Dictionar
 	if stored.is_empty():
 		return out
 	var embed_token := str(embedded.get("invite_token", "")).strip_edges()
+	var embed_endpoint := str(embedded.get("endpoint", "")).strip_edges()
+	if embed_token.is_empty() and embed_endpoint.is_empty():
+		return out
 	if _is_friend_identity(stored) or embed_token.is_empty():
 		for key in IDENTITY_KEYS:
 			out[key] = stored[key]

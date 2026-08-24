@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -283,6 +284,118 @@ class PublishUpdateTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 with mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
                     publish_update.main()
+
+    def test_export_writes_empty_endpoint_for_a_public_embed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+
+            def fake_run(cmd, check, cwd):  # noqa: ANN001
+                Path(cmd[-1]).write_bytes(b"bin")
+                return mock.Mock()
+
+            with mock.patch.object(publish_update, "run", side_effect=["a" * 40, "v1"]), \
+                    mock.patch.object(publish_update, "ROOT", root), \
+                    mock.patch.object(publish_update, "BUILD_INFO",
+                                      root / "generated" / "playtest_build.json"):
+                publish_update.export_shared(
+                    "public", "", godot="godot", runner=fake_run)
+            metadata = json.loads((root / "generated" / "playtest_build.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["endpoint"], "")
+            self.assertEqual(metadata["invite_token"], "")
+            self.assertEqual(metadata["channel"], "public")
+
+    def _embed_public_export(self, channel: str = "public") -> dict:
+        return {
+            "channel": channel, "build_id": "public-b1", "commit_sha": "c" * 40,
+            "version": "v1", "published_at": "2026-08-21T00:00:00Z",
+            "artifacts": {
+                "linux": {"filename": "PokeWilds-linux.x86_64", "sha256": "c" * 64, "bytes": 1},
+                "windows": {"filename": "PokeWilds-windows.exe", "sha256": "d" * 64, "bytes": 1},
+                "macos": {"filename": "PokeWilds-macos.zip", "sha256": "e" * 64, "bytes": 1},
+            },
+        }
+
+    def test_embed_public_writes_empty_stamp_and_skips_relay(self) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_export(channel, endpoint, **kwargs):  # noqa: ANN001
+            captured["channel"] = channel
+            captured["endpoint"] = endpoint
+            captured["cohort"] = kwargs.get("cohort")
+            return self._embed_public_export(channel)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                    mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                    mock.patch.object(publish_update, "ROOT", root), \
+                    mock.patch.object(publish_update, "register_invite") as register, \
+                    mock.patch.object(publish_update, "upload_artifacts") as upload, \
+                    mock.patch.object(publish_update, "publish_manifest") as publish, \
+                    mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
+                    mock.patch.object(publish_update, "build_metadata_lock"), \
+                    mock.patch.object(publish_update, "BUILD_INFO", root / "playtest_build.json"), \
+                    mock.patch.dict("os.environ", {
+                        "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                        "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                        "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
+                    }, clear=False), \
+                    mock.patch("sys.argv", ["publish_update.py", "--embed-public", "--channel", "public"]):
+                self.assertEqual(publish_update.main(), 0)
+            receipt = root / "dist" / "updates" / "public-b1" / "receipt.json"
+            dumped = receipt.read_text(encoding="utf-8")
+        self.assertEqual(captured["channel"], "public")
+        self.assertEqual(captured["endpoint"], "")
+        self.assertIsNone(captured["cohort"])
+        register.assert_not_called()
+        upload.assert_not_called()
+        publish.assert_not_called()
+        self.assertEqual(set(json.loads(dumped)["artifacts"]), {"linux", "windows", "macos"})
+        self.assertNotIn("invite", dumped)
+        self.assertNotIn("token", dumped)
+
+    def test_embed_public_refuses_playtest_flags_and_a_dirty_tree(self) -> None:
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False):
+            for flag in ("--require-cohort", "--already-published", "--require-production-relay"):
+                with self.assertRaises(SystemExit):
+                    with mock.patch("sys.argv", ["publish_update.py", "--embed-public", flag]):
+                        publish_update.main()
+        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=True):
+            with self.assertRaises(SystemExit):
+                with mock.patch("sys.argv", ["publish_update.py", "--embed-public"]):
+                    publish_update.main()
+
+    def test_embed_public_succeeds_when_relay_env_is_unset(self) -> None:
+        env = {
+            key: value for key, value in os.environ.items()
+            if key not in {
+                "PLAYTEST_FEEDBACK_ENDPOINT",
+                "PLAYTEST_FEEDBACK_ADMIN_TOKEN",
+                "PLAYTEST_COHORT_INVITE_TOKEN",
+            }
+        }
+
+        def fake_export(channel, endpoint, **kwargs):  # noqa: ANN001
+            self.assertEqual(endpoint, "")
+            self.assertIsNone(kwargs.get("cohort"))
+            return self._embed_public_export(channel)
+
+        with tempfile.TemporaryDirectory() as raw:
+            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                    mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                    mock.patch.object(publish_update, "write_publish_receipt"), \
+                    mock.patch.object(publish_update, "register_invite") as register, \
+                    mock.patch.object(publish_update, "upload_artifacts") as upload, \
+                    mock.patch.object(publish_update, "publish_manifest") as publish, \
+                    mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
+                    mock.patch.object(publish_update, "build_metadata_lock"), \
+                    mock.patch.object(publish_update, "BUILD_INFO", Path(raw) / "playtest_build.json"), \
+                    mock.patch.dict("os.environ", env, clear=True), \
+                    mock.patch("sys.argv", ["publish_update.py", "--embed-public"]):
+                self.assertEqual(publish_update.main(), 0)
+        register.assert_not_called()
+        upload.assert_not_called()
+        publish.assert_not_called()
 
     def test_receipt_lists_all_three_os_without_tokens(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -687,6 +800,84 @@ class PublishUpdateTests(unittest.TestCase):
         import check_repo_contracts
         root = Path(__file__).resolve().parents[1]
         self.assertEqual(check_repo_contracts.playtest_release_workflow_issues(root), [])
+        self.assertEqual(check_repo_contracts.public_release_workflow_issues(root), [])
+        self.assertEqual(check_repo_contracts.player_readme_issues(root), [])
+        self.assertEqual(check_repo_contracts.ce_unified_plan_issues(root), [])
+        source = (root / "tools/check_repo_contracts.py").read_text(encoding="utf-8")
+        self.assertNotIn('if rel.startswith("docs/plans/"):', source)
+        self.assertIn(
+            'return rel.startswith("docs/plans/") and (',
+            source,
+        )
+
+    def test_ce_unified_plan_contract_refuses_unlabeled_and_broken_links(self) -> None:
+        import check_repo_contracts
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            plans = dest_root / "docs" / "plans"
+            plans.mkdir(parents=True)
+            (plans / "notes.md").write_text("# notes\n", encoding="utf-8")
+            (plans / "ok.md").write_text(
+                "---\n"
+                "title: Ok\n"
+                "artifact_contract: ce-unified-plan/v1\n"
+                "artifact_readiness: implementation-ready\n"
+                "execution: code\n"
+                "---\n\n"
+                "# Ok\n\n"
+                "[missing](./nope.md)\n",
+                encoding="utf-8",
+            )
+            issues = "\n".join(check_repo_contracts.ce_unified_plan_issues(dest_root))
+        self.assertIn("must declare artifact_contract", issues)
+        self.assertIn("Broken internal link", issues)
+
+    def test_ce_metadata_exemption_is_scoped_to_docs_plans(self) -> None:
+        import check_repo_contracts
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            labeled = (
+                "---\n"
+                "artifact_contract: ce-unified-plan/v1\n"
+                "artifact_readiness: implementation-ready\n"
+                "execution: code\n"
+                "---\n\n"
+                "# Labeled\n"
+            )
+            plan = dest_root / "docs" / "plans" / "ok.md"
+            spec = dest_root / "docs" / "product-specs" / "ok.md"
+            plan.parent.mkdir(parents=True)
+            spec.parent.mkdir(parents=True)
+            notes = dest_root / "docs" / "plans" / "notes.md"
+            plan.write_text(labeled, encoding="utf-8")
+            spec.write_text(labeled, encoding="utf-8")
+            notes.write_text("# notes\n", encoding="utf-8")
+            self.assertTrue(
+                check_repo_contracts._is_ce_unified_plan(plan, "docs/plans/ok.md"))
+            self.assertFalse(
+                check_repo_contracts._is_ce_unified_plan(
+                    spec, "docs/product-specs/ok.md"))
+            self.assertFalse(
+                check_repo_contracts._is_ce_unified_plan(notes, "docs/plans/notes.md"))
+
+    def test_playtest_workflow_contract_refuses_v_star_and_missing_prerelease(self) -> None:
+        import check_repo_contracts
+        root = Path(__file__).resolve().parents[1]
+        text = (root / ".github/workflows/playtest-release.yml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as raw:
+            dest_root = Path(raw)
+            dest = dest_root / ".github/workflows/playtest-release.yml"
+            dest.parent.mkdir(parents=True)
+            dest.write_text(
+                text.replace('      - "playtest-*"', '      - "v*"').replace(
+                    "              --prerelease \\\n", "").replace(
+                    '            gh release edit "${RELEASE_TAG}" --prerelease\n', ""),
+                encoding="utf-8",
+            )
+            issues = check_repo_contracts.playtest_release_workflow_issues(dest_root)
+        joined = "\n".join(issues)
+        self.assertIn("must not trigger on v*", joined)
+        self.assertIn("--prerelease", joined)
 
     def test_wrangler_put_prefixes_configured_bucket(self) -> None:
         captured: list[list[str]] = []

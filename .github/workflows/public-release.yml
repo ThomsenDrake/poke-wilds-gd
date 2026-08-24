@@ -1,0 +1,213 @@
+name: public-release
+
+# Public desktop Latest Release. The embed has an empty endpoint and an
+# empty invite. Relay, cohort, and Cloudflare credentials stay off this path.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: public-release
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: 4.6.1-stable
+  CHANNEL: public
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Resolve a v* tag on this SHA
+        id: release
+        run: |
+          git fetch --tags --force origin
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          tag="$(git tag --points-at HEAD | grep -E '^v' | sort -V | tail -n 1 || true)"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      - name: Refuse dispatch without a v* tag
+        if: steps.release.outputs.tag == ''
+        run: |
+          echo "public-release requires a v* tag on this SHA" >&2
+          exit 1
+      - name: Require a green playtests-headless run for this SHA
+        if: steps.release.outputs.tag != ''
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$(git rev-parse HEAD)"
+          run_headless() {
+            local n
+            n="$(gh run list --workflow playtests-headless --commit "$1" --status "$2" --json databaseId --jq 'length')"
+            echo "${n:-0}"
+          }
+          pending_headless() {
+            local total=0 status
+            for status in in_progress queued waiting pending requested; do
+              total=$((total + $(run_headless "$sha" "$status")))
+            done
+            echo "$total"
+          }
+          attempts=60
+          for attempt in $(seq 1 "$attempts"); do
+            if [ "$(run_headless "$sha" "success")" -ge 1 ]; then
+              exit 0
+            fi
+            pending="$(pending_headless)"
+            failed="$(run_headless "$sha" "failure")"
+            if [ "$pending" -lt 1 ] && [ "$failed" -ge 1 ]; then
+              echo "refusing unvalidated public publish ${sha}; no successful playtests-headless run" >&2
+              exit 1
+            fi
+            if [ "$attempt" -lt "$attempts" ]; then
+              echo "waiting for playtests-headless ${sha} (attempt ${attempt}/${attempts})"
+              sleep 30
+            fi
+          done
+          echo "refusing unvalidated public publish ${sha}; no successful playtests-headless run" >&2
+          exit 1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        if: steps.release.outputs.tag != ''
+        with:
+          python-version: "3.12"
+      - name: Restore the pinned Godot binary
+        if: steps.release.outputs.tag != ''
+        id: godot-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64
+      - name: Download the pinned Godot binary on cache miss
+        if: steps.release.outputs.tag != '' && steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/godot-bin"
+          curl -fsSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d "$HOME/godot-bin"
+          mv "$HOME/godot-bin/Godot_v${GODOT_VERSION}_linux.x86_64" "$HOME/godot-bin/godot"
+          chmod +x "$HOME/godot-bin/godot"
+      - name: Restore the pinned export templates
+        if: steps.release.outputs.tag != ''
+        id: templates-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.local/share/godot/export_templates/4.6.1.stable
+          key: godot-export-templates-${{ env.GODOT_VERSION }}
+      - name: Download export templates on cache miss
+        if: steps.release.outputs.tag != '' && steps.templates-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          curl -fsSL -o /tmp/templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_export_templates.tpz"
+          unzip -q /tmp/templates.tpz -d /tmp/godot-templates
+          mv /tmp/godot-templates/templates "$HOME/.local/share/godot/export_templates/4.6.1.stable"
+      - name: Assert the Godot version triple
+        if: steps.release.outputs.tag != ''
+        run: |
+          version="$("$HOME/godot-bin/godot" --version)"
+          echo "godot --version: $version"
+          case "$version" in
+            4.6.1.*) ;;
+            *) echo "expected a 4.6.1.* Godot triple, got: $version"; exit 1 ;;
+          esac
+      - name: Restore the imported-resource cache
+        if: steps.release.outputs.tag != ''
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .godot
+          key: godot-import-${{ env.GODOT_VERSION }}-${{ hashFiles('assets/**', 'project.godot') }}
+          restore-keys: godot-import-${{ env.GODOT_VERSION }}-
+      - name: Import project resources (a fresh checkout has no .godot/)
+        if: steps.release.outputs.tag != ''
+        run: timeout 3000 "$HOME/godot-bin/godot" --headless --path . --import
+      - name: Export public Linux, Windows, and macOS builds
+        if: steps.release.outputs.tag != ''
+        run: |
+          export GODOT_BIN="$HOME/godot-bin/godot"
+          python3 tools/publish_update.py --channel "${CHANNEL}" --embed-public
+      - name: Summarize the public receipt
+        if: steps.release.outputs.tag != ''
+        run: |
+          receipt="$(find dist/updates -name receipt.json -type f | head -n 1)"
+          if [ -z "$receipt" ]; then
+            echo "missing public receipt" >&2
+            exit 1
+          fi
+          python3 - "$receipt" >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          import json
+          import sys
+          doc = json.loads(open(sys.argv[1], encoding="utf-8").read())
+          dumped = json.dumps(doc)
+          if "invite" in dumped or "token" in dumped:
+              raise SystemExit("receipt must not mention invite tokens")
+          missing = {"linux", "windows", "macos"} - set(doc.get("artifacts", {}))
+          if missing:
+              raise SystemExit(f"receipt is missing OS artifacts: {sorted(missing)}")
+          print(f"### public {doc['channel']} build `{doc['build_id']}`\n")
+          for os_name, artifact in doc["artifacts"].items():
+              print(f"- {os_name}: `{artifact['filename']}` ({artifact['bytes']} bytes)")
+          EOF
+          echo "RECEIPT_PATH=$receipt" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.release.outputs.tag != ''
+        with:
+          name: public-release-${{ env.CHANNEL }}
+          path: dist/updates/*/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Attach tagged binaries to a GitHub Release
+        if: steps.release.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          stage="$(mktemp -d)"
+          export PYTHONPATH="${GITHUB_WORKSPACE}/tools"
+          export RELEASE_STAGE="$stage"
+          mapfile -t files < <(python3 - <<'EOF'
+          from pathlib import Path
+          import os
+          import publish_update
+          dest = Path(os.environ["RELEASE_STAGE"])
+          receipt = os.environ.get("RECEIPT_PATH", "")
+          if not receipt:
+              raise SystemExit("missing local receipt; public attach refuses a latest lookup")
+          staged = publish_update.stage_github_release_assets(Path(receipt), dest)
+          for path in staged:
+              print(path)
+          EOF
+          )
+          if [ "${#files[@]}" -ne 3 ]; then
+            echo "expected 3 stable GitHub Release assets, got ${#files[@]}" >&2
+            exit 1
+          fi
+          for expected in PokeWilds-linux.x86_64 PokeWilds-windows.exe PokeWilds-macos.zip; do
+            printf '%s\n' "${files[@]}" | grep -q "/${expected}$" || {
+              echo "missing stable GitHub Release asset ${expected}" >&2
+              exit 1
+            }
+          done
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber
+          else
+            gh release create "${RELEASE_TAG}" "${files[@]}" \
+              --title "PokeWilds ${RELEASE_TAG}" \
+              --notes "Desktop builds for Windows, macOS, and Linux.
+
+          - Windows: PokeWilds-windows.exe
+          - macOS: PokeWilds-macos.zip
+          - Linux: PokeWilds-linux.x86_64"
+          fi

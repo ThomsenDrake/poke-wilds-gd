@@ -1,14 +1,17 @@
 Status: current
-Last verified: 2026-08-21
+Last verified: 2026-08-23
 Review cadence days: 14
-Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot, .github/workflows/playtest-release.yml
+Source paths: scripts/domain/update_manifest.gd, scripts/runtime/update_identity.gd, scripts/runtime/update_applier.gd, scripts/runtime/update_runtime.gd, scripts/runtime/update_save_floor.gd, scripts/ui/title_update.gd, scripts/ui/title_screen.gd, scripts/app/update_flow_scenario.gd, scripts/app/update_flow_checks.gd, scripts/app/qa_scenarios.gd, scripts/runtime/feedback_bundle.gd, tools/update_manifest.py, tools/update_apply.py, tools/publish_update.py, tools/test_publish_update.py, services/feedback-relay/src/updates.ts, services/feedback-relay/src/index.ts, services/feedback-relay/test/routes.test.ts, export_presets.cfg, project.godot, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml
 
 # Game Update
 
 ## Player contract
 
 A packaged desktop build checks a **shared** latest channel (not a per-friend
-binary) on player boot. Scenario/editor boots skip the network check so the
+binary) on player boot. A public stamp with an empty unmerged endpoint skips
+the network check. `UpdateIdentity.merge` does not copy
+`user://playtest_identity.json` onto an embed that has no invite and no
+endpoint. Scenario/editor boots skip the network check so the
 gated suite stays byte-identical. Check failure is silent: the title still
 shows `CONTINUE` / `NEW GAME`.
 
@@ -118,7 +121,7 @@ pointer only after all three objects exist.
 on a Linux runner (official Godot 4.6.1 export templates; codesign stays 0)
 and runs `python3 tools/publish_update.py --require-cohort`. Triggers are a
 successful same-repo `push` `playtests-headless` run on `main` (PR
-`workflow_run` events are refused before checkout), a `v*` tag, and
+`workflow_run` events are refused before checkout), a `playtest-*` tag, and
 `workflow_dispatch`. The workflow publishes only the runtime `playtest`
 channel (no dispatch channel override) and infers the Wrangler/R2
 environment from `PLAYTEST_FEEDBACK_ENDPOINT` (no dispatch wrangler
@@ -128,7 +131,7 @@ channel and refuse any tag, dispatch, or workflow-run whose HEAD is not
 publisher repeats that comparison immediately before writing the
 manifest, after relay wait and export. A tag
 and a later `workflow_run` for the same SHA do not publish twice: if
-`latest.json` already has that `commit_sha`, export is skipped and a `v*`
+`latest.json` already has that `commit_sha`, export is skipped and a `playtest-*`
 rerun attaches the already-published artifacts (checked against the
 manifest SHA-256 and size). A transient or malformed `latest` lookup
 fails the job instead of republishing. `workflow_dispatch` always republishes so a
@@ -147,7 +150,8 @@ revive a revoked invite through the previous Worker. The
 publish endpoint, admin token, cohort invite, and Cloudflare R2 credentials.
 It never receives the GitHub App private key and never runs
 `package_playtest.py`. A public `receipt.json` lists the three OS artifacts
-without tokens. `v*` tags also attach those binaries to a GitHub Release
+without tokens. `playtest-*` tags also attach those binaries to a
+prerelease GitHub Release
 (including a later `workflow_run` when HEAD points at that tag, after a
 green headless gate, and only when `latest.commit_sha` is this SHA)
 under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
@@ -155,6 +159,16 @@ under stable names (`PokeWilds-linux.x86_64`, `PokeWilds-windows.exe`,
 of failing `gh release create` or stacking timestamped copies. A main
 commit that only changes `export_presets.cfg` or `services/feedback-relay/**`
 still runs `playtests-headless` so this publisher can fire.
+
+`.github/workflows/public-release.yml` is a second export path for `v*`
+Latest. It runs `python3 tools/publish_update.py --channel public --embed-public`
+after a green `playtests-headless` on that SHA, writes empty `endpoint`
+and empty `invite_token`, and attaches `PokeWilds-linux.x86_64`,
+`PokeWilds-windows.exe`, and `PokeWilds-macos.zip` from the local receipt
+only. It does not use the `playtest-release` environment, cohort or
+Cloudflare secrets, `PLAYTEST_FEEDBACK_ENDPOINT`, `fetch_latest`, or
+`stage_github_release_from_latest`. `--embed-public` ignores those
+variables even when they are set in the process environment.
 
 ## Apply
 

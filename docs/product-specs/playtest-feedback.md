@@ -1,14 +1,20 @@
 Status: current
 Last verified: 2026-08-23
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_stamp_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
 # Playtest Feedback
 
 ## Player contract
 
-In a packaged desktop build, `F` opens a pause-modal bug report from title,
-overworld, menu (including storage, camp, and waystone), or battle. If a `LineEdit` or `TextEdit` already owns keyboard
+In an invited packaged desktop build, `F` opens a pause-modal bug report from title,
+overworld, menu (including storage, camp, and waystone), or battle.
+On a public packaged desktop build whose unmerged embed has no invite and no
+endpoint, `F` does nothing: no pause, dialog, toast, capture, or
+`feedback_capture_requested`. A tokenless embed does not restore
+`user://playtest_identity.json`. A tokenless Godot Export matches that public
+stamp. An invite with a missing endpoint still opens the dialog and returns
+`feedback_not_configured` without writing the outbox. If a `LineEdit` or `TextEdit` already owns keyboard
 focus, `F` remains text and does not open the report. The report captures the
 screen, screenshot, UI tree, in-memory save, runtime/game summaries, current-session
 trace, and sanitized engine-log tail before the modal becomes visible, then presents one
@@ -206,15 +212,16 @@ A persisted shared-cohort identity is refreshed from the new embed when
 The `playtest-release` GitHub environment holds the publish endpoint, admin
 token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
 key stays out. A public receipt lists the three OS artifacts without tokens.
-`v*` tags also attach those binaries to a GitHub Release under stable
-names so a rerun `--clobber`s the previous assets. Wrangler/R2 selection
+`playtest-*` tags also attach those binaries to a GitHub Release as a
+prerelease under stable names so a rerun `--clobber`s the previous assets
+and the tag cannot become Latest. Wrangler/R2 selection
 follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
 `export_presets.cfg` and `services/feedback-relay/**` so a preset-only or
 relay-only main commit still publishes. A tag
 and a later `workflow_run` for the same SHA skip a second publish. Tag and
 dispatch still require a successful `playtests-headless` run for that SHA
 and wait while that gate is still pending. A later `workflow_run` attaches
-the GitHub Release when HEAD points at a `v*` tag, after a green gate,
+the GitHub Release when HEAD points at a `playtest-*` tag, after a green gate,
 and refuses a previous `latest` pointer that is not this SHA.
 The publisher also refuses to register the cohort invite until production
 `/healthz` reports a Worker that contains the latest relay-touching commit,

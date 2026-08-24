@@ -411,6 +411,11 @@ def main() -> int:
         help="Refuse tokenless shared builds so new testers can still F-report",
     )
     parser.add_argument(
+        "--embed-public",
+        action="store_true",
+        help="Export three OS artifacts with empty endpoint and invite; skip relay publish",
+    )
+    parser.add_argument(
         "--already-published",
         action="store_true",
         help="Print already_published=true|false for HEAD vs the channel latest and exit",
@@ -421,6 +426,21 @@ def main() -> int:
         help="Refuse unless production /healthz version_tag contains the latest relay commit",
     )
     args = parser.parse_args()
+    if args.embed_public and (
+            args.require_cohort or args.already_published or args.require_production_relay):
+        parser.error("--embed-public cannot be combined with playtest publish flags")
+    if args.embed_public:
+        if not args.allow_dirty and worktree_is_dirty():
+            parser.error("worktree is dirty; commit or ignore every release input first")
+        with build_metadata_lock():
+            try:
+                exported = export_shared(
+                    args.channel, "", godot=godot_binary(), cohort=None)
+                write_publish_receipt(exported)
+            finally:
+                BUILD_INFO.unlink(missing_ok=True)
+        print(f"exported public {args.channel} build {exported['build_id']}")
+        return 0
     if args.already_published:
         if not args.endpoint:
             parser.error("set PLAYTEST_FEEDBACK_ENDPOINT")

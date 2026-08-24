@@ -96,6 +96,7 @@ POKEAPI_CI_CONSUMERS = {
 
 FEEDBACK_RELAY_DEPLOY_WORKFLOW = ".github/workflows/feedback-relay-deploy.yml"
 PLAYTEST_RELEASE_WORKFLOW = ".github/workflows/playtest-release.yml"
+PUBLIC_RELEASE_WORKFLOW = ".github/workflows/public-release.yml"
 
 
 def _workflow_step_blocks(text: str) -> list[list[str]]:
@@ -798,7 +799,7 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
     required = (
         "name: playtest-release",
         "  workflow_dispatch:",
-        '      - "v*"',
+        '      - "playtest-*"',
         "  workflow_run:",
         "      - playtests-headless",
         "      - feedback-relay-deploy",
@@ -837,7 +838,9 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "gh release create",
         "gh release upload",
         "gh release view",
-        "Resolve a v* tag on this SHA",
+        "gh release edit",
+        "Resolve a playtest-* tag on this SHA",
+        "--prerelease",
         "waiting for playtests-headless",
         "steps.release.outputs.tag",
         "RELEASE_TAG",
@@ -870,6 +873,10 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
             issues.append(
                 f"{PLAYTEST_RELEASE_WORKFLOW} is missing release contract: {fragment}"
             )
+    if '      - "v*"' in text:
+        issues.append(
+            f"{PLAYTEST_RELEASE_WORKFLOW} must not trigger on v*; public-release owns that namespace"
+        )
     if "package_playtest.py" in text or "--friend" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must publish shared updates, not per-friend packages"
@@ -926,6 +933,216 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must contain only its contracted workflow keys"
         )
+    return issues
+
+
+def public_release_workflow_issues(root: Path) -> list[str]:
+    """Pin the tokenless public Latest Release: v* tags, no playtest secrets."""
+    path = root / PUBLIC_RELEASE_WORKFLOW
+    if not path.exists():
+        return [f"Missing public release workflow: {PUBLIC_RELEASE_WORKFLOW}"]
+    raw = path.read_text(encoding="utf-8")
+    text = _active_yaml_text(raw)
+    issues: list[str] = []
+    required = (
+        "name: public-release",
+        "  workflow_dispatch:",
+        '      - "v*"',
+        "  GODOT_VERSION: 4.6.1-stable",
+        "  CHANNEL: public",
+        "python3 tools/publish_update.py --channel \"${CHANNEL}\" --embed-public",
+        "Resolve a v* tag on this SHA",
+        "gh run list --workflow playtests-headless",
+        "waiting for playtests-headless",
+        "refusing unvalidated public publish",
+        "gh release create",
+        "gh release upload",
+        "gh release view",
+        "--clobber",
+        "stage_github_release_assets",
+        "PokeWilds-linux.x86_64",
+        "PokeWilds-windows.exe",
+        "PokeWilds-macos.zip",
+        "Godot_v${GODOT_VERSION}_export_templates.tpz",
+        "export_templates/4.6.1.stable",
+        "GODOT_BIN=\"$HOME/godot-bin/godot\"",
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065",
+        "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "receipt must not mention invite tokens",
+        "missing local receipt; public attach refuses a latest lookup",
+        "public-release requires a v* tag on this SHA",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(
+                f"{PUBLIC_RELEASE_WORKFLOW} is missing release contract: {fragment}"
+            )
+    forbidden = (
+        "environment: playtest-release",
+        "PLAYTEST_COHORT_INVITE_TOKEN",
+        "PLAYTEST_FEEDBACK_ADMIN_TOKEN",
+        "PLAYTEST_FEEDBACK_ENDPOINT",
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "fetch_latest",
+        "stage_github_release_from_latest",
+        "--require-cohort",
+        "--prerelease",
+        "feedback-relay-deploy",
+    )
+    for fragment in forbidden:
+        if fragment in raw:
+            issues.append(
+                f"{PUBLIC_RELEASE_WORKFLOW} must not mention {fragment}"
+            )
+    if _yaml_mapping_block(text, "permissions:") != [
+        "permissions:",
+        "  contents: write",
+        "  actions: read",
+    ]:
+        issues.append(
+            f"{PUBLIC_RELEASE_WORKFLOW} workflow permissions must be contents: write and actions: read"
+        )
+    workflow_keys = [
+        line.split(":", 1)[0]
+        for line in text.splitlines()
+        if line and not line[0].isspace() and re.match(r"^[A-Za-z0-9_-]+:", line)
+    ]
+    if workflow_keys != ["name", "on", "permissions", "concurrency", "env", "jobs"]:
+        issues.append(
+            f"{PUBLIC_RELEASE_WORKFLOW} must contain only its contracted workflow keys"
+        )
+    return issues
+
+
+def player_readme_issues(root: Path) -> list[str]:
+    """Pin the player storefront README and the agent-map rewire."""
+    readme_path = root / "README.md"
+    if not readme_path.exists():
+        return ["Missing README.md"]
+    text = readme_path.read_text(encoding="utf-8")
+    issues: list[str] = []
+    required = (
+        "https://github.com/ThomsenDrake/poke-wilds-gd/releases/latest",
+        "PokeWilds-windows.exe",
+        "PokeWilds-macos.zip",
+        "PokeWilds-linux.x86_64",
+        "chmod +x PokeWilds-linux.x86_64",
+        "Control-click",
+        "Source code",
+        "no gyms",
+        "WASD",
+        "`Z`",
+        "`X`",
+        "`Enter`",
+        "`C`",
+        "SheerSt",
+        "unofficial",
+        "Nintendo",
+        "Game Freak",
+        "many bugs",
+        "Heart Tower",
+        "docs/generated/showcase/08_biome_vista.png",
+        "docs/generated/showcase/03_ruins_exterior.png",
+        "docs/generated/showcase/07_pen_eggs.png",
+        "Explore",
+        "harvest",
+        "build",
+        "camp",
+        "craft",
+        "rest",
+        "fish",
+        "breed",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(f"README.md is missing player-page contract: {fragment}")
+    forbidden = (
+        "`F`",
+        "playtest",
+        "invite",
+        "reporting",
+        "verify_all",
+        "Start Here",
+        "CONTROLS.md",
+        "scripts/app",
+        "playtest-",
+        "05_heart_tower",
+    )
+    lowered = text.lower()
+    for fragment in forbidden:
+        if fragment.lower() in lowered:
+            issues.append(f"README.md must not mention {fragment}")
+    if re.search(r"github.com/ThomsenDrake/poke-wilds-gd/releases(?!/latest)", text):
+        issues.append("README.md must not link /releases; Latest only")
+    if not re.search(r"!\[[^\]]+\]\(", text):
+        issues.append("README.md showcase images must have nonempty alt text")
+    agents_path = root / "AGENTS.md"
+    if not agents_path.exists():
+        issues.append("Missing AGENTS.md")
+        return issues
+    agents_text = agents_path.read_text(encoding="utf-8")
+    if "Repo overview: [README.md](README.md)" in agents_text:
+        issues.append("AGENTS.md must not list README.md as repo overview")
+    if "STRATEGY.md" not in agents_text:
+        issues.append("AGENTS.md must point at STRATEGY.md")
+    if "docs/product-specs/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/product-specs/")
+    if "docs/plans/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/plans/")
+    if "docs/exec-plans/" not in agents_text:
+        issues.append("AGENTS.md must point at docs/exec-plans/")
+    return issues
+
+
+CE_UNIFIED_PLAN_CONTRACT = "ce-unified-plan/v1"
+CE_UNIFIED_PLAN_FIELDS = ("artifact_contract", "artifact_readiness", "execution")
+
+
+def _yaml_frontmatter(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---"):
+        return {}
+    fields: dict[str, str] = {}
+    for line in text.splitlines()[1:]:
+        if line.strip() == "---":
+            break
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        fields[key.strip()] = value.strip()
+    return fields
+
+
+def _is_ce_unified_plan(path: Path, rel: str) -> bool:
+    return rel.startswith("docs/plans/") and (
+        _yaml_frontmatter(path).get("artifact_contract") == CE_UNIFIED_PLAN_CONTRACT
+    )
+
+
+def ce_unified_plan_issues(root: Path) -> list[str]:
+    """Validate CE unified plans. docs/plans/ is not a metadata-free dump."""
+    plans_root = root / "docs" / "plans"
+    if not plans_root.is_dir():
+        return []
+    issues: list[str] = []
+    for path in sorted(plans_root.rglob("*.md")):
+        rel = relative_path(path, root)
+        fields = _yaml_frontmatter(path)
+        if fields.get("artifact_contract") != CE_UNIFIED_PLAN_CONTRACT:
+            issues.append(
+                f"{rel} must declare artifact_contract: {CE_UNIFIED_PLAN_CONTRACT}; "
+                "repo Status metadata belongs in docs/exec-plans/"
+            )
+            continue
+        missing = [field for field in CE_UNIFIED_PLAN_FIELDS if not fields.get(field)]
+        if missing:
+            issues.append(f"{rel} is missing CE plan fields: {', '.join(missing)}")
+        for target in internal_links(path):
+            if not resolve_link(path, target, root).exists():
+                issues.append(f"Broken internal link in {rel}: {target}")
     return issues
 
 
@@ -1149,6 +1366,8 @@ def run(root: Path | None = None) -> list[str]:
 
     for path in docs_markdown(root):
         rel = relative_path(path, root)
+        if _is_ce_unified_plan(path, rel):
+            continue
         metadata = parse_metadata(path)
         missing_fields = [field for field in METADATA_FIELDS if field not in metadata]
         if missing_fields:
@@ -1184,6 +1403,9 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(pokeapi_ci_cache_issues(root))
     issues.extend(feedback_relay_deploy_issues(root))
     issues.extend(playtest_release_workflow_issues(root))
+    issues.extend(public_release_workflow_issues(root))
+    issues.extend(player_readme_issues(root))
+    issues.extend(ce_unified_plan_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))
     issues.extend(rubric_question_inventory_issues(root))
