@@ -282,10 +282,16 @@ Packaging/fetch tests reject non-HTTPS endpoints and every redirect before eithe
 credential can be forwarded, and hold a
 cross-platform advisory lock across the shared build-metadata write/export/cleanup
 sequence; a concurrent exporter must refuse without deleting the active owner's metadata.
-Shared updates (`tools/publish_update.py`) reuse that lock and dirty-tree refuse,
+Shared updates (`tools/publish_update.py`) reuse that lock and dirty-tree refuse
+(the refuse prints `git status --porcelain` so an import-created `.uid` is
+visible),
 export one artifact per OS without a friend token, upload via R2 (never a Worker POST;
 wrangler `r2 object put` is `{bucket}/{object_key}`, public URL stays the object key),
 and publish `GET /v1/updates/latest` only after all three objects exist.
+Every committed `.gd` under `scripts/` and `addons/` must have its Godot 4
+`.uid` sidecar (`check_repo_contracts.godot_script_uid_issues`); a missing
+sidecar is what made `playtest-release` on `64dc879e` refuse after a green
+relay retag.
 CI (`playtest-release`) runs that publisher with `--require-cohort` after a green
 same-repo `push` `playtests-headless` on current `origin/main` (also `playtest-*` tags
 and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
