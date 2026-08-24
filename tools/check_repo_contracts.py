@@ -1017,6 +1017,45 @@ def public_release_workflow_issues(root: Path) -> list[str]:
     return issues
 
 
+def licensing_posture_issues(root: Path) -> list[str]:
+    """Pin the owner licensing decision: AGPL only on original work."""
+    issues: list[str] = []
+    licensing_path = root / "LICENSING.md"
+    third_party_path = root / "THIRD_PARTY.md"
+    license_path = root / "LICENSE"
+    if not licensing_path.exists():
+        return ["Missing LICENSING.md"]
+    text = licensing_path.read_text(encoding="utf-8")
+    required = (
+        "AGPL-3.0-or-later",
+        "does **not** purport to relicense",
+        "https://github.com/SheerSt/pokewilds",
+        "unofficial, fan-made project",
+        "Nintendo, Game Freak, Creatures Inc., and The Pokémon Company",
+        "The GNU AGPL applies only to material this project's copyright holders have the legal authority to license",
+        "[`THIRD_PARTY.md`](THIRD_PARTY.md)",
+        "[`LICENSE`](LICENSE)",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(f"LICENSING.md is missing posture contract: {fragment}")
+    if not third_party_path.exists():
+        issues.append("Missing THIRD_PARTY.md")
+    else:
+        third_party = third_party_path.read_text(encoding="utf-8")
+        if "LICENSING.md" not in third_party:
+            issues.append("THIRD_PARTY.md must point at LICENSING.md")
+        if "2e1ad7126e57bd293b5610def7d9dd04e0c555f1" not in third_party:
+            issues.append("THIRD_PARTY.md must keep the vendored upstream commit pin")
+    if not license_path.exists():
+        issues.append("Missing LICENSE")
+    else:
+        license_head = license_path.read_text(encoding="utf-8")[:240]
+        if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_head:
+            issues.append("LICENSE must remain the GNU AGPL text")
+    return issues
+
+
 def player_readme_issues(root: Path) -> list[str]:
     """Pin the player storefront README and the agent-map rewire."""
     readme_path = root / "README.md"
@@ -1405,6 +1444,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(playtest_release_workflow_issues(root))
     issues.extend(public_release_workflow_issues(root))
     issues.extend(player_readme_issues(root))
+    issues.extend(licensing_posture_issues(root))
     issues.extend(ce_unified_plan_issues(root))
     issues.extend(region_diff_backstop_sync_issues(root))
     issues.extend(art_anchor_issues(root))

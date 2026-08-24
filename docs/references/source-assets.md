@@ -1,11 +1,11 @@
 Status: current
-Last verified: 2026-08-09
+Last verified: 2026-08-24
 Review cadence days: 45
-Source paths: assets/source/pokemon/pokemon, assets/source/pokemon/moves.asm, assets/source/pokemon/spec_phys_lookup.txt, assets/source/i18n, assets/source/tiles, assets/source/player, assets/source/title_bg1.png, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd, scripts/runtime/player_sprite_frames.gd, assets/data/catalog, tools/import_pokeapi.py, tools/api_data_pin.json
+Source paths: assets/source/pokemon/pokemon, assets/source/pokemon/moves.asm, assets/source/pokemon/spec_phys_lookup.txt, assets/source/i18n, assets/source/tiles, assets/source/player, assets/source/title_bg1.png, scripts/domain/biome_defs.gd, scripts/domain/biome_encounters.gd, scripts/runtime/player_sprite_frames.gd, assets/data/catalog, tools/import_pokeapi.py, tools/api_data_pin.json, LICENSING.md, THIRD_PARTY.md
 
 # Source Assets
 
-The checked-in `assets/source/` tree is a vendored snapshot of the upstream PokeWilds project, treated as an imported source-data and content snapshot. Species/move/item DATA is the exception: since the PokeAPI catalog migration it is authoring-time generated into `assets/data/catalog/` (below), not parsed from this tree at runtime.
+The checked-in `assets/source/` tree is a vendored snapshot of the upstream PokeWilds project, treated as an imported source-data and content snapshot. Legal posture is [LICENSING.md](../../LICENSING.md); this file is provenance only. Species/move/item DATA is the exception: since the PokeAPI catalog migration it is authoring-time generated into `assets/data/catalog/` (below), not parsed from this tree at runtime.
 
 ## Provenance
 

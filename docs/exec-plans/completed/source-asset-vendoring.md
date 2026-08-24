@@ -1,7 +1,7 @@
 Status: completed
 Last verified: 2026-08-24
 Review cadence days: 14
-Source paths: assets/source, THIRD_PARTY.md, docs/references/source-assets.md, README.md, docs/registry/art-anchors.toml, docs/registry/subsystems.toml
+Source paths: assets/source, LICENSING.md, THIRD_PARTY.md, docs/references/source-assets.md, README.md, docs/registry/art-anchors.toml, docs/registry/subsystems.toml
 
 # Source Asset Vendoring
 
@@ -16,7 +16,7 @@ Drop the `pokewilds/` git submodule entirely. The upstream PokeWilds tree become
 - Upstream project: `https://github.com/SheerSt/pokewilds`
 - Pinned commit: `2e1ad7126e57bd293b5610def7d9dd04e0c555f1` (tag `v0.8.11`)
 - Vendored: 2026-08-09 — 66,989 files, verified 1:1 against the submodule's tracked tree at the pinned SHA.
-- Licensing posture unchanged: upstream ships no `LICENSE`; redistribution responsibility stays with the user ([THIRD_PARTY.md](../../../THIRD_PARTY.md)).
+- Licensing posture: owner-documented in [LICENSING.md](../../../LICENSING.md). Upstream ships no `LICENSE`; this project does not relicense that tree. Provenance stays in [THIRD_PARTY.md](../../../THIRD_PARTY.md).
 
 ## Execution (three commits)
 

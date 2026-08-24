@@ -40,4 +40,6 @@ This early alpha is incomplete, and there will be many bugs.
 
 ## Credit
 
-PokeWilds was created by SheerSt. This is an unofficial fan remake and is not affiliated with Nintendo or Game Freak.
+PokeWilds was created by SheerSt. This is an unofficial fan remake and is not affiliated with Nintendo, Game Freak, Creatures Inc., or The Pokémon Company.
+
+See [LICENSING.md](LICENSING.md) for how original code, upstream PokeWilds material, and Pokémon intellectual property are treated.
