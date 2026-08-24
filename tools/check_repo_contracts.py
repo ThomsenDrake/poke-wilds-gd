@@ -1414,6 +1414,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(world_depth_rng_issues(root))
     issues.extend(craft_state_pin_issues(root))
     issues.extend(input_gate_world_pin_issues(root))
+    issues.extend(godot_script_uid_issues(root))
     issues.extend(shot_numbering_issues(root))
     issues.extend(agent_surface_issues(root))
     issues.extend(adapter_authority_gate_issues(root))
@@ -1914,6 +1915,29 @@ def input_gate_world_pin_issues(root: Path) -> list[str]:
             f"{INPUT_GATE_MENU_REL}: _find_cut_tile must return Vector2i.MAX "
             "on not-found ((0,0) is a real tile)"
         )
+    return issues
+
+
+def godot_script_uid_issues(root: Path) -> list[str]:
+    """Every committed .gd must have its Godot 4 uid sidecar.
+
+    `--import` writes a missing `.gd.uid`, and `publish_update` then refuses
+    the dirty tree (2026-08-24 playtest-release on 64dc879e).
+    """
+    issues: list[str] = []
+    for folder in ("scripts", "addons"):
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.gd")):
+            uid = Path(str(path) + ".uid")
+            rel = uid.relative_to(root).as_posix()
+            if not uid.is_file():
+                issues.append(f"Missing committed Godot uid sidecar: {rel}")
+                continue
+            text = uid.read_text(encoding="utf-8").strip()
+            if not text.startswith("uid://"):
+                issues.append(f"Godot uid sidecar is malformed: {rel}")
     return issues
 
 

@@ -27,6 +27,7 @@ from package_playtest import (
     public_tester_id,
     register_invite,
     run,
+    dirty_worktree_error,
     worktree_is_dirty,
 )
 from update_manifest import artifact_key, artifact_public_url, parse
@@ -431,7 +432,7 @@ def main() -> int:
         parser.error("--embed-public cannot be combined with playtest publish flags")
     if args.embed_public:
         if not args.allow_dirty and worktree_is_dirty():
-            parser.error("worktree is dirty; commit or ignore every release input first")
+            parser.error(dirty_worktree_error())
         with build_metadata_lock():
             try:
                 exported = export_shared(
@@ -468,7 +469,7 @@ def main() -> int:
         parser.error("set PLAYTEST_FEEDBACK_ENDPOINT and PLAYTEST_FEEDBACK_ADMIN_TOKEN")
     endpoint = validated_endpoint(args.endpoint)
     if not args.allow_dirty and worktree_is_dirty():
-        parser.error("worktree is dirty; commit or ignore every release input first")
+        parser.error(dirty_worktree_error())
     cohort = cohort_from_env(args.channel)
     if args.require_cohort and not cohort:
         parser.error("PLAYTEST_COHORT_INVITE_TOKEN is required for distributed shared builds")

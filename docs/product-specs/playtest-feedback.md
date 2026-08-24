@@ -197,6 +197,8 @@ python3 tools/package_playtest.py --friend "Name" --target macos|windows|linux
 `--allow-dirty` is for local validation only. `--channel playtest` is refused
 (that channel is CI cohort). Send only the file under
 `dist/playtest/PKMN-…/`. Do not share `.playtest/invites.json`.
+Commit every Godot `.gd.uid` sidecar: CI `--import` writes a missing one, and
+`publish_update` then refuses the dirty tree before export.
 
 Automated shared releases for all three presets are owned by
 `.github/workflows/playtest-release.yml`. That workflow publishes one Linux,
