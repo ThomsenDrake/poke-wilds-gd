@@ -49,9 +49,10 @@ func step_chase_flee(total_steps: int, player_tile: Vector2i, previous_player_ti
 				if int(entity.get("flee_steps", 0)) <= 0:
 					_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_FLED)
 			"chasing":
-				# Already settled against the player's last tile: do not lunge again
-				# (walking away from an adjacent chaser must still catch).
-				if OverworldMons.is_adjacent(entity.tile, previous_player_tile):
+				# One-tile walk-away from a settled adjacent chaser: do not lunge again.
+				# Ignore previous-tile adjacency after teleports / multi-tile jumps.
+				var one_step := _is_one_tile_step(previous_player_tile, player_tile)
+				if one_step and OverworldMons.is_adjacent(entity.tile, previous_player_tile):
 					pass
 				elif not half_cadence or total_steps % 2 == 0:
 					var previous: Vector2i = entity.tile
@@ -73,7 +74,10 @@ func step_triggers(player_tile: Vector2i, previous_player_tile: Vector2i = Vecto
 			elif _rt_ref.get_ref()._disposition_now(entity) == OverworldMons.DISPOSITION_AGGRESSIVE and int(entity.get("pacify_steps", 0)) <= 0 and OverworldMons.is_spotted(entity.tile, player_tile, radius):
 				entity["state"] = "chasing"
 		elif state == "chasing":
-			var settled := OverworldMons.is_adjacent(entity.tile, player_tile) or OverworldMons.is_adjacent(entity.tile, previous_player_tile)
+			var one_step := _is_one_tile_step(previous_player_tile, player_tile)
+			var settled := OverworldMons.is_adjacent(entity.tile, player_tile)
+			if one_step and OverworldMons.is_adjacent(entity.tile, previous_player_tile):
+				settled = true
 			if settled and not bool(entity.get("moved_this_step", false)):
 				if _rt_ref.get_ref()._pending.is_empty() and not _rt_ref.get_ref()._last_battle_was_entity:
 					_rt_ref.get_ref()._force_battle(entity, true) # caught: +3 attack stages (:284); never on the closing lunge step
@@ -259,6 +263,9 @@ func _find_anchor(cell: Vector2i, swim_only: bool, stream_offset: int = -1, clea
 
 # Greedy Manhattan step away from (flee) or toward (chase) the player; first strictly
 # better DIRS-order neighbor wins (deterministic); no open move ⇒ hold the tile.
+func _is_one_tile_step(previous_tile: Vector2i, player_tile: Vector2i) -> bool:
+	return absi(player_tile.x - previous_tile.x) + absi(player_tile.y - previous_tile.y) == 1
+
 func _greedy_step(entity: Dictionary, player_tile: Vector2i, flee: bool) -> Vector2i:
 	var best: Vector2i = entity.tile
 	var best_distance := OverworldMons.manhattan(entity.tile, player_tile)
