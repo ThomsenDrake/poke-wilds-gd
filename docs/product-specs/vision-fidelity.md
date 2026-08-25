@@ -22,7 +22,7 @@ This subsystem is the capture-honesty contract for windowed screenshot verificat
 
 | Constant | Value | Meaning |
 | --- | --- | --- |
-| `MIN_SHOT_BYTES` | 5120 | PNG file bytes; below => kind `undersize` (checked only when a PNG was written, i.e. `png_bytes >= 0`) |
+| `MIN_SHOT_BYTES` | 3072 | PNG file bytes; below => kind `undersize` (checked only when a PNG was written, i.e. `png_bytes >= 0`). Floor was 5120; 1-bit menu/title/creation frames after playtest #58 compress to ~4.3 KiB, which is still well above a blank readback. |
 | `LUMINANCE_FLOOR` | 0.01 | Rec.709 mean luminance (0-1) over sampled pixels; below => kind `blank` |
 | `UNIFORM_LUMA_SPAN` | 0.004 | ~1/255; (max-min) sampled luminance span below => kind `uniform` |
 | `MAGENTA_CHANNEL_TOL` | 8 | Sample matches when r >= 255-tol AND g <= tol AND b >= 255-tol (pure #FF00FF signature of #115402) |

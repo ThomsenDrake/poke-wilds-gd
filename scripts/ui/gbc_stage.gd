@@ -13,7 +13,7 @@ extends RefCounted
 #   explicitly — no preset call.
 # - Labels: fonts.ttf size 7 via apply_font() with an ink parameter. Black ink
 #   on white plates; white ink ONLY on the pure-black splash. apply_font uses
-#   a no-AA / no-subpixel duplicate so 4x NEAREST stays 1-bit (issue #58);
+#   a separate no-AA / no-subpixel FontFile so 4x NEAREST stays 1-bit (#58);
 #   battle_surface keeps the imported GRAY+AUTO font for the text oracle.
 # - NEAREST filtering on every art TextureRect and every apply_font Label.
 #
