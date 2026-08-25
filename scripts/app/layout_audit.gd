@@ -38,9 +38,10 @@ func run(ctx: Dictionary) -> void:
 
 func _audit_battle(snapshot: Dictionary, message: String) -> void:
 	var stage: Control = _battle_view().get_node("BattleViewport/BattleStage")
-	for n in ["EnemySprite", "PlayerSprite"]:
-		if stage.get_node(n).stretch_mode != TextureRect.STRETCH_KEEP_CENTERED:
-			_fail("%s stretch_mode scales 40/48px sheets" % n)
+	if stage.get_node("EnemySprite").stretch_mode != TextureRect.STRETCH_KEEP_CENTERED:
+		_fail("EnemySprite stretch_mode scales 40px sheets")
+	if stage.get_node("PlayerSprite").stretch_mode != TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
+		_fail("PlayerSprite stretch_mode cannot fit backs larger than the 48px slot")
 	for menu_state in ["action", "moves", "item"]:
 		stage.render(snapshot, menu_state, _layout.first_selectable(menu_state, snapshot), message)
 		_audit_labels(stage, "battle_%s" % menu_state, stage.get_global_rect())

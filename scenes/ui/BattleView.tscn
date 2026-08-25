@@ -62,7 +62,7 @@ offset_top = 48.0
 offset_right = 56.0
 offset_bottom = 96.0
 expand_mode = 1
-stretch_mode = 3
+stretch_mode = 5
 
 [node name="EnemyName" type="Label" parent="BattleViewport/BattleStage"]
 layout_mode = 0
