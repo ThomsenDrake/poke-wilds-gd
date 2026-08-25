@@ -1,0 +1,51 @@
+name: enqueue-playtest-feedback
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enqueue-playtest-feedback-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  enqueue:
+    if: ${{ github.event.issue.pull_request == null && github.event.label.name == 'playtest-feedback' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start Cursor automation
+        env:
+          WEBHOOK_URL: https://api2.cursor.sh/automations/webhook/1b041852-a0a4-11f1-b532-320a589b8025
+          WEBHOOK_KEY: ${{ secrets.CURSOR_AUTOMATION_API_KEY }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          if [ -z "$WEBHOOK_KEY" ]; then
+            echo "missing CURSOR_AUTOMATION_API_KEY" >&2
+            exit 1
+          fi
+          python3 -c '
+          import json, os, urllib.request
+          payload = {
+              "issue_url": os.environ["ISSUE_URL"],
+              "number": int(os.environ["ISSUE_NUMBER"]),
+              "title": os.environ["ISSUE_TITLE"],
+          }
+          request = urllib.request.Request(
+              os.environ["WEBHOOK_URL"],
+              data=json.dumps(payload).encode(),
+              headers={
+                  "Authorization": "Bearer " + os.environ["WEBHOOK_KEY"],
+                  "Content-Type": "application/json",
+                  "User-Agent": "poke-wilds-playtest-feedback-enqueue/1.0",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              print("enqueued issue %s status=%s" % (os.environ["ISSUE_NUMBER"], response.status))
+          '
