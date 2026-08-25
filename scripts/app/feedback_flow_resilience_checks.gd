@@ -10,6 +10,7 @@ const TraceLogger := preload("res://scripts/core/trace_logger.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
 const StampChecks := preload("res://scripts/app/feedback_flow_stamp_checks.gd")
+const CancelChecks := preload("res://scripts/app/feedback_flow_cancel_checks.gd")
 const OUTBOX_DIR := "user://feedback_outbox"
 const ENGINE_TAIL_TEST_PATH := "user://feedback-flow-engine-tail.log"
 
@@ -30,6 +31,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_trace_truncation_contract()
 	_engine_log_tail_contract()
 	_failures.append_array(await StampChecks.new().run(_controller, _dialog, _tree))
+	_failures.append_array(await CancelChecks.new().run(_controller, _dialog, _tree))
 	_controller.smoke_set_build_info({"channel": "scenario-blocked", "build_id": "scenario-blocked",
 		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/blocked",
 		"invite_token": "scenario-token-blocked", "tester_id": "T-SCENARIO-BLOCKED"})

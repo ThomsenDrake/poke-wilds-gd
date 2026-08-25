@@ -31,7 +31,7 @@ func open_dialog() -> void:
 		return
 	_editor.text = ""
 	_editor.editable = true
-	_status.text = "Enter: Send   Shift+Enter: New line   Esc/X: Cancel"
+	_status.text = "Enter: Send   Shift+Enter: New line   Esc: Cancel"
 	visible = true
 	_layout_panel()
 	_editor.grab_focus()
@@ -66,6 +66,10 @@ func smoke_message() -> String:
 	return _editor.text if OS.has_feature("editor") else ""
 
 
+func smoke_status() -> String:
+	return _status.text if OS.has_feature("editor") else ""
+
+
 func layout_fits_viewport() -> bool:
 	return _panel != null and _editor != null and get_global_rect().encloses(_panel.get_global_rect()) \
 		and _panel.get_global_rect().encloses(_editor.get_global_rect()) \
@@ -76,9 +80,6 @@ func _input(event: InputEvent) -> void:
 	if not visible or _in_flight:
 		return
 	if event is InputEventKey and event.pressed and event.keycode == Key.KEY_ESCAPE:
-		_cancel_pressed()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("action_b"):
 		_cancel_pressed()
 		get_viewport().set_input_as_handled()
 
