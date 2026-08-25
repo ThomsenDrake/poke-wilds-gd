@@ -98,6 +98,8 @@ quality_bucket = "bootstrap"
 # OUT_DIR) — both scenarios + the checks' OUT_DIR reference it, so the two
 # writers emit byte-identical dumps by construction (the smoke_tap.gd/
 # battle_scenario_fixtures.gd single-home precedent).
+# BATTLE SPRITE STRETCH (2026-08-25, #59): layout_audit pins EnemySprite and
+# PlayerSprite at STRETCH_KEEP_CENTERED so 40/48px sheets cannot aspect-fill.
 # TITLE-FLOW SLICE (new-game flow + startup splash): scripts/app/new_game_flow_scenario.gd
 # + scripts/app/new_game_flow_checks.gd join code_paths (the SmokeScenarios home, the
 # save_migration_scenario precedent) — the gate drives the REAL TitleScreen/CreationScreen
@@ -494,6 +496,7 @@ code_paths = [
   "scripts/ui/attack_animator.gd",
   "scripts/ui/battle_surface_layout.gd",
   "scripts/ui/battle_surface.gd",
+  "scripts/ui/battle_sprite_fit.gd",
   "scripts/ui/battle_turn_player.gd",
   "scripts/ui/battle_view.gd",
   # Moves-panel name fitting (83px baked-art budget; Gen-9 16-char ellipsization),
@@ -515,6 +518,10 @@ quality_bucket = "battle"
 # EnemyHPBar stage rect (32,18,48,4), PlayerHPBar stage rect (96,74,48,4) in
 # scenes/ui/BattleView.tscn. The art-anchored model encodes no bar rects, so the
 # live position rides the shot sidecars' draw_order and the audits match it.
+# SPRITE SIZE (2026-08-25, #59): EnemySprite/PlayerSprite stretch_mode is
+# KEEP_CENTERED (3), not KEEP_ASPECT_CENTERED (5). 40px sheets (Froakie) stay
+# native in the 56/48 slot; aspect-fill scaled them 1.4x and the 4x display
+# turned that into 4-or-8 px texels. DECIDUEYE 56-in-56 is unchanged.
 
 [[subsystems]]
 name = "menu_ui"

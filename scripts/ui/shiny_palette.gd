@@ -1,5 +1,7 @@
 extends RefCounted
 
+const BattleSpriteFit := preload("res://scripts/ui/battle_sprite_fit.gd")
+
 # Shiny rendering (Phase 5; spec: docs/product-specs/pokemon-systems.md). FAITHFUL
 # GSC MODEL: a shiny renders as the species' alternate battle PALETTE ("shiny
 # colors" — the asset dump ships front.pal + shiny.pal siblings in 636/990 species
@@ -34,6 +36,7 @@ func apply_sprite(sprite: TextureRect, mon: Dictionary, path: String, normal_fra
 		sprite.texture = shiny_texture if shiny_texture != null else normal_frame.call(path)
 	else:
 		sprite.texture = normal_frame.call(path)
+	BattleSpriteFit.apply(sprite)
 	_sync_sparkle(sprite, is_shiny, slot)
 
 

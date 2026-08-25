@@ -6,6 +6,7 @@ extends Node
 # fit their rects and cursors/markers sit on their rows. No pixel reading.
 
 const BattleSurfaceLayout := preload("res://scripts/ui/battle_surface_layout.gd")
+const BattleSpriteFit := preload("res://scripts/ui/battle_sprite_fit.gd")
 
 const FIT_TOLERANCE := 1.0
 const ALIGN_TOLERANCE := 2.0
@@ -40,6 +41,8 @@ func _audit_battle(snapshot: Dictionary, message: String) -> void:
 	var stage: Control = _battle_view().get_node("BattleViewport/BattleStage")
 	for menu_state in ["action", "moves", "item"]:
 		stage.render(snapshot, menu_state, _layout.first_selectable(menu_state, snapshot), message)
+		if menu_state == "action":
+			BattleSpriteFit.audit(stage, _fail)
 		_audit_labels(stage, "battle_%s" % menu_state, stage.get_global_rect())
 		_audit_cursors(stage, snapshot, menu_state)
 	stage.render(snapshot, "action", "fight", "")
