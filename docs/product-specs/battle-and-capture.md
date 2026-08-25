@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-25
 Review cadence days: 21
-Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/app/time_evolution_scenario.gd
+Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/ui/battle_sprite_fit.gd, scripts/app/time_evolution_scenario.gd
 
 # Battle And Capture
 

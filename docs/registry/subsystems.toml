@@ -496,6 +496,7 @@ code_paths = [
   "scripts/ui/attack_animator.gd",
   "scripts/ui/battle_surface_layout.gd",
   "scripts/ui/battle_surface.gd",
+  "scripts/ui/battle_sprite_fit.gd",
   "scripts/ui/battle_turn_player.gd",
   "scripts/ui/battle_view.gd",
   # Moves-panel name fitting (83px baked-art budget; Gen-9 16-char ellipsization),
