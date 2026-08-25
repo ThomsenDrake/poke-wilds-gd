@@ -1034,6 +1034,8 @@ def playtest_feedback_enqueue_workflow_issues(root: Path) -> list[str]:
         "CURSOR_AUTOMATION_API_KEY",
         "https://api2.cursor.sh/automations/webhook/",
         '"issue_url"',
+        '"context"',
+        "webhook failed",
         "Authorization",
         "Bearer ",
         "missing CURSOR_AUTOMATION_API_KEY",
