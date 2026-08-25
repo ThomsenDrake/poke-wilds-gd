@@ -38,12 +38,11 @@ func run(ctx: Dictionary) -> void:
 
 func _audit_battle(snapshot: Dictionary, message: String) -> void:
 	var stage: Control = _battle_view().get_node("BattleViewport/BattleStage")
-	if stage.get_node("EnemySprite").stretch_mode != TextureRect.STRETCH_KEEP_CENTERED:
-		_fail("EnemySprite stretch_mode scales 40px sheets")
-	if stage.get_node("PlayerSprite").stretch_mode != TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
-		_fail("PlayerSprite stretch_mode cannot fit backs larger than the 48px slot")
 	for menu_state in ["action", "moves", "item"]:
 		stage.render(snapshot, menu_state, _layout.first_selectable(menu_state, snapshot), message)
+		if menu_state == "action":
+			_audit_battle_sprite_fit(stage.get_node("EnemySprite"), "EnemySprite")
+			_audit_battle_sprite_fit(stage.get_node("PlayerSprite"), "PlayerSprite")
 		_audit_labels(stage, "battle_%s" % menu_state, stage.get_global_rect())
 		_audit_cursors(stage, snapshot, menu_state)
 	stage.render(snapshot, "action", "fight", "")
@@ -203,6 +202,15 @@ func _shown(control: Control) -> bool:
 			return false
 		node = node.get_parent()
 	return true
+
+func _audit_battle_sprite_fit(rect: TextureRect, name: String) -> void:
+	var tex := rect.texture
+	if tex == null:
+		return
+	var overflow := tex.get_width() > int(rect.size.x) or tex.get_height() > int(rect.size.y)
+	var expected := TextureRect.STRETCH_KEEP_ASPECT_CENTERED if overflow else TextureRect.STRETCH_KEEP_CENTERED
+	if rect.stretch_mode != expected:
+		_fail("%s stretch_mode does not fit frame %sx%s into slot %s" % [name, tex.get_width(), tex.get_height(), rect.size])
 
 func _fail(message: String) -> void:
 	_failures.append(message)

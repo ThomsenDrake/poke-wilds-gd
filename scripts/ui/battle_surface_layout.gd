@@ -142,7 +142,8 @@ func move_info(option: Dictionary) -> Dictionary:
 # Front sprites are vertical animation strips (frame counts are not always
 # uniform, e.g. cottonee 40x238, minior 56x128). Policy: taller than wide ->
 # strip, crop first (0,0,width,width) frame; otherwise use as-is. Cached by
-# path. Display is native-size KEEP_CENTERED in the 56/48 slot (never aspect-fill).
+# path. Display is native KEEP_CENTERED when the frame fits the 56/48 slot, else
+# KEEP_ASPECT_CENTERED so larger catalog sheets scale down instead of clipping.
 func pokemon_frame(path: String) -> Texture2D:
 	if path.is_empty():
 		return _placeholder_texture()

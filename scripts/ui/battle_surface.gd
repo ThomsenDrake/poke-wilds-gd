@@ -173,6 +173,15 @@ func _apply_snapshot(snapshot: Dictionary) -> void:
 	# Shiny = the species' alternate palette + a standing sparkle badge (GSC model); normals keep the cached frame.
 	_shiny_palette.apply_sprite(_enemy_sprite, enemy_mon, str(enemy_mon.get("front_path", "")), Callable(_layout, "pokemon_frame"), "enemy")
 	_shiny_palette.apply_sprite(_player_sprite, player_mon, str(player_mon.get("back_path", "")), Callable(_layout, "pokemon_frame"), "player")
+	_fit_battle_sprite(_enemy_sprite)
+	_fit_battle_sprite(_player_sprite)
+
+func _fit_battle_sprite(rect: TextureRect) -> void:
+	var tex := rect.texture
+	if tex == null:
+		return
+	var overflow := tex.get_width() > int(rect.size.x) or tex.get_height() > int(rect.size.y)
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if overflow else TextureRect.STRETCH_KEEP_CENTERED
 
 func _set_hp_bar(fill: ColorRect, mon: Dictionary, width: float) -> void:
 	var max_hp = max(1, int(mon.get("max_hp", 1)))
