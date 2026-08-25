@@ -106,6 +106,8 @@ func _check_player_contact(player_tile: Vector2i) -> void:
 		return
 	var entity := entity_at(player_tile)
 	if ContactEncounter.is_battle_contact(entity):
+		if str(entity.get("state", "")) == "chasing" and bool(entity.get("moved_this_step", false)):
+			return # closing lunge landed on the player tile; wait for settle (keep +3 chase)
 		_force_battle(entity, false)
 
 # The entity on a tile ({} when none); mons take Z-precedence over an egg sharing a tile.
