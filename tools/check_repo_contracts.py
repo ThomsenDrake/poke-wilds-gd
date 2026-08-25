@@ -97,6 +97,7 @@ POKEAPI_CI_CONSUMERS = {
 FEEDBACK_RELAY_DEPLOY_WORKFLOW = ".github/workflows/feedback-relay-deploy.yml"
 PLAYTEST_RELEASE_WORKFLOW = ".github/workflows/playtest-release.yml"
 PUBLIC_RELEASE_WORKFLOW = ".github/workflows/public-release.yml"
+PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW = ".github/workflows/enqueue-playtest-feedback.yml"
 
 
 def _workflow_step_blocks(text: str) -> list[list[str]]:
@@ -1017,6 +1018,63 @@ def public_release_workflow_issues(root: Path) -> list[str]:
     return issues
 
 
+def playtest_feedback_enqueue_workflow_issues(root: Path) -> list[str]:
+    """Pin the playtest-feedback -> Cursor Automation enqueue path."""
+    path = root / PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW
+    if not path.exists():
+        return [f"Missing playtest feedback enqueue workflow: {PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW}"]
+    raw = path.read_text(encoding="utf-8")
+    text = _active_yaml_text(raw)
+    issues: list[str] = []
+    required = (
+        "name: enqueue-playtest-feedback",
+        "    types: [labeled]",
+        "github.event.label.name == 'playtest-feedback'",
+        "github.event.issue.pull_request == null",
+        "CURSOR_AUTOMATION_API_KEY",
+        "https://api2.cursor.sh/automations/webhook/",
+        '"issue_url"',
+        "Authorization",
+        "Bearer ",
+        "missing CURSOR_AUTOMATION_API_KEY",
+        "cancel-in-progress: false",
+    )
+    for fragment in required:
+        if fragment not in text:
+            issues.append(
+                f"{PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW} is missing enqueue contract: {fragment}"
+            )
+    forbidden = (
+        "PLAYTEST_FEEDBACK_ADMIN_TOKEN",
+        "PLAYTEST_COHORT_INVITE_TOKEN",
+        "github.event.issue.body",
+        "echo \"$WEBHOOK_KEY\"",
+        "echo $WEBHOOK_KEY",
+    )
+    for fragment in forbidden:
+        if fragment in raw:
+            issues.append(
+                f"{PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW} must not mention {fragment}"
+            )
+    if _yaml_mapping_block(text, "permissions:") != [
+        "permissions:",
+        "  contents: read",
+    ]:
+        issues.append(
+            f"{PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW} workflow permissions must be exactly contents: read"
+        )
+    workflow_keys = [
+        line.split(":", 1)[0]
+        for line in text.splitlines()
+        if line and not line[0].isspace() and re.match(r"^[A-Za-z0-9_-]+:", line)
+    ]
+    if workflow_keys != ["name", "on", "permissions", "concurrency", "jobs"]:
+        issues.append(
+            f"{PLAYTEST_FEEDBACK_ENQUEUE_WORKFLOW} must contain only its contracted workflow keys"
+        )
+    return issues
+
+
 def licensing_posture_issues(root: Path) -> list[str]:
     """Pin the owner licensing decision: AGPL only on original work."""
     issues: list[str] = []
@@ -1443,6 +1501,7 @@ def run(root: Path | None = None) -> list[str]:
     issues.extend(feedback_relay_deploy_issues(root))
     issues.extend(playtest_release_workflow_issues(root))
     issues.extend(public_release_workflow_issues(root))
+    issues.extend(playtest_feedback_enqueue_workflow_issues(root))
     issues.extend(player_readme_issues(root))
     issues.extend(licensing_posture_issues(root))
     issues.extend(ce_unified_plan_issues(root))

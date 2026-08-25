@@ -1,11 +1,17 @@
 Status: current
-Last verified: 2026-08-24
+Last verified: 2026-08-25
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools, LICENSING.md, THIRD_PARTY.md
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, .github/workflows/enqueue-playtest-feedback.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools, LICENSING.md, THIRD_PARTY.md
 
 # Quality Score
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
+
+Playtest-feedback enqueue (2026-08-25):
+`enqueue-playtest-feedback` POSTs a labeled `playtest-feedback` issue to the
+Cursor Automation webhook. The webhook key stays a GitHub secret; the relay
+admin token never enters that workflow. `feedback_reporting` scores unchanged:
+maintainer enqueue path, not player behavior.
 
 Licensing posture (2026-08-24):
 [LICENSING.md](../LICENSING.md) is the owner decision. Original PokeWilds
