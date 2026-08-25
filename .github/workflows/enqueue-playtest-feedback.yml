@@ -30,11 +30,20 @@ jobs:
             exit 1
           fi
           python3 -c '
-          import json, os, urllib.request
+          import json, os, sys, urllib.error, urllib.request
+          issue_url = os.environ["ISSUE_URL"]
+          issue_number = os.environ["ISSUE_NUMBER"]
+          issue_title = os.environ["ISSUE_TITLE"]
+          context = "Playtest feedback issue %s: %s\nissue_url=%s" % (
+              issue_number, issue_title, issue_url
+          )
           payload = {
-              "issue_url": os.environ["ISSUE_URL"],
-              "number": int(os.environ["ISSUE_NUMBER"]),
-              "title": os.environ["ISSUE_TITLE"],
+              "context": context,
+              "issue_url": issue_url,
+              "issue_number": int(issue_number),
+              "issue_title": issue_title,
+              "repo": "ThomsenDrake/poke-wilds-gd",
+              "prompt": {"text": context},
           }
           request = urllib.request.Request(
               os.environ["WEBHOOK_URL"],
@@ -42,10 +51,14 @@ jobs:
               headers={
                   "Authorization": "Bearer " + os.environ["WEBHOOK_KEY"],
                   "Content-Type": "application/json",
-                  "User-Agent": "poke-wilds-playtest-feedback-enqueue/1.0",
               },
               method="POST",
           )
-          with urllib.request.urlopen(request, timeout=30) as response:
-              print("enqueued issue %s status=%s" % (os.environ["ISSUE_NUMBER"], response.status))
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  print("enqueued issue %s status=%s" % (issue_number, response.status))
+          except urllib.error.HTTPError as exc:
+              body = exc.read().decode("utf-8", "replace")[:2000]
+              print("webhook failed: HTTP %s %s" % (exc.code, body), file=sys.stderr)
+              raise SystemExit(1)
           '
