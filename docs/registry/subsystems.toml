@@ -509,7 +509,7 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario wild_battle",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario battle_anim",
 ]
-required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played", "mon_relocated"]
+required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played", "battle_message_shown", "mon_relocated"]
 quality_bucket = "battle"
 # HUD note (2026-07-21): the programmatic HP bars sit on the baked GSC tracks —
 # EnemyHPBar stage rect (32,18,48,4), PlayerHPBar stage rect (96,74,48,4) in

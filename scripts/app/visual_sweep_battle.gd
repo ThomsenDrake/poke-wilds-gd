@@ -83,7 +83,7 @@ func _damaging_move_id(runtime) -> String:
 
 
 func _await_battle_idle(view: Node) -> void:
-	for _i in range(240):
+	for _i in range(360):
 		if not view.visible or not view.is_animating():
 			break
 		await get_tree().process_frame

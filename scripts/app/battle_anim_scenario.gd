@@ -7,12 +7,13 @@ extends Node
 # scenario drives the live battle view's menu handlers like nav_audit does,
 # waits out the async playback (hard-capped), then asserts from the trace log:
 # an attack_animation_played event for EMBER with frames > 0 and sound = true,
-# plus a resolved turn (enemy HP changed or the battle text names the move).
+# at least two battle_message_shown pages (each one line), plus a
+# resolved turn (enemy HP changed or the battle text names the move).
 
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 
 const TRACE_LOG_PATH := "user://logs/agent_trace.jsonl"
-const MAX_ANIM_WAIT_SECONDS := 8.0
+const MAX_ANIM_WAIT_SECONDS := 12.0
 const PIN := 2026080901 # seed_for_smoke pin (the new_game_flow precedent; NOT a double-run consumer): the Charmander/Geodude builds + the EMBER turn ride the pinned stream
 
 var _runner = SmokeScenarioRunner.new()
@@ -78,6 +79,12 @@ func _drive(ctx: Dictionary) -> String:
 		return "attack_animation_played reported zero frames"
 	if not bool(anim_trace.get("sound", false)):
 		return "attack_animation_played reported no sound"
+	var shown := _message_traces_since(cursor)
+	if shown.size() < 2:
+		return "turn did not page battle messages throughout the turn"
+	for payload in shown:
+		if str(payload.get("text", "")).count("\n") > 1:
+			return "battle message page too tall: %s" % str(payload.get("text", ""))
 	var enemy_hp_after := int(view._snapshot.get("enemy_mon", {}).get("current_hp", 0))
 	if enemy_hp_after == enemy_hp_before and not str(view._message).to_upper().contains("EMBER"):
 		return "turn did not resolve (enemy HP unchanged, no EMBER battle text)"
@@ -112,5 +119,27 @@ func _anim_trace_since(from_line: int) -> Dictionary:
 			var payload = parsed.get("payload", {})
 			if payload is Dictionary and str(payload.get("move_id", "")) == "EMBER":
 				found = payload
+	file.close()
+	return found
+
+
+func _message_traces_since(from_line: int) -> Array:
+	if not FileAccess.file_exists(TRACE_LOG_PATH):
+		return []
+	var file := FileAccess.open(TRACE_LOG_PATH, FileAccess.READ)
+	if file == null:
+		return []
+	var line_index := 0
+	var found: Array = []
+	while not file.eof_reached():
+		var line := file.get_line().strip_edges()
+		line_index += 1
+		if line_index <= from_line or not line.begins_with("{"):
+			continue
+		var parsed = JSON.parse_string(line)
+		if parsed is Dictionary and str(parsed.get("event", "")) == "battle_message_shown":
+			var payload = parsed.get("payload", {})
+			if payload is Dictionary:
+				found.append(payload)
 	file.close()
 	return found

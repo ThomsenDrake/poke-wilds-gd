@@ -7,6 +7,13 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Battle turn messages (2026-08-25):
+`battle_turn_player` pages battle text on the battle surface throughout
+the turn and toasts only the short outcome line after a finish, so the
+overworld box no longer dumps the full transcript. `battle_anim` pins
+`battle_message_shown`. `battle_loop` scores unchanged: presentation
+sequencing of existing text, not new combat rules.
+
 Playtest-feedback enqueue (2026-08-25):
 `enqueue-playtest-feedback` POSTs a labeled `playtest-feedback` issue to the
 Cursor Automation webhook. The webhook key stays a GitHub secret; the relay

@@ -81,6 +81,7 @@ func turn_for(actor_side: String, attack_result: Dictionary) -> Dictionary:
 		"anim_key": anim_key,
 		"hit": bool(attack_result.get("hit", false)),
 		"damage": int(attack_result.get("damage", 0)),
+		"message": str(attack_result.get("message", "")),
 		"anim": anim,
 	}
 

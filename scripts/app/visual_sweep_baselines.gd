@@ -212,7 +212,7 @@ func _compare_with_baselines(shot_dir: String, threshold_pct: float) -> Dictiona
 
 # Shared battle-quiesce wait (display_matrix + the main sweep's battle shots).
 func await_battle_idle(tree: SceneTree, view: Node) -> void:
-	for _i in range(240):
+	for _i in range(360):
 		if not view.visible or not view.is_animating():
 			break
 		await tree.process_frame

@@ -134,10 +134,10 @@ class BattleAttackAdapter:
 	func settle() -> bool:
 		return _settled
 	func max_frames() -> int:
-		# A full exchange (move + counter) settles ~frame 124 on the FrameTicker
-		# pulse (one process frame each); 160 covers it with headroom while keeping
-		# per-frame PNG capture inside the wall-clock budget.
-		return 160
+		# Paged battle lines hold PAGE_FRAMES each before the hit anim, so a
+		# Charmander/Geodude exchange exceeds the old 160-frame cap. 360 matches
+		# the visual_sweep idle wait and stays under PROCESS_FRAME_BUDGET.
+		return 360
 	func on_frame(_frame) -> void:
 		_frames += 1
 		if _animating():
