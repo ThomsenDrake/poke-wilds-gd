@@ -97,6 +97,30 @@ func stand_tile(world, near: Vector2i, biome: String, water_reach: int = 10) -> 
 	return Vector2i.MAX
 
 
+# Closing chase step must NOT arm the battle (the sprite is still lerping from 2 tiles
+# away). The next player-step clock, once adjacent and settled, catches. "" = ok.
+func chase_settle_failure(world, mons, runtime, stand: Vector2i) -> String:
+	var far: Vector2i = Vector2i.ZERO
+	for direction in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+		if world.is_tile_walkable(stand + direction) and world.is_tile_walkable(stand + direction * 2):
+			far = stand + direction * 2
+			break
+	if far == Vector2i.ZERO:
+		return "settle: no 2-tile walkable corridor beside the player"
+	var cell := Vector2i(floori(float(far.x) / 8.0), floori(float(far.y) / 8.0))
+	var record: Dictionary = mons.get("_sim").call("new_mon", "inject_settle", "roaming", 0, cell, "MACHOP", far, 5, "AGGRESSIVE")
+	record["state"] = "chasing"
+	mons._entities[str(record.id)] = record
+	runtime.note_player_step()
+	if not (mons.get("_pending") as Dictionary).is_empty():
+		return "settle: the closing chase step armed the battle (sprite still 2 tiles away)"
+	runtime.note_player_step()
+	if (mons.get("_pending") as Dictionary).is_empty():
+		return "settle: the settled adjacent chaser did not catch"
+	mons.take_pending_encounter()
+	return ""
+
+
 # Deterministic stimulus crafting for scenario/audit (party-swap status): a fresh entity
 # record on a walkable tile `distance` from `center`, rolled on the derived stream (the
 # sim's new_mon), inserted live. Only for when the natural scan misses (band-spawn luck).

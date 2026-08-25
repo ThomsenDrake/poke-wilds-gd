@@ -41,6 +41,7 @@ func recompute_on_time_change(time_label: String) -> void:
 func step_chase_flee(total_steps: int, player_tile: Vector2i) -> void:
 	var half_cadence: bool = _rt_ref.get_ref()._field_move_runtime != null and _rt_ref.get_ref()._field_move_runtime.is_riding() # Ride counter-play (:278)
 	for entity in _rt_ref.get_ref()._live_list():
+		entity["moved_this_step"] = false # chase-catch waits for a settled adjacent tile (entity_layer lerp)
 		match str(entity.get("state", "idle")):
 			"fleeing":
 				entity["tile"] = _greedy_step(entity, player_tile, true)
@@ -49,7 +50,9 @@ func step_chase_flee(total_steps: int, player_tile: Vector2i) -> void:
 					_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_FLED)
 			"chasing":
 				if not half_cadence or total_steps % 2 == 0:
+					var previous: Vector2i = entity.tile
 					entity["tile"] = _greedy_step(entity, player_tile, false)
+					entity["moved_this_step"] = entity.tile != previous
 
 func step_triggers(player_tile: Vector2i) -> void:
 	for entity in _rt_ref.get_ref()._live_list():
@@ -66,9 +69,9 @@ func step_triggers(player_tile: Vector2i) -> void:
 			elif _rt_ref.get_ref()._disposition_now(entity) == OverworldMons.DISPOSITION_AGGRESSIVE and int(entity.get("pacify_steps", 0)) <= 0 and OverworldMons.is_spotted(entity.tile, player_tile, radius):
 				entity["state"] = "chasing"
 		elif state == "chasing":
-			if OverworldMons.is_adjacent(entity.tile, player_tile):
+			if OverworldMons.is_adjacent(entity.tile, player_tile) and not bool(entity.get("moved_this_step", false)):
 				if _rt_ref.get_ref()._pending.is_empty() and not _rt_ref.get_ref()._last_battle_was_entity:
-					_rt_ref.get_ref()._force_battle(entity, true) # caught: +3 attack stages (:284)
+					_rt_ref.get_ref()._force_battle(entity, true) # caught: +3 attack stages (:284); never on the closing lunge step
 			elif OverworldMons.chase_dropped(entity.tile, player_tile):
 				entity["state"] = "idle" # re-spots at once inside SPOT_RADIUS (cooldown DEFERRED)
 		elif state == "engaged" and _rt_ref.get_ref()._pending.is_empty() and not _rt_ref.get_ref()._last_battle_was_entity:

@@ -1439,6 +1439,10 @@ validation_commands = [
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario visual_sweep_overworld",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario playtest_entity_soak",
 ]
+# CHASE-SETTLE (2026-08-25): overworld_mons_sim records moved_this_step on a chase
+# close so CATCH_RADIUS adjacency does not arm the battle on the same tick the
+# mon lunges (entity_layer lerp). Disposition tails witness it via
+# overworld_mons_probe.chase_settle_failure.
 # The SEVEN plan-mandated domain traces (source "OverworldMonsRuntime"): spawn/despawn
 # lifecycle, the recruit path, nest + egg-theft + Alpha provocation; plus the scenario's
 # symmetric passed/failed pair (miss-002) and the deterministic 22/23 sweep marker.
