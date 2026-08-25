@@ -30,7 +30,7 @@ const OverworldMonsDispositionChecks := preload("res://scripts/app/overworld_mon
 const SEED := 2026072711 # calibrated world seed (all 11 biomes found by the spoke scan — climate blobs under slice 2 — + the nest sequence)
 const DAY_MINUTES := 600 # noon: the DAY label holds across the walks (no DAY<->NIGHT recompute)
 const WALK_STEPS := 24 # the pinned step script for the determinism double run
-const EXPECTED_OVERWORLD_BUILDS := 8 # charm recruits x2 + hostile seam battles x3 + Alpha + the guardian re-catch during the hatch drive + the save-case recruit
+const EXPECTED_OVERWORLD_BUILDS := 9 # charm recruits x2 + hostile seam battles x3 + Alpha + the guardian re-catch during the hatch drive + the save-case recruit + the chase-settle catch
 
 var _ctx: Dictionary = {}
 var _runner = SmokeScenarioRunner.new()

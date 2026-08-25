@@ -46,6 +46,7 @@ func run_cases(runtime, mons) -> bool:
 	_run_irritable_chase(runtime, mons)
 	_run_ride_gait_chase(runtime, mons)
 	_run_despawn_respot(runtime, mons)
+	_run_chase_settle(runtime, mons)
 	return _failures.size() == start
 
 
@@ -128,6 +129,13 @@ func _run_despawn_respot(runtime, mons) -> void:
 	# home cell straddling the audit rect's edge jitters its leashed roamer in/out by at most 2.
 	var fled: int = probe.trace_count(cursor, "overworld_mon_despawned", {"reason": "fled"})
 	_ensure(live_after >= 1 and live_after >= live_before - 2 - fled, "respot: the window around the player never re-derived live entities (%d -> %d, fled %d)" % [live_before, live_after, fled])
+
+
+func _run_chase_settle(runtime, mons) -> void:
+	_reset(mons)
+	var err: String = load("res://scripts/runtime/overworld_mons_probe.gd").new().chase_settle_failure(_world(), mons, runtime, _player().tile_position)
+	if not err.is_empty():
+		_ensure(false, err)
 
 
 # --- harness: crafted state, injection, the live disposition oracle ------------------
