@@ -26,7 +26,7 @@ func play(view: Node, turns: Array, previous_snapshot: Dictionary, finish := {})
 		view._render()
 	else:
 		view.visible = false
-		view.battle_finished.emit(str(finish.get("outcome", "")), _finish_toast(finish))
+		view.battle_finished.emit(str(finish.get("outcome", "")), finish_toast(finish))
 
 
 func _present(view: Node, turns: Array, previous_snapshot: Dictionary, full: String, should_abort: Callable) -> void:
@@ -124,7 +124,7 @@ func _hold(view: Node, should_abort: Callable) -> void:
 		await ticker.pulse
 
 
-func _finish_toast(finish: Dictionary) -> String:
+func finish_toast(finish: Dictionary) -> String:
 	var outcome := str(finish.get("outcome", ""))
 	var full := str(finish.get("message", ""))
 	var grant := _grant_suffix(full)

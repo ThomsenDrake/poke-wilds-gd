@@ -156,7 +156,7 @@ func _apply_response(response: Dictionary) -> void:
 			_turn_player.generation += 1  # cancel any in-flight turn playback
 			_set_animating(false)
 			visible = false
-			battle_finished.emit(str(response.get("outcome", "")), _message)
+			battle_finished.emit(str(response.get("outcome", "")), _turn_player.finish_toast(response))
 		else:
 			_turn_player.play(self, finished_turns, previous_snapshot, response)
 		return
