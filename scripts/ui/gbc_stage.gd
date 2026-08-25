@@ -11,10 +11,11 @@ extends RefCounted
 #   preset is rect-preserving and bakes 0x0 (slice plan, diagnosis 2).
 # - Full-rect helpers (Backing, resize watcher) set anchors + offsets
 #   explicitly — no preset call.
-# - Labels: fonts.ttf size 7 via apply_font() (battle_surface.gd:220
-#   _apply_battle_font pattern) with an ink parameter. Black ink on white
-#   plates; white ink ONLY on the pure-black splash.
-# - NEAREST filtering on every art TextureRect.
+# - Labels: fonts.ttf size 7 via apply_font() with an ink parameter. Black ink
+#   on white plates; white ink ONLY on the pure-black splash. apply_font uses
+#   a separate no-AA / no-subpixel FontFile so 4x NEAREST stays 1-bit (#58);
+#   battle_surface keeps the imported GRAY+AUTO font for the text oracle.
+# - NEAREST filtering on every art TextureRect and every apply_font Label.
 #
 # Usage from a screen's _ready (host root must already be in the tree):
 #   var parts := GbcStage.build(self)          # {viewport, stage, display, backing}
@@ -26,6 +27,7 @@ const FONT_PATH := "res://assets/source/fonts.ttf"
 const FONT_SIZE := 7
 
 static var _font: Font
+static var _menu_font: Font
 
 
 # Builds the stage tree under host_root. opts: opaque_backing (default true) —
@@ -120,18 +122,37 @@ static func stage_point(display: TextureRect, screen_point: Vector2):
 	)
 
 
-# Cached fonts.ttf load (battle_surface.gd:9-10 font contract).
+# Cached fonts.ttf load (battle_surface.gd:9-10 font contract — GRAY AA).
 static func font() -> Font:
 	if _font == null:
 		_font = load(FONT_PATH)
 	return _font
 
 
-# _apply_battle_font pattern (battle_surface.gd:220) with an ink parameter.
+# Menu/title/creation/message-box ink: same glyphs as font(), but 1-bit. GRAY
+# AA + AUTO subpixel at 7px becomes a 4x4 gray block after integer NEAREST
+# scale and reads as blur next to the 1-bit chrome (playtest #58).
+static func menu_font() -> Font:
+	if _menu_font == null:
+		var crisp := FontFile.new()
+		# Separate FontFile (not Resource.duplicate of the imported GRAY
+		# resource) so mutating AA cannot alias into battle_surface's load.
+		if crisp.load_dynamic_font(FONT_PATH) == OK:
+			crisp.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+			crisp.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+			crisp.hinting = TextServer.HINTING_LIGHT
+			_menu_font = crisp
+		else:
+			_menu_font = font()
+	return _menu_font
+
+
+# _apply_battle_font pattern with an ink parameter; menu_font, not font().
 static func apply_font(label: Label, ink: Color) -> void:
-	label.add_theme_font_override("font", font())
+	label.add_theme_font_override("font", menu_font())
 	label.add_theme_font_size_override("font_size", FONT_SIZE)
 	label.add_theme_color_override("font_color", ink)
+	label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 
 # Stage Label factory: absolute integer position, fonts.ttf@7, input-ignoring.

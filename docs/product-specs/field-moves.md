@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-03
+Last verified: 2026-08-25
 Review cadence days: 21
 Source paths: scripts/domain/field_moves.gd, scripts/runtime/night_system.gd, scripts/runtime/player_avatar.gd, scripts/domain/structures.gd, scripts/runtime/session_state.gd, scripts/app/field_action_router.gd, scripts/runtime/game_runtime.gd, scripts/runtime/build_runtime.gd, scripts/runtime/harvest_runtime.gd, scripts/runtime/harvest_resolver.gd, scripts/app/field_moves_flow_scenario.gd, scripts/app/field_moves_dig_checks.gd
 

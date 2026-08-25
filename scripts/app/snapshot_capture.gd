@@ -15,7 +15,7 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const RenderIntrospection := preload("res://scripts/app/render_introspection.gd")
 const RenderPalette := preload("res://scripts/app/render_palette.gd")
 
-const MIN_SHOT_BYTES := 5120      # PNG bytes; below => undersize (only when a save_path wrote one)
+const MIN_SHOT_BYTES := 3072      # PNG bytes; below => undersize (only when a save_path wrote one). 1-bit GBC menu frames compress to ~4.3 KiB after issue #58.
 const LUMINANCE_FLOOR := 0.01     # Rec.709 mean luminance (0-1); below => blank
 const UNIFORM_LUMA_SPAN := 0.004  # ~1/255; sampled luminance span below => uniform
 const MAGENTA_CHANNEL_TOL := 8    # r >= 255-tol && g <= tol && b >= 255-tol => magenta sample
