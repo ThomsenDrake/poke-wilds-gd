@@ -65,6 +65,8 @@ var _faced_tile := Vector2i.MAX
 # same idiom as _time_label/_faced_tile) and read/written by overworld_mons_actions.interact.
 var _last_interact_id := ""
 var _last_interact_step := -100
+var _prev_player_tile := Vector2i.ZERO
+var _has_prev_player := false
 
 # NO rng parameter — the guarantee is structural (header). Registers the Phase-4 hooks.
 func setup(session_state, catalog, pokemon_rules, trace_logger, world_generator, biome_encounters, field_move_runtime) -> void:
@@ -86,12 +88,15 @@ func note_player_step(total_steps: int, player_tile: Vector2i, time_label: Strin
 		return # chamber contact stays live; the overworld sim never moves/spawns at dungeon-local coords
 	if not active:
 		return
+	var previous := _prev_player_tile if _has_prev_player else player_tile
 	_sim.recompute_on_time_change(time_label)
-	_sim.step_chase_flee(total_steps, player_tile)
-	_sim.step_triggers(player_tile)
+	_sim.step_chase_flee(total_steps, player_tile, previous)
+	_sim.step_triggers(player_tile, previous)
 	_check_player_contact(player_tile)
 	_sim.step_roam(total_steps, player_tile)
 	_sim.sync_window(player_tile, time_label)
+	_prev_player_tile = player_tile
+	_has_prev_player = true
 
 # Collision-only default (overworld-pokemon.md): stepping ONTO a wild mon's tile forces a
 # battle — player-initiated, provoked:false (NO +3; the attack_entity precedent). Eggs never

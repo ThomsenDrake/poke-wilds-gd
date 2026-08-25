@@ -38,7 +38,7 @@ func recompute_on_time_change(time_label: String) -> void:
 		if kind != "egg" and kind != "legendary" and not pool_for(biome_of(OverworldMons.cell_center(entity.cell)), time_label).has(str(entity.species_id)): # legendaries are pool-exempt statics (the never-encounter exclusion)
 			_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_RECOMPUTE, false)
 
-func step_chase_flee(total_steps: int, player_tile: Vector2i) -> void:
+func step_chase_flee(total_steps: int, player_tile: Vector2i, previous_player_tile: Vector2i = Vector2i.ZERO) -> void:
 	var half_cadence: bool = _rt_ref.get_ref()._field_move_runtime != null and _rt_ref.get_ref()._field_move_runtime.is_riding() # Ride counter-play (:278)
 	for entity in _rt_ref.get_ref()._live_list():
 		entity["moved_this_step"] = false # chase-catch waits for a settled adjacent tile (entity_layer lerp)
@@ -49,12 +49,16 @@ func step_chase_flee(total_steps: int, player_tile: Vector2i) -> void:
 				if int(entity.get("flee_steps", 0)) <= 0:
 					_rt_ref.get_ref()._remove_entity(entity, OverworldMons.REASON_FLED)
 			"chasing":
-				if not half_cadence or total_steps % 2 == 0:
+				# Already settled against the player's last tile: do not lunge again
+				# (walking away from an adjacent chaser must still catch).
+				if OverworldMons.is_adjacent(entity.tile, previous_player_tile):
+					pass
+				elif not half_cadence or total_steps % 2 == 0:
 					var previous: Vector2i = entity.tile
 					entity["tile"] = _greedy_step(entity, player_tile, false)
 					entity["moved_this_step"] = entity.tile != previous
 
-func step_triggers(player_tile: Vector2i) -> void:
+func step_triggers(player_tile: Vector2i, previous_player_tile: Vector2i = Vector2i.ZERO) -> void:
 	for entity in _rt_ref.get_ref()._live_list():
 		var kind := str(entity.get("kind", ""))
 		if kind == "egg":
@@ -69,7 +73,8 @@ func step_triggers(player_tile: Vector2i) -> void:
 			elif _rt_ref.get_ref()._disposition_now(entity) == OverworldMons.DISPOSITION_AGGRESSIVE and int(entity.get("pacify_steps", 0)) <= 0 and OverworldMons.is_spotted(entity.tile, player_tile, radius):
 				entity["state"] = "chasing"
 		elif state == "chasing":
-			if OverworldMons.is_adjacent(entity.tile, player_tile) and not bool(entity.get("moved_this_step", false)):
+			var settled := OverworldMons.is_adjacent(entity.tile, player_tile) or OverworldMons.is_adjacent(entity.tile, previous_player_tile)
+			if settled and not bool(entity.get("moved_this_step", false)):
 				if _rt_ref.get_ref()._pending.is_empty() and not _rt_ref.get_ref()._last_battle_was_entity:
 					_rt_ref.get_ref()._force_battle(entity, true) # caught: +3 attack stages (:284); never on the closing lunge step
 			elif OverworldMons.chase_dropped(entity.tile, player_tile):
