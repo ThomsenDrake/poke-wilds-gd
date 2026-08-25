@@ -23,7 +23,7 @@ func _escape_only_cancel_contract() -> void:
 	var prior_paused := _tree.paused
 	await SmokeTap.tap(_tree, "feedback_report")
 	_check(_dialog.visible and _tree.paused, "escape-only check could not open feedback")
-	var hint := _dialog.smoke_status()
+	var hint: String = _dialog.smoke_status()
 	_check(hint == "Enter: Send   Shift+Enter: New line   Esc: Cancel" and not hint.contains("X"),
 		"feedback hint still advertised X cancel")
 	await SmokeTap.tap(_tree, "action_b")
