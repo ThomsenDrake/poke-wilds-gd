@@ -5,7 +5,7 @@ extends RefCounted
 # per-frame metadata offsets the combatant sprites and hides HUD layers, and
 # the move's sound plays once at start. Playback advances ONE FRAME PER
 # PROCESS FRAME (never real-time timers): playback length is then bounded in
-# process frames, so frame-counted idle waits (visual_sweep's 240-frame
+# process frames, so frame-counted idle waits (visual_sweep's 360-frame
 # await_battle_idle) outlast it at ANY display refresh rate — a real-time
 # playback clock loses that race above ~135Hz and a capture can land
 # mid-animation (frozen flash modulate, pre-turn message). Every exit path
