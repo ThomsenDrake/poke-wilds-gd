@@ -66,6 +66,8 @@ func _part_4_creation() -> void:
 	# SEED step: RANDOM is the one-press default; move_left is the custom-seed gesture.
 	if not _expect(title_label.text == "WORLD SEED" and value_label.text == "RANDOM", "4: the seed step opened on '%s'/'%s', not WORLD SEED/RANDOM" % [title_label.text, value_label.text]):
 		return
+	if not _expect(_menu_font_is_crisp(title_label), "4: creation title font still has grayscale AA (blurry start-menu text)"):
+		return
 	await _tap("move_left")
 	if not _expect(CreationRender.seed_edit_active(creation), "4: injection witness: move_left did not open the seed digit row"):
 		return
@@ -195,6 +197,11 @@ func _expect(ok: bool, label: String) -> bool: # appends a labeled failure; retu
 	if not ok:
 		_failures.append(label)
 	return ok
+
+func _menu_font_is_crisp(label: Label) -> bool:
+	var font := label.get_theme_font("font")
+	return font is FontFile and (font as FontFile).antialiasing == TextServer.FONT_ANTIALIASING_NONE \
+			and (font as FontFile).subpixel_positioning == TextServer.SUBPIXEL_POSITIONING_DISABLED
 
 func _title() -> Control: return _ctx["title_screen"]
 func _creation() -> Control: return _ctx["creation_screen"]

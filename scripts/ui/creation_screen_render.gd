@@ -10,8 +10,8 @@ extends RefCounted
 const SessionState := preload("res://scripts/runtime/session_state.gd")
 const CreationStage := preload("res://scripts/ui/creation_screen_stage.gd")
 
-const SEED_HINT := "(L/R: enter a custom seed   Z: next)"
-const SEED_EDIT_HINT := "Type digits; L/R pick a digit; U/D change it; Backspace deletes. (Z: commit   X: close)"
+const SEED_HINT := "(L/R: enter a custom seed)\n(Z: next)"
+const SEED_EDIT_HINT := "Type digits; L/R pick a digit;\nU/D change it; Backspace deletes.\n(Z: commit   X: close)"
 const FRAME_INTERIOR := CreationStage.FRAME_RECT # single-sourced at the stage (it owns the frame art)
 const TITLE_VALUE_GAP := 2.0
 
@@ -61,7 +61,7 @@ static func center_block(screen) -> void:
 	var title_label: Label = screen._title_label
 	var value_lines: int = maxi(1, value_label.get_line_count())
 	var block_h: float = title_label.get_line_height() + TITLE_VALUE_GAP + value_lines * value_label.get_line_height()
-	var top: float = FRAME_INTERIOR.position.y + (FRAME_INTERIOR.size.y - block_h) / 2.0
+	var top: float = floorf(FRAME_INTERIOR.position.y + (FRAME_INTERIOR.size.y - block_h) / 2.0)
 	title_label.position.y = top
-	value_label.position.y = top + title_label.get_line_height() + TITLE_VALUE_GAP
+	value_label.position.y = floorf(top + title_label.get_line_height() + TITLE_VALUE_GAP)
 	value_label.size.y = value_lines * value_label.get_line_height()

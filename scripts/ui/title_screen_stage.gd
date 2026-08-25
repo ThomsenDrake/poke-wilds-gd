@@ -104,7 +104,7 @@ static func rebuild_rows(rows, labels: Array, keep_selection: bool = false) -> v
 
 
 static func center_rows(rows) -> void:
-	rows.root().position.y = ENTRY_BAND.position.y + (ENTRY_BAND.size.y - rows.row_count() * GbcWidgets.RowList.PITCH) / 2.0
+	rows.root().position.y = floorf(ENTRY_BAND.position.y + (ENTRY_BAND.size.y - rows.row_count() * GbcWidgets.RowList.PITCH) / 2.0)
 
 
 # Full-stage NEAREST TextureRect; a missing asset degrades to the opaque black

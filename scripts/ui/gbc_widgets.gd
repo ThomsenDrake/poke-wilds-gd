@@ -5,7 +5,8 @@ extends RefCounted
 # All geometry is absolute integer offsets in stage space. Ink contract:
 # black ink on white plates (cursor: black battle/arrow_right1.png); the white
 # cursor is for dark backings only (arrow_right_white2.png). Labels use
-# fonts.ttf@7 on an 8px row pitch (the text_oracle raster contract).
+# fonts.ttf@7 on an 8px row pitch (ascent 7; clip rows to PITCH — min-size
+# height is 9 and would overlap the next row by 1px).
 # Every widget built here is also accessibility-annotated (accessible name/
 # description/live region — METADATA ONLY, zero geometry/visual change); the
 # contract lives in docs/references/accessibility.md.
@@ -131,7 +132,10 @@ class RowList extends RefCounted:
 			label.position = Vector2(0, i * PITCH)
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			_apply_font.call(label)
-			label.size = label.get_combined_minimum_size()
+			# Clip to PITCH: get_combined_minimum_size().y is font height 9, and
+			# stacked 9px rects on an 8px pitch smear AA into the next row (#58).
+			label.size = Vector2(label.get_combined_minimum_size().x, float(PITCH))
+			label.clip_contents = true
 			# Row text is final at build, so the accessible name pins it
 			# (a name pinned over LATER-mutated text would go stale).
 			label.accessibility_name = label.text
