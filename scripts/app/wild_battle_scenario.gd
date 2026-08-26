@@ -28,7 +28,9 @@ func run(ctx: Dictionary) -> void:
 	if wild_mon.is_empty():
 		fail = "could not create a wild encounter"
 	else:
-		await _run_smoke_battle(ctx, set_battle, wild_mon)
+		fail = await _run_smoke_battle(ctx, set_battle, runner, wild_mon)
+	if fail.is_empty():
+		fail = await _assert_ko_clear(ctx, set_battle, runner)
 	if set_battle.is_valid():
 		set_battle.call(false)
 	runner.resync_player_tile(world, player, runtime)
@@ -45,26 +47,64 @@ func run(ctx: Dictionary) -> void:
 	runner.resync_player_tile(world, player, runtime)
 	runner.restore_party(runtime, party_before)
 	if fail.is_empty():
-		runtime.emit_trace("wild_battle_passed", "SmokeScenarios", {"campsite_hold": true, "defeat_heal": true})
+		runtime.emit_trace("wild_battle_passed", "SmokeScenarios", {"campsite_hold": true, "defeat_heal": true, "battle_theme_held": true, "battle_clear_shown": true})
 	else:
 		push_error("Wild battle scenario failed: %s" % fail)
 
 
 # The smoke battle driver (extracted FROM the smoke host): gate + battle music +
 # one scripted turn, then escape if the view is still up (miss-002: the downstream
-# encounter_started / battle_finished traces ride this path).
-func _run_smoke_battle(ctx: Dictionary, set_battle: Callable, wild_mon: Dictionary) -> void:
+# encounter_started / battle_finished traces ride this path). Also pins the
+# contact-step music hold: an in-battle tile_changed must not re-select biome music.
+func _run_smoke_battle(ctx: Dictionary, set_battle: Callable, runner: SmokeScenarioRunner, wild_mon: Dictionary) -> String:
 	if set_battle.is_valid():
 		set_battle.call(true)
 	ctx["message_box"].hide_message()
 	ctx["music_router"].play_battle_track("wild")
 	ctx["battle_view"].start_wild_battle(wild_mon)
-	await get_tree().create_timer(0.2).timeout
+	var cursor := runner.trace_log_line_count()
+	ctx["player"].get_parent()._on_player_tile_changed(ctx["player"].tile_position)
+	if runner.trace_log_has_since("music_track_selected", cursor):
+		return "in-battle step re-selected overworld music"
 	ctx["battle_view"].run_smoke_turn()
-	await get_tree().create_timer(0.2).timeout
+	await _await_idle(ctx)
 	if ctx["battle_view"].visible:
 		ctx["battle_view"].run_smoke_escape()
-		await get_tree().create_timer(0.2).timeout
+		await _await_idle(ctx)
+	return ""
+
+
+func _assert_ko_clear(ctx: Dictionary, set_battle: Callable, runner: SmokeScenarioRunner) -> String:
+	var runtime: Node = ctx["runtime"]
+	var view: Node = ctx["battle_view"]
+	var species_id := str(runtime.catalog.species.keys()[0])
+	var target: Dictionary = runtime.pokemon_rules.create_pokemon_instance(runtime.catalog.get_species(species_id), 2, Callable(runtime.catalog, "get_move"))
+	if target.is_empty():
+		return "could not craft a 1-HP wild mon"
+	if set_battle.is_valid():
+		set_battle.call(true)
+	ctx["message_box"].hide_message()
+	view.start_wild_battle(target)
+	runtime.battle_runtime._enemy_mon["current_hp"] = 1
+	runtime.battle_runtime._enemy_mon["stats"]["spe"] = 1
+	var cursor := runner.trace_log_line_count()
+	view._apply_response(runtime.perform_battle_move(_safe_move_index(runtime.battle_runtime._player_mon)))
+	await _await_idle(ctx)
+	if not runner.trace_log_has_since("battle_clear_presented", cursor, {"outcome": "victory"}):
+		return "KO blow did not present the battle-clear snapshot"
+	if view.visible:
+		view.run_smoke_escape()
+		await _await_idle(ctx)
+	return ""
+
+
+func _await_idle(ctx: Dictionary) -> void:
+	var view: Node = ctx["battle_view"]
+	for _i in range(240):
+		if not view.visible or not view.is_animating():
+			break
+		await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func _assert_campsite_capture(runtime, runner, target: Dictionary, cursor: int) -> String:

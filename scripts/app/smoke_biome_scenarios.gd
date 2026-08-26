@@ -53,12 +53,20 @@ func _run_smoke_battle(wild_mon: Dictionary) -> void:
 	_ctx["message_box"].hide_message()
 	_ctx["music_router"].play_battle_track("wild")
 	_ctx["battle_view"].start_wild_battle(wild_mon)
-	await get_tree().create_timer(0.2).timeout
 	_ctx["battle_view"].run_smoke_turn()
-	await get_tree().create_timer(0.2).timeout
+	await _await_battle_idle()
 	if _ctx["battle_view"].visible:
 		_ctx["battle_view"].run_smoke_escape()
-		await get_tree().create_timer(0.2).timeout
+		await _await_battle_idle()
+
+
+func _await_battle_idle() -> void:
+	var view: Node = _ctx["battle_view"]
+	for _i in range(240):
+		if not view.visible or not view.is_animating():
+			break
+		await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func _walk_until_biome_change(start_biome: String, max_steps: int) -> bool:
