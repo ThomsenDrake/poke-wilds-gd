@@ -70,7 +70,7 @@ func _on_player_tile_changed(tile_position: Vector2i) -> void:
 	_runtime().note_player_step()
 	if _runtime().get_player_tile() != tile_position: _sync_world_from_runtime(); _runtime().save_game(); return # a dungeon warp re-homed the player mid-step: re-anchor + rebuild on the canonical _sync path (the waystone-warp precedent)
 	_world.set_time_of_day(_runtime().get_time_of_day_minutes())
-	_play_biome_music()
+	if not _in_battle: _play_biome_music() # contact battles start inside note_player_step; do not stomp the battle theme
 	_runtime().save_game()
 
 

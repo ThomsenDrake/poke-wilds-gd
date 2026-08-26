@@ -26,6 +26,9 @@ validation_commands = [
 ]
 required_trace_events = ["boot_started", "boot_ready", "world_rebuilt", "traversal_blocked", "biome_probe_passed", "field_move_used", "field_move_scenario_passed", "playtest_journey_passed", "playtest_soak_passed", "visual_sweep_passed", "nav_audit_passed", "nav_audit_failed", "texture_audit_passed", "data_audit_passed", "layout_audit_passed", "world_consistency_audit_passed", "ui_render_audit_passed", "quarantine_finding", "battle_anim_passed", "display_matrix_passed", "harvest_flow_passed", "save_migration_passed", "input_gate_passed", "input_gate_failed", "battle_end_input_passed", "battle_end_input_failed", "rng_joint_pin_passed", "rng_joint_pin_failed", "save_stability_passed", "save_stability_failed", "encounter_config_passed", "encounter_config_failed", "new_game_flow_passed", "new_game_flow_failed", "play_agent_passed", "play_agent_failed", "overworld_step", "inventory_checked", "ui_tree_dump_passed", "ui_tree_dump_failed", "legibility_soak_passed", "legibility_soak_failed"]
 quality_bucket = "bootstrap"
+# BATTLE-THEME HOLD (2026-08-25): tile_changed skips biome music while
+# `_in_battle` so an overworld-contact start inside note_player_step cannot
+# stomp the battle theme (issue #68). wild_battle pins battle_theme_held.
 # CRAFT-STATE SPAWN PIN (2026-08-23): visual_sweep_baselines.craft_state calls
 # RegistrySupport.pin_craft_world before find_walkable_spawn so session.world_seed
 # matches the spec seed (landmark_resolver reads the session, not generator setup).
@@ -511,6 +514,8 @@ validation_commands = [
 ]
 required_trace_events = ["encounter_started", "battle_finished", "attack_animation_played", "mon_relocated"]
 quality_bucket = "battle"
+# Battle-clear hold (2026-08-25): a KO blow renders the post-KO snapshot/message
+# (`battle_clear_presented`) before BattleView hides — issue #68 skipped that beat.
 # HUD note (2026-07-21): the programmatic HP bars sit on the baked GSC tracks —
 # EnemyHPBar stage rect (32,18,48,4), PlayerHPBar stage rect (96,74,48,4) in
 # scenes/ui/BattleView.tscn. The art-anchored model encodes no bar rects, so the

@@ -7,6 +7,14 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Battle-clear hold (2026-08-25):
+Overworld-contact battles start inside `note_player_step` on the same
+`tile_changed` that previously re-requested biome music, cutting the battle
+theme on the opening frame. A KO blow also hid BattleView on the pre-turn
+pose. `app_bootstrap` now skips biome music while `_in_battle`; `battle_loop`
+renders the post-KO snapshot for a short clear hold (`battle_clear_presented`).
+`wild_battle` pins both. Scores unchanged: presentation-order fix.
+
 Playtest-feedback enqueue (2026-08-25):
 `enqueue-playtest-feedback` POSTs a labeled `playtest-feedback` issue to the
 Cursor Automation webhook. The webhook key stays a GitHub secret; the relay

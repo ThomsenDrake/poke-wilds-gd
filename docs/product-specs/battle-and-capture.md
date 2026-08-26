@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-14
+Last verified: 2026-08-25
 Review cadence days: 21
-Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/app/time_evolution_scenario.gd
+Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/ui/battle_turn_player.gd, scripts/app/time_evolution_scenario.gd
 
 # Battle And Capture
 
@@ -9,7 +9,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 
 - A wild battle can start from an encounter tile, playing the wild species' cry and the wild-battle theme.
 - Battle presentation uses a native-resolution Crystal-style battle surface that scales to the largest INTEGER factor that fits, centered — fractional scales alias the pixel font.
-- Move turns play their source animation sets (per-frame layer scripts, sprite translations, and per-move sound) when one exists for the move — 157 of 299 catalog moves — with a synthesized lunge/flash fallback for the rest; each played animation emits an `attack_animation_played` trace.
+- Move turns play their source animation sets (per-frame layer scripts, sprite translations, and per-move sound) when one exists for the move — 157 of 299 catalog moves — with a synthesized lunge/flash fallback for the rest; each played animation emits an `attack_animation_played` trace. A KO blow then renders the post-KO snapshot and result message on the battle surface for a short clear hold (`battle_clear_presented`) before the view hides and `battle_finished` reaches Main — so the last battle frame is the faint/result, not the pre-turn attack pose (`wild_battle` pins `battle_clear_shown`).
 - The player may select one of up to four moves, use a Poke Ball, use a Potion, or run.
 - The action box uses the baked `battle_screen2.png` command text for `FIGHT`, disabled `PKMN`, `ITEM`, and `RUN`.
 - Battle menu selection supports both directional input plus `Z`/`X` and direct mouse clicks.
@@ -39,7 +39,7 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 
 ## Smoke validation
 
-- `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal).
+- `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal). It also pins the in-battle biome-music hold (an in-battle `tile_changed` must not emit `music_track_selected`) and a 1-HP KO presenting `battle_clear_presented` before the view hides.
 - `time_evolution` (Phase 2) proves the time-of-day evolution gate in both directions under `seed_for_smoke`: EEVEE at happiness 255, exp poked to one seeded victory from level — a DAY battle (time 600) leaves it EEVEE with `evolution_time_gate{time_of_day:"DAY", evolved:""}`, and the same setup at NIGHT (time 1380) evolves it to UMBREON with `evolution_time_gate{evolved:"UMBREON"}` (SNOM→FROSMOTH rides the identical `TR_NITE` gate). The shadow-retreat block is proven by `night_cycle` (run refused once with `retreat_blocked`, then victory), not here.
 
 
