@@ -1,9 +1,8 @@
 extends RefCounted
 
-# Smoke-harness support: scenario-request consumption, the world-scan / trace-log
-# probe helpers shared by scripts/app/smoke_scenarios.gd, and the save backup/
-# restore guard so scenarios never clobber the player's real save.
+# Shared smoke request/probe helpers and the player's save backup/restore guard.
 
+const TraceLogger := preload("res://scripts/core/trace_logger.gd")
 const SaveStore := preload("res://scripts/runtime/save_store.gd")
 const HarvestResolver := preload("res://scripts/runtime/harvest_resolver.gd")
 
@@ -272,17 +271,20 @@ func assert_save_recovery(runtime, cursor: int) -> String:
 	var ok: bool = session.campsite_tile == anchor and str(got.get("species_id", "")) == str(mon.get("species_id", "")) and int(got.get("level", 0)) == 8 and got_id == want_id
 	return "" if ok else "campsite hold did not survive the save round-trip"
 
-
-# Line count of the JSONL trace log; capture before an action to scope trace_log_has_since.
 func trace_log_line_count() -> int:
-	return _trace_log_lines().size()
+	var logger = _trace_logger()
+	return logger.trace_log_line_count() if logger != null else TraceLogger.read_log_lines_since(TRACE_LOG_PATH).size()
+
+
+func trace_log_lines_since(from_line: int) -> PackedStringArray:
+	var logger = _trace_logger()
+	return logger.trace_log_lines_since(from_line) if logger != null else TraceLogger.read_log_lines_since(TRACE_LOG_PATH, from_line)
 
 
 # True when a trace at/after from_line matches the event name and every key/value of payload_match.
 func trace_log_has_since(event_name: String, from_line: int, payload_match: Dictionary = {}) -> bool:
-	var lines = _trace_log_lines()
-	for index in range(maxi(from_line, 0), lines.size()):
-		var parsed = JSON.parse_string(lines[index])
+	for line in trace_log_lines_since(from_line):
+		var parsed = JSON.parse_string(line)
 		if not (parsed is Dictionary):
 			continue
 		if str((parsed as Dictionary).get("event", "")) != event_name:
@@ -292,15 +294,13 @@ func trace_log_has_since(event_name: String, from_line: int, payload_match: Dict
 	return false
 
 
-func _trace_log_lines() -> PackedStringArray:
-	if not FileAccess.file_exists(TRACE_LOG_PATH):
-		return PackedStringArray()
-	var file = FileAccess.open(TRACE_LOG_PATH, FileAccess.READ)
-	if file == null:
-		return PackedStringArray()
-	var text = file.get_as_text()
-	file.close()
-	return text.split("\n", false)
+func _trace_log_lines() -> PackedStringArray: return TraceLogger.read_log_lines_since(TRACE_LOG_PATH)
+
+
+func _trace_logger():
+	var tree := Engine.get_main_loop() as SceneTree
+	var runtime := tree.root.get_node_or_null("GameRuntime") if tree != null else null
+	return runtime.get("trace") if runtime != null else null
 
 
 func _payload_matches(payload: Variant, expected: Dictionary) -> bool:

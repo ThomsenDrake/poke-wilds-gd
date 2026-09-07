@@ -35,3 +35,7 @@ Read-only analysis found that public exports intentionally omit endpoint/invite 
 ## Workspace safety
 
 Work in the isolated `codex/alpha-feedback` worktree. Preserve the user's original checkout and its existing `project.godot` edit. Do not print, stage, or copy credentials or private report bundles.
+
+## Validation repair discovered during execution
+
+The initial full gate at `5b77e982` reproduced an existing `overworld_mons` 45-second timeout in both determinism passes. Both runs emitted the same 951 event/payload records; their trace assertions repeatedly read the 175 MB append-only log from earlier launches. The scenario and those readers were unchanged by the feedback work. Optimize only the trace-reader seam: read uncapped current-session events, cache the historical line count once, and preserve absolute cursor compatibility and fallback for older cursors. Add a regression using prior history and rerun at the same deadline. Keep gameplay and user logs unchanged.

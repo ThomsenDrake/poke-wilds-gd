@@ -220,6 +220,7 @@ status = "active"
 layer = "runtime"
 code_paths = [
   "scripts/core/trace_logger.gd",
+  "scripts/app/trace_cursor_checks.gd",
   "scripts/runtime/game_runtime.gd",
   "scripts/runtime/stone_evolution_runtime.gd",
   "scripts/runtime/session_state.gd",
@@ -246,6 +247,7 @@ validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
+  "python3 tools/run_playtests.py --scenario feedback_flow --scenario overworld_mons --timeout 45 --fresh-save",
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"

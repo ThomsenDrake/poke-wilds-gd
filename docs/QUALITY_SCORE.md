@@ -7,6 +7,12 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
+Trace cursor validation (2026-09-07): repeated oracle checks now read uncapped
+session traces with absolute line cursors and one streamed historical count.
+The fresh-save headless `overworld_mons` probe passed in 14.03s under its unchanged
+45s deadline; `feedback_flow`, including isolated cursor/reset fixtures, passed
+in 10.62s. These focused results do not replace the full gate. Scores unchanged.
+
 Anonymous alpha feedback (2026-09-07): public and shared alpha stamps carry a
 separate public feedback endpoint with no friend token. Feedback ignores persisted
 friend routes; legacy outbox routes remain intact. Anonymous Worker intake retains

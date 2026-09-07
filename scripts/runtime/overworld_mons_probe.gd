@@ -175,19 +175,5 @@ func last_payload(cursor: int, event_name: String) -> Dictionary:
 			last = payload if payload is Dictionary else {}
 	return last
 
-func _lines_from(cursor: int) -> Array:
-	var lines := _trace_lines()
-	var out: Array = []
-	for index in range(maxi(cursor, 0), lines.size()):
-		out.append(lines[index])
-	return out
-
-func _trace_lines() -> PackedStringArray:
-	if not FileAccess.file_exists(SmokeScenarioRunner.TRACE_LOG_PATH):
-		return PackedStringArray()
-	var file := FileAccess.open(SmokeScenarioRunner.TRACE_LOG_PATH, FileAccess.READ)
-	if file == null:
-		return PackedStringArray()
-	var text := file.get_as_text()
-	file.close()
-	return text.split("\n", false)
+func _lines_from(cursor: int) -> PackedStringArray:
+	return SmokeScenarioRunner.new().trace_log_lines_since(cursor)

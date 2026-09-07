@@ -223,6 +223,15 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godot --scene res://scenes/app/Main.tscn --scenario feedback_flow
 ```
 
+Trace oracle reads keep absolute nonempty-line cursors. They stream-count old
+history once and decode uncapped session lines for repeated checks; explicit
+before-session cursors retain the full-file fallback. Under the single-writer
+contract, observed truncation or a changed session anchor invalidates cached
+offsets. The isolated cursor fixtures run in `feedback_flow`. On 2026-09-07,
+fresh-save headless probes passed: `overworld_mons` 14.03s and `feedback_flow`
+10.62s, both with `--timeout 45`; the player's save was restored after each.
+The full pre-push gate remains required.
+
 Run `feedback_flow` after touching the `F` binding, feedback dialog, capture,
 redaction, bundle, outbox, or upload path. A configured public alpha stamp opens
 feedback without an invite, uses its dedicated endpoint before persisted identity,
