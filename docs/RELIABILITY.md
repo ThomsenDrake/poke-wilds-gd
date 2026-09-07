@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-25
+Last verified: 2026-09-07
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, .github/workflows/enqueue-playtest-feedback.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/legibility_lib.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json, LICENSING.md, THIRD_PARTY.md
 
@@ -224,8 +224,11 @@ python3 tools/godot_dap_smoketest.py --project /absolute/path/to/poke-wilds-godo
 ```
 
 Run `feedback_flow` after touching the `F` binding, feedback dialog, capture,
-redaction, bundle, outbox, or upload path. A public stamp (empty invite and
-empty endpoint) must keep `F` silent; an invited stamp still opens the dialog.
+redaction, bundle, outbox, or upload path. A configured public alpha stamp opens
+feedback without an invite, uses its dedicated endpoint before persisted identity,
+and preserves public updater isolation. A truly unconfigured stamp keeps F silent;
+legacy invited stamps retain their existing path. Real text input must accept X;
+Enter/Escape acknowledgement closes a persistent result without leaking input.
 It drives real `F` events with the
 actual title/menu/storage/camp/waystone/battle/overworld screen state, proves each
 surface receives its distinct capture label, proves an existing text field
@@ -250,7 +253,7 @@ It also suspends an active retry transport, submits another report, and proves t
 shared upload-owner lock plus fresh outbox reconciliation retain and schedule the new
 entry. The first report is queued under one synthetic package identity, the active
 package is changed, and retry proves the persisted private route still supplies the
-original endpoint/invite. A fresh retry scan leaves that old route queued, continues to
+original endpoint, feedback mode, and optional legacy invite. A fresh retry scan leaves that old route queued, continues to
 send the later independent route, then sends the old route on a later pass; both reports
 prove their private route is removed after success. The injected transport returns any
 pre-existing outbox entry as queued without reading, counting, blocking, or deleting it,
@@ -292,11 +295,11 @@ Every committed `.gd` under `scripts/` and `addons/` must have its Godot 4
 `.uid` sidecar (`check_repo_contracts.godot_script_uid_issues`); a missing
 sidecar is what made `playtest-release` on `64dc879e` refuse after a green
 relay retag.
-CI (`playtest-release`) runs that publisher with `--require-cohort` after a green
+CI (`playtest-release`) runs the anonymous alpha publisher after a green
 same-repo `push` `playtests-headless` on current `origin/main` (also `playtest-*` tags
 and `workflow_dispatch`): official 4.6.1 export templates, all three desktop
-presets, a stable accountless cohort invite from `PLAYTEST_COHORT_INVITE_TOKEN`,
-and a public receipt that must not mention tokens. Channel publishes serialize
+presets, explicit public feedback mode/endpoint, and a public receipt that must not
+mention tokens. No per-player or cohort invite is required. Channel publishes serialize
 and refuse a stale playtest HEAD (workflow_run, tag, or dispatch),
 including a second `origin/main` check immediately before
 `latest.json` is written. The
@@ -308,34 +311,37 @@ asset names and uploads `--clobber` when the GitHub Release already exists.
 commit still reaches this publisher. A tag and a later `workflow_run` for
 the same SHA skip a second publish when `latest.json` already has that
 commit. A timeout, 5xx, or malformed `latest` lookup fails closed instead
-of treating the miss as unpublished. `workflow_dispatch` always republishes so a rotated cohort token
-can land without a new commit, but tag and dispatch still require a
+of treating the miss as unpublished. `workflow_dispatch` always republishes so release configuration
+can be refreshed without a new commit, but tag and dispatch still require a
 successful `playtests-headless` run for that SHA; a tag or dispatch
 waits while that gate is still queued or in progress. A later
 `workflow_run` on the same SHA still attaches a `playtest-*` prerelease GitHub Release
 when HEAD points at that tag, but only after a green headless gate and
-only when `latest.commit_sha` is this SHA. Before
-`register_invite`, the publisher also requires a successful
-`feedback-relay-deploy` for a production Worker whose `/healthz`
-`version_tag` contains the latest relay-touching commit (the live tag may
-be a later manual deploy of `main`). The publisher retries while that
-ancestor deploy is still queued or in progress, and a successful
-`feedback-relay-deploy` can retrigger the release after headless already
-passed, so a delayed or failed production
-deploy cannot hit the old upsert that cleared `revoked_at`. Per-friend
-`package_playtest.py` stays off that path.
-Public Latest uses a second workflow (`.github/workflows/public-release.yml`)
-and `publish_update.py --embed-public`: empty endpoint and empty invite,
-local-receipt GitHub assets only, no relay wait, and no playtest
-environment or Cloudflare secrets. `--embed-public` ignores
-`PLAYTEST_FEEDBACK_ENDPOINT`, the admin token, and
-`PLAYTEST_COHORT_INVITE_TOKEN` when those variables are set.
+only when `latest.commit_sha` is this SHA. Shared publication requires a successful
+`feedback-relay-deploy` and production `/healthz` with a version tag containing the
+latest relay commit. It retries pending deployments and refuses stale production.
+There is no cohort registration step. Legacy per-friend `package_playtest.py` remains
+separate.
+Public Latest uses `.github/workflows/public-release.yml` and
+`publish_update.py --embed-public`: updater endpoint and invite stay empty, while
+`feedback_mode=public` and `feedback_endpoint` enable anonymous alpha reports. Public
+exports verify production feedback relay readiness before creating artifacts, use their
+local receipt, and need no playtest environment or Cloudflare secrets.
+The public feedback endpoint comes from `--feedback-endpoint` /
+`ALPHA_FEEDBACK_ENDPOINT` or the production default; legacy invite/admin environment
+variables never become public build credentials.
 `POST /v1/admin/invites` refuses a revoked `tester_id` (`invite_revoked`)
 and never clears `revoked_at` on upsert.
 `update_flow` is a headless playtest with an injected transport; it pins
 friend-wins-after-UPDATE (explicit `identity_kind=friend`, including a
 playtest-channel friend package) and refreshes a persisted shared-cohort
 token from the new embed. `package_playtest.py` refuses `--channel playtest`.
+Anonymous requests are rate-limited by a hashed client address before body parsing,
+then must use PUBLIC-ALPHA on public/playtest and pass the existing size, schema,
+ZIP, hash, and quota checks. Supplied invalid/revoked invites cannot downgrade to
+anonymous access. Worker tests pin public success, bad input, early limits, and
+idempotent issue creation. The client sends an explicit application User-Agent and
+retains a bounded safe relay error code without exposing raw response bodies.
 Relay changes additionally require
 `python3 tools/test_feedback_bundle.py`, `npm ci && npm run check`, and both
 production/staging `wrangler deploy --dry-run` commands from

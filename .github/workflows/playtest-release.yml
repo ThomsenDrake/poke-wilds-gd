@@ -1,9 +1,7 @@
 name: playtest-release
 
-# Shared Linux/Windows/macOS playtest releases. One artifact per OS, no
-# per-friend package. A stable cohort invite (PLAYTEST_COHORT_INVITE_TOKEN)
-# is embedded so a tester who never received a friend package can still F-report
-# without a GitHub account. Persisted user:// friend identity still wins.
+# Shared Linux/Windows/macOS alpha releases use public feedback without
+# invitations or a GitHub account. Deployment credentials remain in the publisher.
 
 on:
   workflow_dispatch:
@@ -30,6 +28,7 @@ concurrency:
 env:
   GODOT_VERSION: 4.6.1-stable
   CHANNEL: playtest
+  ALPHA_FEEDBACK_ENDPOINT: ${{ vars.ALPHA_FEEDBACK_ENDPOINT || 'https://poke-wilds-feedback-relay.drake-t.workers.dev' }}
 
 jobs:
   publish:
@@ -226,15 +225,6 @@ jobs:
       - name: Import project resources (a fresh checkout has no .godot/)
         if: steps.latest.outputs.already_published != 'true'
         run: timeout 3000 "$HOME/godot-bin/godot" --headless --path . --import
-      - name: Require the accountless cohort invite
-        if: steps.latest.outputs.already_published != 'true'
-        env:
-          PLAYTEST_COHORT_INVITE_TOKEN: ${{ secrets.PLAYTEST_COHORT_INVITE_TOKEN }}
-        run: |
-          if [ -z "${PLAYTEST_COHORT_INVITE_TOKEN}" ]; then
-            echo "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report" >&2
-            exit 1
-          fi
       - name: Recheck origin/main before publish
         if: steps.latest.outputs.already_published != 'true'
         run: |
@@ -250,14 +240,12 @@ jobs:
         env:
           PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}
           PLAYTEST_FEEDBACK_ADMIN_TOKEN: ${{ secrets.PLAYTEST_FEEDBACK_ADMIN_TOKEN }}
-          PLAYTEST_COHORT_INVITE_TOKEN: ${{ secrets.PLAYTEST_COHORT_INVITE_TOKEN }}
-          PLAYTEST_COHORT_NICKNAME: ${{ vars.PLAYTEST_COHORT_NICKNAME || 'shared-playtest' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           export GODOT_BIN="$HOME/godot-bin/godot"
           export PATH="${GITHUB_WORKSPACE}/services/feedback-relay/node_modules/.bin:${PATH}"
-          python3 tools/publish_update.py --channel "${CHANNEL}" --require-cohort
+          python3 tools/publish_update.py --channel "${CHANNEL}" --feedback-endpoint "${ALPHA_FEEDBACK_ENDPOINT}"
       - name: Summarize the public receipt
         if: steps.latest.outputs.already_published != 'true'
         run: |
@@ -333,5 +321,5 @@ jobs:
             gh release create "${RELEASE_TAG}" "${files[@]}" \
               --prerelease \
               --title "PokeWilds ${RELEASE_TAG}" \
-              --notes "Shared Linux, Windows, and macOS playtest builds. F reporting stays accountless; existing friend identity is preserved across UPDATE."
+              --notes "Shared Linux, Windows, and macOS alpha builds. Press F to submit feedback and create a GitHub issue without an invitation or account."
           fi

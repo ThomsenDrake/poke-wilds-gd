@@ -1,9 +1,11 @@
 Status: current
-Last verified: 2026-08-14
+Last verified: 2026-09-07
 Review cadence days: 21
 Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd, scripts/domain/battle_effect_tables.gd, scripts/domain/battle_status.gd, scripts/domain/battle_text.gd, scripts/domain/type_chart.gd, scripts/domain/pokemon_rules.gd, scripts/domain/day_phase.gd, scripts/ui/battle_view.gd, scripts/ui/battle_surface.gd, scripts/app/time_evolution_scenario.gd
 
 # Battle And Capture
+
+Source review (2026-09-07): the listed battle sources are unchanged since the previous review. The time-evolution scenario and field-storage implementation were checked directly, and the obsolete claims below were corrected. Runtime revalidation is recorded separately by the canonical `wild_battle`, `time_evolution`, and `storage_flow` lanes in `tools/run_playtests.py`.
 
 ## Supported behavior
 
@@ -34,13 +36,13 @@ Source paths: scripts/runtime/battle_runtime.gd, scripts/domain/battle_rules.gd,
 
 - Attack animation playback is a fixed first pass: frames and sounds play, but layer-script coverage may not match every original effect, and 142 moves use the synthesized fallback. (Infinite-world slice 2: playback frame waits ride a `FrameTicker` child whose `_exit_tree` pulse lets suspended animations resume + unwind during scene teardown — the 'resources still in use at exit' flake class is closed at the source. Slice 3 hardened the ordering: the ticker's `exit_hook` bumps the turn player's generation BEFORE the teardown pulse — the parent `battle_view._exit_tree` fires after its child's and would bump too late, letting a teardown-resumed playback emit `battle_finished` mid-quit — and `_exit_tree` keeps a backstop bump for a pulse-less path.)
 - No abilities, weather, held items, or trainer battles.
-- No PC storage-box UI. A full-party capture is non-losing: the overflow Pokemon is held at the player's campsite and retrieved from the party screen (RETRIEVE action). The full storage-box system is a later phase.
+- Field storage boxes have a deposit/withdraw/release UI, described in [storage-and-party.md](storage-and-party.md). Full-party captures still place overflow at the campsite for retrieval from the party screen; captures do not automatically route into a field box.
 - No move learning UI beyond replacing the oldest move when a fifth move would be learned.
 
 ## Smoke validation
 
 - `wild_battle` opens a battle, drives the same menu navigation methods used by live input, performs one move if possible, and exits cleanly. It additionally asserts the Phase-0 data-integrity behaviors: a full-party capture relocates the overflow Pokemon to the campsite (party unchanged, `mon_relocated` fired, mon retrievable) instead of losing it, and the defeat/blackout path leaves the party with a clean status (no residual status condition or `sleep_turns` after the heal).
-- `time_evolution` (Phase 2) proves the time-of-day evolution gate in both directions under `seed_for_smoke`: EEVEE at happiness 255, exp poked to one seeded victory from level — a DAY battle (time 600) leaves it EEVEE with `evolution_time_gate{time_of_day:"DAY", evolved:""}`, and the same setup at NIGHT (time 1380) evolves it to UMBREON with `evolution_time_gate{evolved:"UMBREON"}` (SNOM→FROSMOTH rides the identical `TR_NITE` gate). The shadow-retreat block is proven by `night_cycle` (run refused once with `retreat_blocked`, then victory), not here.
+- `time_evolution` proves EEVEE evolves to ESPEON during DAY (600 minutes) and UMBREON at NIGHT (1380 minutes), both at happiness 255. SNOM provides the negative DAY witness (no evolution) and evolves to FROSMOTH at NIGHT. Each seeded battle checks `evolution_time_gate` with the actual time label and target; `night_cycle` covers shadow-retreat refusal.
 
 
 ## Phase 5 Pokemon systems co-modification (cross-subsystem)

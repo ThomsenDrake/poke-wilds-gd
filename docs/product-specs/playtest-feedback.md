@@ -1,33 +1,33 @@
 Status: current
-Last verified: 2026-08-25
+Last verified: 2026-09-07
 Review cadence days: 14
-Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/enqueue-playtest-feedback.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_stamp_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
+Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/enqueue-playtest-feedback.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_legacy_checks.gd, scripts/app/feedback_flow_stamp_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/report_access.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
 # Playtest Feedback
 
 ## Player contract
 
-In an invited packaged desktop build, `F` opens a pause-modal bug report from title,
-overworld, menu (including storage, camp, and waystone), or battle.
-On a public packaged desktop build whose unmerged embed has no invite and no
-endpoint, `F` does nothing: no pause, dialog, toast, capture, or
-`feedback_capture_requested`. A tokenless embed does not restore
-`user://playtest_identity.json`. A tokenless Godot Export matches that public
-stamp. An invite with a missing endpoint still opens the dialog and returns
-`feedback_not_configured` without writing the outbox. If a `LineEdit` or `TextEdit` already owns keyboard
+In every packaged alpha desktop build, `F` opens a pause-modal bug report from title,
+overworld, menu (including storage, camp, and waystone), or battle. Public and shared
+alpha stamps include `feedback_mode: "public"` and an HTTPS `feedback_endpoint`.
+They need no friend invitation, invite token, or GitHub login. The separate feedback
+endpoint does not enable the updater in a public build. A genuinely unconfigured
+bare editor/export stamp remains silent; a partially configured invited stamp opens
+but returns `feedback_not_configured` before writing an outbox entry. If a `LineEdit` or `TextEdit` already owns keyboard
 focus, `F` remains text and does not open the report. The report captures the
 screen, screenshot, UI tree, in-memory save, runtime/game summaries, current-session
 trace, and sanitized engine-log tail before the modal becomes visible, then presents one
-1–1000 character field. Enter sends, Shift+Enter inserts a newline, and Escape or X
-cancels even while the field owns focus. Submission and result display ignore further
-send/cancel/reopen input. The dialog says
+1–1000 character field. Enter sends, Shift+Enter inserts a newline, and Escape
+cancels. X is ordinary text, including while the field owns focus. Submission ignores
+further send/cancel/reopen input. Results stay visible until Enter or Escape dismisses
+them, and that acknowledgement must not leak into gameplay input. The dialog says
 that the message is public while the screenshot, save, and diagnostics stay
 private, using the exact disclosure text shown in the dialog.
 
 The exact prior `SceneTree.paused` value is restored after cancel, success, or
 queueing. A network/429/5xx failure leaves the ZIP, public metadata, and a local-only
 private route in `user://feedback_outbox`; the route retains that report's original
-endpoint/invite across a later package change and is never uploaded. An atomic metadata
+endpoint, feedback mode, and any legacy invite across a later package change and is never uploaded. An atomic metadata
 commit makes only complete ZIP/route/metadata sets retry-visible, while malformed or
 incomplete prior entries are preserved out of the retry queue and their orphaned route
 is removed. The relay counts the same Unicode code points as the Godot field, so up to
@@ -44,7 +44,9 @@ outbox commit, so a non-personalized export cannot create a permanently unsendab
 private route; a legacy malformed route is terminally blocked rather than retried forever.
 Runtime parsing requires a nonempty DNS/IP host and an optional numeric port in the
 1–65535 range, matching the package-time boundary for malformed authorities.
-Runtime uploads also reject redirects instead of forwarding the invite credential.
+Runtime uploads reject redirects, send an explicit application User-Agent, and attach
+Authorization only for legacy invited routes. Safe bounded relay error identifiers
+remain available for diagnosis; raw response bodies are never shown or logged.
 Bundle creation checks the result of each ZIP entry write, entry close, and final archive
 close before the outbox can commit it. The stable install ID must be exactly 32 lowercase
 hexadecimal characters; a missing or malformed persisted value is regenerated into a
@@ -84,30 +86,25 @@ route is neither an artifact nor upload metadata and never enters the ZIP, trace
 
 ## Identity, relay, and issue contract
 
-`tools/package_playtest.py` creates one package per friend and platform. The
-friend never types a code: the export embeds a public-safe tester handle and a
-revocable opaque invite token in generated, ignored build metadata, plus
-`published_at` so a later shared update can compare monotonically.
-A later shared update ([game-update.md](game-update.md)) does not re-embed that
-token: the first launch copies `tester_id` / `invite_token` / `endpoint` /
-`channel` into `user://playtest_identity.json`, and `load_build_info()` prefers
-that persisted friend route for new `F` reports. A persisted shared-cohort
-route is refreshed from the new embed when the cohort token rotates. If the identity write fails, the
-shared update check and apply are refused so a tokenless replace cannot
-strip the friend route. Shared update checks read the
-embedded `endpoint` from `playtest_build.json` and do not follow the persisted
-friend relay. Editor smoke build-info overrides are
-not merged with disk identity. The relay
-stores only the token hash and private nickname. The package token is treated as
-extractable and is protected by revocation, cohort scoping, per-minute edge
-limiting, and D1 daily limits—not as a durable secret. Re-registering a
-revoked `tester_id` returns `invite_revoked` and does not clear `revoked_at`,
-so a later playtest publish cannot silently revive a compromised cohort
-token. `playtest-release` waits for the production Worker that contains
-that check (`feedback-relay-deploy` success plus `/healthz` `version_tag`
-that contains the latest relay-touching commit, including a later manual
-`main` deploy) before `register_invite`. Rotate `PLAYTEST_COHORT_INVITE_TOKEN` instead. GitHub App and maintainer
-credentials exist only as Worker secrets.
+Public alpha feedback uses the fixed anonymous tester label `PUBLIC-ALPHA` and the
+existing random per-install ID. It resolves its feedback endpoint directly from the
+current build stamp, before any persisted friend identity is considered. An old
+`user://playtest_identity.json` cannot redirect a new alpha report or reintroduce an
+invite requirement. Public and shared alpha publishers do not register invites.
+
+Requests without Authorization use anonymous admission for the `public` and `playtest`
+channels. A hashed client-address limiter runs before body parsing; existing per-install
+and per-channel daily quotas still apply. Client metadata is untrusted and does not
+prove possession of an official build. Any supplied Authorization uses strict legacy
+invite validation; an invalid/revoked credential never falls back to anonymous access.
+GitHub App and maintainer credentials exist only as Worker secrets.
+
+Previously distributed friend packages and queued reports remain compatible. Their
+private route retains its original endpoint/invite, and no repair silently resends a
+blocked report. A route-less legacy ZIP/metadata pair can use a saved identity only
+when its tester and channel match; an explicit private route always wins. The optional legacy `tools/package_playtest.py` still creates revocable
+personalized packages; it is not required for alpha feedback. Legacy identity/update
+behavior remains described in [game-update.md](game-update.md).
 The relay endpoint must be HTTPS without embedded credentials, a query, a fragment, or
 an empty/malformed explicit port;
 one shared validator runs before both the admin invite request and the maintainer bundle
@@ -116,13 +113,14 @@ endpoint is the one embedded into the package. A cross-platform advisory lock co
 the shared `generated/playtest_build.json` write/export/delete sequence, so a concurrent invocation
 refuses without overwriting or deleting the active export's tester metadata.
 
-Public tester handles use the `PKMN-<SPECIES>-<SUFFIX>` scheme and are derived
+Legacy invited tester handles use the `PKMN-<SPECIES>-<SUFFIX>` scheme and are derived
 only from the opaque invite token. A friend's private nickname is never an input
 to the public handle and remains solely in the ignored mode-0600 registry and
 the relay's private D1 invite row.
 
-`POST /v1/reports` authorizes the invite and applies the five-per-minute
-tester/token edge limit before consuming the bounded multipart body. Typed relay
+`POST /v1/reports` applies the five-per-minute hashed-client edge limit for
+anonymous alpha reports, or strict invite authorization and the existing tester/token
+limit for legacy reports, before consuming the bounded multipart body. Typed relay
 errors carry their public status from the validation source, so permanent schema/ZIP
 failures cannot fall into the retryable 5xx class. The relay verifies the
 client hash, EOCD-declared ZIP central directory with matching local headers and CRCs,
@@ -180,73 +178,41 @@ token. The agent fetches the private bundle with
 `tools/fetch_feedback_report.py` after it starts. Closed canaries and
 `feedback_not_configured` reports are not a reason to rerun this enqueue.
 
-### Maintainer: send a friend build
+### Maintainer: distribute an alpha build
 
-Never use Godot's Export Project. A bare export embeds `build_id=local`,
-`commit_sha=unknown`, and empty `endpoint` / `invite_token`; `F` then returns
-`feedback_not_configured` (issues #48 / #50). Use one of these paths on a
-**green** `main` (`playtests-headless` success for that SHA):
+Use the release publisher on a green, committed SHA. Godot's bare Export Project does
+not create the build stamp. Both public `v*` releases and shared `playtest-*` releases
+embed public feedback configuration and produce one file per desktop OS. An alpha
+player needs no personalized package or code. Confirm that a release job actually
+exported rather than only reporting `already_published=true`.
 
-Shared cohort (several friends, one binary per OS) — after green headless,
-`playtest-release` runs `publish_update.py --require-cohort` and writes Linux /
-Windows / macOS artifacts. Confirm the job actually exported (a 17s
-`already_published=true` skip is **not** a publish). Distribute the three OS
-files from the workflow artifact or `GET /v1/updates/latest?channel=playtest`.
-A `v*` tag is optional and only attaches a GitHub Release.
+`public-release` uses `publish_update.py --channel public --embed-public`; its updater
+endpoint stays empty. The public feedback endpoint defaults to the production relay
+and may be supplied with `--feedback-endpoint` / `ALPHA_FEEDBACK_ENDPOINT`. It contains
+no secret and requires no Cloudflare credential for export. Public exports also verify
+the deployed production feedback relay revision before building artifacts. Shared `playtest-release`
+publishes the update artifacts through R2 and waits for production relay readiness,
+without consuming or registering a cohort invite. Publisher administration still
+requires server-side publish credentials; these never enter a public build.
 
-Per-friend first contact (clean committed tree, production relay creds):
+Distribute the Windows `.exe`, Linux `.x86_64`, or macOS `.zip` from the matching release
+receipt. `--allow-dirty` is only for local validation. Commit every `.gd.uid` sidecar so
+Godot import does not make the release checkout dirty. Legacy personalized exports
+remain supported by `tools/package_playtest.py --friend ... --target ...`, but do not
+use that workflow to onboard ordinary alpha players.
 
-```bash
-export PLAYTEST_FEEDBACK_ENDPOINT="https://<production-relay>"
-export PLAYTEST_FEEDBACK_ADMIN_TOKEN="<admin-bearer>"
-python3 tools/package_playtest.py --friend "Name" --target macos|windows|linux
-```
-
-`--allow-dirty` is for local validation only. `--channel playtest` is refused
-(that channel is CI cohort). Send only the file under
-`dist/playtest/PKMN-…/`. Do not share `.playtest/invites.json`.
-Commit every Godot `.gd.uid` sidecar: CI `--import` writes a missing one, and
-`publish_update` then refuses the dirty tree before export.
-
-Automated shared releases for all three presets are owned by
-`.github/workflows/playtest-release.yml`. That workflow publishes one Linux,
-Windows, and macOS artifact through `tools/publish_update.py --require-cohort`
-and embeds a stable cohort invite (`PLAYTEST_COHORT_INVITE_TOKEN`) so a friend
-who never received a first-contact package can still `F`-report without a
-GitHub account. It does not mint per-friend tokens, does not run
-`package_playtest.py`, and never prints the cohort or admin credential.
-Existing `user://playtest_identity.json` friend routes still win after UPDATE.
-A persisted shared-cohort identity is refreshed from the new embed when
-`PLAYTEST_COHORT_INVITE_TOKEN` rotates. Friend packages persist
-`identity_kind=friend` and cannot use `--channel playtest`.
-The `playtest-release` GitHub environment holds the publish endpoint, admin
-token, cohort invite, and Cloudflare R2 credentials; the GitHub App private
-key stays out. A public receipt lists the three OS artifacts without tokens.
-`playtest-*` tags also attach those binaries to a GitHub Release as a
-prerelease under stable names so a rerun `--clobber`s the previous assets
-and the tag cannot become Latest. Wrangler/R2 selection
-follows `PLAYTEST_FEEDBACK_ENDPOINT`. `playtests-headless` includes
-`export_presets.cfg` and `services/feedback-relay/**` so a preset-only or
-relay-only main commit still publishes. A tag
-and a later `workflow_run` for the same SHA skip a second publish. Tag and
-dispatch still require a successful `playtests-headless` run for that SHA
-and wait while that gate is still pending. A later `workflow_run` attaches
-the GitHub Release when HEAD points at a `playtest-*` tag, after a green gate,
-and refuses a previous `latest` pointer that is not this SHA.
-The publisher also refuses to register the cohort invite until production
-`/healthz` reports a Worker that contains the latest relay-touching commit,
-retries while that ancestor deploy is still pending, and can retrigger
-after `feedback-relay-deploy` succeeds. A transient `latest` lookup fails
-closed instead of republishing the same SHA. `origin/main` is rechecked
-immediately before writing the manifest.
+A successful local smoke run is not Windows runtime certification. Validate a Windows
+artifact on Windows and confirm its issue number against the GitHub issue and D1
+receipt. Live test submissions must be explicitly authorized; unit/smoke tests use
+injected transports and never publish fabricated player reports.
 
 The three committed export presets are Linux x86-64, Windows x86-64, and macOS
 Universal 2. Linux and Windows embed the PCK so the single reported executable
 is the complete distributable; macOS exports one ZIP. The packaging command refuses
 tracked or untracked worktree changes unless
-`--allow-dirty` is deliberately supplied for local validation. It registers an
-invite through the admin API, creates temporary build metadata, exports the
-release, and removes the generated metadata in a lock-owned `finally` block. Raw invite
+`--allow-dirty` is deliberately supplied for local validation. The legacy personalized command registers an
+invite through the admin API; all publishers create temporary build metadata, export
+the release, and remove the generated metadata in a lock-owned `finally` block. Raw invite
 tokens remain only in the ignored mode-0600 `.playtest/invites.json` and inside
 their revocable packages; commands never print them. Private/generated/output paths
 remain excluded through `.gitignore`, while an untracked exportable resource blocks

@@ -1,8 +1,10 @@
 Status: current
-Last verified: 2026-08-09
+Last verified: 2026-09-07
 Review cadence days: 21
 Source paths: scripts/ui/gbc_widgets.gd, scripts/ui/gbc_stage.gd, scripts/ui/menu_list_stage.gd
 # Accessibility Annotations (GBC UI)
+
+Source review (2026-09-07): the annotation table was checked against `GbcWidgets`, `GbcStage`, and `MenuListStage.Rows`; the name, selection/unavailability description, and polite live-region assignments remain in place. Runtime metadata revalidation is pending `ui_tree_dump` and `legibility_soak`; this does not claim native screen-reader announcements were tested.
 
 Umbrella doc: [agent-integration.md](agent-integration.md) (the repo-wide
 agent surface; this file is the AccessKit annotation contract it points at).

@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-08-17
+Last verified: 2026-09-07
 Review cadence days: 14
-Source paths: scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py
+Source paths: scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/report_access.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py
 
 # Feedback Report Schema
 
@@ -22,6 +22,10 @@ Bundle v1 is a ZIP with this exact entry allowlist:
 `game`, `capture`, and `artifacts`. `artifacts` excludes `report.json` to avoid a
 self-hash and contains `{path, bytes, sha256, truncated}` for every other entry.
 `build` contains only version/SHA/build/channel—never endpoint or invite token.
+Anonymous alpha reports use `tester_id: "PUBLIC-ALPHA"` with channel `public` or
+`playtest`; install IDs keep their existing random 32-hex format. Feedback mode and
+endpoint belong only to embedded configuration and the local private route. The
+schema version, exact ZIP allowlist, and manifest agreement checks remain v1.
 
 `POST /v1/reports` metadata repeats the private manifest identity/capture fields, including
 `capture.screen` and `capture.screenshot_available`, and adds

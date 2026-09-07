@@ -87,6 +87,7 @@ names = ["game/party_size", "game/world_seed", "game/current_screen"]
 query_api = "Performance.get_custom_monitor"
 
 [feedback_reports]
+# Public/shared alpha reports use anonymous intake; legacy invite reports remain readable.
 # Public issues carry only a sanitized handoff and report id. Raw release-build
 # reproduction artifacts remain private and require the maintainer credential.
 schema_doc = "docs/references/feedback-report-schema.md"

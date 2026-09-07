@@ -324,6 +324,139 @@ describe("feedback report route boundaries", () => {
   });
 });
 
+describe("anonymous alpha reports", () => {
+  const address = "203.0.113.7";
+  const publicHeaders = { "CF-Connecting-IP": address };
+  const publicOptions = { testerId: "PUBLIC-ALPHA", channel: "public", headers: publicHeaders };
+  beforeEach(() => findOrCreateIssue.mockReset());
+
+  it.each(["public", "playtest"])("stores a %s alpha report and creates its GitHub issue without an invite", async (channel) => {
+    const harness = routeHarness();
+    findOrCreateIssue.mockResolvedValueOnce({ number: 101, html_url: "https://github.com/o/r/issues/101" });
+    const response = await submit(harness.env, { ...publicOptions, channel });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ ok: true, issue_number: 101 });
+    expect(harness.queries.some((query) => query.includes("FROM invites"))).toBe(false);
+    expect(harness.put).toHaveBeenCalledWith(
+      `reports/${channel}/01234567-89ab-cdef-0123-456789abcdef/bundle.zip`,
+      expect.any(Uint8Array), expect.anything(),
+    );
+    expect(findOrCreateIssue).toHaveBeenCalledWith(harness.env,
+      expect.objectContaining({ tester_id: "PUBLIC-ALPHA", build: expect.objectContaining({ channel }) }),
+      expect.any(String));
+    expect(JSON.stringify(harness.bindings)).not.toContain(address);
+  });
+
+  it("returns the same issue for a duplicate anonymous upload without storing or creating twice", async () => {
+    const harness = routeHarness();
+    findOrCreateIssue.mockResolvedValueOnce({ number: 102, html_url: "https://github.com/o/r/issues/102" });
+    const payload = await uploadPayload(publicOptions);
+    const first = await submitPayload(harness.env, payload, publicHeaders);
+    const second = await submitPayload(harness.env, payload, publicHeaders);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({ ok: true, issue_number: 102 });
+    expect(harness.put).toHaveBeenCalledOnce();
+    expect(findOrCreateIssue).toHaveBeenCalledOnce();
+    expect(harness.queries.filter((query) => query.startsWith("INSERT OR IGNORE"))).toHaveLength(1);
+  });
+
+  it("rate limits by hashed client address before reading an anonymous body", async () => {
+    const harness = routeHarness();
+    const limit = vi.fn().mockResolvedValue({ success: false });
+    harness.env.REPORT_RATE_LIMITER = { limit } as RateLimit;
+    for (const client of [address, "2001:db8::1"]) {
+      const request = new Request("https://relay.test/v1/reports", {
+        method: "POST", headers: { "CF-Connecting-IP": client, "Content-Type": "not-multipart" }, body: "ignored",
+      });
+      const response = await worker.fetch(request, harness.env);
+      expect(response.status).toBe(429);
+      expect(await response.json()).toMatchObject({ error: "rate_limited" });
+      expect(request.bodyUsed).toBe(false);
+      expect(limit).toHaveBeenLastCalledWith({ key: `public:${await sha256Hex(client)}` });
+    }
+    expect(limit.mock.calls[0][0].key).not.toBe(limit.mock.calls[1][0].key);
+    expect(harness.queries).toEqual([]);
+    expect(harness.put).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "", "invalid-client", "1".repeat(65)])(
+    "refuses missing or unusable Cloudflare client addresses without trusting forwarded headers (%s)", async (client) => {
+      const harness = routeHarness();
+      const limit = vi.fn();
+      harness.env.REPORT_RATE_LIMITER = { limit } as unknown as RateLimit;
+      const headers = new Headers({ "X-Forwarded-For": address, "X-Real-IP": address });
+      if (client !== undefined) headers.set("CF-Connecting-IP", client);
+      const request = new Request("https://relay.test/v1/reports", { method: "POST", headers, body: "ignored" });
+      const response = await worker.fetch(request, harness.env);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: "client_address_required" });
+      expect(request.bodyUsed).toBe(false);
+      expect(limit).not.toHaveBeenCalled();
+      expect(harness.queries).toEqual([]);
+    },
+  );
+
+  it.each(["", "Bearer", "Bearer ", "Basic invalid", "Bearer revoked-token"])(
+    "never downgrades supplied invalid authentication to anonymous admission (%s)", async (authorization) => {
+      const harness = routeHarness({ invalidInvite: true });
+      const limit = vi.fn();
+      harness.env.REPORT_RATE_LIMITER = { limit } as unknown as RateLimit;
+      const request = new Request("https://relay.test/v1/reports", {
+        method: "POST", headers: { ...publicHeaders, Authorization: authorization }, body: "ignored",
+      });
+      const response = await worker.fetch(request, harness.env);
+      expect(response.status).toBe(401);
+      expect(request.bodyUsed).toBe(false);
+      expect(limit).not.toHaveBeenCalled();
+      expect(harness.put).not.toHaveBeenCalled();
+      expect(findOrCreateIssue).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { testerId: "T-TEST", channel: "public", error: "tester_mismatch" },
+    { testerId: "PUBLIC-ALPHA", channel: "friends", error: "cohort_mismatch" },
+  ])("rejects an anonymous identity outside its public alpha stamp ($testerId / $channel)", async (identity) => {
+    const harness = routeHarness();
+    const response = await submit(harness.env, { ...publicOptions, ...identity });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: identity.error });
+    expect(harness.put).not.toHaveBeenCalled();
+    expect(findOrCreateIssue).not.toHaveBeenCalled();
+  });
+
+  it("validates anonymous bundle hashes and ZIP structure before admission", async () => {
+    for (const hashMatches of [false, true]) {
+      const harness = routeHarness();
+      const payload = await uploadPayload(publicOptions);
+      payload.bundle = new Uint8Array([1]);
+      payload.metadata.bundle_bytes = 1;
+      if (hashMatches) payload.metadata.bundle_sha256 = await sha256Hex(payload.bundle);
+      const response = await submitPayload(harness.env, payload, publicHeaders);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: hashMatches ? "invalid_zip" : "bundle_hash_mismatch" });
+      expect(harness.queries).toEqual([]);
+      expect(harness.put).not.toHaveBeenCalled();
+      expect(findOrCreateIssue).not.toHaveBeenCalled();
+    }
+  });
+
+  it("preserves daily install and cohort admission limits for anonymous reports", async () => {
+    const harness = routeHarness({ admissionChanges: 0 });
+    const response = await submit(harness.env, publicOptions);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ error: "daily_limit" });
+    const admission = harness.bindings.find(({ query }) => query.startsWith("INSERT OR IGNORE"));
+    expect(admission?.query).toContain("install_id_hash=? AND created_at >= datetime('now','-1 day')) < 20");
+    expect(admission?.query).toContain("cohort_id=? AND created_at >= datetime('now','-1 day')) < 200");
+    expect(admission?.values[3]).toBe(await sha256Hex(`public:${"a".repeat(32)}`));
+    expect(admission?.values.at(-1)).toBe("public");
+    expect(harness.put).not.toHaveBeenCalled();
+    expect(findOrCreateIssue).not.toHaveBeenCalled();
+  });
+});
+
 describe("expired report cleanup", () => {
   it("drains more than one deterministic page with bulk storage operations", async () => {
     const harness = cleanupHarness([cleanupRows(100, 0), cleanupRows(55, 100)]);
@@ -383,6 +516,7 @@ describe("expired report cleanup", () => {
 });
 
 type HarnessOptions = {
+  invalidInvite?: boolean;
   existing?: ReturnType<typeof reportRow>;
   existingAfterUploadClaim?: ReturnType<typeof reportRow>;
   admissionChanges?: number;
@@ -452,38 +586,48 @@ function cleanupIds(count: number, offset: number): string[] {
 
 function routeHarness(options: HarnessOptions = {}) {
   const queries: string[] = [];
+  const bindings: Array<{ query: string; values: unknown[] }> = [];
   const put = options.put ?? vi.fn().mockResolvedValue(undefined);
   const existing = options.existing;
+  let completed: { issueNumber: number; issueUrl: string; bundleHash: string } | undefined;
   const envValue = env(true);
   envValue.REPORTS = { put, delete: vi.fn().mockResolvedValue(undefined) } as unknown as R2Bucket;
   envValue.DB = {
     prepare: (query: string) => {
       queries.push(query);
       return {
-        bind: () => ({
-          first: async () => {
-            if (query.startsWith("SELECT tester_id")) return { tester_id: "T-TEST", nickname: "Tester", token_hash: "", cohort_id: "friends" };
-            if (query.startsWith("SELECT report_id,status")) return existing ? { ...existing, bundle_sha256: existing.bundle_sha256 || currentBundleHash } : null;
-            if (query.startsWith("SELECT status,issue_number")) {
-              const row = options.existingAfterUploadClaim ?? existing;
-              return row ? { ...row, bundle_sha256: row.bundle_sha256 || currentBundleHash } : null;
-            }
-            return null;
-          },
-          run: async () => {
-            if (query.startsWith("INSERT OR IGNORE")) return { meta: { changes: options.admissionChanges ?? 1 } };
-            if (query.includes("SET status='uploading'")) return { meta: { changes: options.uploadClaimChanges ?? 1 } };
-            if (query.startsWith("UPDATE reports SET status='completed'")) {
-              if (options.completionError) throw options.completionError;
+        bind: (...values: unknown[]) => {
+          bindings.push({ query, values });
+          return {
+            first: async () => {
+              if (query.startsWith("SELECT tester_id")) return options.invalidInvite ? null : { tester_id: "T-TEST", nickname: "Tester", token_hash: "", cohort_id: "friends" };
+              if (query.startsWith("SELECT report_id,status") && completed) {
+                return { ...reportRow("completed"), bundle_sha256: completed.bundleHash,
+                  issue_number: completed.issueNumber, issue_url: completed.issueUrl };
+              }
+              if (query.startsWith("SELECT report_id,status")) return existing ? { ...existing, bundle_sha256: existing.bundle_sha256 || currentBundleHash } : null;
+              if (query.startsWith("SELECT status,issue_number")) {
+                const row = options.existingAfterUploadClaim ?? existing;
+                return row ? { ...row, bundle_sha256: row.bundle_sha256 || currentBundleHash } : null;
+              }
+              return null;
+            },
+            run: async () => {
+              if (query.startsWith("INSERT OR IGNORE")) return { meta: { changes: options.admissionChanges ?? 1 } };
+              if (query.includes("SET status='uploading'")) return { meta: { changes: options.uploadClaimChanges ?? 1 } };
+              if (query.startsWith("UPDATE reports SET status='completed'")) {
+                if (options.completionError) throw options.completionError;
+                completed = { issueNumber: Number(values[0]), issueUrl: String(values[1]), bundleHash: currentBundleHash };
+                return { meta: { changes: 1 } };
+              }
               return { meta: { changes: 1 } };
-            }
-            return { meta: { changes: 1 } };
-          },
-        }),
+            },
+          };
+        },
       };
     },
   } as unknown as D1Database;
-  return { env: envValue, put, queries };
+  return { env: envValue, put, queries, bindings };
 }
 
 function reportRow(status: string, updatedAt = new Date().toISOString()) {
@@ -493,18 +637,24 @@ function reportRow(status: string, updatedAt = new Date().toISOString()) {
   };
 }
 
-async function submit(envValue: Env): Promise<Response> {
-  const { metadata, bundle } = await uploadPayload();
+async function submit(envValue: Env,
+  options: { testerId?: string; channel?: string; headers?: Record<string, string> } = {}): Promise<Response> {
+  return submitPayload(envValue, await uploadPayload(options), options.headers ?? { Authorization: "Bearer invite" });
+}
+
+async function submitPayload(envValue: Env, payload: Awaited<ReturnType<typeof uploadPayload>>,
+  headers: Record<string, string>): Promise<Response> {
+  const { metadata, bundle } = payload;
   currentBundleHash = String(metadata.bundle_sha256);
   const form = new FormData();
   form.set("metadata", JSON.stringify(metadata));
   form.set("bundle", new Blob([bundle], { type: "application/zip" }), "report.zip");
   return worker.fetch(new Request("https://relay.test/v1/reports", {
-    method: "POST", headers: { Authorization: "Bearer invite" }, body: form,
+    method: "POST", headers, body: form,
   }), envValue);
 }
 
-async function uploadPayload(): Promise<{ metadata: Record<string, unknown>; bundle: Uint8Array }> {
+async function uploadPayload(identity: { testerId?: string; channel?: string } = {}): Promise<{ metadata: Record<string, unknown>; bundle: Uint8Array }> {
   const reportId = "01234567-89ab-cdef-0123-456789abcdef";
   const runtime = { godot_version: "4.6", os_name: "macOS", os_version: "15", architecture: "arm64", locale: "en_US",
     renderer: "gl_compatibility", adapter: "Apple", window_size: [1152, 648] };
@@ -516,8 +666,8 @@ async function uploadPayload(): Promise<{ metadata: Record<string, unknown>; bun
   const artifacts = await Promise.all(Object.entries(contents).map(async ([path, bytes]) =>
     ({ path, bytes: bytes.byteLength, sha256: await sha256Hex(bytes), truncated: false })));
   const base = { schema_version: 1, report_id: reportId, created_at_utc: "2026-08-12T12:34:56Z", message: "stuck",
-    tester_id: "T-TEST", install_id: "a".repeat(32),
-    build: { version: "0.0.0", commit_sha: "b".repeat(40), build_id: "beta-1", channel: "friends" }, runtime, game, capture };
+    tester_id: identity.testerId ?? "T-TEST", install_id: "a".repeat(32),
+    build: { version: "0.0.0", commit_sha: "b".repeat(40), build_id: "beta-1", channel: identity.channel ?? "friends" }, runtime, game, capture };
   const bundle = zipSync({ ...contents, "report.json": strToU8(JSON.stringify({ ...base, artifacts })) }, { level: 0 });
   return { bundle, metadata: { ...base, bundle_sha256: await sha256Hex(bundle), bundle_bytes: bundle.byteLength } };
 }

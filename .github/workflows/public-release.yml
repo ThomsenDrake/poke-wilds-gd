@@ -1,7 +1,7 @@
 name: public-release
 
-# Public desktop Latest Release. The embed has an empty endpoint and an
-# empty invite. Relay, cohort, and Cloudflare credentials stay off this path.
+# Public desktop Latest Release. Alpha feedback uses a non-secret public URL.
+# The updater remains disabled and deployment credentials stay off this path.
 
 on:
   workflow_dispatch:
@@ -20,6 +20,7 @@ concurrency:
 env:
   GODOT_VERSION: 4.6.1-stable
   CHANNEL: public
+  ALPHA_FEEDBACK_ENDPOINT: ${{ vars.ALPHA_FEEDBACK_ENDPOINT || 'https://poke-wilds-feedback-relay.drake-t.workers.dev' }}
 
 jobs:
   publish:
@@ -137,7 +138,7 @@ jobs:
         if: steps.release.outputs.tag != ''
         run: |
           export GODOT_BIN="$HOME/godot-bin/godot"
-          python3 tools/publish_update.py --channel "${CHANNEL}" --embed-public
+          python3 tools/publish_update.py --channel "${CHANNEL}" --embed-public --feedback-endpoint "${ALPHA_FEEDBACK_ENDPOINT}"
       - name: Summarize the public receipt
         if: steps.release.outputs.tag != ''
         run: |
@@ -205,7 +206,7 @@ jobs:
           else
             gh release create "${RELEASE_TAG}" "${files[@]}" \
               --title "PokeWilds ${RELEASE_TAG}" \
-              --notes "Desktop builds for Windows, macOS, and Linux.
+              --notes "Desktop alpha builds for Windows, macOS, and Linux. Press F to submit feedback and create a GitHub issue without an account.
 
           - Windows: PokeWilds-windows.exe
           - macOS: PokeWilds-macos.zip

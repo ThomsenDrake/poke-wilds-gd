@@ -26,7 +26,7 @@ var _suppress_close_toast = false
 var _battle_enemy_dex := 0
 
 func _ready() -> void:
-	_input_router.configure_input_map(); _input_router.bind_ui_consumers([$UI/CampMenu, _start_menu, _message_box, $UI/StorageScreen, $UI/TitleScreen, $UI/CreationScreen])
+	_input_router.configure_input_map(); _input_router.bind_ui_consumers([$UI/CampMenu, _start_menu, _message_box, $UI/StorageScreen, $UI/TitleScreen, $UI/CreationScreen, $UI/FeedbackDialog])
 	_runtime().emit_trace("boot_started", "App.Main", {"scene": "res://scenes/app/Main.tscn"})
 	var smoke_scenario = _smoke_runner.consume_requested_scenario() # consumed BEFORE ensure_initialized (title_flow boot split): scenario presence IS the silent-new-game flag
 	_runtime().ensure_initialized(not smoke_scenario.is_empty())

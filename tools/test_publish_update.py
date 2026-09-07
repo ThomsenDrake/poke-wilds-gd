@@ -14,6 +14,7 @@ from unittest import mock
 import urllib.error
 import zipfile
 
+import package_playtest
 import publish_update
 import update_apply
 import update_manifest
@@ -227,10 +228,12 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(set(exported["artifacts"]), {"linux", "windows", "macos"})
             metadata = json.loads((root / "generated" / "playtest_build.json").read_text(encoding="utf-8"))
             self.assertEqual(metadata["invite_token"], "")
-            self.assertEqual(metadata["tester_id"], "UNASSIGNED")
+            self.assertEqual(metadata["tester_id"], "PUBLIC-ALPHA")
+            self.assertEqual(metadata["feedback_mode"], "public")
+            self.assertEqual(metadata["feedback_endpoint"], "https://relay.test")
             self.assertEqual(metadata["channel"], "playtest")
 
-    def test_export_embeds_a_cohort_invite_not_a_friend_name(self) -> None:
+    def test_export_ignores_legacy_cohort_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
 
@@ -252,40 +255,48 @@ class PublishUpdateTests(unittest.TestCase):
                     "playtest", "https://relay.test", godot="godot",
                     runner=fake_run, cohort=cohort)
             metadata = json.loads((root / "generated" / "playtest_build.json").read_text(encoding="utf-8"))
-            self.assertEqual(metadata["invite_token"], "secret-cohort-token")
-            self.assertEqual(metadata["tester_id"], "PKMN-EEVEE-ABCDEF")
+            self.assertEqual(metadata["invite_token"], "")
+            self.assertEqual(metadata["tester_id"], "PUBLIC-ALPHA")
+            self.assertEqual(metadata["feedback_mode"], "public")
+            self.assertEqual(metadata["feedback_endpoint"], "https://relay.test")
             self.assertEqual(metadata["channel"], "playtest")
-            self.assertEqual(metadata["identity_kind"], "cohort")
+            self.assertEqual(metadata["identity_kind"], "")
             self.assertNotIn("nickname", metadata)
+            self.assertNotIn("secret-cohort-token", json.dumps(metadata))
 
-    def test_cohort_from_env_derives_the_public_handle(self) -> None:
-        token = "stable-shared-token"
-        with mock.patch.dict("os.environ", {
-            "PLAYTEST_COHORT_INVITE_TOKEN": token,
-            "PLAYTEST_COHORT_NICKNAME": "shared-playtest",
-        }, clear=False):
-            cohort = publish_update.cohort_from_env("playtest")
-        self.assertIsNotNone(cohort)
-        assert cohort is not None
-        self.assertEqual(cohort["token"], token)
-        self.assertEqual(cohort["cohort_id"], "playtest")
-        self.assertEqual(cohort["nickname"], "shared-playtest")
-        self.assertTrue(cohort["tester_id"].startswith("PKMN-"))
-        with mock.patch.dict("os.environ", {"PLAYTEST_COHORT_INVITE_TOKEN": ""}, clear=False):
-            self.assertIsNone(publish_update.cohort_from_env("playtest"))
+    def test_shared_stamp_requires_supported_channel_and_safe_feedback_url(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            dest = Path(raw) / "playtest_build.json"
+            with mock.patch.object(publish_update, "BUILD_INFO", dest):
+                for channel, endpoint in (
+                    ("friends-1", "https://relay.test"),
+                    ("public", "http://relay.test"),
+                    ("public", "https://user:credential@relay.test"),
+                    ("public", "https://relay.test?credential=private"),
+                ):
+                    with self.subTest(channel=channel, endpoint=endpoint), self.assertRaises(ValueError):
+                        publish_update.write_shared_build_info(
+                            channel, "", "a" * 40, "v1", "b1", "2026-09-07T00:00:00Z",
+                            feedback_endpoint=endpoint)
+                    self.assertFalse(dest.exists())
 
-    def test_require_cohort_refuses_a_tokenless_distributed_build(self) -> None:
-        with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
-                mock.patch.dict("os.environ", {
-                    "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
-                    "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
-                    "PLAYTEST_COHORT_INVITE_TOKEN": "",
-                }, clear=False):
-            with self.assertRaises(SystemExit):
-                with mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
-                    publish_update.main()
+    def test_feedback_endpoint_can_differ_from_update_endpoint(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            dest = Path(raw) / "playtest_build.json"
+            with mock.patch.object(publish_update, "BUILD_INFO", dest):
+                for channel, update_endpoint in (("public", ""), ("playtest", "https://updates.test")):
+                    with self.subTest(channel=channel):
+                        publish_update.write_shared_build_info(
+                            channel, "https://updates.test", "a" * 40, "v1", "b1",
+                            "2026-09-07T00:00:00Z", feedback_endpoint="https://feedback.test/")
+                        metadata = json.loads(dest.read_text(encoding="utf-8"))
+                        self.assertEqual(metadata["endpoint"], update_endpoint)
+                        self.assertEqual(metadata["feedback_endpoint"], "https://feedback.test")
+                        self.assertEqual(metadata["feedback_mode"], "public")
+                        self.assertEqual(metadata["tester_id"], "PUBLIC-ALPHA")
+                        self.assertEqual(metadata["invite_token"], "")
 
-    def test_export_writes_empty_endpoint_for_a_public_embed(self) -> None:
+    def test_public_embed_has_feedback_and_no_update_endpoint(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
 
@@ -303,6 +314,9 @@ class PublishUpdateTests(unittest.TestCase):
             self.assertEqual(metadata["endpoint"], "")
             self.assertEqual(metadata["invite_token"], "")
             self.assertEqual(metadata["channel"], "public")
+            self.assertEqual(metadata["feedback_mode"], "public")
+            self.assertEqual(metadata["feedback_endpoint"], publish_update.DEFAULT_FEEDBACK_ENDPOINT)
+            self.assertEqual(metadata["tester_id"], "PUBLIC-ALPHA")
 
     def _embed_public_export(self, channel: str = "public") -> dict:
         return {
@@ -315,21 +329,24 @@ class PublishUpdateTests(unittest.TestCase):
             },
         }
 
-    def test_embed_public_writes_empty_stamp_and_skips_relay(self) -> None:
+    def test_embed_public_stamps_dedicated_feedback_and_skips_deployment(self) -> None:
         captured: dict[str, object] = {}
 
         def fake_export(channel, endpoint, **kwargs):  # noqa: ANN001
             captured["channel"] = channel
             captured["endpoint"] = endpoint
             captured["cohort"] = kwargs.get("cohort")
+            captured["feedback_endpoint"] = kwargs.get("feedback_endpoint")
             return self._embed_public_export(channel)
 
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
                     mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                    mock.patch.object(publish_update, "assert_production_relay") as ready, \
+                    mock.patch.object(publish_update, "required_relay_commit", return_value="relay-sha"), \
                     mock.patch.object(publish_update, "ROOT", root), \
-                    mock.patch.object(publish_update, "register_invite") as register, \
+                    mock.patch.object(package_playtest, "register_invite") as register, \
                     mock.patch.object(publish_update, "upload_artifacts") as upload, \
                     mock.patch.object(publish_update, "publish_manifest") as publish, \
                     mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
@@ -337,16 +354,20 @@ class PublishUpdateTests(unittest.TestCase):
                     mock.patch.object(publish_update, "BUILD_INFO", root / "playtest_build.json"), \
                     mock.patch.dict("os.environ", {
                         "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                        "ALPHA_FEEDBACK_ENDPOINT": "https://feedback.test",
                         "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
                         "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
                     }, clear=False), \
-                    mock.patch("sys.argv", ["publish_update.py", "--embed-public", "--channel", "public"]):
+                    mock.patch("sys.argv", ["publish_update.py", "--embed-public", "--channel", "public",
+                                            "--feedback-endpoint", "https://override.test"]):
                 self.assertEqual(publish_update.main(), 0)
             receipt = root / "dist" / "updates" / "public-b1" / "receipt.json"
             dumped = receipt.read_text(encoding="utf-8")
         self.assertEqual(captured["channel"], "public")
         self.assertEqual(captured["endpoint"], "")
         self.assertIsNone(captured["cohort"])
+        self.assertEqual(captured["feedback_endpoint"], "https://override.test")
+        ready.assert_called_once()
         register.assert_not_called()
         upload.assert_not_called()
         publish.assert_not_called()
@@ -370,6 +391,7 @@ class PublishUpdateTests(unittest.TestCase):
             key: value for key, value in os.environ.items()
             if key not in {
                 "PLAYTEST_FEEDBACK_ENDPOINT",
+                "ALPHA_FEEDBACK_ENDPOINT",
                 "PLAYTEST_FEEDBACK_ADMIN_TOKEN",
                 "PLAYTEST_COHORT_INVITE_TOKEN",
             }
@@ -378,13 +400,16 @@ class PublishUpdateTests(unittest.TestCase):
         def fake_export(channel, endpoint, **kwargs):  # noqa: ANN001
             self.assertEqual(endpoint, "")
             self.assertIsNone(kwargs.get("cohort"))
+            self.assertEqual(kwargs["feedback_endpoint"], publish_update.DEFAULT_FEEDBACK_ENDPOINT)
             return self._embed_public_export(channel)
 
         with tempfile.TemporaryDirectory() as raw:
             with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
                     mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                    mock.patch.object(publish_update, "assert_production_relay") as ready, \
+                    mock.patch.object(publish_update, "required_relay_commit", return_value="relay-sha"), \
                     mock.patch.object(publish_update, "write_publish_receipt"), \
-                    mock.patch.object(publish_update, "register_invite") as register, \
+                    mock.patch.object(package_playtest, "register_invite") as register, \
                     mock.patch.object(publish_update, "upload_artifacts") as upload, \
                     mock.patch.object(publish_update, "publish_manifest") as publish, \
                     mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
@@ -393,9 +418,22 @@ class PublishUpdateTests(unittest.TestCase):
                     mock.patch.dict("os.environ", env, clear=True), \
                     mock.patch("sys.argv", ["publish_update.py", "--embed-public"]):
                 self.assertEqual(publish_update.main(), 0)
+        ready.assert_called_once()
         register.assert_not_called()
         upload.assert_not_called()
         publish.assert_not_called()
+
+    def test_public_export_refuses_stale_relay_before_any_artifact(self) -> None:
+        for extra in ([], ["--allow-dirty"]):
+            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                    mock.patch.object(publish_update, "required_relay_commit", return_value="relay-sha"), \
+                    mock.patch.object(publish_update, "assert_production_relay", side_effect=RuntimeError("stale production relay")) as ready, \
+                    mock.patch.object(publish_update, "export_shared") as export, \
+                    mock.patch("sys.argv", ["publish_update.py", "--embed-public", "--feedback-endpoint", "https://feedback.test", *extra]):
+                with self.assertRaisesRegex(RuntimeError, "stale production relay"):
+                    publish_update.main()
+                ready.assert_called_once_with("https://feedback.test", "relay-sha")
+                export.assert_not_called()
 
     def test_receipt_lists_all_three_os_without_tokens(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -453,48 +491,46 @@ class PublishUpdateTests(unittest.TestCase):
             for os_name, stable_name in publish_update.STABLE_RELEASE_ASSETS.items():
                 self.assertEqual((dest / stable_name).read_bytes(), payloads[os_name])
 
-    def test_publish_registers_the_cohort_invite_before_export(self) -> None:
-        order: list[str] = []
+    def test_shared_publish_needs_no_invite_and_checks_relay_before_export(self) -> None:
+        for token, flags in (("", []), ("old-cohort-credential", []), ("", ["--require-cohort"])):
+            with self.subTest(token_present=bool(token), flags=flags):
+                order: list[str] = []
 
-        def fake_register(*_args, **_kwargs):  # noqa: ANN001
-            order.append("register")
+                def fake_export(channel, endpoint, **kwargs):  # noqa: ANN001
+                    order.append("export")
+                    self.assertEqual(endpoint, "https://relay.test")
+                    self.assertEqual(kwargs["feedback_endpoint"], "https://relay.test")
+                    self.assertNotIn("cohort", kwargs)
+                    return self._embed_public_export(channel)
 
-        def fake_export(*_args, **_kwargs):  # noqa: ANN001
-            order.append("export")
-            return {
-                "channel": "playtest", "build_id": "b1", "commit_sha": "c" * 40,
-                "version": "v1", "published_at": "2026-08-21T00:00:00Z",
-                "artifacts": {},
-            }
-
-        with tempfile.TemporaryDirectory() as raw:
-            receipt = Path(raw) / "receipt.json"
-            with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
-                    mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
-                    mock.patch.object(publish_update, "assert_current_main"), \
-                    mock.patch.object(publish_update, "assert_production_relay",
-                                      side_effect=lambda *_args, **_kwargs: order.append("relay")), \
-                    mock.patch.object(publish_update, "register_invite", side_effect=fake_register), \
-                    mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
-                    mock.patch.object(publish_update, "write_publish_receipt",
-                                      return_value=receipt) as write_receipt, \
-                    mock.patch.object(publish_update, "upload_artifacts",
-                                      return_value={}) as upload, \
-                    mock.patch.object(publish_update, "publish_manifest") as publish, \
-                    mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
-                    mock.patch.object(publish_update, "build_metadata_lock"), \
-                    mock.patch.object(publish_update, "BUILD_INFO", Path(raw) / "playtest_build.json"), \
-                    mock.patch.dict("os.environ", {
-                        "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
-                        "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
-                        "PLAYTEST_COHORT_INVITE_TOKEN": "stable-shared-token",
-                    }, clear=False), \
-                    mock.patch("sys.argv", ["publish_update.py", "--require-cohort"]):
-                self.assertEqual(publish_update.main(), 0)
-        self.assertEqual(order, ["relay", "register", "export"])
-        write_receipt.assert_called_once()
-        upload.assert_called_once()
-        publish.assert_called_once()
+                with tempfile.TemporaryDirectory() as raw:
+                    receipt = Path(raw) / "receipt.json"
+                    with mock.patch.object(publish_update, "worktree_is_dirty", return_value=False), \
+                            mock.patch.object(publish_update, "assert_current_main"), \
+                            mock.patch.object(publish_update, "assert_production_relay",
+                                              side_effect=lambda *_a, **_k: order.append("relay")), \
+                            mock.patch.object(package_playtest, "register_invite") as register, \
+                            mock.patch.object(publish_update, "export_shared", side_effect=fake_export), \
+                            mock.patch.object(publish_update, "write_publish_receipt",
+                                              return_value=receipt) as write_receipt, \
+                            mock.patch.object(publish_update, "upload_artifacts", return_value={}) as upload, \
+                            mock.patch.object(publish_update, "publish_manifest") as publish, \
+                            mock.patch.object(publish_update, "godot_binary", return_value="godot"), \
+                            mock.patch.object(publish_update, "build_metadata_lock"), \
+                            mock.patch.object(publish_update, "BUILD_INFO", Path(raw) / "playtest_build.json"), \
+                            mock.patch.dict("os.environ", {
+                                "PLAYTEST_FEEDBACK_ENDPOINT": "https://relay.test",
+                                "ALPHA_FEEDBACK_ENDPOINT": "",
+                                "PLAYTEST_FEEDBACK_ADMIN_TOKEN": "a" * 32,
+                                "PLAYTEST_COHORT_INVITE_TOKEN": token,
+                            }, clear=False), \
+                            mock.patch("sys.argv", ["publish_update.py", *flags]):
+                        self.assertEqual(publish_update.main(), 0)
+                self.assertEqual(order, ["relay", "export"])
+                register.assert_not_called()
+                write_receipt.assert_called_once()
+                upload.assert_called_once()
+                publish.assert_called_once()
 
     def test_assert_current_main_refuses_when_origin_main_moved(self) -> None:
         def fake_run(*args: str) -> str:
@@ -528,7 +564,7 @@ class PublishUpdateTests(unittest.TestCase):
                     mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
                     mock.patch.object(publish_update, "assert_current_main", side_effect=fake_main), \
                     mock.patch.object(publish_update, "assert_production_relay"), \
-                    mock.patch.object(publish_update, "register_invite"), \
+                    mock.patch.object(package_playtest, "register_invite"), \
                     mock.patch.object(publish_update, "export_shared", return_value={
                         "channel": "playtest", "build_id": "b1", "commit_sha": "c" * 40,
                         "version": "v1", "published_at": "2026-08-21T00:00:00Z",
@@ -629,7 +665,7 @@ class PublishUpdateTests(unittest.TestCase):
             "https://relay.test", parent, urlopen=lambda request, timeout: FakeResponse())
         self.assertEqual(health["version_tag"], head)
 
-    def test_publish_refuses_register_when_production_relay_is_stale(self) -> None:
+    def test_publish_refuses_export_when_production_relay_is_stale(self) -> None:
         def boom(*_args, **_kwargs):  # noqa: ANN001
             raise RuntimeError("refusing stale production relay; wanted version_tag x")
 
@@ -637,7 +673,7 @@ class PublishUpdateTests(unittest.TestCase):
                 mock.patch.object(publish_update, "validated_endpoint", return_value="https://relay.test"), \
                 mock.patch.object(publish_update, "assert_current_main"), \
                 mock.patch.object(publish_update, "assert_production_relay", side_effect=boom), \
-                mock.patch.object(publish_update, "register_invite") as register_invite, \
+                mock.patch.object(package_playtest, "register_invite") as register_invite, \
                 mock.patch.object(publish_update, "export_shared") as export_shared, \
                 mock.patch.object(publish_update, "build_metadata_lock"), \
                 mock.patch.dict("os.environ", {
@@ -824,6 +860,29 @@ class PublishUpdateTests(unittest.TestCase):
             'return rel.startswith("docs/plans/") and (',
             source,
         )
+
+    def test_release_contract_refuses_invites_and_secret_feedback_urls(self) -> None:
+        import check_repo_contracts
+        root = Path(__file__).resolve().parents[1]
+        mutations = (
+            ("public-release.yml", check_repo_contracts.public_release_workflow_issues,
+             "vars.ALPHA_FEEDBACK_ENDPOINT", "secrets.ALPHA_FEEDBACK_ENDPOINT", "secrets."),
+            ("playtest-release.yml", check_repo_contracts.playtest_release_workflow_issues,
+             '--feedback-endpoint "${ALPHA_FEEDBACK_ENDPOINT}"', "--require-cohort", "cohort credentials"),
+            ("playtest-release.yml", check_repo_contracts.playtest_release_workflow_issues,
+             "  CHANNEL: playtest", "  CHANNEL: playtest\n  PLAYTEST_COHORT_INVITE_TOKEN: private",
+             "cohort credentials"),
+        )
+        for name, checker, old, new, expected in mutations:
+            with self.subTest(name=name, mutation=new), tempfile.TemporaryDirectory() as raw:
+                dest_root = Path(raw)
+                dest = dest_root / ".github/workflows" / name
+                dest.parent.mkdir(parents=True)
+                source = (root / ".github/workflows" / name).read_text(encoding="utf-8")
+                self.assertIn(old, source)
+                dest.write_text(source.replace(old, new), encoding="utf-8")
+                issues = "\n".join(checker(dest_root))
+                self.assertIn(expected, issues)
 
     def test_ce_unified_plan_contract_refuses_unlabeled_and_broken_links(self) -> None:
         import check_repo_contracts

@@ -791,7 +791,7 @@ def feedback_relay_deploy_issues(root: Path) -> list[str]:
 
 
 def playtest_release_workflow_issues(root: Path) -> list[str]:
-    """Pin the shared three-OS playtest release + accountless cohort contract."""
+    """Pin the shared three-OS alpha release and invitation-free feedback contract."""
     path = root / PLAYTEST_RELEASE_WORKFLOW
     if not path.exists():
         return [f"Missing playtest release workflow: {PLAYTEST_RELEASE_WORKFLOW}"]
@@ -808,8 +808,8 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "      - main",
         "  GODOT_VERSION: 4.6.1-stable",
         "    environment: playtest-release",
-        "python3 tools/publish_update.py --channel \"${CHANNEL}\" --require-cohort",
-        "PLAYTEST_COHORT_INVITE_TOKEN: ${{ secrets.PLAYTEST_COHORT_INVITE_TOKEN }}",
+        'python3 tools/publish_update.py --channel "${CHANNEL}" --feedback-endpoint "${ALPHA_FEEDBACK_ENDPOINT}"',
+        "ALPHA_FEEDBACK_ENDPOINT: ${{ vars.ALPHA_FEEDBACK_ENDPOINT || 'https://poke-wilds-feedback-relay.drake-t.workers.dev' }}",
         "PLAYTEST_FEEDBACK_ADMIN_TOKEN: ${{ secrets.PLAYTEST_FEEDBACK_ADMIN_TOKEN }}",
         "PLAYTEST_FEEDBACK_ENDPOINT: ${{ secrets.PLAYTEST_FEEDBACK_ENDPOINT }}",
         "CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}",
@@ -866,7 +866,6 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         "waiting",
         "PokeWilds-linux.x86_64",
         "Linux, Windows, and macOS",
-        "PLAYTEST_COHORT_INVITE_TOKEN is required so shared builds can F-report",
         "receipt must not mention invite tokens",
     )
     for fragment in required:
@@ -882,6 +881,11 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must publish shared updates, not per-friend packages"
         )
+    for fragment in ("PLAYTEST_COHORT_INVITE_TOKEN", "PLAYTEST_COHORT_NICKNAME", "--require-cohort"):
+        if fragment in text:
+            issues.append(
+                f"{PLAYTEST_RELEASE_WORKFLOW} must not require or embed cohort credentials: {fragment}"
+            )
     if "description: Shared update channel" in text:
         issues.append(
             f"{PLAYTEST_RELEASE_WORKFLOW} must not take a dispatch channel; the runtime queries playtest"
@@ -908,8 +912,6 @@ def playtest_release_workflow_issues(root: Path) -> list[str]:
             f"{PLAYTEST_RELEASE_WORKFLOW} must not receive the GitHub App private key"
         )
     for leaked in (
-        "echo \"$PLAYTEST_COHORT_INVITE_TOKEN\"",
-        "echo $PLAYTEST_COHORT_INVITE_TOKEN",
         "echo \"$PLAYTEST_FEEDBACK_ADMIN_TOKEN\"",
         "echo $PLAYTEST_FEEDBACK_ADMIN_TOKEN",
     ):
@@ -951,7 +953,8 @@ def public_release_workflow_issues(root: Path) -> list[str]:
         '      - "v*"',
         "  GODOT_VERSION: 4.6.1-stable",
         "  CHANNEL: public",
-        "python3 tools/publish_update.py --channel \"${CHANNEL}\" --embed-public",
+        'python3 tools/publish_update.py --channel "${CHANNEL}" --embed-public --feedback-endpoint "${ALPHA_FEEDBACK_ENDPOINT}"',
+        "ALPHA_FEEDBACK_ENDPOINT: ${{ vars.ALPHA_FEEDBACK_ENDPOINT || 'https://poke-wilds-feedback-relay.drake-t.workers.dev' }}",
         "Resolve a v* tag on this SHA",
         "gh run list --workflow playtests-headless",
         "waiting for playtests-headless",
@@ -987,6 +990,7 @@ def public_release_workflow_issues(root: Path) -> list[str]:
         "PLAYTEST_FEEDBACK_ENDPOINT",
         "CLOUDFLARE_API_TOKEN",
         "CLOUDFLARE_ACCOUNT_ID",
+        "secrets.",
         "fetch_latest",
         "stage_github_release_from_latest",
         "--require-cohort",

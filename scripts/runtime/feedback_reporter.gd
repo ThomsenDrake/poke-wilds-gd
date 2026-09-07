@@ -32,7 +32,7 @@ func _ready() -> void:
 
 func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 	var report_id := str(capture.get("report_id", ""))
-	var configuration_error := _configuration_error(_bundle.load_build_info())
+	var configuration_error := _configuration_error(_bundle.load_feedback_build_info())
 	if not configuration_error.is_empty():
 		runtime.emit_trace("feedback_report_failed", "FeedbackReporter", {
 			"report_id": report_id, "reason": configuration_error})
@@ -78,13 +78,12 @@ func submit(message: String, capture: Dictionary, runtime: Node) -> Dictionary:
 
 func _upload(prepared: Dictionary) -> Dictionary:
 	var build: Dictionary = prepared.get("build", {})
-	var raw_endpoint := str(build.get("endpoint", ""))
+	var raw_endpoint := _endpoint_for(build)
 	var configuration_error := _configuration_error(build)
 	if not configuration_error.is_empty():
 		return {"status": "blocked", "reason": configuration_error}
 	if _transport_override.is_valid():
 		return await _transport_override.call(prepared)
-	var token := str(build.get("invite_token", ""))
 	var endpoint := _validated_endpoint(raw_endpoint)
 	var metadata_json := JSON.stringify(prepared["metadata"])
 	var bundle_bytes := FileAccess.get_file_as_bytes(prepared["bundle_path"])
@@ -94,8 +93,8 @@ func _upload(prepared: Dictionary) -> Dictionary:
 	_append_text(body, "--%s\r\nContent-Disposition: form-data; name=\"bundle\"; filename=\"report.zip\"\r\nContent-Type: application/zip\r\n\r\n" % boundary)
 	body.append_array(bundle_bytes)
 	_append_text(body, "\r\n--%s--\r\n" % boundary)
-	var headers := PackedStringArray(["Authorization: Bearer " + token,
-		"Content-Type: multipart/form-data; boundary=" + boundary, "Accept: application/json"])
+	var headers := _request_headers(build)
+	headers.append("Content-Type: multipart/form-data; boundary=" + boundary)
 	var request_error := _http.request_raw(endpoint.trim_suffix("/") + "/v1/reports", headers,
 		HTTPClient.METHOD_POST, body)
 	if request_error != OK:
@@ -115,17 +114,41 @@ func _upload(prepared: Dictionary) -> Dictionary:
 			return {"status": "sent", "issue_number": int(parsed["issue_number"])}
 		return {"status": "queued", "reason": "invalid_success_response"}
 	if code == 202 or code == 408 or code == 429 or code >= 500 or code == 0:
-		return {"status": "queued", "reason": "http_%d" % code}
-	return {"status": "blocked", "reason": "http_%d" % code}
+		return {"status": "queued", "reason": _response_reason(code, parsed)}
+	return {"status": "blocked", "reason": _response_reason(code, parsed)}
 
 
 func _configuration_error(build: Dictionary) -> String:
-	var raw_endpoint := str(build.get("endpoint", ""))
-	if raw_endpoint.strip_edges().is_empty() or str(build.get("invite_token", "")).is_empty():
+	var raw_endpoint := _endpoint_for(build)
+	var public_report: bool = build.get("feedback_mode", "") == "public"
+	if public_report and (build.get("tester_id", "") != "PUBLIC-ALPHA" or build.get("channel", "") not in ["public", "playtest"]):
+		return "feedback_configuration_invalid"
+	if raw_endpoint.strip_edges().is_empty() or (not public_report and str(build.get("invite_token", "")).is_empty()):
 		return "feedback_not_configured"
 	if _validated_endpoint(raw_endpoint).is_empty():
 		return "feedback_endpoint_invalid"
 	return ""
+
+
+func _endpoint_for(build: Dictionary) -> String:
+	return str(build.get("feedback_endpoint", "")) if build.get("feedback_mode", "") == "public" else str(build.get("endpoint", ""))
+
+
+func _request_headers(build: Dictionary) -> PackedStringArray:
+	var headers := PackedStringArray(["Accept: application/json", "User-Agent: PokeWilds-feedback/1.0"])
+	if build.get("feedback_mode", "") != "public":
+		headers.append("Authorization: Bearer " + str(build.get("invite_token", "")))
+	return headers
+
+
+func _response_reason(code: int, parsed: Variant) -> String:
+	var reason := "http_%d" % code
+	if parsed is Dictionary:
+		var identifier := str(parsed.get("error", ""))
+		var pattern := RegEx.new()
+		if identifier.length() <= 64 and pattern.compile("^[a-z][a-z0-9_]*$") == OK and pattern.search(identifier) != null:
+			return reason + ":" + identifier
+	return reason
 
 
 func retry_pending(only_report_id: String = "") -> void:
@@ -135,8 +158,8 @@ func retry_pending(only_report_id: String = "") -> void:
 		_schedule_retry()
 		return
 	_busy = true
-	var build := _bundle.load_build_info()
-	for prepared in _outbox.pending(build, only_report_id):
+	var build := _bundle.load_feedback_build_info()
+	for prepared in _outbox.pending(build, only_report_id, _bundle.load_legacy_feedback_route()):
 		var report_id := str(prepared["metadata"].get("report_id", ""))
 		var result: Dictionary = await _upload(prepared)
 		if result.get("status") == "sent":
@@ -227,7 +250,7 @@ func _valid_port(port: String) -> bool:
 func _reconcile_retry_schedule() -> void:
 	# Freshly rescan after the final await. A submit may have committed another
 	# report while this upload owned the shared HTTPRequest.
-	if _outbox.pending(_bundle.load_build_info()).is_empty():
+	if _outbox.pending(_bundle.load_feedback_build_info(), "", _bundle.load_legacy_feedback_route()).is_empty():
 		_retry_index = 0
 		_retry_timer.stop()
 	else:
@@ -263,6 +286,15 @@ func set_build_info_for_smoke(build: Dictionary) -> void:
 func set_remove_failure_for_smoke(failure: Callable) -> void:
 	if OS.has_feature("editor"):
 		_outbox.set_remove_failure_for_smoke(failure)
+
+
+func request_details_for_smoke(build: Dictionary) -> Dictionary:
+	return {"endpoint": _endpoint_for(build), "headers": _request_headers(build),
+		"error": _configuration_error(build)} if OS.has_feature("editor") else {}
+
+
+func response_reason_for_smoke(code: int, parsed: Variant) -> String:
+	return _response_reason(code, parsed) if OS.has_feature("editor") else ""
 
 
 func state_for_smoke() -> Dictionary:
