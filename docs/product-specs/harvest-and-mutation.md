@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-17
+Last verified: 2026-09-09
 Review cadence days: 21
 Source paths: scripts/domain/world_overrides.gd, scripts/domain/field_moves.gd, scripts/runtime/harvest_resolver.gd, scripts/runtime/harvest_runtime.gd, scripts/runtime/game_runtime.gd, scripts/app/harvest_flow_scenario.gd
 
@@ -26,7 +26,9 @@ Cut/Dig/Smash (above) and Build ([building-and-placement.md](building-and-placem
 
 ## Persistence
 
-- Overrides persist in save schema v3 (`world_overrides` keyed `"x,y"`, up to 10k entries) and survive save/load and world rebuilds. v1/v2 saves migrate; the legacy `unlocked_field_moves` key is dropped.
+- Harvest overrides were introduced in save schema v3 and persist in the current v6 schema (`session_state.gd` / `session_payload.gd`). `world_overrides` uses `"x,y"` keys; the 10,000-entry mutation cap is shared with structure placements, rather than a separate harvest allowance. Overrides survive save/load and world rebuilds. Legacy saves pass through migration; the old `unlocked_field_moves` key is dropped.
+
+Re-verified 2026-09-09 against `harvest_resolver.gd`, `field_moves.gd`, `world_overrides.gd`, and the session serializer: base yields, bonus pools and rarity, landmark refusal, and the final-evolution Water-type Surf gate match the behavior above.
 
 ## Smoke validation
 

@@ -1,5 +1,5 @@
 Status: active
-Last verified: 2026-08-24
+Last verified: 2026-09-09
 Review cadence days: 14
 Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, LICENSING.md, THIRD_PARTY.md, scripts, scenes, tools, .github/workflows/repo-contracts.yml, .github/workflows/playtests-headless.yml
 
@@ -9,7 +9,9 @@ Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SC
 
 Bring the Godot port to **single-player feature parity with the original PokeWilds** (SheerSt/libGDX), as verified by the July 2026 feature audit (22 features: 4 done, 7 partial, 11 absent), while preserving this repo's defining property: every behavior is spec'd, registered, traced, and covered by the local playtest suite.
 
-The port has nailed presentation, data, and combat. What remains is the survival-crafting sandbox loop — placement, building, crafting, camping, breeding, habitat drops, overworld Pokémon, landmarks — plus the battle-system edges and the defect backlog. This plan sequences that work into nine phases plus one continuous local-verification workstream.
+The July audit identified the survival-crafting sandbox loop — placement, building, crafting, camping, breeding, habitat drops, overworld Pokémon, landmarks — plus battle-system edges and the defect backlog. The phase sequence below records that implementation plan, not a current list of absent features.
+
+Re-verified 2026-09-09 against the subsystem registry and runtime: the sandbox systems now have registered implementations and product specs, including storage and overworld Pokémon. `session_state.gd` writes save schema v6; the infinite-world slice supersedes the earlier world-chaining design recorded in Phase 7 (see [infinite-world.md](../../product-specs/infinite-world.md)). Remaining limitations belong to the current product specs and [tech debt tracker](../../tech-debt-tracker.md). This review does not certify complete original-game parity. `python3 tools/check_architecture.py` passes on the reviewed tree.
 
 **Non-goals** (explicit): online multiplayer (the original never shipped its v0.9 MMO mode), weather and seasons (absent from the original), mobile/Android, and an in-game Pokédex (the original lacks one; parity does not require it — kept as an optional stretch in Phase 9).
 

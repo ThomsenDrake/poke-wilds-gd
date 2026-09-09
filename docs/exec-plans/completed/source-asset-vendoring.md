@@ -1,11 +1,11 @@
 Status: completed
-Last verified: 2026-08-24
+Last verified: 2026-09-09
 Review cadence days: 14
 Source paths: assets/source, LICENSING.md, THIRD_PARTY.md, docs/references/source-assets.md, README.md, docs/registry/art-anchors.toml, docs/registry/subsystems.toml
 
 # Source Asset Vendoring
 
-Re-verified 2026-08-24: `assets/source/` is still the vendored v0.8.11 snapshot (no `pokewilds/` submodule); `THIRD_PARTY.md` and `docs/references/source-assets.md` still own provenance. No re-vendor since 2026-08-09.
+Re-verified 2026-09-09: `THIRD_PARTY.md` and `docs/references/source-assets.md` retain the v0.8.11 upstream pin below. Comparing `assets/source/` with relocation commit `db99e4c4` shows nine case-only `.PNG` to `.png` renames and no content changes; this is not a new upstream snapshot. Runtime catalog paths use `assets/data/catalog/`, while art remains under `assets/source/`. The validation results below are the dated August 9 close-out evidence, not results for the current release.
 
 ## Goal
 

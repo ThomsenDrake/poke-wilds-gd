@@ -1,11 +1,11 @@
 Status: active
-Last verified: 2026-08-24
+Last verified: 2026-09-09
 Review cadence days: 14
 Source paths: scripts/data/pokemon_catalog.gd, docs/registry/subsystems.toml, docs/references/source-assets.md, docs/product-specs/bootstrap-and-overworld.md, README.md, tools/verify_all.py
 
 # PokeAPI Catalog Migration
 
-Re-verified 2026-08-24: catalog still loads from `assets/data/catalog/`; `tools/import_pokeapi.py --check` remains the S4.5 static step; source paths above still exist. No runtime-half rollback.
+Re-verified 2026-09-09 against `pokemon_catalog.gd` and the importer: both migration halves are present. Runtime reads the three JSON files in `assets/data/catalog/`; `python3 tools/import_pokeapi.py --check` passes with 954 species, 730 moves, and 120 items. The implementation and validation chronology below preserves the earlier migration stages; its interim failures and catalog counts are historical.
 
 ## Goal
 
@@ -23,7 +23,7 @@ Authoring time (local only): `tools/import_pokeapi.py` reads a pinned `PokeAPI/a
 ## Validation
 
 - Static gates green on the runtime-half tree: `python3 tools/check_architecture.py` + `python3 tools/check_repo_contracts.py` (registry `code_paths` drop the deleted parsers; `validation_commands` gains `python3 tools/import_pokeapi.py --check`).
-- Interim state until the importer half lands: verify_all's new S4.5 step is RED (missing tool/cache/catalog) BY DESIGN — the freshness gate arms the moment `tools/import_pokeapi.py` exists.
+- Historical interim state before the importer half landed: verify_all's new S4.5 step is RED (missing tool/cache/catalog) BY DESIGN — the freshness gate arms the moment `tools/import_pokeapi.py` exists.
 - Gate phase (both halves landed): `python3 tools/import_pokeapi.py` regenerate → `python3 tools/verify_all.py` full local gate (determinism, `data_audit`/`texture_audit`/`wild_battle`/`encounter_config`, `save_stability` golden — species ids unchanged, windowed visual sweep). Review `docs/generated/catalog-parity.md` first; accept baselines via `visual_sweep_update` only where learnset churn explains pixel diffs.
 
 ## Rollback
