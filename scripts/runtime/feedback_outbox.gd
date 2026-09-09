@@ -38,7 +38,7 @@ func commit(staging_path: String, metadata: Dictionary, build: Dictionary) -> Di
 		"route_path": route_path, "metadata": metadata, "build": build}
 
 
-func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary]:
+func pending(build: Dictionary, only_report_id: String = "", legacy_build: Dictionary = {}) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var dir := DirAccess.open(OUTBOX_DIR)
 	if dir == null:
@@ -75,9 +75,11 @@ func pending(build: Dictionary, only_report_id: String = "") -> Array[Dictionary
 				_quarantine(report_id, "corrupt")
 				continue
 		elif not _route_matches(build, parsed):
-			# Legacy entries have no private route. Never try or block one under a
-			# different tester/cohort; a matching older package can still recover it.
-			continue
+			# Only route-less legacy reports may use a matching persisted identity.
+			# New public reports and explicit routes never inherit it.
+			if not _route_matches(legacy_build, parsed):
+				continue
+			prepared_build = legacy_build
 		result.append({"ok": true, "metadata": parsed, "metadata_path": metadata_path,
 			"route_path": route_path, "bundle_path": bundle_path, "build": prepared_build})
 	return result
@@ -202,13 +204,21 @@ func _recover_incomplete(filenames: PackedStringArray) -> void:
 
 
 func _private_route(metadata: Dictionary, build: Dictionary) -> Dictionary:
-	return {"endpoint": str(build.get("endpoint", "")),
+	var route := {"endpoint": str(build.get("endpoint", "")),
 		"invite_token": str(build.get("invite_token", "")),
 		"tester_id": str(metadata.get("tester_id", "")),
 		"channel": str(metadata.get("build", {}).get("channel", ""))}
+	if build.get("feedback_mode", "") == "public":
+		route["feedback_mode"] = "public"
+		route["feedback_endpoint"] = str(build.get("feedback_endpoint", ""))
+		route["endpoint"] = ""
+		route["invite_token"] = ""
+	return route
 
 
 func _route_matches(route: Dictionary, metadata: Dictionary) -> bool:
+	if route.get("feedback_mode", "") == "public" and not (route.get("feedback_endpoint") is String):
+		return false
 	return route.has_all(["endpoint", "invite_token", "tester_id", "channel"]) \
 		and route.get("endpoint") is String and route.get("invite_token") is String \
 		and route.get("tester_id") is String and route.get("channel") is String \

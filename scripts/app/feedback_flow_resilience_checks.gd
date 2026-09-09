@@ -9,6 +9,8 @@ const Redactor := preload("res://scripts/core/feedback_redactor.gd")
 const TraceLogger := preload("res://scripts/core/trace_logger.gd")
 const FeedbackBundle := preload("res://scripts/runtime/feedback_bundle.gd")
 const SmokeTap := preload("res://scripts/app/smoke_tap.gd")
+const TraceCursorChecks := preload("res://scripts/app/trace_cursor_checks.gd")
+const LegacyChecks := preload("res://scripts/app/feedback_flow_legacy_checks.gd")
 const StampChecks := preload("res://scripts/app/feedback_flow_stamp_checks.gd")
 const OUTBOX_DIR := "user://feedback_outbox"
 const ENGINE_TAIL_TEST_PATH := "user://feedback-flow-engine-tail.log"
@@ -28,8 +30,10 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_result_copy_contract()
 	_redaction_contract()
 	_trace_truncation_contract()
+	_failures.append_array(TraceCursorChecks.new().run())
 	_engine_log_tail_contract()
 	_failures.append_array(await StampChecks.new().run(_controller, _dialog, _tree))
+	_failures.append_array(await LegacyChecks.new().run(_controller, _dialog, _tree))
 	_controller.smoke_set_build_info({"channel": "scenario-blocked", "build_id": "scenario-blocked",
 		"commit_sha": "scenario", "endpoint": "https://feedback.invalid/blocked",
 		"invite_token": "scenario-token-blocked", "tester_id": "T-SCENARIO-BLOCKED"})
@@ -40,6 +44,7 @@ func run(controller: Node, dialog: Control, tree: SceneTree) -> Array[String]:
 	_dialog.smoke_set_message("A permanent rejection must stop retrying.")
 	await SmokeTap.tap_key(_tree, Key.KEY_ENTER)
 	await _tree.create_timer(2.1, true, false, true).timeout
+	await SmokeTap.tap_key(_tree, Key.KEY_ESCAPE)
 	var stem := "%s/%s" % [OUTBOX_DIR, report_id]
 	_check(_transport_calls == 1 and FileAccess.file_exists(stem + ".json"),
 		"blocked-write check did not queue its initial report")
@@ -174,7 +179,7 @@ func _result_copy_contract() -> void:
 		"Report could not be saved—please try again or tell Drake.",
 		"unsaved bundle failure claimed a local copy existed")
 	_check(_controller.smoke_result_message({"status": "blocked"}) ==
-		"Saved on this computer—please let Drake know.",
+		"Report was not accepted (rejected). A copy is saved on this computer.",
 		"retained blocked bundle did not identify the local copy")
 	_check(_controller.smoke_result_message({"status": "sent_cleanup_failed", "issue_number": 4321}).begins_with("Report #4321 sent"),
 		"remote success with local cleanup failure hid the issue number")

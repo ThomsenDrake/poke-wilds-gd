@@ -12,6 +12,7 @@ var _disclosure: Label
 var _status: Label
 var _panel: PanelContainer
 var _in_flight := false
+var _result_ready := false
 
 
 func _ready() -> void:
@@ -31,7 +32,7 @@ func open_dialog() -> void:
 		return
 	_editor.text = ""
 	_editor.editable = true
-	_status.text = "Enter: Send   Shift+Enter: New line   Esc/X: Cancel"
+	_status.text = "Enter: Send   Shift+Enter: New line   Esc: Cancel"
 	visible = true
 	_layout_panel()
 	_editor.grab_focus()
@@ -44,12 +45,14 @@ func show_sending() -> void:
 
 
 func show_result(text: String) -> void:
-	_status.text = text
+	_result_ready = true
+	_status.text = text + "\nEnter/Esc: Continue"
 
 
 func close_dialog() -> void:
 	visible = false
 	_in_flight = false
+	_result_ready = false
 	_editor.release_focus()
 
 
@@ -60,6 +63,10 @@ func smoke_set_message(text: String, caret_column: int = -1) -> void:
 	_on_text_changed()
 	if caret_column >= 0:
 		_editor.set_caret_column(caret_column)
+
+
+func smoke_result_ready() -> bool:
+	return _result_ready if OS.has_feature("editor") else false
 
 
 func smoke_message() -> String:
@@ -73,12 +80,13 @@ func layout_fits_viewport() -> bool:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible or _in_flight:
+	if not visible or not event is InputEventKey or not event.pressed or event.echo:
 		return
-	if event is InputEventKey and event.pressed and event.keycode == Key.KEY_ESCAPE:
-		_cancel_pressed()
-		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("action_b"):
+	if _result_ready:
+		if event.keycode in [Key.KEY_ENTER, Key.KEY_KP_ENTER, Key.KEY_ESCAPE]:
+			cancelled.emit()
+			get_viewport().set_input_as_handled()
+	elif not _in_flight and event.keycode == Key.KEY_ESCAPE:
 		_cancel_pressed()
 		get_viewport().set_input_as_handled()
 

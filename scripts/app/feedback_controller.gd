@@ -30,15 +30,15 @@ func _input(event: InputEvent) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
 		return
-	if _is_public_stamp():
+	if _feedback_disabled():
 		return
 	_begin_capture()
 	get_viewport().set_input_as_handled()
 
 
-func _is_public_stamp() -> bool:
+func _feedback_disabled() -> bool:
 	var embed: Dictionary = _reporter.embedded_build_info()
-	return str(embed.get("invite_token", "")).strip_edges().is_empty() \
+	return embed.get("feedback_mode", "") != "public" and str(embed.get("invite_token", "")).strip_edges().is_empty() \
 		and str(embed.get("endpoint", "")).strip_edges().is_empty()
 
 
@@ -80,8 +80,6 @@ func _on_submitted(message: String) -> void:
 	_dialog.show_sending()
 	var result: Dictionary = await _reporter.submit(message, _capture, get_node("/root/GameRuntime"))
 	_dialog.show_result(_result_message(result))
-	await get_tree().create_timer(1.8, true, false, true).timeout
-	_close_and_resume()
 
 
 func _on_cancelled() -> void:
@@ -104,9 +102,12 @@ func _result_message(result: Dictionary) -> String:
 	match str(result.get("status", "unsaved")):
 		"sent": return "Report #%d sent. Thank you!" % int(result.get("issue_number", 0))
 		"sent_cleanup_failed": return "Report #%d sent, but local cleanup failed—please tell Drake." % int(result.get("issue_number", 0))
-		"queued": return "Saved — it will send when you're online."
-		"blocked": return "Saved on this computer—please let Drake know."
-		_: return "Report could not be saved—please try again or tell Drake."
+		"queued": return "Saved — delivery is pending. It will retry automatically."
+		"blocked": return "Report was not accepted (%s). A copy is saved on this computer." % str(result.get("reason", "rejected"))
+		_:
+			if str(result.get("reason", "")).begins_with("feedback_"):
+				return "Feedback is unavailable in this build. Please install the latest alpha."
+			return "Report could not be saved—please try again or tell Drake."
 
 
 # One explicit editor-only seam for feedback_flow; production behavior stays
@@ -160,3 +161,11 @@ func smoke_submit(message: String, runtime: Node) -> Dictionary:
 func smoke_retry(report_id: String) -> void:
 	if OS.has_feature("editor"):
 		await _reporter.retry_pending(report_id)
+
+
+func smoke_request_details(build: Dictionary) -> Dictionary:
+	return _reporter.request_details_for_smoke(build) if OS.has_feature("editor") else {}
+
+
+func smoke_response_reason(code: int, parsed: Variant) -> String:
+	return _reporter.response_reason_for_smoke(code, parsed) if OS.has_feature("editor") else ""

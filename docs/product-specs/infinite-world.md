@@ -1,9 +1,11 @@
 Status: current
-Last verified: 2026-08-10
+Last verified: 2026-09-07
 Review cadence days: 21
 Source paths: scripts/domain/biome_field.gd, scripts/domain/content_scatter.gd, scripts/domain/landmark_scatter.gd, scripts/domain/legendary_placement.gd, scripts/domain/save_migration.gd, scripts/domain/world_generator.gd, scripts/domain/world_gen_audit.gd, scripts/domain/world_gen_cohesion.gd, scripts/domain/world_gen_dungeons.gd, scripts/runtime/game_runtime.gd, scripts/runtime/session_state.gd, scripts/ui/seed_prompt.gd, scripts/ui/start_menu.gd, scripts/ui/title_screen.gd, scripts/ui/creation_screen.gd, scripts/ui/name_entry.gd, scripts/ui/avatar_picker.gd, scenes/ui/TitleScreen.tscn, scenes/ui/CreationScreen.tscn, scripts/app/content_scatter_scenario.gd, scripts/app/seed_choice_scenario.gd, scripts/app/legendary_spawn_scenario.gd, scripts/app/world_gen_audit_scenario.gd, scripts/app/new_game_flow_scenario.gd, scripts/app/new_game_flow_checks.gd
 
 # Infinite World
+
+Source review (2026-09-07): `BiomeField` remains the biome source, `ContentScatter` retains its chunk and origin-core constants, and `SessionState.SAVE_VERSION` remains 6. The creation, scatter, world-generation, and migration scenarios remain registered in `tools/run_playtests.py`; their runtime revalidation is pending the full gate.
 
 The world is ONE SEAMLESS INFINITE PROCEDURAL PLANE. `world_generator.get_tile_logic` computes any coordinate forever — the noise plane was ALWAYS unbounded; the bounded disc only ever lived in the chain predicates, and the infinite-world arc (slices 1-4, 2026-08-02..03) deleted them. This spec is the successor the [world-depth.md](world-depth.md) retirement banner mandated: its § World chaining / § Save v5 sections are HISTORICAL and this document supersedes them; every other world-depth section (landmarks, legendaries, the frozen state seam, the pinned byte witnesses) stays current and is referenced from here, not repeated.
 

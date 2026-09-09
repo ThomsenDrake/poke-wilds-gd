@@ -1,7 +1,7 @@
 Status: current
 Last verified: 2026-08-23
 Review cadence days: 21
-Source paths: scripts/domain/overworld_mons.gd, scripts/runtime/overworld_mons_runtime.gd, scripts/runtime/overworld_mons_sim.gd, scripts/runtime/overworld_mons_probe.gd, scripts/runtime/entity_layer.gd, scripts/app/overworld_entity_actions.gd, scripts/app/overworld_mons_scenario.gd, scripts/app/overworld_mons_checks.gd, scripts/app/overworld_mons_battle_checks.gd, scripts/app/world_entity_audit.gd, scripts/app/visual_sweep_overworld.gd, scripts/runtime/game_runtime.gd, scripts/runtime/field_move_runtime.gd, scripts/runtime/fishing_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/domain/biome_encounters.gd, scripts/domain/encounter_selection.gd, scripts/domain/world_generator.gd, scripts/domain/breeding.gd, scripts/data/pokemon_catalog.gd, scripts/app/field_action_router.gd, scripts/app/field_move_actions.gd, scripts/app/world_consistency_audit.gd, scripts/app/world_spatial_audit.gd, scripts/app/qa_scenarios.gd, scripts/runtime/smoke_scenario_runner.gd, scenes/app/Main.tscn
+Source paths: scripts/runtime/overworld_mons_probe.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/core/trace_logger.gd, scripts/domain/overworld_mons.gd, scripts/runtime/overworld_mons_runtime.gd, scripts/runtime/overworld_mons_sim.gd, scripts/runtime/entity_layer.gd, scripts/app/overworld_entity_actions.gd, scripts/app/overworld_mons_scenario.gd, scripts/app/overworld_mons_checks.gd, scripts/app/overworld_mons_battle_checks.gd, scripts/app/world_entity_audit.gd, scripts/app/visual_sweep_overworld.gd, scripts/runtime/game_runtime.gd, scripts/runtime/field_move_runtime.gd, scripts/runtime/fishing_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/world_view.gd, scripts/runtime/player_avatar.gd, scripts/domain/biome_encounters.gd, scripts/domain/encounter_selection.gd, scripts/domain/world_generator.gd, scripts/domain/breeding.gd, scripts/data/pokemon_catalog.gd, scripts/app/field_action_router.gd, scripts/app/field_move_actions.gd, scripts/app/world_consistency_audit.gd, scripts/app/world_spatial_audit.gd, scripts/app/qa_scenarios.gd, scenes/app/Main.tscn
 
 # Overworld Pokémon
 
@@ -201,3 +201,8 @@ The new-game-flow slice ([bootstrap-and-overworld.md](bootstrap-and-overworld.md
 ## Legendary-dungeon chamber integration (2026-08-11)
 
 The seven boot-time overworld legendary statics are replaced by one chamber entity stamped on dungeon entry. `overworld_mons_runtime` preserves the existing forced-battle payload and derived entity construction, adds dungeon-local chamber state seams, and suppresses its normal roam/contact simulation while `active_area` is set. Catch grants a tablet when applicable; KO records the Regi cooldown without granting one; white-out keeps the chamber whittle for the session.
+
+Trace-oracle performance (2026-09-07): `overworld_mons_probe` uses the shared
+absolute-line cursor reader. Historical trace size no longer multiplies with each
+assertion; event matching and the 45-second scenario timeout are unchanged. The
+reader's fixture coverage is part of `feedback_flow`; see [menu-and-save.md](menu-and-save.md#trace-cursor-validation).

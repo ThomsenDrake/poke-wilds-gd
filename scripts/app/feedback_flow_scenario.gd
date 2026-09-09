@@ -89,8 +89,10 @@ func _submit_overworld() -> void:
 	_dialog().smoke_set_message("I walked into a tree and got stuck.")
 	await _key(Key.KEY_ENTER)
 	await get_tree().create_timer(2.1, true, false, true).timeout
+	_check(_dialog().visible and get_tree().paused and _dialog().smoke_result_ready(), "result closed before acknowledgement")
+	await _key(Key.KEY_ENTER)
 	_check(FileAccess.file_exists(_prepared_path), "offline report was not retained")
-	_check(not _dialog().visible and not get_tree().paused, "offline queue did not resume play")
+	_check(not _dialog().visible and not get_tree().paused and not _ctx.start_menu.visible, "acknowledgement did not resume play cleanly")
 	var first_path := _prepared_path
 	var first_route := first_path.trim_suffix(".zip") + ".route"
 	var second_build := _scenario_build("b")
@@ -105,6 +107,7 @@ func _submit_overworld() -> void:
 	_dialog().smoke_set_message("I walked into a tree and got stuck.")
 	await _key(Key.KEY_ENTER)
 	await get_tree().create_timer(2.1, true, false, true).timeout
+	await _key(Key.KEY_ESCAPE)
 	var second_path := "user://feedback_outbox/%s.zip" % second_report_id
 	var second_route := second_path.trim_suffix(".zip") + ".route"
 	_check(_transport_calls == 1, "concurrent submit reused the active HTTP transport")
@@ -134,11 +137,9 @@ func _submit_overworld() -> void:
 		"malformed persisted install ID was not regenerated")
 	_controller().smoke_set_build_info({})
 	_cleanup_install_id_test()
-
 func _offline_transport(prepared: Dictionary) -> Dictionary:
 	_prepared_path = str(prepared.get("bundle_path", ""))
 	return {"status": "queued", "reason": "scenario_offline"}
-
 func _race_transport(prepared: Dictionary) -> Dictionary:
 	var report_id := str(prepared.get("metadata", {}).get("report_id", ""))
 	var expected: Dictionary = _expected_routes.get(report_id, {})

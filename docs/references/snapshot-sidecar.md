@@ -1,9 +1,11 @@
 Status: current
-Last verified: 2026-08-11
+Last verified: 2026-09-07
 Review cadence days: 21
 Source paths: scripts/app/render_introspection.gd, scripts/app/snapshot_capture.gd, scripts/app/ui_render_model.gd, scripts/app/visual_sweep.gd, tools/visual_region_diff.py
 
 # Snapshot Sidecar
+
+Source review (2026-09-07): the listed collector, capture, model, sweep, and region-diff source paths have no commits since the prior review; their naming and injection seams still match this schema. Historical timing measurements below remain historical. Fresh pixel/sidecar/trace correlation is pending the windowed sweep gate.
 
 Each VALID `visual_sweep` capture writes a canonical JSON sidecar next to its PNG. Sidecars carry the semantic render state an agent needs to explain a pixel diff with NO vision: labels, draw order, palettes, expected regions, the canary rect. The schema is single-sourced by two suppliers: `scripts/app/render_introspection.gd` (the semantic collector — labels/draw order/cursor pairs/expected regions/canary rect/capture env/crafted state) and `scripts/app/snapshot_capture.gd` (the writer host — capture stamps, validity, palettes from the readback, `JSON.stringify` + file write). Spec context: [vision-fidelity.md](../product-specs/vision-fidelity.md).
 

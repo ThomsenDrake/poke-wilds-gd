@@ -1,7 +1,8 @@
 import { findOrCreateIssue } from "./github";
 import { badRequest, payloadTooLarge, RelayError } from "./errors";
+import { authorizeReport, reportIdentity } from "./report_access";
 import { constantTimeEqual, inspectBundle, MAX_COMPRESSED_BYTES, MAX_METADATA_BYTES, sha256Hex, validateMetadata } from "./security";
-import type { Env, InviteRow, ReportMetadata, ReportRow } from "./types";
+import type { Env, ReportMetadata, ReportRow } from "./types";
 import { artifactKey, latestKey, parseArtifactPath, parseChannel, parseManifest } from "./updates";
 
 const MAX_MULTIPART_BYTES = MAX_COMPRESSED_BYTES + MAX_METADATA_BYTES + 256 * 1024;
@@ -74,8 +75,8 @@ export async function cleanupExpiredReports(env: Env): Promise<{ batches: number
 
 async function createReport(request: Request, env: Env): Promise<Response> {
   const started = Date.now();
-  const authorized = await authorizeInvite(request, env);
-  const limited = await env.REPORT_RATE_LIMITER.limit({ key: `${authorized.invite.tester_id}:${authorized.tokenHash}` });
+  const access = await authorizeReport(request, env);
+  const limited = await env.REPORT_RATE_LIMITER.limit({ key: access.rateLimitKey });
   if (!limited.success) return json({ ok: false, error: "rate_limited" }, 429, { "Retry-After": "60" });
   const form = await boundedFormData(request);
   const metadataField = form.get("metadata");
@@ -89,8 +90,7 @@ async function createReport(request: Request, env: Env): Promise<Response> {
     if (error instanceof SyntaxError) throw badRequest("invalid_metadata_json");
     throw error;
   }
-  if (metadata.tester_id !== authorized.invite.tester_id) throw badRequest("tester_mismatch");
-  if (metadata.build.channel !== authorized.invite.cohort_id) throw badRequest("cohort_mismatch");
+  const identity = reportIdentity(access, metadata);
   const bytes = new Uint8Array(await bundleField.arrayBuffer());
   if (bytes.byteLength !== metadata.bundle_bytes || await sha256Hex(bytes) !== metadata.bundle_sha256) throw badRequest("bundle_hash_mismatch");
   await inspectBundle(bytes, metadata);
@@ -118,8 +118,8 @@ async function createReport(request: Request, env: Env): Promise<Response> {
     await env.DB.prepare("UPDATE reports SET status='stored',updated_at=CURRENT_TIMESTAMP WHERE report_id=? AND status='issuing' AND updated_at=?")
       .bind(metadata.report_id, existing.updated_at).run();
   }
-  const installHash = await sha256Hex(`${authorized.invite.cohort_id}:${metadata.install_id}`);
-  const key = `reports/${authorized.invite.cohort_id}/${metadata.report_id}/bundle.zip`;
+  const installHash = await sha256Hex(`${identity.cohortId}:${metadata.install_id}`);
+  const key = `reports/${identity.cohortId}/${metadata.report_id}/bundle.zip`;
   const expires = new Date(Date.now() + 180 * 86400_000).toISOString();
   if (!existing) {
     const admission = await env.DB.prepare(
@@ -127,8 +127,8 @@ async function createReport(request: Request, env: Env): Promise<Response> {
       "SELECT ?,?,?,?,?, 'received',?,?,?,? WHERE " +
       "(SELECT COUNT(*) FROM reports WHERE install_id_hash=? AND created_at >= datetime('now','-1 day')) < 20 AND " +
       "(SELECT COUNT(*) FROM reports WHERE cohort_id=? AND created_at >= datetime('now','-1 day')) < 200",
-    ).bind(metadata.report_id, authorized.invite.tester_id, authorized.invite.cohort_id, installHash, metadata.build.build_id, key,
-      metadata.bundle_sha256, bytes.byteLength, expires, installHash, authorized.invite.cohort_id).run();
+    ).bind(metadata.report_id, identity.testerId, identity.cohortId, installHash, metadata.build.build_id, key,
+      metadata.bundle_sha256, bytes.byteLength, expires, installHash, identity.cohortId).run();
     if ((admission.meta.changes ?? 0) !== 1) {
       const raced = await env.DB.prepare(
         "SELECT report_id,status,bundle_sha256,issue_number,issue_url,updated_at,expires_at FROM reports WHERE report_id=?",
@@ -189,17 +189,6 @@ async function reportStateResponse(env: Env, reportId: string): Promise<Response
     return json({ ok: true, report_id: reportId, issue_number: row.issue_number, issue_url: row.issue_url }, 200);
   }
   return json({ ok: false, report_id: reportId, error: "issue_in_progress" }, 202, { "Retry-After": "30" });
-}
-
-async function authorizeInvite(request: Request, env: Env): Promise<{ invite: InviteRow; tokenHash: string }> {
-  const auth = request.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) throw new RelayError("missing_invite_token", 401);
-  const tokenHash = await sha256Hex(auth.slice(7));
-  const invite = await env.DB.prepare(
-    "SELECT tester_id,nickname,token_hash,cohort_id FROM invites WHERE token_hash=? AND revoked_at IS NULL",
-  ).bind(tokenHash).first<InviteRow>();
-  if (!invite) throw new RelayError("invalid_invite_token", 401);
-  return { invite, tokenHash };
 }
 
 async function boundedFormData(request: Request): Promise<FormData> {

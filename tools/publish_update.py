@@ -24,8 +24,6 @@ from package_playtest import (
     USER_AGENT,
     build_metadata_lock,
     godot_binary,
-    public_tester_id,
-    register_invite,
     run,
     dirty_worktree_error,
     worktree_is_dirty,
@@ -33,6 +31,7 @@ from package_playtest import (
 from update_manifest import artifact_key, artifact_public_url, parse
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_FEEDBACK_ENDPOINT = "https://poke-wilds-feedback-relay.drake-t.workers.dev"
 WRANGLER_CONFIG = ROOT / "services" / "feedback-relay" / "wrangler.jsonc"
 RELAY_PATHS = (
     "services/feedback-relay",
@@ -54,35 +53,28 @@ def sha256_file(path: Path) -> str:
 
 
 def write_shared_build_info(channel: str, endpoint: str, commit: str, version: str,
-                            build_id: str, published_at: str, cohort: dict | None) -> None:
+                            build_id: str, published_at: str, cohort: dict | None = None,
+                            *, feedback_endpoint: str = "") -> None:
+    """Stamp shared alpha access; an obsolete cohort argument never enters the build."""
+    if channel not in ("public", "playtest"):
+        raise ValueError("shared alpha channel must be public or playtest")
     payload = {
         "schema_version": 1,
         "version": version,
         "commit_sha": commit,
         "build_id": build_id,
         "channel": channel,
-        "endpoint": endpoint,
+        "endpoint": "" if channel == "public" else endpoint,
+        "feedback_mode": "public",
+        "feedback_endpoint": validated_endpoint(
+            feedback_endpoint or endpoint or DEFAULT_FEEDBACK_ENDPOINT),
         "published_at": published_at,
-        "tester_id": (cohort or {}).get("tester_id", "UNASSIGNED"),
-        "invite_token": (cohort or {}).get("token", ""),
-        "identity_kind": "cohort" if cohort else "",
+        "tester_id": "PUBLIC-ALPHA",
+        "invite_token": "",
+        "identity_kind": "",
     }
     BUILD_INFO.parent.mkdir(parents=True, exist_ok=True)
     BUILD_INFO.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-
-def cohort_from_env(channel: str) -> dict | None:
-    """Return the shared accountless invite, or None when CI/local publish is tokenless."""
-    token = os.environ.get("PLAYTEST_COHORT_INVITE_TOKEN", "").strip()
-    if not token:
-        return None
-    nickname = os.environ.get("PLAYTEST_COHORT_NICKNAME", "shared-playtest").strip()
-    return {
-        "tester_id": public_tester_id(token),
-        "token": token,
-        "nickname": nickname or "shared-playtest",
-        "cohort_id": channel,
-    }
 
 
 def write_publish_receipt(exported: dict, path: Path | None = None) -> Path:
@@ -127,14 +119,15 @@ def stage_github_release_assets(receipt_path: Path, dest_dir: Path) -> list[Path
 
 
 def export_shared(channel: str, endpoint: str, *, godot: str, runner=subprocess.run,
-                  cohort: dict | None = None) -> dict:
+                  cohort: dict | None = None, feedback_endpoint: str = "") -> dict:
     commit = run("git", "rev-parse", "HEAD")
     version = run("git", "describe", "--tags", "--always")
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     build_id = f"{channel}-{commit[:10]}-{published_at.replace(':', '').replace('-', '')}"
     output_dir = ROOT / "dist" / "updates" / build_id
     output_dir.mkdir(parents=True, exist_ok=True)
-    write_shared_build_info(channel, endpoint, commit, version, build_id, published_at, cohort)
+    write_shared_build_info(channel, endpoint, commit, version, build_id, published_at, cohort,
+                            feedback_endpoint=feedback_endpoint)
     artifacts = {}
     for os_name, (preset, extension) in TARGETS.items():
         output = output_dir / f"PokeWilds-{build_id}-{os_name}{extension}"
@@ -402,19 +395,23 @@ def wrangler_put(key: str, path: Path, endpoint: str = "",
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--channel", default="playtest")
+    parser.add_argument("--channel", choices=("public", "playtest"), default="playtest")
     parser.add_argument("--endpoint", default=os.environ.get("PLAYTEST_FEEDBACK_ENDPOINT", ""))
+    parser.add_argument(
+        "--feedback-endpoint", default=os.environ.get("ALPHA_FEEDBACK_ENDPOINT", ""),
+        help="Non-secret alpha feedback URL; defaults to the update relay or public relay",
+    )
     parser.add_argument("--wrangler-env", default=os.environ.get("PLAYTEST_UPDATE_WRANGLER_ENV", ""))
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument(
         "--require-cohort",
         action="store_true",
-        help="Refuse tokenless shared builds so new testers can still F-report",
+        help="Deprecated compatibility flag; shared alpha builds no longer need an invite",
     )
     parser.add_argument(
         "--embed-public",
         action="store_true",
-        help="Export three OS artifacts with empty endpoint and invite; skip relay publish",
+        help="Export three OS artifacts with public feedback and no updater; skip relay publish",
     )
     parser.add_argument(
         "--already-published",
@@ -431,12 +428,14 @@ def main() -> int:
             args.require_cohort or args.already_published or args.require_production_relay):
         parser.error("--embed-public cannot be combined with playtest publish flags")
     if args.embed_public:
+        feedback_endpoint = validated_endpoint(args.feedback_endpoint or DEFAULT_FEEDBACK_ENDPOINT)
         if not args.allow_dirty and worktree_is_dirty():
             parser.error(dirty_worktree_error())
+        assert_production_relay(feedback_endpoint, required_relay_commit())
         with build_metadata_lock():
             try:
                 exported = export_shared(
-                    args.channel, "", godot=godot_binary(), cohort=None)
+                    args.channel, "", godot=godot_binary(), feedback_endpoint=feedback_endpoint)
                 write_publish_receipt(exported)
             finally:
                 BUILD_INFO.unlink(missing_ok=True)
@@ -470,17 +469,16 @@ def main() -> int:
     endpoint = validated_endpoint(args.endpoint)
     if not args.allow_dirty and worktree_is_dirty():
         parser.error(dirty_worktree_error())
-    cohort = cohort_from_env(args.channel)
-    if args.require_cohort and not cohort:
-        parser.error("PLAYTEST_COHORT_INVITE_TOKEN is required for distributed shared builds")
+    feedback_endpoint = validated_endpoint(args.feedback_endpoint or endpoint)
     with build_metadata_lock():
         try:
             assert_current_main()
-            if cohort:
-                assert_production_relay(endpoint, required_relay_commit())
-                register_invite(endpoint, admin_token, cohort)
+            required_relay = required_relay_commit()
+            assert_production_relay(endpoint, required_relay)
+            if feedback_endpoint != endpoint:
+                assert_production_relay(feedback_endpoint, required_relay)
             exported = export_shared(
-                args.channel, endpoint, godot=godot_binary(), cohort=cohort)
+                args.channel, endpoint, godot=godot_binary(), feedback_endpoint=feedback_endpoint)
             write_publish_receipt(exported)
             builds = upload_artifacts(
                 exported, put_object=lambda key, dest: wrangler_put(
@@ -489,8 +487,7 @@ def main() -> int:
             publish_manifest(endpoint, admin_token, exported, builds)
         finally:
             BUILD_INFO.unlink(missing_ok=True)
-    suffix = f" cohort {cohort['tester_id']}" if cohort else ""
-    print(f"published shared {args.channel} update {exported['build_id']}{suffix}")
+    print(f"published shared {args.channel} update {exported['build_id']}")
     return 0
 
 

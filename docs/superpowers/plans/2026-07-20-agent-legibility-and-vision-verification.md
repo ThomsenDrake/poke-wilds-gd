@@ -1,9 +1,11 @@
 Status: active
-Last verified: 2026-08-19
+Last verified: 2026-09-07
 Review cadence days: 14
 Source paths: docs/product-specs, docs/registry/subsystems.toml, docs/QUALITY_SCORE.md, docs/RELIABILITY.md, docs/references/trace-events.md, docs/references/vision-review-rubric.md, docs/superpowers/specs/2026-07-18-autonomous-playtesting-oracles-design.md, scripts/app, scripts/runtime, tools
 
 # Vision Fidelity & Agent Legibility
+
+Current contract review (2026-09-07): this plan remains active. Its dated rollout measurements, former scenario totals, and source line budgets are historical records. Current suite membership is `PLAYTEST_SCENARIOS`/`SMOKE_SCENARIOS` in `tools/run_playtests.py`; current shot ownership is `VisualSweepBaselines.SHOT_REGISTRY`. CI now runs the headless gate, and cloud windowed runs provide live visual evidence without certifying Apple M4 pixel baselines. The full gate and this plan's multi-run/graduation evidence remain separate requirements; runtime revalidation is pending.
 
 > **Status note (2026-07-21):** Workstream L.1 has **LANDED** — `tools/verify_all.py` exists and absorbs the steps (S1–S10) and refusals (R1–R6) described below. Every present-tense reference to `verify_all.py` as "(absent today)" / "when it lands" / "once L.1 lands" in this plan is historical (written before L.1 landed) and is now superseded; see `docs/RELIABILITY.md` § Local gate for the current mechanic.
 
@@ -13,7 +15,7 @@ Deepen an AI agent's **legibility** into (a) Godot 4.6.1 itself and (b) this por
 
 It is built on the **Vision-first** proposal (the higher-scoring of the two reviewed: it grows the *coded* red-tier oracle surface, introduces no runtime network surface, and is the most flake-averse), with the **Introspection-first** proposal's legibility backbone grafted in **in-process** — semantic snapshot sidecars correlated to the JSONL trace, an explainable per-region diff, and an ASCII change grid an agent can read with no vision at all. The Introspection-first proposal's live TCP endpoint is **deliberately deferred** to an optional later lane: the in-process collectors deliver ~90% of the structured-observation value with zero new runtime moving parts.
 
-**Non-goals** (explicit): any CI runtime gate (CI stays lint/contract-only); cross-platform/cross-machine baseline sharing (pixels are driver-specific); a first-party GDScript test runner (Godot 4.6 ships none; `--test` is engine-dev-only); OCR as a primary text oracle (strictly dominated here by template matching on a fixed font); headless capture of any kind (blank by engine design).
+**Non-goals** (explicit): certifying hardware-specific pixel baselines on CI; cross-platform/cross-machine baseline sharing (pixels are driver-specific); a first-party GDScript test runner (Godot 4.6 ships none; `--test` is engine-dev-only); OCR as a primary text oracle (strictly dominated here by template matching on a fixed font); headless capture of any kind (blank by engine design).
 
 **Operating constraint:** the suite stays **local and windowed** for captures. This is engine reality, not policy preference — verified below.
 
@@ -224,9 +226,9 @@ Sequenced so **honest captures come first** (everything else stands on them), th
 
 The initiative is done when the repo's definition of done holds **and**:
 
-- With the current codebase clean, the full suite stays green and **two consecutive windowed sweeps are bit-identical** on all 16 shots (or every nonzero delta has a `capture_nondeterminism` trace with an identified cause).
+- With the current codebase clean, the full suite stays green and **two consecutive windowed sweeps are bit-identical** on all shots owned by the exercised families in `VisualSweepBaselines.SHOT_REGISTRY` (or every nonzero delta has a `capture_nondeterminism` trace with an identified cause).
 - Re-introducing a **seeded** canary strip-bleed (1-frame offset) and a deleted battle label turns the suite **red via the region gates** with no per-bug assertion written (validation pass, then reverted) — the oracle spec's "no new assertions for that specific bug" bar.
-- `PLAYTEST_FORCE_HEADLESS=1` reports `19/19 (1 skipped-headless)` and is never red on transport.
+- `PLAYTEST_FORCE_HEADLESS=1` runs the canonical `PLAYTEST_SCENARIOS`/`SMOKE_SCENARIOS` lists with honest windowed transport skips and is never red on transport.
 - `playtest-report.json` carries HEAD sha + Godot 4.6.1 + renderer; `verify_all.py` (LANDED) refuses a report older than HEAD.
 - Lane 4 produces `.godot-smoke/vision-review.json` on **every** sweep whose shots change; **100%** of findings cite and intersect a sidecar region; the rubric + grounding catches **≥1 seeded visual defect all coded oracles miss**, as a `quarantine_finding`.
 - The pixel lint is graduated **per state** (`GRADUATED_STATES`) after 5 clean windowed runs + glyph-oracle agreement; the glyph oracle's raster-equivalence proof is on file.

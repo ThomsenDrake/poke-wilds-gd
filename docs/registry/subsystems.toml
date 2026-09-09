@@ -220,6 +220,7 @@ status = "active"
 layer = "runtime"
 code_paths = [
   "scripts/core/trace_logger.gd",
+  "scripts/app/trace_cursor_checks.gd",
   "scripts/runtime/game_runtime.gd",
   "scripts/runtime/stone_evolution_runtime.gd",
   "scripts/runtime/session_state.gd",
@@ -246,6 +247,7 @@ validation_commands = [
   "python3 tools/check_repo_contracts.py",
   "python3 tools/check_architecture.py",
   "python3 tools/godot_dap_smoketest.py --project /absolute/path/to/project --scene res://scenes/app/Main.tscn --scenario menu_save",
+  "python3 tools/run_playtests.py --scenario feedback_flow --scenario overworld_mons --timeout 45 --fresh-save",
 ]
 required_trace_events = ["session_loaded", "session_created", "save_written", "save_recovery", "warning"]
 quality_bucket = "runtime"
@@ -2002,6 +2004,7 @@ code_paths = [
   "scripts/app/feedback_flow_scenario.gd",
   "scripts/app/feedback_flow_resilience_checks.gd",
   "scripts/app/feedback_flow_stamp_checks.gd",
+  "scripts/app/feedback_flow_legacy_checks.gd",
   "scripts/ui/feedback_dialog.gd",
   "scripts/runtime/feedback_snapshot.gd",
   "scripts/runtime/feedback_bundle.gd",
@@ -2024,26 +2027,16 @@ validation_commands = [
 ]
 required_trace_events = ["feedback_capture_requested", "feedback_report_queued", "feedback_report_sent", "feedback_report_failed", "feedback_flow_passed", "feedback_flow_failed"]
 quality_bucket = "feedback"
-# SHARED UPDATE IDENTITY (2026-08-21): POST /v1/admin/invites refuses a
-# revoked tester_id (invite_revoked) and does not clear revoked_at, so a
-# later playtest publish cannot silently revive a compromised cohort token.
-# playtest-release waits for production /healthz version_tag containing
-# the latest relay-touching commit before register_invite, retries a
-# pending ancestor deploy, and fails closed on a transient latest lookup.
-# PUBLIC STAMP (2026-08-23): empty invite plus empty endpoint is a public
-# build. FeedbackController returns before capture so F is silent. merge()
-# does not restore user://playtest_identity.json onto that stamp.
-# SHARED UPDATE IDENTITY (2026-08-19): load_build_info() prefers
-# user://playtest_identity.json after a generic replace so F reports keep the
-# friend route; editor smoke overrides are not merged with disk identity.
-# load_embedded_build_info() is the unmerged stamp; update checks use that
-# endpoint, not the persisted friend host. Worker GET /v1/updates/artifacts
-# serves updates/ only and never reports/. Identity persist failure refuses
-# the shared update so a tokenless replace cannot strip F-to-report.
+# PUBLIC ALPHA (2026-09-07): explicit public feedback mode/endpoint bypasses
+# persisted friend identity without enabling public updates. Anonymous intake uses
+# PUBLIC-ALPHA on public/playtest channels; supplied invites remain strict legacy
+# auth. Private outbox routes retain mode and old credentials across build changes.
+# Real X input, acknowledged result messages, app User-Agent, and public retry paths
+# are pinned by feedback_flow; packaging and Worker tests pin tokenless intake.
 # Packaged-player diagnostics: real F input captures before the pause-modal,
 # current-launch trace slicing prevents historical-log leakage, full save/UI/
 # screenshot state is checksummed into a private bundle, and a revocable
-# friend-specific token reaches the R2/D1/GitHub-App relay without shipping any
+# optional legacy token reaches the R2/D1/GitHub-App relay without shipping any
 # GitHub credential. feedback_flow drives the seven player-facing contexts, pins
 # their distinct capture labels, and parses the ZIP through an injected transport;
 # its overlay/menu case pins aggregation of every visible UI sibling. display_matrix

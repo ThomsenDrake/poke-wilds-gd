@@ -25,7 +25,7 @@ func build(message: String, capture: Dictionary, bundle_path: String) -> Diction
 	for field in ["save", "runtime", "game", "trace_slice", "engine_slice"]:
 		if not capture.has(field):
 			return {"ok": false, "error": "missing_capture_%s" % field}
-	var build := load_build_info()
+	var build := load_feedback_build_info()
 	var install := _install_id()
 	if not bool(install.get("ok", false)):
 		return {"ok": false, "error": install.get("error", "install_id_write_failed")}
@@ -85,6 +85,22 @@ func load_embedded_build_info() -> Dictionary:
 		if parsed is Dictionary:
 			embedded = parsed
 	return embedded
+
+
+func load_feedback_build_info() -> Dictionary:
+	var embedded := load_embedded_build_info()
+	if OS.has_feature("editor") and not _build_info_override.is_empty() and embedded.get("feedback_mode", "") != "public":
+		return embedded
+	return resolve_feedback_build(embedded)
+
+
+static func resolve_feedback_build(embedded: Dictionary, persisted: Dictionary = {}) -> Dictionary:
+	# Public alpha reports use their current stamp, never a saved friend route.
+	return embedded.duplicate(true) if embedded.get("feedback_mode", "") == "public" else UpdateIdentity.merge(embedded, persisted)
+
+
+func load_legacy_feedback_route() -> Dictionary:
+	return UpdateIdentity.load_identity() if load_embedded_build_info().get("feedback_mode", "") == "public" else {}
 
 
 func load_build_info() -> Dictionary:
