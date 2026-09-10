@@ -55,6 +55,7 @@ def _load_module(name: str, path: Path):
 
 smoketest = _load_module("godot_dap_smoketest", TOOLS / "godot_dap_smoketest.py")
 playtests = _load_module("run_playtests", TOOLS / "run_playtests.py")
+_load_module("cloud_env", TOOLS / "cloud_env.py").load_cloud_env()
 
 
 def force_headless() -> bool:
@@ -128,8 +129,12 @@ def turn_budget_error() -> dict[str, str | bool]:
     return {
         "code": "turn_budget_exhausted",
         "retryable": False,
-        "hint": "Inspect .godot-smoke/play_agent_loop.json and rerun with fewer turns.",
+        "hint": "The loop reached --turns without quit; raise the budget or inspect the report.",
     }
+
+
+def godot_cmd(godot_bin: str, project: Path) -> list[str]:
+    return [godot_bin, "--path", str(project), *playtests.godot_audio_args()]
 
 
 def write_json_atomic(path: Path, doc: dict[str, Any]) -> None:
@@ -196,6 +201,7 @@ def _next_command(
     explorer_i: int,
     file_once: bool,
     novelty: dict[str, Any] | None,
+    turn_budget: int = TURN_BUDGET,
 ) -> tuple[dict[str, Any], int, bool]:
     planner = os.environ.get(PLANNER_CMD_ENV, "").strip()
     if planner and observation is not None:
@@ -219,6 +225,8 @@ def _next_command(
             },
         }
         return apply_live_policy(command), explorer_i, True
+    if turn >= turn_budget:
+        return apply_live_policy({"id": f"t{turn}", "action": "quit", "payload": {}}), explorer_i, file_once
     plan = explorer_plan()
     step = plan[min(explorer_i, len(plan) - 1)]
     command = {"id": f"t{turn}", "action": step["action"], "payload": dict(step.get("payload") or {})}
@@ -281,11 +289,14 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     explorer_i = 0
     file_once = False
     observation: dict[str, Any] | None = None
+    sent_quit = False
     try:
+        env = os.environ.copy()
+        env.setdefault("GODOT_AUDIO_DRIVER", "Dummy")
         proc = subprocess.Popen(
-            [godot_bin, "--path", str(project)], cwd=str(project),
+            godot_cmd(godot_bin, project), cwd=str(project),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, errors="replace", bufsize=1,
+            text=True, errors="replace", bufsize=1, env=env,
         )
         stdout_lines: "queue.Queue[str]" = queue.Queue()
         stderr_lines: list[str] = []
@@ -308,7 +319,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         while turns < turn_budget and time.monotonic() < deadline:
             drain()
             command, explorer_i, file_once = _next_command(
-                turns + 1, observation, explorer_i, file_once, novelty,
+                turns + 1, observation, explorer_i, file_once, novelty, turn_budget,
             )
             if command["action"] == "file_feedback" and novelty and not novelty.get("novel"):
                 skipped_duplicate += 1
@@ -335,10 +346,25 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                 filed = "live" if live_file_enabled() and bool((command.get("payload") or {}).get("live")) else "dry"
                 issue_number = int(feedback.get("issue_number") or 0)
             if command["action"] == "quit":
+                sent_quit = True
                 break
             if proc.poll() is not None:
                 break
-        if turns >= turn_budget:
+        if (
+            not sent_quit
+            and proc is not None
+            and proc.poll() is None
+            and time.monotonic() < deadline
+        ):
+            quit_cmd = apply_live_policy({
+                "id": f"t{turns + 1}", "action": "quit", "payload": {},
+            })
+            write_json_atomic(command_path, quit_cmd)
+            grace = _wait_observation(observation_path, quit_cmd["id"], proc, deadline)
+            if grace is not None:
+                sent_quit = True
+                observation = grace
+        if turns >= turn_budget and not sent_quit:
             errors.append(turn_budget_error())
         drain()
         for line in stderr_lines:

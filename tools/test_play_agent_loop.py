@@ -81,6 +81,23 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertEqual(index, 1)
         self.assertFalse(filed)
 
+    def test_last_turn_forces_quit(self) -> None:
+        command, _, _ = pal._next_command(8, {"screen": "overworld"}, 3, True, None, 8)
+        self.assertEqual(command["action"], "quit")
+
+    def test_last_turn_still_files_novel(self) -> None:
+        novelty = {"anomaly": True, "novel": True, "live_fileable": False}
+        command, _, filed = pal._next_command(
+            8, {"screen": "overworld", "exceptions": ["boom"]}, 3, False, novelty, 8,
+        )
+        self.assertEqual(command["action"], "file_feedback")
+        self.assertTrue(filed)
+
+    def test_godot_cmd_uses_dummy_audio(self) -> None:
+        argv = pal.godot_cmd("/godot", Path("/tmp/proj"))
+        self.assertIn("--audio-driver", argv)
+        self.assertIn("Dummy", argv)
+
 
 if __name__ == "__main__":
     unittest.main()
