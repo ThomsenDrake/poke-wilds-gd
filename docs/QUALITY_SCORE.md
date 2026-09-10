@@ -1,11 +1,17 @@
 Status: current
-Last verified: 2026-09-07
+Last verified: 2026-09-10
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, .github/workflows/enqueue-playtest-feedback.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools, LICENSING.md, THIRD_PARTY.md
 
 # Quality Score
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
+
+Closed-loop play agent (2026-09-10): optional `play_agent_loop` file bridge,
+novelty gate, and real-F filing land beside the existing `play_agent`
+one-shot. Off the default gate (`--with-play-agent-loop`). Human F and the
+67-scenario suite are unchanged. `app_bootstrap` scores unchanged:
+verification harness, not player behavior.
 
 Trace cursor validation (2026-09-07): repeated oracle checks now read uncapped
 session traces with absolute line cursors and one streamed historical count.
