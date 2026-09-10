@@ -15,6 +15,7 @@ All under `.godot-smoke/` (gitignored). Engine paths use the `res://.godot-smoke
 - `agent_command.json` — Python writes via temp file + atomic rename. Engine consumes, then deletes.
 - `agent_observation.json` — engine writes via temp file + atomic rename after each applied command.
 - `play_agent_loop.json` — Python session report at exit.
+- `play_agent_loop.mp4` — ffmpeg recording of the windowed play session (default on; `--no-video` or `PLAY_AGENT_RECORD_VIDEO=0` skips).
 - `ui_tree/loop.json` — latest UI-tree snapshot from an `observe` or any applied command.
 
 ## Command object
@@ -51,14 +52,17 @@ Canonical string: `screen|tile|exception_class|last_failed_event|ui_tree_structu
 
 ## Session report
 
-`{ok, skipped, reason, turns, anomalies, filed, skipped_duplicate, issue_number, errors:[{code,retryable,hint}]}`
+`{ok, skipped, reason, turns, anomalies, filed, skipped_duplicate, issue_number, errors:[{code,retryable,hint}], video, video_bytes, video_reason}`
 
-Headless / `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason}` and exits 0. A skipped lane certifies nothing.
+`video` is a project-relative path to the session mp4 when ffmpeg recorded the window, else empty. Missing ffmpeg or a display-less host does not fail `ok`; it sets `video_reason` (`ffmpeg_missing`, `no_capture_source`, `video_disabled`, `headless`, `recorder_empty`). Headless / `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason, video_reason: "headless"}` and exits 0. A skipped lane certifies nothing.
 
 ## Flags
 
 - `PLAY_AGENT_LIVE_FILE=1` — allow a real relay POST. Absent or `0` forces `live: false` and mock transport.
 - `PLAY_AGENT_PLANNER_CMD` — optional CLI; stdin is one observation JSON, stdout is one command JSON. Default explorer is deterministic: `boot_new_game`, a bounded walk, `menu`, `observe`, `quit`.
+- `PLAY_AGENT_RECORD_VIDEO=0` — skip the session mp4. Default is on for windowed runs (`--no-video` is the same).
+- `PLAY_AGENT_VIDEO_PATH` / `--video` — write the mp4 somewhere other than `.godot-smoke/play_agent_loop.mp4`.
+- `PLAY_AGENT_FFMPEG` — ffmpeg binary; otherwise `PATH`.
 - `PLAY_AGENT_FEEDBACK_ENDPOINT` — HTTPS endpoint embedded via the editor stamp for live runs. Not committed.
 
 ## Trace events

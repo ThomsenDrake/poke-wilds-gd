@@ -16,6 +16,9 @@ class PlayAgentLoopTests(unittest.TestCase):
     def tearDown(self) -> None:
         os.environ.pop(pal.FORCE_HEADLESS_ENV, None)
         os.environ.pop(pal.LIVE_FILE_ENV, None)
+        os.environ.pop(pal.RECORD_VIDEO_ENV, None)
+        os.environ.pop(pal.VIDEO_PATH_ENV, None)
+        os.environ.pop(pal.FFMPEG_ENV, None)
 
     def test_headless_skip_envelope(self) -> None:
         os.environ[pal.FORCE_HEADLESS_ENV] = "1"
@@ -36,6 +39,8 @@ class PlayAgentLoopTests(unittest.TestCase):
             self.assertTrue(report["ok"])
             self.assertTrue(report["skipped"])
             self.assertTrue(report["reason"])
+            self.assertEqual(report["video"], "")
+            self.assertEqual(report["video_reason"], "headless")
 
     def test_live_flag_absent_strips_live(self) -> None:
         os.environ.pop(pal.LIVE_FILE_ENV, None)
@@ -97,6 +102,45 @@ class PlayAgentLoopTests(unittest.TestCase):
         argv = pal.godot_cmd("/godot", Path("/tmp/proj"))
         self.assertIn("--audio-driver", argv)
         self.assertIn("Dummy", argv)
+
+    def test_recorder_disabled(self) -> None:
+        os.environ[pal.RECORD_VIDEO_ENV] = "0"
+        argv, reason = pal.recorder_argv(Path("/tmp/play.mp4"))
+        self.assertIsNone(argv)
+        self.assertEqual(reason, "video_disabled")
+
+    def test_recorder_missing_ffmpeg(self) -> None:
+        os.environ[pal.RECORD_VIDEO_ENV] = "1"
+        os.environ[pal.FFMPEG_ENV] = ""
+        orig = pal.shutil.which
+        pal.shutil.which = lambda _name: None
+        try:
+            argv, reason = pal.recorder_argv(Path("/tmp/play.mp4"))
+        finally:
+            pal.shutil.which = orig
+        self.assertIsNone(argv)
+        self.assertEqual(reason, "ffmpeg_missing")
+
+    def test_recorder_linux_x11_argv(self) -> None:
+        os.environ[pal.RECORD_VIDEO_ENV] = "1"
+        os.environ[pal.FFMPEG_ENV] = "/usr/bin/ffmpeg"
+        os.environ["DISPLAY"] = ":99"
+        argv, reason = pal.recorder_argv(Path("/tmp/play.mp4"))
+        if not pal.sys.platform.startswith("linux"):
+            self.assertIsNone(argv)
+            self.assertEqual(reason, "no_capture_source")
+            return
+        self.assertEqual(reason, "")
+        self.assertIsNotNone(argv)
+        self.assertIn("-f", argv)
+        self.assertIn("x11grab", argv)
+        self.assertIn("/tmp/play.mp4", argv)
+
+    def test_video_report_fields_empty(self) -> None:
+        fields = pal.video_report_fields(Path("/tmp"), None, "ffmpeg_missing")
+        self.assertEqual(fields["video"], "")
+        self.assertEqual(fields["video_bytes"], 0)
+        self.assertEqual(fields["video_reason"], "ffmpeg_missing")
 
 
 if __name__ == "__main__":

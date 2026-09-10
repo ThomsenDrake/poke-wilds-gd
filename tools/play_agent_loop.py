@@ -17,6 +17,8 @@ import json
 import os
 from pathlib import Path
 import queue
+import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -33,7 +35,12 @@ SCENARIO = "play_agent_loop"
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 LIVE_FILE_ENV = "PLAY_AGENT_LIVE_FILE"
 PLANNER_CMD_ENV = "PLAY_AGENT_PLANNER_CMD"
+RECORD_VIDEO_ENV = "PLAY_AGENT_RECORD_VIDEO"
+VIDEO_PATH_ENV = "PLAY_AGENT_VIDEO_PATH"
+FFMPEG_ENV = "PLAY_AGENT_FFMPEG"
 REPORT_NAME = "play_agent_loop.json"
+VIDEO_NAME = "play_agent_loop.mp4"
+CANONICAL_SIZE = (1152, 648)
 ACTIONS = (
     "boot_new_game", "press", "hold", "observe", "file_feedback", "quit",
 )
@@ -84,6 +91,9 @@ def skip_report(reason: str) -> dict[str, Any]:
         "skipped_duplicate": 0,
         "issue_number": 0,
         "errors": [],
+        "video": "",
+        "video_bytes": 0,
+        "video_reason": "headless",
     }
 
 
@@ -98,9 +108,130 @@ def session_report(**overrides: Any) -> dict[str, Any]:
         "skipped_duplicate": 0,
         "issue_number": 0,
         "errors": [],
+        "video": "",
+        "video_bytes": 0,
+        "video_reason": "",
     }
     report.update(overrides)
     return report
+
+
+def video_enabled() -> bool:
+    return os.environ.get(RECORD_VIDEO_ENV, "1").lower() not in (
+        "0", "false", "no", "off",
+    )
+
+
+def ffmpeg_path() -> str:
+    return os.environ.get(FFMPEG_ENV, "") or (shutil.which("ffmpeg") or "")
+
+
+def video_path_for(project: Path) -> Path:
+    override = os.environ.get(VIDEO_PATH_ENV, "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return project / ".godot-smoke" / VIDEO_NAME
+
+
+def _x11_size() -> tuple[int, int]:
+    try:
+        output = subprocess.check_output(["xdpyinfo"], text=True, timeout=2)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return CANONICAL_SIZE
+    for line in output.splitlines():
+        if "dimensions:" not in line:
+            continue
+        token = line.split(":", 1)[1].strip().split()[0]
+        if "x" in token:
+            width, height = token.split("x", 1)
+            if width.isdigit() and height.isdigit():
+                return int(width), int(height)
+    return CANONICAL_SIZE
+
+
+def recorder_argv(out: Path) -> tuple[list[str] | None, str]:
+    if not video_enabled():
+        return None, "video_disabled"
+    ffmpeg = ffmpeg_path()
+    if not ffmpeg:
+        return None, "ffmpeg_missing"
+    display = os.environ.get("DISPLAY", "")
+    if sys.platform.startswith("linux") and display:
+        width, height = _x11_size()
+        return [
+            ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "x11grab", "-draw_mouse", "0",
+            "-video_size", f"{width}x{height}", "-framerate", "30",
+            "-i", display,
+            "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-preset", "veryfast", "-crf", "23",
+            str(out),
+        ], ""
+    return None, "no_capture_source"
+
+
+def start_recorder(out: Path) -> tuple[subprocess.Popen | None, str]:
+    argv, reason = recorder_argv(out)
+    if argv is None:
+        return None, reason
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        proc = subprocess.Popen(
+            argv, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE, text=True,
+        )
+    except OSError as exc:
+        return None, f"recorder_launch_failed:{exc}"
+    time.sleep(0.2)
+    if proc.poll() is not None:
+        err = ""
+        if proc.stderr is not None:
+            err = (proc.stderr.read() or "").strip()
+        return None, (err or "recorder_exited")[:200]
+    return proc, ""
+
+
+def stop_recorder(proc: subprocess.Popen | None) -> str:
+    if proc is None:
+        return ""
+    if proc.poll() is not None:
+        if proc.stderr is None:
+            return ""
+        return (proc.stderr.read() or "").strip()[:200]
+    try:
+        if proc.stdin is not None:
+            proc.stdin.write("q")
+            proc.stdin.flush()
+            proc.stdin.close()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        proc.send_signal(signal.SIGINT)
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+    return ""
+
+
+def video_report_fields(project: Path, recorder: subprocess.Popen | None,
+                        reason: str) -> dict[str, Any]:
+    path = video_path_for(project)
+    if recorder is not None and path.is_file() and path.stat().st_size > 0:
+        rel = path
+        try:
+            rel = path.relative_to(project)
+        except ValueError:
+            pass
+        return {
+            "video": str(rel),
+            "video_bytes": int(path.stat().st_size),
+            "video_reason": "",
+        }
+    return {"video": "", "video_bytes": 0, "video_reason": reason or "recorder_empty"}
 
 
 def apply_live_policy(command: dict[str, Any]) -> dict[str, Any]:
@@ -290,7 +421,10 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     file_once = False
     observation: dict[str, Any] | None = None
     sent_quit = False
+    recorder: subprocess.Popen | None = None
+    video_reason = ""
     try:
+        recorder, video_reason = start_recorder(video_path_for(project))
         env = os.environ.copy()
         env.setdefault("GODOT_AUDIO_DRIVER", "Dummy")
         proc = subprocess.Popen(
@@ -377,6 +511,9 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         errors.append({"code": "launch_failed", "retryable": True, "hint": str(exc)})
     finally:
         _stop_process(proc)
+        stop_err = stop_recorder(recorder)
+        if stop_err and not video_reason:
+            video_reason = stop_err
         if request_path.exists():
             request_path.unlink()
     failed = bool(errors) or "play_agent_loop_failed" in collector.events
@@ -391,6 +528,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         errors=errors,
         events_seen=sorted(collector.events),
         exceptions=exceptions,
+        **video_report_fields(project, recorder, video_reason),
     )
 
 
@@ -413,6 +551,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--turns", type=int, default=TURN_BUDGET)
     parser.add_argument("--report", type=Path, default=None)
     parser.add_argument("--prior-findings", type=Path, default=None)
+    parser.add_argument("--no-video", action="store_true",
+                        help="Skip the ffmpeg play-session recording")
+    parser.add_argument("--video", type=Path, default=None,
+                        help="Write the play-session mp4 here (default .godot-smoke/play_agent_loop.mp4)")
     args = parser.parse_args(argv)
     project = Path(args.project).expanduser().resolve()
     if not (project / "project.godot").exists():
@@ -436,12 +578,18 @@ def main(argv: list[str] | None = None) -> int:
                 prior = loaded
         except (OSError, ValueError):
             prior = []
+    if args.no_video:
+        os.environ[RECORD_VIDEO_ENV] = "0"
+    if args.video is not None:
+        os.environ[VIDEO_PATH_ENV] = str(Path(args.video).expanduser().resolve())
     turn_budget = TURN_BUDGET
     if args.turns > 0:
         turn_budget = min(int(args.turns), TURN_BUDGET)
     report, path = run_loop(project, args.godot_bin, float(args.timeout), prior, args.report, turn_budget)
     print(json.dumps(report, indent=2, sort_keys=True))
     print(f"report: {path}", file=sys.stderr)
+    if report.get("video"):
+        print(f"video: {report['video']}", file=sys.stderr)
     return 0 if report.get("ok") else 1
 
 

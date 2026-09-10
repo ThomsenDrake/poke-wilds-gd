@@ -70,6 +70,8 @@ optional = true
 live_file_env = "PLAY_AGENT_LIVE_FILE"
 headless_env = "PLAYTEST_FORCE_HEADLESS=1"
 report_path = ".godot-smoke/play_agent_loop.json"
+video_path = ".godot-smoke/play_agent_loop.mp4"
+record_video_env = "PLAY_AGENT_RECORD_VIDEO"
 
 [traces]
 # One JSON object per line, record shape {event, ts_msec, source, payload}.

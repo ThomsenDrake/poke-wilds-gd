@@ -142,7 +142,8 @@ section that is its machine-readable source instead of restating paths.
   session over the file bridge in [agent-step-bridge.md](agent-step-bridge.md).
   The default explorer is deterministic (`boot_new_game`, a short walk,
   `menu`, `observe`, `quit`). Novelty is checked before F. Live GitHub
-  filing requires `PLAY_AGENT_LIVE_FILE=1`. Headless /
+  filing requires `PLAY_AGENT_LIVE_FILE=1`. Windowed runs record
+  `.godot-smoke/play_agent_loop.mp4` when ffmpeg can see `DISPLAY`. Headless /
   `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason}`
   and exits 0. Off the default `verify_all` suite; opt in with
   `--with-play-agent-loop`.

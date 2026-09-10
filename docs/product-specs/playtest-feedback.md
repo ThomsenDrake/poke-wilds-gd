@@ -259,6 +259,9 @@ input, a 1–1000 character public sentence that starts with `[agent-play]`,
 Enter to send. Default runs inject a mock transport. Live production POST
 requires `PLAY_AGENT_LIVE_FILE=1` plus a public stamp. Novelty is checked
 before F so a repeat signature does not open a second dialog. The dedicated
-install-id path is `user://feedback-agent-play-install-id.txt`. Human focus,
-pause, disclosure, and acknowledgement behavior are unchanged. Contract:
+install-id path is `user://feedback-agent-play-install-id.txt`. Windowed runs
+also write `.godot-smoke/play_agent_loop.mp4` (ffmpeg of the live window). That
+recording is operator evidence, not part of the public F ZIP or GitHub issue.
+`--no-video` skips it. Human focus, pause, disclosure, and acknowledgement
+behavior are unchanged. Contract:
 [../references/agent-step-bridge.md](../references/agent-step-bridge.md).

@@ -28,6 +28,7 @@ SKIP_KEYS = ("ok", "skipped", "reason")
 REPORT_KEYS = (
     "ok", "skipped", "reason", "turns", "anomalies", "filed",
     "skipped_duplicate", "issue_number", "errors",
+    "video", "video_bytes", "video_reason",
 )
 
 
