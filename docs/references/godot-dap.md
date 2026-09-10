@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-10
+Last verified: 2026-09-10
 Review cadence days: 30
 Source paths: tools/godot_dap_smoketest.py, tools/run_playtests.py, scenes/app/Main.tscn, scripts/runtime/smoke_scenario_runner.gd
 
@@ -33,6 +33,8 @@ After launch, the runner sends `configurationDone`.
 - `overworld_step`
 - `menu_save`
 - `wild_battle`
+
+The full `SCENARIO_REQUIREMENTS` table in `tools/godot_dap_smoketest.py` also registers later playtest and windowed-only names. `play_agent` and `play_agent_loop` stay in `WINDOWED_ONLY_SCENARIOS`; `play_agent_loop` is opt-in (`--with-play-agent-loop`) and is not in the default 67-scenario suite.
 
 When the imported species catalog is empty, the battle scenario uses a synthetic fallback mon so the smoke path still exercises battle start, action handling, trace emission, and teardown.
 
