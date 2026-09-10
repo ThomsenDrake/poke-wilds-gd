@@ -12,11 +12,11 @@ const WORLD_SEED := 2026080702
 const STEP_HOLD_FRAMES := 30
 
 var _ctx: Dictionary = {}
-var _runner = SmokeScenarioRunner.new()
+var _runner: SmokeScenarioRunner = SmokeScenarioRunner.new()
 var _failures: Array = []
 
 
-func setup(ctx: Dictionary, runner, failures: Array) -> void:
+func setup(ctx: Dictionary, runner: SmokeScenarioRunner, failures: Array) -> void:
 	_ctx = ctx
 	_runner = runner
 	_failures = failures
@@ -25,7 +25,7 @@ func setup(ctx: Dictionary, runner, failures: Array) -> void:
 func boot_new_game() -> void:
 	var title := _title()
 	var creation := _creation()
-	var cursor := _runner.trace_log_line_count()
+	var cursor: int = _runner.trace_log_line_count()
 	_player().input_enabled = false
 	title.begin_boot(true)
 	await _tap("action_a")
@@ -72,7 +72,7 @@ func boot_new_game() -> void:
 	await _tap("action_a")
 	if not _expect(CreationRender.step_title_label(creation).text == "Go!", "landed on '%s'" % CreationRender.step_title_label(creation).text):
 		return
-	var go_cursor := _runner.trace_log_line_count()
+	var go_cursor: int = _runner.trace_log_line_count()
 	await _tap("action_a")
 	await get_tree().create_timer(0.9).timeout
 	_expect(_runner.trace_log_has_since("creation_confirmed", go_cursor, {"world_seed": WORLD_SEED}), "no creation_confirmed")

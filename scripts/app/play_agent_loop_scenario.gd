@@ -15,7 +15,7 @@ const IDLE_S := 45.0
 const WALL_S := 180.0
 
 var _ctx: Dictionary = {}
-var _runner = SmokeScenarioRunner.new()
+var _runner: SmokeScenarioRunner = SmokeScenarioRunner.new()
 var _failures: Array = []
 var _drive: Node
 var _turns := 0
