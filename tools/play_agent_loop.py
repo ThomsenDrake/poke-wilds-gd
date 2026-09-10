@@ -258,7 +258,8 @@ def _stop_process(proc: subprocess.Popen | None) -> None:
             pass
 
 
-def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[Any]) -> dict[str, Any]:
+def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[Any],
+           turn_budget: int = TURN_BUDGET) -> dict[str, Any]:
     request_path = smoketest.write_smoke_request(project, SCENARIO)
     command_path = project / ".godot-smoke" / "agent_command.json"
     observation_path = project / ".godot-smoke" / "agent_observation.json"
@@ -304,7 +305,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                 playtests.handle_output_line(line, collector, exceptions)
 
         novelty: dict[str, Any] | None = None
-        while turns < TURN_BUDGET and time.monotonic() < deadline:
+        while turns < turn_budget and time.monotonic() < deadline:
             drain()
             command, explorer_i, file_once = _next_command(
                 turns + 1, observation, explorer_i, file_once, novelty,
@@ -337,7 +338,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                 break
             if proc.poll() is not None:
                 break
-        if turns >= TURN_BUDGET:
+        if turns >= turn_budget:
             errors.append(turn_budget_error())
         drain()
         for line in stderr_lines:
@@ -369,11 +370,12 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
 
 def run_loop(project: Path, godot_bin: str, timeout: float = PLAY_TIMEOUT,
              prior_findings: list[Any] | None = None,
-             report_path: Path | None = None) -> tuple[dict[str, Any], Path]:
+             report_path: Path | None = None,
+             turn_budget: int = TURN_BUDGET) -> tuple[dict[str, Any], Path]:
     if force_headless():
         report = skip_report(skip_reason())
         return report, write_report(project, report, report_path)
-    report = _drive(project, godot_bin, timeout, prior_findings or [])
+    report = _drive(project, godot_bin, timeout, prior_findings or [], turn_budget)
     return report, write_report(project, report, report_path)
 
 
@@ -408,10 +410,10 @@ def main(argv: list[str] | None = None) -> int:
                 prior = loaded
         except (OSError, ValueError):
             prior = []
-    global TURN_BUDGET
+    turn_budget = TURN_BUDGET
     if args.turns > 0:
-        TURN_BUDGET = min(int(args.turns), TURN_BUDGET)
-    report, path = run_loop(project, args.godot_bin, float(args.timeout), prior, args.report)
+        turn_budget = min(int(args.turns), TURN_BUDGET)
+    report, path = run_loop(project, args.godot_bin, float(args.timeout), prior, args.report, turn_budget)
     print(json.dumps(report, indent=2, sort_keys=True))
     print(f"report: {path}", file=sys.stderr)
     return 0 if report.get("ok") else 1
