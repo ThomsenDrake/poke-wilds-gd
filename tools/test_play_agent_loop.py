@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""Unit tests for play_agent_loop (no Godot window required)."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import tempfile
+import unittest
+
+import play_agent_loop as pal
+
+
+class PlayAgentLoopTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        os.environ.pop(pal.FORCE_HEADLESS_ENV, None)
+        os.environ.pop(pal.LIVE_FILE_ENV, None)
+
+    def test_headless_skip_envelope(self) -> None:
+        os.environ[pal.FORCE_HEADLESS_ENV] = "1"
+        self.assertTrue(pal.force_headless())
+        report = pal.skip_report(pal.skip_reason())
+        self.assertTrue(report["ok"])
+        self.assertTrue(report["skipped"])
+        self.assertIn(pal.FORCE_HEADLESS_ENV, report["reason"])
+
+    def test_main_headless_skip_writes_report(self) -> None:
+        os.environ[pal.FORCE_HEADLESS_ENV] = "1"
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "project.godot").write_text("\n", encoding="utf-8")
+            code = pal.main(["--project", str(root)])
+            self.assertEqual(code, 0)
+            report = json.loads((root / ".godot-smoke" / pal.REPORT_NAME).read_text(encoding="utf-8"))
+            self.assertTrue(report["ok"])
+            self.assertTrue(report["skipped"])
+            self.assertTrue(report["reason"])
+
+    def test_live_flag_absent_strips_live(self) -> None:
+        os.environ.pop(pal.LIVE_FILE_ENV, None)
+        command = {
+            "id": "t1",
+            "action": "file_feedback",
+            "payload": {"message": "[agent-play] planted", "live": True},
+        }
+        out = pal.apply_live_policy(command)
+        self.assertFalse(out["payload"]["live"])
+        self.assertTrue(command["payload"]["live"])
+
+    def test_live_flag_present_keeps_live(self) -> None:
+        os.environ[pal.LIVE_FILE_ENV] = "1"
+        command = {
+            "id": "t1",
+            "action": "file_feedback",
+            "payload": {"message": "[agent-play] planted", "live": True},
+        }
+        out = pal.apply_live_policy(command)
+        self.assertTrue(out["payload"]["live"])
+
+    def test_explorer_vocab(self) -> None:
+        plan = pal.explorer_plan()
+        self.assertEqual(plan[0]["action"], "boot_new_game")
+        self.assertEqual(plan[-1]["action"], "quit")
+        self.assertTrue(any(step["action"] == "observe" for step in plan))
+        for step in plan:
+            self.assertIn(step["action"], pal.ACTIONS)
+            payload = step.get("payload") or {}
+            if step["action"] in {"press", "hold"}:
+                self.assertIn(payload.get("input"), pal.INPUTS)
+
+    def test_turn_budget_error(self) -> None:
+        err = pal.turn_budget_error()
+        self.assertEqual(err["code"], "turn_budget_exhausted")
+        self.assertFalse(err["retryable"])
+        self.assertTrue(err["hint"])
+
+    def test_next_command_starts_with_boot(self) -> None:
+        command, index, filed = pal._next_command(1, None, 0, False, None)
+        self.assertEqual(command["action"], "boot_new_game")
+        self.assertEqual(index, 1)
+        self.assertFalse(filed)
+
+
+if __name__ == "__main__":
+    unittest.main()
