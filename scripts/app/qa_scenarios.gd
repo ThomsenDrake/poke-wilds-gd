@@ -134,6 +134,7 @@ const SCENARIOS := {
 	# Live-play drive for tools/commandcode_play_agent.py — windowed-only like
 	# temporal_flow; runs inside the dispatcher's save backup/restore guard.
 	"play_agent": [preload("res://scripts/app/play_agent_scenario.gd"), "run", []],
+	"play_agent_loop": [preload("res://scripts/app/play_agent_loop_scenario.gd"), "run", []],
 	# Showcase capture (NOT a baseline sweep): crafts the coolest locales deterministically and saves
 	# evocative frames + crafted-state sidecars to docs/generated/showcase/. Deliberately outside the
 	# baseline gate machinery — no SHOT_REGISTRY entry, no reconcile()/region-diff gate. Windowed-only.
