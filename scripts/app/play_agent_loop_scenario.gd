@@ -22,6 +22,7 @@ var _turns := 0
 var _stuck_hits := 0
 var _last_place := ""
 var _booted := false
+var _trace_from := 0
 
 
 func run(ctx: Dictionary) -> void:
@@ -39,6 +40,7 @@ func run(ctx: Dictionary) -> void:
 	_drive = LoopDrive.new()
 	add_child(_drive)
 	_drive.setup(_ctx, _runner, _failures)
+	_trace_from = _runner.trace_log_line_count()
 	_runtime().emit_trace("play_agent_loop_started", "PlayAgentLoop", {"pin": PIN})
 	var origin := Time.get_ticks_msec()
 	var idle_at := origin
@@ -107,7 +109,7 @@ func _publish(command_id: String, action: String, payload: Dictionary, feedback)
 	AgentStepReader.write_ui_tree(ui_tree)
 	var stuck := _update_stuck(action, payload)
 	var exceptions := _failures.duplicate()
-	var observation := AgentStepReader.build_observation(command_id, _runtime(), _player(), ui_tree, exceptions, stuck, feedback)
+	var observation := AgentStepReader.build_observation(command_id, _runtime(), _player(), ui_tree, exceptions, stuck, feedback, _trace_from)
 	if stuck or not exceptions.is_empty() or _tail_has_failed(observation.get("trace_tail", [])):
 		_runtime().emit_trace("play_agent_anomaly_observed", "PlayAgentLoop", {"command_id": command_id, "stuck": stuck})
 	AgentStepReader.write_observation(observation)

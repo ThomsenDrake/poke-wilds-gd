@@ -34,7 +34,7 @@ A `file_feedback` message that is empty, longer than 1000 Unicode code points, o
 - `screen` — `PerformanceMonitors.screen_label_for` string
 - `monitors` — `game/current_screen`, `game/party_size`, `game/world_seed`
 - `tile` — `[x, y]` or `null`
-- `trace_tail` — last 40 JSONL records
+- `trace_tail` — last 40 JSONL records from this loop session (not prior playtest leftovers in the append-only `user://logs/agent_trace.jsonl`)
 - `ui_tree` — `UiTreeDumpWriter.snapshot_screen` dictionary
 - `exceptions` — strings
 - `stuck` — true after 8 applied movement commands with the same screen+tile

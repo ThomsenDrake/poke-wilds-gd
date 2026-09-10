@@ -80,8 +80,8 @@ static func monitors_for(runtime: Node) -> Dictionary:
 	}
 
 
-static func read_trace_tail() -> Array:
-	var lines := TraceLogger.read_log_lines_since(TRACE_PATH)
+static func read_trace_tail(from_line: int = 0) -> Array:
+	var lines := TraceLogger.read_log_lines_since(TRACE_PATH, from_line)
 	var start := maxi(0, lines.size() - TRACE_TAIL)
 	var out: Array = []
 	for i in range(start, lines.size()):
@@ -98,13 +98,13 @@ static func tile_payload(player: Node) -> Variant:
 	return [tile.x, tile.y]
 
 
-static func build_observation(command_id: String, runtime: Node, player: Node, ui_tree: Dictionary, exceptions: Array, stuck: bool, feedback) -> Dictionary:
+static func build_observation(command_id: String, runtime: Node, player: Node, ui_tree: Dictionary, exceptions: Array, stuck: bool, feedback, from_line: int = 0) -> Dictionary:
 	return {
 		"command_id": command_id,
 		"screen": PerformanceMonitors.screen_label_for(runtime),
 		"monitors": monitors_for(runtime),
 		"tile": tile_payload(player),
-		"trace_tail": read_trace_tail(),
+		"trace_tail": read_trace_tail(from_line),
 		"ui_tree": ui_tree,
 		"exceptions": exceptions.duplicate(),
 		"stuck": stuck,
