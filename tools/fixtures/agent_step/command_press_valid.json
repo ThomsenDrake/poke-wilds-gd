@@ -1,0 +1,5 @@
+{
+  "id": "t1",
+  "action": "press",
+  "payload": {"input": "move_right"}
+}

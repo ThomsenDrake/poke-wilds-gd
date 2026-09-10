@@ -1,0 +1,11 @@
+{
+  "command_id": "t1",
+  "screen": "overworld",
+  "monitors": {"game/current_screen": "overworld", "game/party_size": 1, "game/world_seed": 2026080702},
+  "tile": [3, 4],
+  "trace_tail": [{"event": "overworld_step", "ts_msec": 1, "source": "SmokeScenarios", "payload": {}}],
+  "ui_tree": {"screen": "overworld", "cursor": {}, "node_count": 1, "nodes": [{"path": ".", "type": "Control", "text": "HUD"}]},
+  "exceptions": [],
+  "stuck": false,
+  "feedback": null
+}

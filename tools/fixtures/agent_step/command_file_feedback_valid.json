@@ -1,0 +1,5 @@
+{
+  "id": "t2",
+  "action": "file_feedback",
+  "payload": {"message": "[agent-play] Softlock on overworld tile 3,4", "live": false}
+}

@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "skipped": false,
+  "reason": "",
+  "turns": 5,
+  "anomalies": 1,
+  "filed": "dry",
+  "skipped_duplicate": 0,
+  "issue_number": 0,
+  "errors": []
+}
