@@ -22,7 +22,7 @@ All under `.godot-smoke/` (gitignored). Engine paths use the `res://.godot-smoke
 - `id` (string, unique per turn)
 - `action` one of: `boot_new_game`, `press`, `hold`, `observe`, `file_feedback`, `quit`
 - `payload` object
-  - `press` / `hold`: `{"input":"<godot action name>"}` — allowed inputs: `move_up`, `move_down`, `move_left`, `move_right`, `action_a`, `action_b`, `menu`
+  - `press` / `hold`: `{"input":"<bridge input name>"}` — allowed inputs: `move_up`, `move_down`, `move_left`, `move_right`, `action_a`, `action_b`, `menu`. `menu` maps to the InputMap action `start` (Enter); the other names are InputMap actions as-is.
   - `file_feedback`: `{"message":"<1-1000 chars starting with [agent-play]>", "live": false}`
   - others: empty object
 

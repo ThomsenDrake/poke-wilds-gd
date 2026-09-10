@@ -10,6 +10,7 @@ const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runne
 const PIN := 2026080701
 const WORLD_SEED := 2026080702
 const STEP_HOLD_FRAMES := 30
+const INPUT_ALIASES := {"menu": "start"}
 
 var _ctx: Dictionary = {}
 var _runner: SmokeScenarioRunner = SmokeScenarioRunner.new()
@@ -81,17 +82,19 @@ func boot_new_game() -> void:
 
 
 func apply_press(input_name: String) -> void:
-	if not SmokeTap.inject_press(input_name):
+	var bound := _bound_input(input_name)
+	if not SmokeTap.inject_press(bound):
 		_failures.append("injection: no key event is bound to %s" % input_name)
 		return
 	await get_tree().process_frame
-	SmokeTap.inject_release(input_name)
+	SmokeTap.inject_release(bound)
 	await get_tree().process_frame
 
 
 func apply_hold(input_name: String) -> void:
+	var bound := _bound_input(input_name)
 	_player().input_enabled = true
-	if not SmokeTap.inject_press(input_name):
+	if not SmokeTap.inject_press(bound):
 		_failures.append("injection: no key event is bound to %s" % input_name)
 		return
 	var started := false
@@ -100,9 +103,13 @@ func apply_hold(input_name: String) -> void:
 		if _player().is_moving():
 			started = true
 			break
-	SmokeTap.inject_release(input_name)
+	SmokeTap.inject_release(bound)
 	if started:
 		await _player().tile_changed
+
+
+func _bound_input(input_name: String) -> String:
+	return str(INPUT_ALIASES.get(input_name, input_name))
 
 
 func _tap(action: String) -> void:
