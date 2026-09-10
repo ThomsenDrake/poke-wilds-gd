@@ -510,10 +510,12 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     except OSError as exc:
         errors.append({"code": "launch_failed", "retryable": True, "hint": str(exc)})
     finally:
-        _stop_process(proc)
+        if recorder is not None and proc is not None and proc.poll() is None:
+            time.sleep(0.5)
         stop_err = stop_recorder(recorder)
         if stop_err and not video_reason:
             video_reason = stop_err
+        _stop_process(proc)
         if request_path.exists():
             request_path.unlink()
     failed = bool(errors) or "play_agent_loop_failed" in collector.events
