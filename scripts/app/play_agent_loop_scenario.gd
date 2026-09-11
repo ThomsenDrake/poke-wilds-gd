@@ -13,6 +13,7 @@ const TURN_BUDGET := 96
 const POLL_S := 0.05
 const IDLE_S := 45.0
 const WALL_S := 180.0
+const LINGER_S := 0.55
 
 var _ctx: Dictionary = {}
 var _runner: SmokeScenarioRunner = SmokeScenarioRunner.new()
@@ -90,6 +91,8 @@ func _apply(consumed: Dictionary) -> void:
 			feedback = await _file(payload)
 		"quit":
 			pass
+	if action != "boot_new_game" and action != "quit":
+		await get_tree().create_timer(LINGER_S).timeout
 	_runtime().emit_trace("play_agent_step_applied", "PlayAgentLoop", {"id": command_id, "action": action})
 	await _publish(command_id, action, payload, feedback)
 
