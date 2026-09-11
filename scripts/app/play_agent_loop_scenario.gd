@@ -34,6 +34,7 @@ func run(ctx: Dictionary) -> void:
 		_finish()
 		return
 	await get_tree().create_timer(0.2).timeout
+	Engine.max_fps = 60
 	Input.use_accumulated_input = true
 	_player().input_enabled = false
 	_runtime().seed_for_smoke(PIN)
