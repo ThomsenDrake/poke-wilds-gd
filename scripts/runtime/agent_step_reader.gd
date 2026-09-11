@@ -145,6 +145,16 @@ static func harvest_near_payload(world: Node, player: Node) -> Variant:
 	return null
 
 
+static func party_field_moves(runtime: Node) -> Array:
+	var out: Array = []
+	if runtime == null or not runtime.has_method("party_has_field_move_ability"):
+		return out
+	for move_id in ["cut", "smash", "dig"]:
+		if runtime.party_has_field_move_ability(move_id):
+			out.append(move_id)
+	return out
+
+
 static func build_observation(command_id: String, runtime: Node, player: Node, ui_tree: Dictionary, exceptions: Array, stuck: bool, feedback, from_line: int = 0, world: Node = null) -> Dictionary:
 	return {
 		"command_id": command_id,
@@ -155,6 +165,7 @@ static func build_observation(command_id: String, runtime: Node, player: Node, u
 		"faced_action": faced_action(world, player),
 		"nearby": nearby_payload(runtime, player),
 		"harvest_near": harvest_near_payload(world, player),
+		"party_field_moves": party_field_moves(runtime),
 		"trace_tail": read_trace_tail(from_line),
 		"ui_tree": ui_tree,
 		"exceptions": exceptions.duplicate(),

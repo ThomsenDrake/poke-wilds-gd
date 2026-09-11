@@ -18,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import shutil
 import signal
 import subprocess
@@ -35,6 +36,7 @@ TURN_BUDGET = 96
 SCENARIO = "play_agent_loop"
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 LIVE_FILE_ENV = "PLAY_AGENT_LIVE_FILE"
+COMMIT_SHA_ENV = "PLAY_AGENT_COMMIT_SHA"
 PLANNER_CMD_ENV = "PLAY_AGENT_PLANNER_CMD"
 RECORD_VIDEO_ENV = "PLAY_AGENT_RECORD_VIDEO"
 VIDEO_PATH_ENV = "PLAY_AGENT_VIDEO_PATH"
@@ -60,6 +62,9 @@ MOVE_DELTA = {
 DIR_ORDER = ("move_right", "move_down", "move_left", "move_up")
 MIN_BATTLE_PRESSES = 12
 HARVEST_BUMP = ("cut", "smash", "dig")
+CUT_HINT = "COULD BE CUT"
+COMMIT_SHA_RE = re.compile(r"^(unknown|[0-9a-f]{7,64})$")
+SENT_FILE_STATUSES = frozenset({"sent", "sent_cleanup_failed"})
 OVERLAY_SCREENS = ("menu", "party", "bag", "camp", "storage", "waystone")
 ANOMALY_PNG_NAME = "play_agent_anomaly.png"
 MESSAGE_PREFIX = "[agent-play]"
@@ -104,6 +109,87 @@ def live_file_enabled() -> bool:
     if raw is None or raw.strip() == "":
         return True
     return raw.strip().lower() not in ("0", "false", "no", "off")
+
+
+def _git_head() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
+def stamp_commit_sha(env: dict[str, str] | None = None, *, git_head: str | None = None) -> str:
+    source = env if env is not None else os.environ
+    raw = str(source.get(COMMIT_SHA_ENV) or "").strip().lower()
+    if COMMIT_SHA_RE.fullmatch(raw):
+        return raw
+    head = git_head if git_head is not None else _git_head()
+    head = str(head or "").strip().lower()
+    if COMMIT_SHA_RE.fullmatch(head):
+        return head
+    return "unknown"
+
+
+def _trace_event(record: dict[str, Any]) -> str:
+    return str(record.get("event") or record.get("name") or "")
+
+
+def _trace_payload(record: dict[str, Any]) -> dict[str, Any]:
+    raw = record.get("payload")
+    return raw if isinstance(raw, dict) else {}
+
+
+def filed_from_observation(
+    observation: dict[str, Any] | None,
+    command: dict[str, Any] | None = None,
+) -> tuple[bool | str, int]:
+    obs = observation if isinstance(observation, dict) else {}
+    feedback = obs.get("feedback") if isinstance(obs.get("feedback"), dict) else {}
+    status = str(feedback.get("status") or "")
+    try:
+        issue = int(feedback.get("issue_number") or 0)
+    except (TypeError, ValueError):
+        issue = 0
+    failed = False
+    for record in obs.get("trace_tail") or []:
+        if not isinstance(record, dict):
+            continue
+        event = _trace_event(record)
+        payload = _trace_payload(record)
+        if event == "feedback_report_sent":
+            try:
+                sent_issue = int(payload.get("issue_number") or 0)
+            except (TypeError, ValueError):
+                sent_issue = 0
+            if sent_issue > 0:
+                issue = sent_issue
+            if not status:
+                status = "sent"
+        if event == "feedback_report_failed":
+            failed = True
+    payload = command.get("payload") if isinstance(command, dict) else {}
+    payload = payload if isinstance(payload, dict) else {}
+    want_live = bool(payload.get("live")) if "live" in payload else True
+    live_on = live_file_enabled()
+    if failed and issue <= 0:
+        return False, 0
+    if status in SENT_FILE_STATUSES and issue > 0:
+        if want_live and live_on:
+            return "live", issue
+        return "dry", issue
+    if status in {"sent", "queued"} and not (want_live and live_on):
+        return "dry", issue
+    return False, issue
 
 
 def skip_report(reason: str) -> dict[str, Any]:
@@ -337,6 +423,10 @@ def new_explorer_state() -> dict[str, Any]:
         "capture_done": False,
         "saw_menu": False,
         "saw_capture": False,
+        "pending_harvest": "",
+        "pending_harvest_ts": 0,
+        "unusable_harvest": [],
+        "cut_try_here": None,
     }
 
 
@@ -435,6 +525,116 @@ def _spiral_hold(state: dict[str, Any]) -> dict[str, Any]:
     return _hold(state, chosen)
 
 
+def _max_trace_ts(observation: dict[str, Any]) -> int:
+    mx = 0
+    for record in observation.get("trace_tail") or []:
+        if not isinstance(record, dict):
+            continue
+        try:
+            ts = int(record.get("ts_msec") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        if ts > mx:
+            mx = ts
+    return mx
+
+
+def _field_move_used_since(observation: dict[str, Any], action: str, since_ts: int) -> bool:
+    for record in observation.get("trace_tail") or []:
+        if not isinstance(record, dict):
+            continue
+        if _trace_event(record) != "field_move_used":
+            continue
+        try:
+            ts = int(record.get("ts_msec") or 0)
+        except (TypeError, ValueError):
+            ts = 0
+        if ts <= since_ts:
+            continue
+        payload = _trace_payload(record)
+        move_id = str(payload.get("move_id") or payload.get("action") or "")
+        if not action or move_id == action:
+            return True
+    return False
+
+
+def _can_harvest(state: dict[str, Any], observation: dict[str, Any], action: str) -> bool:
+    if action not in HARVEST_BUMP:
+        return False
+    unused = {str(item) for item in (state.get("unusable_harvest") or [])}
+    if action in unused:
+        return False
+    if "party_field_moves" not in observation:
+        return True
+    raw = observation.get("party_field_moves")
+    if not isinstance(raw, list):
+        return True
+    return action in {str(item) for item in raw}
+
+
+def _resolve_pending_harvest(state: dict[str, Any], observation: dict[str, Any]) -> None:
+    pending = str(state.get("pending_harvest") or "")
+    if not pending:
+        return
+    since = int(state.get("pending_harvest_ts") or 0)
+    if not _field_move_used_since(observation, pending, since):
+        unused = [str(item) for item in (state.get("unusable_harvest") or [])]
+        if pending not in unused:
+            unused.append(pending)
+        state["unusable_harvest"] = unused
+        tries = int(state.get("harvest_tries") or 0)
+        if tries > 0:
+            state["harvest_tries"] = tries - 1
+        if int(state.get("harvest_tries") or 0) == 0:
+            state["saw_harvest"] = False
+    state["pending_harvest"] = ""
+    state["pending_harvest_ts"] = 0
+
+
+def _harvest_press(
+    state: dict[str, Any],
+    observation: dict[str, Any],
+    action: str,
+) -> dict[str, Any]:
+    state["pending_harvest"] = action
+    state["pending_harvest_ts"] = _max_trace_ts(observation)
+    state["saw_harvest"] = True
+    state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
+    return _press("action_a")
+
+
+def _cut_hint(observation: dict[str, Any]) -> bool:
+    tree = observation.get("ui_tree") if isinstance(observation.get("ui_tree"), dict) else {}
+    texts: list[str] = []
+    for node in tree.get("nodes") or []:
+        if isinstance(node, dict):
+            texts.append(str(node.get("text") or ""))
+    if CUT_HINT in " ".join(texts).upper():
+        return True
+    for record in observation.get("trace_tail") or []:
+        if not isinstance(record, dict):
+            continue
+        payload = _trace_payload(record)
+        reason = str(payload.get("reason") or "").upper()
+        req = str(payload.get("requires_field_move") or "")
+        if CUT_HINT in reason or req == "cut":
+            return True
+    return False
+
+
+def _path_cut(
+    state: dict[str, Any],
+    observation: dict[str, Any],
+    here: tuple[int, int],
+) -> dict[str, Any] | None:
+    if not _cut_hint(observation):
+        return None
+    if state.get("cut_try_here") == here:
+        return None
+    state["cut_try_here"] = here
+    return _press("action_a")
+
+
 def _approach(
     state: dict[str, Any],
     here: tuple[int, int],
@@ -446,14 +646,19 @@ def _approach(
         return _press("action_a")
     blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
     if faced in HARVEST_BUMP:
-        if int(state.get("harvest_tries") or 0) < 2:
-            state["saw_harvest"] = True
-            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
-            return _press("action_a")
+        if _can_harvest(state, observation, faced) and int(state.get("harvest_tries") or 0) < 2:
+            return _harvest_press(state, observation, faced)
+        cut = _path_cut(state, observation, here)
+        if cut is not None:
+            return cut
         last = str(state.get("last_input") or "")
         if last and last not in blocked:
             blocked.append(last)
             state["blocked_dirs"] = blocked
+    else:
+        cut = _path_cut(state, observation, here)
+        if cut is not None:
+            return cut
     return _hold(state, _dir_options(here, dest, blocked)[0])
 
 
@@ -471,15 +676,16 @@ def _harvest_command(
     observation: dict[str, Any],
     here: tuple[int, int],
 ) -> dict[str, Any] | None:
+    faced = str(observation.get("faced_action") or "")
+    if int(state.get("harvest_tries") or 0) < 2 and _can_harvest(state, observation, faced):
+        return _harvest_press(state, observation, faced)
     if int(state.get("harvest_tries") or 0) >= 2:
         return None
-    faced = str(observation.get("faced_action") or "")
-    if faced in HARVEST_BUMP:
-        state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
-        state["saw_harvest"] = True
-        return _press("action_a")
     target = _cut_target(observation)
     if target is None:
+        return None
+    action = str(target.get("action") or "")
+    if not _can_harvest(state, observation, action):
         return None
     stand = _as_tile(target.get("from_tile")) or _as_tile(target.get("tile"))
     harvest_tile = _as_tile(target.get("tile"))
@@ -487,9 +693,7 @@ def _harvest_command(
         return None
     if here == stand:
         if _facing_toward(observation.get("facing"), here, harvest_tile) or faced in HARVEST_BUMP:
-            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
-            state["saw_harvest"] = True
-            return _press("action_a")
+            return _harvest_press(state, observation, action or faced)
         toward = _input_toward(here, harvest_tile)
         if toward:
             return _hold(state, toward)
@@ -551,6 +755,7 @@ def explorer_command(
         state["booted"] = True
         return {"action": "boot_new_game", "payload": {}}
     obs = observation or {}
+    _resolve_pending_harvest(state, obs)
     screen = str(obs.get("screen") or "")
     if screen == "battle":
         state["saw_battle"] = True
@@ -887,6 +1092,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         recorder, video_reason = start_recorder(video_path_for(project))
         env = os.environ.copy()
         env.setdefault("GODOT_AUDIO_DRIVER", "Dummy")
+        env.setdefault(COMMIT_SHA_ENV, stamp_commit_sha())
         proc = subprocess.Popen(
             godot_cmd(godot_bin, project), cwd=str(project),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -961,10 +1167,8 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                     )
                 else:
                     skipped_duplicate += 1
-            feedback = observation.get("feedback")
-            if isinstance(feedback, dict) and str(feedback.get("status", "")) in {"sent", "queued"}:
-                filed = "live" if live_file_enabled() and bool((command.get("payload") or {}).get("live")) else "dry"
-                issue_number = int(feedback.get("issue_number") or 0)
+            if command["action"] == "file_feedback":
+                filed, issue_number = filed_from_observation(observation, command)
             if command["action"] == "quit":
                 sent_quit = True
                 break

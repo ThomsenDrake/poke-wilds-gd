@@ -7,6 +7,7 @@
   "faced_action": "cut",
   "nearby": [{"tile": [5, 4], "species_id": "PIDGEY", "kind": "roamer"}],
   "harvest_near": {"action": "cut", "tile": [4, 4], "from_tile": [3, 4]},
+  "party_field_moves": ["cut"],
   "trace_tail": [{"event": "overworld_step", "ts_msec": 1, "source": "SmokeScenarios", "payload": {}}],
   "ui_tree": {"screen": "overworld", "cursor": {}, "node_count": 1, "nodes": [{"path": ".", "type": "Control", "text": "HUD"}]},
   "exceptions": [],

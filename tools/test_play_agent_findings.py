@@ -261,13 +261,26 @@ class PlayAgentFindingsTests(unittest.TestCase):
     def test_input_swallowed_and_empty_tile_quiet(self) -> None:
         from play_agent_findings import detect_anomalies
         previous = _obs()
+        previous["party_field_moves"] = ["cut"]
         after = _obs()
+        after["party_field_moves"] = ["cut"]
         after["trace_tail"] = list(previous["trace_tail"]) + [
             {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
         ]
         command = {"action": "press", "payload": {"input": "action_a"}}
         found = detect_anomalies(after, previous=previous, last_command=command)
         self.assertIn("input_swallowed:action_a", found)
+        missing_prev = _obs()
+        missing_prev.pop("party_field_moves", None)
+        missing = _obs()
+        missing.pop("party_field_moves", None)
+        missing["trace_tail"] = list(missing_prev["trace_tail"]) + [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
+        ]
+        self.assertIn(
+            "input_swallowed:action_a",
+            detect_anomalies(missing, previous=missing_prev, last_command=command),
+        )
         empty_prev = _obs(faced_action="")
         empty_prev["harvest_near"] = None
         empty = _obs(faced_action="")
@@ -278,6 +291,32 @@ class PlayAgentFindingsTests(unittest.TestCase):
         self.assertNotIn(
             "input_swallowed:action_a",
             detect_anomalies(empty, previous=empty_prev, last_command=command),
+        )
+
+    def test_input_swallowed_quiet_when_party_cannot_use_harvest(self) -> None:
+        from play_agent_findings import detect_anomalies
+        previous = _obs(faced_action="dig")
+        previous["party_field_moves"] = []
+        after = _obs(faced_action="dig")
+        after["party_field_moves"] = []
+        after["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
+        ]
+        command = {"action": "press", "payload": {"input": "action_a"}}
+        self.assertNotIn(
+            "input_swallowed:action_a",
+            detect_anomalies(after, previous=previous, last_command=command),
+        )
+        can_dig = _obs(faced_action="dig")
+        can_dig["party_field_moves"] = ["dig"]
+        can_dig["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
+        ]
+        prev_can = _obs(faced_action="dig")
+        prev_can["party_field_moves"] = ["dig"]
+        self.assertIn(
+            "input_swallowed:action_a",
+            detect_anomalies(can_dig, previous=prev_can, last_command=command),
         )
 
     def test_world_unchanged_after_field_move(self) -> None:
