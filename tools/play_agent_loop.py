@@ -40,6 +40,8 @@ VIDEO_PATH_ENV = "PLAY_AGENT_VIDEO_PATH"
 FFMPEG_ENV = "PLAY_AGENT_FFMPEG"
 REPORT_NAME = "play_agent_loop.json"
 VIDEO_NAME = "play_agent_loop.mp4"
+PRIOR_NAME = "play_agent_prior.json"
+FINDINGS_DIRNAME = "play_agent_findings"
 CANONICAL_SIZE = (1152, 648)
 ACTIONS = (
     "boot_new_game", "press", "hold", "observe", "file_feedback", "quit",
@@ -90,20 +92,12 @@ def live_file_enabled() -> bool:
 
 
 def skip_report(reason: str) -> dict[str, Any]:
-    return {
-        "ok": True,
-        "skipped": True,
-        "reason": reason,
-        "turns": 0,
-        "anomalies": 0,
-        "filed": False,
-        "skipped_duplicate": 0,
-        "issue_number": 0,
-        "errors": [],
-        "video": "",
-        "video_bytes": 0,
-        "video_reason": "headless",
-    }
+    return session_report(
+        ok=True,
+        skipped=True,
+        reason=reason,
+        video_reason="headless",
+    )
 
 
 def session_report(**overrides: Any) -> dict[str, Any]:
@@ -120,6 +114,12 @@ def session_report(**overrides: Any) -> dict[str, Any]:
         "video": "",
         "video_bytes": 0,
         "video_reason": "",
+        "commands": [],
+        "findings": [],
+        "world_seed": 0,
+        "replayed": False,
+        "source": "",
+        "coverage": {"screens": [], "verbs": []},
     }
     report.update(overrides)
     return report
@@ -552,9 +552,16 @@ def write_report(project: Path, report: dict[str, Any], out_path: Path | None = 
     return path
 
 
+def _findings():
+    path = TOOLS / "play_agent_findings.py"
+    if not path.is_file():
+        return None
+    return _load_module("play_agent_findings", path)
+
+
 def _evaluate_novelty(observation: dict[str, Any], session: list[str], prior: list[Any]) -> dict[str, Any]:
-    findings_path = TOOLS / "play_agent_findings.py"
-    if not findings_path.is_file():
+    findings = _findings()
+    if findings is None:
         anomalies = bool(observation.get("exceptions") or observation.get("stuck"))
         return {
             "anomaly": anomalies,
@@ -564,19 +571,41 @@ def _evaluate_novelty(observation: dict[str, Any], session: list[str], prior: li
             "reason": "novelty_helper_missing",
             "anomalies": [],
         }
-    findings = _load_module("play_agent_findings", findings_path)
     return findings.evaluate_novelty(observation, session, prior)
 
 
-def _file_message(observation: dict[str, Any]) -> str:
-    screen = str(observation.get("screen") or "unknown")
-    tile = observation.get("tile")
-    tile_s = f"{tile[0]},{tile[1]}" if isinstance(tile, list) and len(tile) == 2 else ""
-    extra = "stuck" if observation.get("stuck") else "anomaly"
-    exceptions = observation.get("exceptions") or []
-    if exceptions:
-        extra = str(exceptions[0])[:80]
-    return f"{MESSAGE_PREFIX} {extra} on {screen} tile {tile_s}".strip()[:1000]
+def _file_message(
+    observation: dict[str, Any],
+    transcript: list[dict[str, Any]] | None = None,
+    signature_text: str = "",
+) -> str:
+    findings = _findings()
+    if findings is None:
+        screen = str(observation.get("screen") or "unknown")
+        tile = observation.get("tile")
+        tile_s = f"{tile[0]},{tile[1]}" if isinstance(tile, list) and len(tile) == 2 else ""
+        extra = "stuck" if observation.get("stuck") else "anomaly"
+        exceptions = observation.get("exceptions") or []
+        if exceptions:
+            extra = str(exceptions[0])[:80]
+        return f"{MESSAGE_PREFIX} {extra} on {screen} tile {tile_s}".strip()[:1000]
+    return findings.file_message(observation, transcript, signature_text)
+
+
+def prior_path_for(project: Path) -> Path:
+    return project / ".godot-smoke" / PRIOR_NAME
+
+
+def findings_dir_for(project: Path) -> Path:
+    return project / ".godot-smoke" / FINDINGS_DIRNAME
+
+
+def load_prior_findings(project: Path, explicit: Path | None = None) -> list[Any]:
+    findings = _findings()
+    path = explicit if explicit is not None else prior_path_for(project)
+    if findings is None:
+        return []
+    return findings.load_prior_ledger(path)
 
 
 def _planner_command(observation: dict[str, Any], cmd: str) -> dict[str, Any] | None:
@@ -604,7 +633,17 @@ def _next_command(
     file_once: bool,
     novelty: dict[str, Any] | None,
     turn_budget: int = TURN_BUDGET,
+    transcript: list[dict[str, Any]] | None = None,
+    replay_commands: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
+    if replay_commands is not None:
+        index = turn - 1
+        if 0 <= index < len(replay_commands):
+            planned = dict(replay_commands[index])
+            planned.setdefault("id", f"t{turn}")
+            planned.setdefault("payload", {})
+            return apply_live_policy(planned), state, file_once
+        return apply_live_policy({"id": f"t{turn}", "action": "quit", "payload": {}}), state, file_once
     planner = os.environ.get(PLANNER_CMD_ENV, "").strip()
     if planner and observation is not None:
         planned = _planner_command(observation, planner)
@@ -622,7 +661,11 @@ def _next_command(
             "id": f"t{turn}",
             "action": "file_feedback",
             "payload": {
-                "message": _file_message(observation or {}),
+                "message": _file_message(
+                    observation or {},
+                    transcript,
+                    str((novelty or {}).get("signature") or ""),
+                ),
                 "live": live_file_enabled() and bool(novelty.get("live_fileable")),
             },
         }
@@ -667,8 +710,32 @@ def _stop_process(proc: subprocess.Popen | None) -> None:
             pass
 
 
+def _note_finding(
+    project: Path,
+    observation: dict[str, Any],
+    novelty: dict[str, Any],
+    transcript: list[dict[str, Any]],
+    video: str,
+    findings_out: list[dict[str, Any]],
+) -> None:
+    helper = _findings()
+    if helper is None:
+        return
+    pack = helper.build_finding_pack(
+        observation,
+        transcript,
+        signature_text=str(novelty.get("signature") or ""),
+        anomalies=list(novelty.get("anomalies") or []),
+        video=video,
+        report=str(Path(".godot-smoke") / REPORT_NAME),
+    )
+    helper.write_finding_pack(findings_dir_for(project), pack)
+    findings_out.append(pack)
+
+
 def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[Any],
-           turn_budget: int = TURN_BUDGET) -> dict[str, Any]:
+           turn_budget: int = TURN_BUDGET,
+           replay_commands: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     request_path = smoketest.write_smoke_request(project, SCENARIO)
     command_path = project / ".godot-smoke" / "agent_command.json"
     observation_path = project / ".godot-smoke" / "agent_observation.json"
@@ -693,6 +760,9 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     sent_quit = False
     recorder: subprocess.Popen | None = None
     video_reason = ""
+    transcript: list[dict[str, Any]] = []
+    findings_out: list[dict[str, Any]] = []
+    helper = _findings()
     try:
         recorder, video_reason = start_recorder(video_path_for(project))
         env = os.environ.copy()
@@ -724,6 +794,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
             drain()
             command, explorer_state, file_once = _next_command(
                 turns + 1, observation, explorer_state, file_once, novelty, turn_budget,
+                transcript=transcript, replay_commands=replay_commands,
             )
             if command["action"] == "file_feedback" and novelty and not novelty.get("novel"):
                 skipped_duplicate += 1
@@ -739,11 +810,21 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                     "hint": "Confirm the windowed Godot process is still polling agent_command.json.",
                 })
                 break
+            if helper is not None:
+                transcript.append(helper.compact_turn(command, observation))
             novelty = _evaluate_novelty(observation, session_sigs, prior_findings)
             if novelty.get("anomaly"):
                 anomalies += 1
                 session_sigs.append(str(novelty.get("signature") or ""))
-                if not novelty.get("novel"):
+                if novelty.get("novel"):
+                    expected_video = str(Path(".godot-smoke") / VIDEO_NAME)
+                    if not video_enabled():
+                        expected_video = ""
+                    _note_finding(
+                        project, observation, novelty, transcript,
+                        expected_video, findings_out,
+                    )
+                else:
                     skipped_duplicate += 1
             feedback = observation.get("feedback")
             if isinstance(feedback, dict) and str(feedback.get("status", "")) in {"sent", "queued"}:
@@ -768,6 +849,9 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
             if grace is not None:
                 sent_quit = True
                 observation = grace
+                turns += 1
+                if helper is not None:
+                    transcript.append(helper.compact_turn(quit_cmd, grace))
         if turns >= turn_budget and not sent_quit:
             errors.append(turn_budget_error())
         drain()
@@ -789,6 +873,18 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         if request_path.exists():
             request_path.unlink()
     failed = bool(errors) or "play_agent_loop_failed" in collector.events
+    video_fields = video_report_fields(project, recorder, video_reason)
+    if helper is not None and findings_out:
+        ledger = helper.merge_prior_ledger(
+            helper.load_prior_ledger(prior_path_for(project)),
+            findings_out,
+        )
+        helper.save_prior_ledger(prior_path_for(project), ledger)
+        if video_fields.get("video"):
+            for pack in findings_out:
+                pack["video"] = video_fields["video"]
+    coverage = helper.coverage_from_turns(transcript) if helper is not None else {"screens": [], "verbs": []}
+    seed = helper.world_seed_of(observation) if helper is not None else 0
     return session_report(
         ok=not failed,
         skipped=False,
@@ -800,18 +896,30 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         errors=errors,
         events_seen=sorted(collector.events),
         exceptions=exceptions,
-        **video_report_fields(project, recorder, video_reason),
+        commands=transcript,
+        findings=findings_out,
+        world_seed=seed,
+        coverage=coverage,
+        **video_fields,
     )
 
 
 def run_loop(project: Path, godot_bin: str, timeout: float = PLAY_TIMEOUT,
              prior_findings: list[Any] | None = None,
              report_path: Path | None = None,
-             turn_budget: int = TURN_BUDGET) -> tuple[dict[str, Any], Path]:
+             turn_budget: int = TURN_BUDGET,
+             replay_commands: list[dict[str, Any]] | None = None,
+             replay_source: str = "") -> tuple[dict[str, Any], Path]:
     if force_headless():
         report = skip_report(skip_reason())
         return report, write_report(project, report, report_path)
-    report = _drive(project, godot_bin, timeout, prior_findings or [], turn_budget)
+    report = _drive(
+        project, godot_bin, timeout, prior_findings or [], turn_budget,
+        replay_commands=replay_commands,
+    )
+    if replay_commands is not None:
+        report["replayed"] = True
+        report["source"] = replay_source
     return report, write_report(project, report, report_path)
 
 
@@ -823,6 +931,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--turns", type=int, default=TURN_BUDGET)
     parser.add_argument("--report", type=Path, default=None)
     parser.add_argument("--prior-findings", type=Path, default=None)
+    parser.add_argument("--replay", type=Path, default=None,
+                        help="Replay commands from a finding pack or session report")
     parser.add_argument("--no-video", action="store_true",
                         help="Skip the ffmpeg play-session recording")
     parser.add_argument("--video", type=Path, default=None,
@@ -839,17 +949,34 @@ def main(argv: list[str] | None = None) -> int:
         print(f"SKIP: {skip_reason()}", file=sys.stderr)
         print(f"report: {path}", file=sys.stderr)
         return 0
+    replay_cmds: list[dict[str, Any]] | None = None
+    replay_source = ""
+    helper = _findings()
+    if args.replay is not None:
+        replay_path = Path(args.replay).expanduser().resolve()
+        replay_source = str(replay_path)
+        if helper is None:
+            err = {
+                "code": "replay_source_invalid",
+                "retryable": False,
+                "hint": "play_agent_findings.py is missing; cannot load a replay pack.",
+            }
+            report = session_report(ok=False, errors=[err], replayed=True, source=replay_source)
+            path = write_report(project, report, args.report)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            print(f"report: {path}", file=sys.stderr)
+            return 1
+        replay_cmds, err = helper.load_replay_source(replay_path)
+        if err is not None:
+            report = session_report(ok=False, errors=[err], replayed=True, source=replay_source)
+            path = write_report(project, report, args.report)
+            print(json.dumps(report, indent=2, sort_keys=True))
+            print(f"report: {path}", file=sys.stderr)
+            return 1
     if not Path(args.godot_bin).exists():
         print(f"error: Godot binary missing: {args.godot_bin}", file=sys.stderr)
         return 2
-    prior: list[Any] = []
-    if args.prior_findings and args.prior_findings.exists():
-        try:
-            loaded = json.loads(args.prior_findings.read_text(encoding="utf-8"))
-            if isinstance(loaded, list):
-                prior = loaded
-        except (OSError, ValueError):
-            prior = []
+    prior = load_prior_findings(project, args.prior_findings)
     if args.no_video:
         os.environ[RECORD_VIDEO_ENV] = "0"
     if args.video is not None:
@@ -857,7 +984,10 @@ def main(argv: list[str] | None = None) -> int:
     turn_budget = TURN_BUDGET
     if args.turns > 0:
         turn_budget = min(int(args.turns), TURN_BUDGET)
-    report, path = run_loop(project, args.godot_bin, float(args.timeout), prior, args.report, turn_budget)
+    report, path = run_loop(
+        project, args.godot_bin, float(args.timeout), prior, args.report, turn_budget,
+        replay_cmds, replay_source,
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     print(f"report: {path}", file=sys.stderr)
     if report.get("video"):

@@ -16,6 +16,8 @@ All under `.godot-smoke/` (gitignored). Engine paths use the `res://.godot-smoke
 - `agent_observation.json` — engine writes via temp file + atomic rename after each applied command.
 - `play_agent_loop.json` — Python session report at exit.
 - `play_agent_loop.mp4` — ffmpeg recording of the windowed play session (default on; `--no-video` or `PLAY_AGENT_RECORD_VIDEO=0` skips).
+- `play_agent_findings/<slug>.json` — one replayable pack per novel anomaly (command log, compact observation, signature, seed).
+- `play_agent_prior.json` — local novelty ledger; loaded automatically on the next run when `--prior-findings` is omitted.
 - `ui_tree/loop.json` — latest UI-tree snapshot from an `observe` or any applied command.
 
 ## Command object
@@ -56,7 +58,9 @@ Canonical string: `screen|tile|exception_class|last_failed_event|ui_tree_structu
 
 ## Session report
 
-`{ok, skipped, reason, turns, anomalies, filed, skipped_duplicate, issue_number, errors:[{code,retryable,hint}], video, video_bytes, video_reason}`
+`{ok, skipped, reason, turns, anomalies, filed, skipped_duplicate, issue_number, errors:[{code,retryable,hint}], video, video_bytes, video_reason, commands, findings, world_seed, replayed, source, coverage}`
+
+`commands` is the compact transcript (`id`, `action`, `payload`, `screen`, `tile`, `stuck`, `exception_count`). `findings` copies each novel pack written this session. `coverage` is `{screens, verbs}` from that transcript. `replayed` is true when `--replay` drove the session; `source` is that pack path. Full `ui_tree` nodes stay in `.godot-smoke/ui_tree/loop.json`, not the report.
 
 `video` is a project-relative path to the session mp4 when ffmpeg recorded the window, else empty. Missing ffmpeg or a display-less host does not fail `ok`; it sets `video_reason` (`ffmpeg_missing`, `no_capture_source`, `video_disabled`, `headless`, `recorder_empty`). Headless / `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason, video_reason: "headless"}` and exits 0. A skipped lane certifies nothing.
 
@@ -68,6 +72,9 @@ Canonical string: `screen|tile|exception_class|last_failed_event|ui_tree_structu
 - `PLAY_AGENT_VIDEO_PATH` / `--video` — write the mp4 somewhere other than `.godot-smoke/play_agent_loop.mp4`.
 - `PLAY_AGENT_FFMPEG` — ffmpeg binary; otherwise `PATH`.
 - `PLAY_AGENT_FEEDBACK_ENDPOINT` — HTTPS endpoint embedded via the editor stamp for live runs. Not committed.
+- `--replay PATH` — republish the pack/report `commands[]` over the same file bridge (`file_feedback` omitted so F does not re-open). Fail-closed codes: `replay_source_missing`, `replay_source_invalid`, `replay_missing_commands`. Headless still SKIP.
+
+Finding packs stay under `.godot-smoke/` (gitignored). The public F sentence may include screen, tile, seed, a short signature, and recent actions; it stays ≤1000 chars and still starts with `[agent-play]`. Packs are not copied into the public F ZIP or GitHub issue.
 
 ## Trace events
 

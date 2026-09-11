@@ -10,5 +10,21 @@
   "errors": [],
   "video": ".godot-smoke/play_agent_loop.mp4",
   "video_bytes": 4096,
-  "video_reason": ""
+  "video_reason": "",
+  "commands": [
+    {
+      "id": "t1",
+      "action": "boot_new_game",
+      "payload": {},
+      "screen": "overworld",
+      "tile": [3, 4],
+      "stuck": false,
+      "exception_count": 0
+    }
+  ],
+  "findings": [],
+  "world_seed": 2026080702,
+  "replayed": false,
+  "source": "",
+  "coverage": {"screens": ["overworld"], "verbs": ["boot_new_game"]}
 }

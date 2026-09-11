@@ -41,6 +41,9 @@ class PlayAgentLoopTests(unittest.TestCase):
             self.assertTrue(report["reason"])
             self.assertEqual(report["video"], "")
             self.assertEqual(report["video_reason"], "headless")
+            self.assertEqual(report["commands"], [])
+            self.assertEqual(report["findings"], [])
+            self.assertFalse(report["replayed"])
 
     def test_live_flag_absent_strips_live(self) -> None:
         os.environ.pop(pal.LIVE_FILE_ENV, None)
@@ -107,6 +110,56 @@ class PlayAgentLoopTests(unittest.TestCase):
         )
         self.assertEqual(command["action"], "file_feedback")
         self.assertTrue(filed)
+        message = command["payload"]["message"]
+        self.assertTrue(message.startswith(pal.MESSAGE_PREFIX))
+        self.assertLessEqual(len(message), 1000)
+
+    def test_replay_queue_emits_recorded_commands(self) -> None:
+        recorded = [
+            {"id": "t1", "action": "boot_new_game", "payload": {}},
+            {"id": "t2", "action": "hold", "payload": {"input": "move_right"}},
+            {"id": "t3", "action": "quit", "payload": {}},
+        ]
+        first, _, _ = pal._next_command(
+            1, None, pal.new_explorer_state(), False, None,
+            replay_commands=recorded,
+        )
+        self.assertEqual(first["action"], "boot_new_game")
+        second, _, _ = pal._next_command(
+            2, {"screen": "overworld"}, pal.new_explorer_state(), False, None,
+            replay_commands=recorded,
+        )
+        self.assertEqual(second["action"], "hold")
+        self.assertEqual(second["payload"]["input"], "move_right")
+        done, _, _ = pal._next_command(
+            4, {"screen": "overworld"}, pal.new_explorer_state(), False, None,
+            replay_commands=recorded,
+        )
+        self.assertEqual(done["action"], "quit")
+
+    def test_replay_missing_pack_exits_without_godot(self) -> None:
+        os.environ.pop(pal.FORCE_HEADLESS_ENV, None)
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "project.godot").write_text("\n", encoding="utf-8")
+            code = pal.main([
+                "--project", str(root),
+                "--godot-bin", str(root / "missing-godot"),
+                "--replay", str(root / "no-pack.json"),
+            ])
+            self.assertEqual(code, 1)
+            report = json.loads((root / ".godot-smoke" / pal.REPORT_NAME).read_text(encoding="utf-8"))
+            self.assertFalse(report["ok"])
+            self.assertTrue(report["replayed"])
+            self.assertEqual(report["errors"][0]["code"], "replay_source_missing")
+
+    def test_session_report_includes_transcript_keys(self) -> None:
+        report = pal.session_report()
+        self.assertEqual(report["commands"], [])
+        self.assertEqual(report["findings"], [])
+        self.assertEqual(report["world_seed"], 0)
+        self.assertFalse(report["replayed"])
+        self.assertEqual(report["coverage"], {"screens": [], "verbs": []})
 
     def test_explorer_harvests_faced_tile(self) -> None:
         state = pal.new_explorer_state()

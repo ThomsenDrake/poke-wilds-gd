@@ -10,8 +10,10 @@ Scores use `0-3` where `3` means strong, mechanically supported coverage.
 Closed-loop play agent (2026-09-11): optional `play_agent_loop` file bridge,
 novelty gate, and real-F filing land beside the existing `play_agent`
 one-shot. The default explorer is observation-driven (harvest, build, contact
-battle) with a 96-turn budget. Off the default gate
-(`--with-play-agent-loop`). Windowed runs record
+battle) with a 96-turn budget. Novel anomalies write a replayable finding pack
+(command transcript, seed, signature) under `.godot-smoke/play_agent_findings/`
+and merge into `.godot-smoke/play_agent_prior.json`; `--replay` re-drives the
+pack. Off the default gate (`--with-play-agent-loop`). Windowed runs record
 `.godot-smoke/play_agent_loop.mp4` when ffmpeg is available. Human F
 and the 67-scenario suite are unchanged. `app_bootstrap` scores unchanged:
 verification harness, not player behavior.

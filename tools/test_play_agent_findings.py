@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 from play_agent_findings import detect_anomalies, evaluate_novelty, signature
@@ -98,6 +99,77 @@ class PlayAgentFindingsTests(unittest.TestCase):
         sig = signature(obs)
         self.assertNotIn("/home/ubuntu", sig)
         self.assertNotIn("secret.gd", sig)
+
+    def test_compact_turn_and_coverage(self) -> None:
+        from play_agent_findings import compact_turn, coverage_from_turns, world_seed_of
+        command = {"id": "t1", "action": "hold", "payload": {"input": "move_right"}}
+        obs = _obs()
+        turn = compact_turn(command, obs)
+        self.assertEqual(turn["action"], "hold")
+        self.assertEqual(turn["screen"], "overworld")
+        self.assertEqual(turn["tile"], [3, 4])
+        self.assertEqual(world_seed_of(obs), 2026080702)
+        coverage = coverage_from_turns([turn, {"action": "press", "payload": {"input": "action_a"}, "screen": "battle"}])
+        self.assertEqual(coverage["screens"], ["overworld", "battle"])
+        self.assertIn("hold:move_right", coverage["verbs"])
+
+    def test_finding_pack_round_trip_and_replay(self) -> None:
+        from play_agent_findings import (
+            build_finding_pack, commands_from_source, compact_turn,
+            load_replay_source, merge_prior_ledger, replay_commands,
+            save_prior_ledger, write_finding_pack,
+        )
+        obs = _obs(exceptions=["NullRef: planted"])
+        command = {"id": "t1", "action": "boot_new_game", "payload": {}}
+        pack = build_finding_pack(
+            obs,
+            [compact_turn(command, obs)],
+            anomalies=["exception:NullRef: planted"],
+            video=".godot-smoke/play_agent_loop.mp4",
+            report=".godot-smoke/play_agent_loop.json",
+        )
+        self.assertEqual(pack["schema"], "play_agent_finding/1")
+        self.assertEqual(pack["world_seed"], 2026080702)
+        self.assertNotIn("nodes", pack["observation"].get("ui_tree") or {})
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            path = write_finding_pack(root / "play_agent_findings", pack)
+            self.assertTrue(path.is_file())
+            self.assertNotIn("|", path.name)
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            cmds = replay_commands(loaded)
+            self.assertEqual(len(cmds), 1)
+            self.assertEqual(cmds[0]["action"], "boot_new_game")
+            with_file = commands_from_source({
+                "commands": cmds + [{"id": "t2", "action": "file_feedback", "payload": {"message": "[agent-play] x"}}],
+            })
+            self.assertEqual(len(replay_commands({"commands": with_file})), 1)
+            missing_cmds, err = load_replay_source(root / "missing.json")
+            self.assertEqual(missing_cmds, [])
+            self.assertEqual(err["code"], "replay_source_missing")
+            empty_path = root / "empty.json"
+            empty_path.write_text("{}", encoding="utf-8")
+            _, empty_err = load_replay_source(empty_path)
+            self.assertEqual(empty_err["code"], "replay_missing_commands")
+            ledger_path = root / "play_agent_prior.json"
+            merged = merge_prior_ledger([], [pack, pack])
+            self.assertEqual(len(merged), 1)
+            save_prior_ledger(ledger_path, merged)
+            self.assertTrue(ledger_path.is_file())
+
+    def test_file_message_is_bounded_and_prefixed(self) -> None:
+        from play_agent_findings import MESSAGE_MAX, MESSAGE_PREFIX, file_message
+        obs = _obs(exceptions=["NullRef: planted"])
+        commands = [
+            {"action": "boot_new_game", "payload": {}},
+            {"action": "hold", "payload": {"input": "move_right"}},
+        ]
+        message = file_message(obs, commands)
+        self.assertTrue(message.startswith(MESSAGE_PREFIX))
+        self.assertLessEqual(len(message), MESSAGE_MAX)
+        self.assertIn("seed 2026080702", message)
+        self.assertIn("boot_new_game", message)
+        self.assertNotIn("/home/", message)
 
 
 if __name__ == "__main__":

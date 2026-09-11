@@ -9,11 +9,22 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 import shutil
 import subprocess
 from typing import Any
 
 SIGNATURE_PARTS = 5
+FINDING_SCHEMA = "play_agent_finding/1"
+MESSAGE_PREFIX = "[agent-play]"
+MESSAGE_MAX = 1000
+ACTIONS = (
+    "boot_new_game", "press", "hold", "observe", "file_feedback", "quit",
+)
+_COMPACT_OBS_KEYS = (
+    "command_id", "screen", "monitors", "tile", "facing", "faced_action",
+    "nearby", "harvest_near", "trace_tail", "exceptions", "stuck", "feedback",
+)
 
 
 def detect_anomalies(observation: dict[str, Any] | None) -> list[str]:
@@ -188,3 +199,255 @@ def evaluate_novelty(
     result["live_fileable"] = True
     result["reason"] = "novel"
     return result
+
+
+def world_seed_of(observation: dict[str, Any] | None) -> int:
+    if not isinstance(observation, dict):
+        return 0
+    monitors = observation.get("monitors") or {}
+    if not isinstance(monitors, dict):
+        return 0
+    try:
+        return int(monitors.get("game/world_seed") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def compact_observation(observation: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(observation, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key in _COMPACT_OBS_KEYS:
+        if key in observation:
+            out[key] = observation[key]
+    ui_tree = observation.get("ui_tree")
+    if isinstance(ui_tree, dict):
+        out["ui_tree"] = {
+            "screen": ui_tree.get("screen"),
+            "node_count": ui_tree.get("node_count"),
+        }
+    return out
+
+
+def compact_turn(
+    command: dict[str, Any] | None,
+    observation: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    command = command if isinstance(command, dict) else {}
+    observation = observation if isinstance(observation, dict) else {}
+    payload = command.get("payload")
+    exceptions = observation.get("exceptions") or []
+    return {
+        "id": str(command.get("id") or ""),
+        "action": str(command.get("action") or ""),
+        "payload": dict(payload) if isinstance(payload, dict) else {},
+        "screen": str(observation.get("screen") or ""),
+        "tile": observation.get("tile"),
+        "stuck": bool(observation.get("stuck")),
+        "exception_count": len(exceptions) if isinstance(exceptions, list) else 0,
+    }
+
+
+def coverage_from_turns(turns: list[Any] | None) -> dict[str, list[str]]:
+    screens: list[str] = []
+    verbs: list[str] = []
+    for item in turns or []:
+        if not isinstance(item, dict):
+            continue
+        screen = str(item.get("screen") or "")
+        if screen and screen not in screens:
+            screens.append(screen)
+        action = str(item.get("action") or "")
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        if action in {"press", "hold"}:
+            token = f"{action}:{payload.get('input') or ''}"
+        else:
+            token = action
+        if token and token not in verbs:
+            verbs.append(token)
+    return {"screens": screens, "verbs": verbs}
+
+
+def signature_slug(sig: str) -> str:
+    text = str(sig or "unknown")
+    cleaned = "".join(ch if ch.isalnum() else "-" for ch in text)
+    cleaned = "-".join(part for part in cleaned.split("-") if part) or "unknown"
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:10]
+    return f"{cleaned[:48]}-{digest}"
+
+
+def build_finding_pack(
+    observation: dict[str, Any] | None,
+    commands: list[Any] | None,
+    *,
+    signature_text: str = "",
+    anomalies: list[str] | None = None,
+    video: str = "",
+    report: str = "",
+) -> dict[str, Any]:
+    observation = observation if isinstance(observation, dict) else {}
+    sig = signature_text or signature(observation)
+    return {
+        "schema": FINDING_SCHEMA,
+        "signature": sig,
+        "anomalies": list(anomalies or detect_anomalies(observation)),
+        "world_seed": world_seed_of(observation),
+        "screen": str(observation.get("screen") or ""),
+        "tile": observation.get("tile"),
+        "commands": [item for item in (commands or []) if isinstance(item, dict)],
+        "observation": compact_observation(observation),
+        "video": video,
+        "report": report,
+    }
+
+
+def write_finding_pack(directory: Path, pack: dict[str, Any]) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{signature_slug(str(pack.get('signature') or ''))}.json"
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(pack, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def commands_from_source(doc: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(doc, dict) or not isinstance(doc.get("commands"), list):
+        return []
+    out: list[dict[str, Any]] = []
+    for index, item in enumerate(doc["commands"], start=1):
+        if not isinstance(item, dict):
+            continue
+        action = item.get("action")
+        if action not in ACTIONS:
+            continue
+        payload = item.get("payload")
+        out.append({
+            "id": str(item.get("id") or f"t{index}"),
+            "action": action,
+            "payload": dict(payload) if isinstance(payload, dict) else {},
+        })
+    return out
+
+
+def replay_commands(
+    doc: dict[str, Any] | None,
+    *,
+    include_file: bool = False,
+) -> list[dict[str, Any]]:
+    commands = commands_from_source(doc)
+    if include_file:
+        return commands
+    return [item for item in commands if item.get("action") != "file_feedback"]
+
+
+def load_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return doc if isinstance(doc, dict) else None
+
+
+def load_replay_source(path: Path) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    if not path.exists():
+        return [], {
+            "code": "replay_source_missing",
+            "retryable": False,
+            "hint": f"No replay pack at {path}; pass a finding JSON or session report.",
+        }
+    doc = load_json_object(path)
+    if doc is None:
+        return [], {
+            "code": "replay_source_invalid",
+            "retryable": False,
+            "hint": f"Replay source {path} is not a JSON object.",
+        }
+    commands = replay_commands(doc)
+    if not commands:
+        return [], {
+            "code": "replay_missing_commands",
+            "retryable": False,
+            "hint": "The pack or report has no replayable commands[]; record a session first.",
+        }
+    return commands, None
+
+
+def load_prior_ledger(path: Path) -> list[Any]:
+    if not path.exists():
+        return []
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if isinstance(loaded, list):
+        return loaded
+    if isinstance(loaded, dict) and isinstance(loaded.get("findings"), list):
+        return loaded["findings"]
+    return []
+
+
+def merge_prior_ledger(existing: list[Any], packs: list[Any]) -> list[Any]:
+    known = set(_prior_signatures(existing))
+    out = list(existing)
+    for pack in packs:
+        sig = ""
+        screen = ""
+        anomalies: list[Any] = []
+        if isinstance(pack, str):
+            sig = pack
+        elif isinstance(pack, dict):
+            sig = str(pack.get("signature") or "")
+            screen = str(pack.get("screen") or "")
+            raw = pack.get("anomalies") or []
+            anomalies = list(raw) if isinstance(raw, list) else []
+        if not sig or sig.count("|") != SIGNATURE_PARTS - 1 or sig in known:
+            continue
+        out.append({"signature": sig, "screen": screen, "anomalies": anomalies})
+        known.add(sig)
+    return out
+
+
+def save_prior_ledger(path: Path, items: list[Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(items, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def _command_token(item: dict[str, Any]) -> str:
+    action = str(item.get("action") or "")
+    payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+    if action in {"press", "hold"} and payload.get("input"):
+        return f"{action}:{payload.get('input')}"
+    return action
+
+
+def file_message(
+    observation: dict[str, Any] | None,
+    commands: list[Any] | None = None,
+    signature_text: str = "",
+) -> str:
+    observation = observation if isinstance(observation, dict) else {}
+    screen = str(observation.get("screen") or "unknown")
+    tile = observation.get("tile")
+    tile_s = f"{tile[0]},{tile[1]}" if isinstance(tile, list) and len(tile) == 2 else ""
+    extra = "stuck" if observation.get("stuck") else "anomaly"
+    exceptions = observation.get("exceptions") or []
+    if isinstance(exceptions, list) and exceptions:
+        extra = str(exceptions[0])[:80].replace("/home/", "")
+    sig = signature_text or signature(observation)
+    sig_short = "/".join(sig.split("|")[:4])
+    tokens = [_command_token(item) for item in (commands or []) if isinstance(item, dict)]
+    cmds = ",".join(token for token in tokens[-6:] if token)
+    seed = world_seed_of(observation)
+    parts = [MESSAGE_PREFIX, extra, "on", screen]
+    if tile_s:
+        parts.extend(["tile", tile_s])
+    if seed:
+        parts.extend(["seed", str(seed)])
+    if sig_short:
+        parts.extend(["sig", sig_short])
+    if cmds:
+        parts.extend(["cmds", cmds])
+    return " ".join(parts)[:MESSAGE_MAX]

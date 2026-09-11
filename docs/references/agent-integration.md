@@ -143,7 +143,11 @@ section that is its machine-readable source instead of restating paths.
   The default explorer is observation-driven (`boot_new_game`, harvest
   `action_a`, `build_toggle` place attempt, then a contact battle). Novelty is checked before F. Live GitHub
   filing requires `PLAY_AGENT_LIVE_FILE=1`. Windowed runs record
-  `.godot-smoke/play_agent_loop.mp4` when ffmpeg can see `DISPLAY`. Headless /
+  `.godot-smoke/play_agent_loop.mp4` when ffmpeg can see `DISPLAY`. A novel
+  anomaly also writes a replayable pack under
+  `.godot-smoke/play_agent_findings/` and merges signatures into
+  `.godot-smoke/play_agent_prior.json`. Re-run with
+  `--replay <pack-or-report.json>` (skips `file_feedback`). Headless /
   `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason}`
   and exits 0. Off the default `verify_all` suite; opt in with
   `--with-play-agent-loop`.
