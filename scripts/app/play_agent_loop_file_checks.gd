@@ -13,12 +13,19 @@ static func message_ok(message: String) -> bool:
 
 
 static func live_env_on() -> bool:
-	var raw := OS.get_environment(LIVE_ENV).to_lower()
-	return raw in ["1", "true", "yes", "on"]
+	if env_truthy("GITHUB_ACTIONS") or env_truthy("CI"):
+		return false
+	var raw := OS.get_environment(LIVE_ENV).strip_edges().to_lower()
+	if raw.is_empty():
+		return true
+	return not (raw == "0" or raw == "false" or raw == "no" or raw == "off")
 
 
 static func live_requested(payload: Dictionary) -> bool:
-	return live_env_on() and bool(payload.get("live", false))
+	var want := true
+	if payload.has("live"):
+		want = bool(payload.get("live"))
+	return live_env_on() and want
 
 
 static func public_stamp(_live: bool) -> Dictionary:

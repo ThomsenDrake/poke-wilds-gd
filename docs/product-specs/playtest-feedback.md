@@ -255,16 +255,22 @@ The fixture never truncates or deletes the player's trace log.
 
 `play_agent_loop` is an optional windowed driver, not a change to human F.
 The default explorer stays in the overworld long enough to attempt harvest
-(`Z` / `action_a`), build (`C` / `build_toggle`, then `Z` to place), and a
-contact battle (overworld mons are live for this scenario). After that it
+(`Z` / `action_a`, including dig), build (`C` / `build_toggle`, then `Z` to place),
+a contact battle (fight plus a capture try; overworld mons are live for this
+scenario), then menus and camp rather than quitting. After that it
 plays through the same capture/dialog/relay path: real `feedback_report`
 input, a 1–1000 character public sentence that starts with `[agent-play]`,
-Enter to send. Default runs inject a mock transport. Live production POST
-requires `PLAY_AGENT_LIVE_FILE=1` plus a public stamp. Novelty is checked
-before F so a repeat signature does not open a second dialog. The dedicated
+Enter to send. Default runs live-file unless `PLAY_AGENT_LIVE_FILE` is off or
+CI is set; mock transport is used when live is off. VLM-only findings never
+live-file. Novelty is checked
+before F so a repeat signature does not open a second dialog. A novel
+anomaly also writes a gitignored replay pack (commands, seed, signature)
+under `.godot-smoke/play_agent_findings/`; `--replay` re-drives it without
+re-opening F. The public sentence includes seed, a short signature, and a
+repo-relative replay one-liner, and stays ≤1000 characters. Packs and the session mp4 are operator
+evidence, not part of the public F ZIP or GitHub issue. The dedicated
 install-id path is `user://feedback-agent-play-install-id.txt`. Windowed runs
-also write `.godot-smoke/play_agent_loop.mp4` (ffmpeg of the live window). That
-recording is operator evidence, not part of the public F ZIP or GitHub issue.
-`--no-video` skips it. Human focus, pause, disclosure, and acknowledgement
+also write `.godot-smoke/play_agent_loop.mp4` (ffmpeg of the live window).
+`--no-video` skips the recording. Human focus, pause, disclosure, and acknowledgement
 behavior are unchanged. Contract:
 [../references/agent-step-bridge.md](../references/agent-step-bridge.md).

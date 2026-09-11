@@ -61,7 +61,8 @@ optional = true
 [play_agent_loop]
 # OPTIONAL closed-loop play: Python publishes commands on the file bridge,
 # the engine applies real input-phase events, novelty gates F. Live GitHub
-# filing requires PLAY_AGENT_LIVE_FILE=1. Off the default gate.
+# filing defaults on unless PLAY_AGENT_LIVE_FILE is off or CI is set.
+# VLM-only rows never live-file. Off the default gate.
 driver_path = "tools/play_agent_loop.py"
 scenario = "play_agent_loop"
 contract_doc = "docs/references/agent-step-bridge.md"
@@ -71,6 +72,8 @@ live_file_env = "PLAY_AGENT_LIVE_FILE"
 headless_env = "PLAYTEST_FORCE_HEADLESS=1"
 report_path = ".godot-smoke/play_agent_loop.json"
 video_path = ".godot-smoke/play_agent_loop.mp4"
+findings_dir = ".godot-smoke/play_agent_findings"
+prior_findings_path = ".godot-smoke/play_agent_prior.json"
 record_video_env = "PLAY_AGENT_RECORD_VIDEO"
 
 [traces]
