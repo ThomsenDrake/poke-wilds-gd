@@ -215,6 +215,8 @@ class PlayAgentLoopTests(unittest.TestCase):
         argv = pal.godot_cmd("/godot", Path("/tmp/proj"))
         self.assertIn("--audio-driver", argv)
         self.assertIn("Dummy", argv)
+        self.assertIn("--max-fps", argv)
+        self.assertIn("60", argv)
 
     def test_recorder_disabled(self) -> None:
         os.environ[pal.RECORD_VIDEO_ENV] = "0"

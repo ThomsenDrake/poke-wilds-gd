@@ -536,7 +536,7 @@ def turn_budget_error() -> dict[str, str | bool]:
 
 
 def godot_cmd(godot_bin: str, project: Path) -> list[str]:
-    return [godot_bin, "--path", str(project), *playtests.godot_audio_args()]
+    return [godot_bin, "--path", str(project), "--max-fps", "60", *playtests.godot_audio_args()]
 
 
 def write_json_atomic(path: Path, doc: dict[str, Any]) -> None:
