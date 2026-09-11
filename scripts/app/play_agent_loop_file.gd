@@ -44,11 +44,11 @@ func _mock_transport(_prepared: Dictionary) -> Dictionary:
 
 func _live_result(controller: Node, dialog: Control) -> Dictionary:
 	var state: Dictionary = controller.smoke_reporter_state()
-	var status := "queued"
-	if dialog.smoke_result_ready():
-		status = str(state.get("last_status", "sent"))
-	return {
-		"status": status,
-		"reason": str(state.get("last_reason", "")),
-		"issue_number": int(state.get("issue_number", 0)),
-	}
+	var issue := int(state.get("issue_number", 0))
+	var status := str(state.get("last_status", ""))
+	var reason := str(state.get("last_reason", ""))
+	if not dialog.smoke_result_ready():
+		return {"status": "queued", "reason": reason, "issue_number": issue}
+	if status.is_empty() or (status == "sent" and issue <= 0):
+		return {"status": "blocked", "reason": "result_without_issue", "issue_number": issue}
+	return {"status": status, "reason": reason, "issue_number": issue}

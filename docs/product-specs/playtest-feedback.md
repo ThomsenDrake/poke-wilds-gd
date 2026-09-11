@@ -271,6 +271,10 @@ repo-relative replay one-liner, and stays ≤1000 characters. Packs and the sess
 evidence, not part of the public F ZIP or GitHub issue. The dedicated
 install-id path is `user://feedback-agent-play-install-id.txt`. Windowed runs
 also write `.godot-smoke/play_agent_loop.mp4` (ffmpeg of the live window).
-`--no-video` skips the recording. Human focus, pause, disclosure, and acknowledgement
+`--no-video` skips the recording. The agent-play public stamp keeps
+`build_id: "agent-play"` but `commit_sha` is `unknown` or the real HEAD hex
+(`[0-9a-f]{7,64}`); the literal `"agent-play"` is not a valid `commit_sha`
+(relay `isBuild` rejects it). The session helper reports `filed: "live"` only
+when a GitHub issue number is present. Human focus, pause, disclosure, and acknowledgement
 behavior are unchanged. Contract:
 [../references/agent-step-bridge.md](../references/agent-step-bridge.md).

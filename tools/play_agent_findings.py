@@ -37,7 +37,8 @@ ACTIONS = (
 )
 _COMPACT_OBS_KEYS = (
     "command_id", "screen", "monitors", "tile", "facing", "faced_action",
-    "nearby", "harvest_near", "trace_tail", "exceptions", "stuck", "feedback",
+    "nearby", "harvest_near", "party_field_moves", "trace_tail", "exceptions",
+    "stuck", "feedback",
 )
 
 
@@ -111,6 +112,15 @@ def _command_input(command: dict[str, Any] | None) -> tuple[str, str]:
         return "", ""
     payload = command.get("payload") if isinstance(command.get("payload"), dict) else {}
     return str(command.get("action") or ""), str(payload.get("input") or "")
+
+
+def _party_harvest_moves(observation: dict[str, Any] | None) -> set[str] | None:
+    if not isinstance(observation, dict) or "party_field_moves" not in observation:
+        return None
+    raw = observation.get("party_field_moves")
+    if not isinstance(raw, list):
+        return None
+    return {str(item) for item in raw}
 
 
 def _harvest_token(near: Any) -> tuple[str, str] | None:
@@ -207,7 +217,14 @@ def detect_anomalies(
         action, button = _command_input(last_command)
         if action == "press" and button == "action_a" and screen != "battle":
             prev_faced = str((previous or {}).get("faced_action") or "")
-            expect = screen in OVERLAY_SCREENS or prev_faced in HARVEST_MOVES
+            harvest_expect = prev_faced in HARVEST_MOVES
+            if harvest_expect:
+                capable = _party_harvest_moves(previous)
+                if capable is None:
+                    capable = _party_harvest_moves(observation)
+                if capable is not None and prev_faced not in capable:
+                    harvest_expect = False
+            expect = screen in OVERLAY_SCREENS or harvest_expect
             if expect:
                 gameplay = [
                     _event_name(record) for record in new_events

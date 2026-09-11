@@ -29,6 +29,11 @@ quality_bucket = "bootstrap"
 # PLAY-AGENT LOOP (2026-09-11): ui_tree dumps use game/current_screen (not a
 # synthetic "loop" id) so screen/monitor/tree agreement is a real oracle.
 # Live F defaults on unless PLAY_AGENT_LIVE_FILE is off or CI is set.
+# PLAY-AGENT LIVE-RUN GAPS (2026-09-11): public F commit_sha is unknown or
+# HEAD hex (never the literal "agent-play"). Session helper does not report
+# filed live with issue 0. Oracle E stays quiet when the party cannot use the
+# faced harvest verb. Explorer skips unusable spawn harvest A and retries
+# Cut on bump text without spending harvest_tries.
 # CRAFT-STATE SPAWN PIN (2026-08-23): visual_sweep_baselines.craft_state calls
 # RegistrySupport.pin_craft_world before find_walkable_spawn so session.world_seed
 # matches the spec seed (landmark_resolver reads the session, not generator setup).

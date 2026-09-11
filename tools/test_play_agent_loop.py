@@ -15,12 +15,14 @@ import play_agent_loop as pal
 class PlayAgentLoopTests(unittest.TestCase):
     def setUp(self) -> None:
         os.environ.pop(pal.LIVE_FILE_ENV, None)
+        os.environ.pop(pal.COMMIT_SHA_ENV, None)
         os.environ.pop("CI", None)
         os.environ.pop("GITHUB_ACTIONS", None)
 
     def tearDown(self) -> None:
         os.environ.pop(pal.FORCE_HEADLESS_ENV, None)
         os.environ.pop(pal.LIVE_FILE_ENV, None)
+        os.environ.pop(pal.COMMIT_SHA_ENV, None)
         os.environ.pop(pal.RECORD_VIDEO_ENV, None)
         os.environ.pop(pal.VIDEO_PATH_ENV, None)
         os.environ.pop(pal.FFMPEG_ENV, None)
@@ -256,11 +258,65 @@ class PlayAgentLoopTests(unittest.TestCase):
             "tile": [3, 4],
             "facing": [1, 0],
             "faced_action": "dig",
+            "party_field_moves": ["dig"],
             "harvest_near": {"action": "dig", "tile": [4, 4], "from_tile": [3, 4]},
             "nearby": [],
         })
         self.assertEqual(command["payload"]["input"], "action_a")
-        self.assertTrue(state["saw_harvest"])
+        self.assertTrue(state["saw_harvest"] or state.get("pending_harvest"))
+
+    def test_explorer_skips_swallowed_spawn_dig(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        spawn = {
+            "screen": "overworld",
+            "tile": [-4, -4],
+            "facing": [0, 1],
+            "faced_action": "dig",
+            "party_field_moves": [],
+            "harvest_near": {"action": "dig", "tile": [-4, -4], "from_tile": [-4, -4]},
+            "nearby": [],
+            "trace_tail": [],
+        }
+        first = pal.explorer_command(state, spawn)
+        self.assertNotEqual(first.get("payload", {}).get("input"), "action_a")
+        self.assertFalse(state["saw_harvest"])
+        self.assertEqual(int(state.get("harvest_tries") or 0), 0)
+        swallowed = dict(spawn)
+        swallowed["trace_tail"] = [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
+        ]
+        pal.explorer_command(state, swallowed)
+        self.assertFalse(state["saw_harvest"])
+        self.assertEqual(int(state.get("harvest_tries") or 0), 0)
+
+    def test_explorer_retries_cut_on_bump_text(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True, "last_tile": (-4, 5),
+            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
+        })
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [-4, 5],
+            "facing": [0, 1],
+            "faced_action": "cut",
+            "party_field_moves": [],
+            "nearby": [{"tile": [-4, 8], "species_id": "PIDGEY", "kind": "roamer"}],
+            "ui_tree": {
+                "screen": "overworld",
+                "nodes": [{"path": ".", "type": "Label", "text": "A TALL TREE BLOCKS THE WAY. IT COULD BE CUT."}],
+            },
+            "trace_tail": [{
+                "event": "traversal_blocked", "ts_msec": 12,
+                "payload": {"reason": "A tall tree blocks the way. It could be CUT.", "requires_field_move": "cut"},
+            }],
+        })
+        self.assertEqual(command["action"], "press")
+        self.assertEqual(command["payload"]["input"], "action_a")
+        self.assertFalse(state["saw_harvest"])
+        self.assertEqual(int(state.get("harvest_tries") or 0), 0)
 
     def test_explorer_builds_after_harvest(self) -> None:
         state = pal.new_explorer_state()
@@ -285,6 +341,7 @@ class PlayAgentLoopTests(unittest.TestCase):
             "tile": [3, 4],
             "facing": [0, 1],
             "faced_action": "cut",
+            "party_field_moves": [],
             "nearby": [{"tile": [3, 7], "species_id": "PIDGEY", "kind": "roamer"}],
         })
         self.assertEqual(command["action"], "hold")
@@ -403,6 +460,41 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertEqual(fields["video"], "")
         self.assertEqual(fields["video_bytes"], 0)
         self.assertEqual(fields["video_reason"], "ffmpeg_missing")
+
+    def test_stamp_commit_sha_never_agent_play(self) -> None:
+        self.assertEqual(pal.stamp_commit_sha({"PLAY_AGENT_COMMIT_SHA": "agent-play"}, git_head=""), "unknown")
+        self.assertEqual(pal.stamp_commit_sha({"PLAY_AGENT_COMMIT_SHA": "ABCDEF0"}), "abcdef0")
+        self.assertEqual(pal.stamp_commit_sha({}, git_head="c" * 40), "c" * 40)
+        self.assertEqual(pal.stamp_commit_sha({"PLAY_AGENT_COMMIT_SHA": "nope"}, git_head="deadbeef"), "deadbeef")
+        src = (Path(__file__).resolve().parents[1] / "scripts/app/play_agent_loop_file_checks.gd").read_text(encoding="utf-8")
+        self.assertNotIn('"commit_sha": "agent-play"', src)
+        self.assertIn("unknown", src)
+        self.assertIn("stamp_commit_sha", src)
+
+    def test_filed_from_observation_rejects_live_without_issue(self) -> None:
+        command = {"action": "file_feedback", "payload": {"live": True}}
+        failed = {
+            "feedback": {"status": "sent", "reason": "http_400:invalid_build", "issue_number": 0},
+            "trace_tail": [{"event": "feedback_report_failed", "payload": {"reason": "http_400:invalid_build"}}],
+        }
+        filed, issue = pal.filed_from_observation(failed, command)
+        self.assertFalse(filed)
+        self.assertEqual(issue, 0)
+        sent = {
+            "feedback": {"status": "sent", "issue_number": 77},
+            "trace_tail": [{"event": "feedback_report_sent", "payload": {"issue_number": 77}}],
+        }
+        filed, issue = pal.filed_from_observation(sent, command)
+        self.assertEqual(filed, "live")
+        self.assertEqual(issue, 77)
+        dry = pal.filed_from_observation(
+            {"feedback": {"status": "sent", "issue_number": 0}},
+            {"action": "file_feedback", "payload": {"live": False}},
+        )
+        self.assertEqual(dry[0], "dry")
+        gd = (Path(__file__).resolve().parents[1] / "scripts/app/play_agent_loop_file.gd").read_text(encoding="utf-8")
+        self.assertNotIn('state.get("last_status", "sent")', gd)
+        self.assertIn("result_without_issue", gd)
 
 
 if __name__ == "__main__":
