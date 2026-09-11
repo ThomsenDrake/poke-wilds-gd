@@ -1,7 +1,7 @@
 Status: current
-Last verified: 2026-09-07
+Last verified: 2026-09-11
 Review cadence days: 14
-Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/run_codex_cloud_visuals.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_legacy_checks.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, docs/references/feedback-report-schema.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
+Source paths: tools/setup_worktree.py, tools/setup_codex_cloud.sh, tools/run_codex_cloud_visuals.sh, tools/godot_dap_smoketest.py, tools/run_playtests.py, tools/verify_all.py, tools/cloud_env.py, tools/vlm_reviewer.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/play_agent_loop.py, tools/play_agent_findings.py, docs/references/agent-step-bridge.md, scripts/app/play_agent_loop_scenario.gd, scripts/core/trace_logger.gd, scripts/runtime/game_runtime.gd, scripts/runtime/smoke_scenario_runner.gd, scripts/runtime/performance_monitors.gd, scripts/app/ui_tree_dump_scenario.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/feedback_flow_legacy_checks.gd, docs/registry/agent-surface.toml, docs/references/trace-events.md, docs/references/godot-dap.md, docs/references/accessibility.md, docs/references/snapshot-sidecar.md, docs/references/feedback-report-schema.md, addons/agent_trace/agent_trace_plugin.gd, addons/agent_trace/agent_trace_debugger.gd, addons/agent_trace/README.md, docs/generated/visual-baselines, docs/generated/golden-saves/v4_golden.json
 
 # Agent Integration
 
@@ -137,6 +137,16 @@ section that is its machine-readable source instead of restating paths.
   scripted play agent can drive the windowed transport through the same
   scenario seams; `tools/commandcode_play_agent.py` is the repo's optional
   reference driver (windowed-only), never part of the contract.
+- **Closed-loop play and file via F — optional** (manifest `[play_agent_loop]`).
+  `python3 tools/play_agent_loop.py --project <abs>` drives a windowed
+  session over the file bridge in [agent-step-bridge.md](agent-step-bridge.md).
+  The default explorer is observation-driven (`boot_new_game`, harvest
+  `action_a`, `build_toggle` place attempt, then a contact battle). Novelty is checked before F. Live GitHub
+  filing requires `PLAY_AGENT_LIVE_FILE=1`. Windowed runs record
+  `.godot-smoke/play_agent_loop.mp4` when ffmpeg can see `DISPLAY`. Headless /
+  `PLAYTEST_FORCE_HEADLESS=1` writes `{ok: true, skipped: true, reason}`
+  and exits 0. Off the default `verify_all` suite; opt in with
+  `--with-play-agent-loop`.
 
 ## Error-as-directive
 

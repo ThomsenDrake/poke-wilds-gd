@@ -1,0 +1,14 @@
+{
+  "ok": true,
+  "skipped": false,
+  "reason": "",
+  "turns": 5,
+  "anomalies": 1,
+  "filed": "dry",
+  "skipped_duplicate": 0,
+  "issue_number": 0,
+  "errors": [],
+  "video": ".godot-smoke/play_agent_loop.mp4",
+  "video_bytes": 4096,
+  "video_reason": ""
+}

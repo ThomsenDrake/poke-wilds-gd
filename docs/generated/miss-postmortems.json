@@ -284,8 +284,8 @@
           "scripts/app/nav_audit.gd": "da8ed8283c70b908a1836e2ea2df4b9b35e46ddb350621daa5e8f1bfb7911094",
           "scripts/app/nav_audit_battle.gd": "b3468cadbaaf368cf7f9e34fc5861b6ec03006a417118ed23b8217604a26f291",
           "tools/run_playtests.py": "570f397edb2a343af4d4a7e590dc16000afbc72fb83aa75a6491081315456360",
-          "tools/godot_dap_smoketest.py": "0b05f37e5f15fffcfd6431862a9effa754340aa8cb405b90902f6313476e56ca",
-          "tools/verify_all.py": "59924c1d2f890851eeaa9ef77d0208bc3a16eaafcfcf061d3e44adbf37a013f3"
+          "tools/godot_dap_smoketest.py": "107fea2751f269d09f14db0d03b88ac6a9d3c0f782b9d8cff6cf8f062dedb35d",
+          "tools/verify_all.py": "1c6e7b455c27610a73b27aed7ac27765e952c3e26b84f69e2ec8f458c47fd9f5"
         },
         "re_stamp_log": [
           {
@@ -945,6 +945,20 @@
             "old_pin": "eaf5b2a1a428",
             "new_pin": "0b05f37e5f15",
             "reason": "legitimate edit (shared game updates): registered update_flow with required update_flow_passed. ERROR_MARKERS, failed_event_entry, and the honest-reporting and determinism mechanisms remain unchanged."
+          },
+          {
+            "date": "2026-09-10",
+            "file": "tools/godot_dap_smoketest.py",
+            "old_pin": "0b05f37e5f15",
+            "new_pin": "107fea2751f2",
+            "reason": "legitimate edit (closed-loop play_agent_loop): registered play_agent_loop in WINDOWED_ONLY_SCENARIOS + WINDOWED_SUBPROCESS_SCENARIOS and SCENARIO_REQUIREMENTS (all: play_agent_loop_started; any: play_agent_loop_passed). Not added to PLAYTEST_SCENARIOS. Additive dispatch-table change that leaves this entry's proved (C) honest-reporting mechanism byte-for-byte untouched: ERROR_MARKERS still carries 'ERROR: ' (godot_dap_smoketest.py:39), failed_event_entry still collects structured *_failed reasons (:606), run_playtests.py still single-sources both tables from the sibling harness. The (A) determinism seam is untouched; the run_playtests.py pin is unchanged and still holds."
+          },
+          {
+            "date": "2026-09-10",
+            "file": "tools/verify_all.py",
+            "old_pin": "59924c1d2f89",
+            "new_pin": "1c6e7b455c27",
+            "reason": "legitimate edit (closed-loop play_agent_loop): added --with-play-agent-loop (S8.6) so the optional windowed lane stays off the default gate and records SKIP under --skip-windowed or a missing Godot binary. Additive orchestrator flag only. The (C) honest-reporting mechanism this entry proves is untouched; the run_playtests.py pin is unchanged and still holds."
           }
         ]
       },

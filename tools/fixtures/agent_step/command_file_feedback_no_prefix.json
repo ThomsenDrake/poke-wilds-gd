@@ -1,0 +1,5 @@
+{
+  "id": "bad1",
+  "action": "file_feedback",
+  "payload": {"message": "I got stuck", "live": false}
+}

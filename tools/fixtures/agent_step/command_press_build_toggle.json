@@ -1,0 +1,5 @@
+{
+  "id": "t2",
+  "action": "press",
+  "payload": {"input": "build_toggle"}
+}

@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "skipped": true,
+  "reason": "windowed-only play_agent_loop skipped under PLAYTEST_FORCE_HEADLESS (live play needs a real window and renderer)",
+  "video": "",
+  "video_bytes": 0,
+  "video_reason": "headless"
+}

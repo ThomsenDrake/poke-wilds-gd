@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-08-19
+Last verified: 2026-09-10
 Review cadence days: 21
 Source paths: scenes/app/Main.tscn, scenes/ui/BattleView.tscn, scenes/ui/StartMenu.tscn
 

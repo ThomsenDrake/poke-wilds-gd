@@ -565,6 +565,26 @@ class Runner:
                             outer_timeout=300.0, retry_once=False,
                             exit_map={0: "pass", 1: "fail", 2: "tool_error"})
 
+                # --- S8.6: optional closed-loop play agent (off the default gate)
+                if not self.fail_fast_stop and getattr(args, "with_play_agent_loop", False):
+                    if args.skip_windowed:
+                        self.record_skip("play_agent_loop", "windowed",
+                                         "windowed lane skipped (--skip-windowed)")
+                    elif self.binary_missing:
+                        self.record_skip("play_agent_loop", "windowed",
+                                         "godot binary missing (run_playtests exit 2)")
+                    else:
+                        self.run_tool(
+                            "play_agent_loop", "windowed",
+                            py("play_agent_loop.py") + [
+                                "--project", str(ROOT),
+                                "--godot-bin", bin_,
+                                "--timeout", "180",
+                            ],
+                            pop_force_headless=True,
+                            outer_timeout=300.0, retry_once=False,
+                            exit_map={0: "pass", 1: "fail", 2: "tool_error"})
+
         # --- S10: legibility report (generate-only, findings already gated) ---
         if not self.fail_fast_stop:
             entry = self.run_tool(
@@ -1025,6 +1045,9 @@ def main() -> int:
     parser.add_argument("--with-play-agent", action="store_true",
                         help="opt-in S8.5 Command Code play agent (windowed-subprocess "
                              "drive, no DAP; default off locally; skipped under --skip-windowed)")
+    parser.add_argument("--with-play-agent-loop", action="store_true",
+                        help="opt-in S8.6 closed-loop play agent (windowed file bridge + "
+                             "optional F file; default off; skipped under --skip-windowed)")
     parser.add_argument("--timeout", type=float, default=120,
                         help="per-scenario wall-clock budget (s) for the headless suite "
                              "(default 120)")

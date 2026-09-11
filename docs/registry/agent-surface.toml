@@ -58,6 +58,21 @@ scenario = "play_agent"
 windowed_only = true
 optional = true
 
+[play_agent_loop]
+# OPTIONAL closed-loop play: Python publishes commands on the file bridge,
+# the engine applies real input-phase events, novelty gates F. Live GitHub
+# filing requires PLAY_AGENT_LIVE_FILE=1. Off the default gate.
+driver_path = "tools/play_agent_loop.py"
+scenario = "play_agent_loop"
+contract_doc = "docs/references/agent-step-bridge.md"
+windowed_only = true
+optional = true
+live_file_env = "PLAY_AGENT_LIVE_FILE"
+headless_env = "PLAYTEST_FORCE_HEADLESS=1"
+report_path = ".godot-smoke/play_agent_loop.json"
+video_path = ".godot-smoke/play_agent_loop.mp4"
+record_video_env = "PLAY_AGENT_RECORD_VIDEO"
+
 [traces]
 # One JSON object per line, record shape {event, ts_msec, source, payload}.
 # Appended by the emitter below and mirrored on stdout (both harness transports

@@ -14,7 +14,7 @@ var _had_save := false
 var _backup_armed := false
 
 
-static func scenario_uses_overworld(scenario: String) -> bool: return ["overworld_mons", "encounter_config", "visual_sweep_overworld", "visual_sweep_overworld_update"].has(scenario) # Phase 6 activation gate: opt-in scenarios only; every other baseline runs inert (byte-stable)
+static func scenario_uses_overworld(scenario: String) -> bool: return ["overworld_mons", "encounter_config", "visual_sweep_overworld", "visual_sweep_overworld_update", "play_agent_loop"].has(scenario) # Phase 6 activation gate: opt-in only; other baselines stay inert
 func consume_requested_scenario() -> String:
 	if not FileAccess.file_exists(REQUEST_PATH):
 		return ""
