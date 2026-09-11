@@ -20,7 +20,7 @@ ACTIONS = frozenset({
 })
 INPUTS = frozenset({
     "move_up", "move_down", "move_left", "move_right",
-    "action_a", "action_b", "menu",
+    "action_a", "action_b", "menu", "build_toggle",
 })
 MESSAGE_PREFIX = "[agent-play]"
 MESSAGE_MAX = 1000
@@ -124,6 +124,10 @@ def _load_findings():
 class AgentStepContractTests(unittest.TestCase):
     def test_valid_press_parses(self) -> None:
         ok, err = validate_command(_load("command_press_valid.json"))
+        self.assertTrue(ok, err)
+
+    def test_valid_build_toggle_parses(self) -> None:
+        ok, err = validate_command(_load("command_press_build_toggle.json"))
         self.assertTrue(ok, err)
 
     def test_valid_file_feedback_parses(self) -> None:

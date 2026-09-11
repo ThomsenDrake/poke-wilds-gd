@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-09-10
+Last verified: 2026-09-11
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/enqueue-playtest-feedback.yml, scenes/ui/FeedbackDialog.tscn, scripts/app/feedback_controller.gd, scripts/app/feedback_flow_scenario.gd, scripts/app/feedback_flow_resilience_checks.gd, scripts/app/trace_cursor_checks.gd, scripts/app/feedback_flow_legacy_checks.gd, scripts/app/feedback_flow_stamp_checks.gd, scripts/app/display_matrix.gd, scripts/ui/feedback_dialog.gd, scripts/runtime/performance_monitors.gd, scripts/runtime/feedback_snapshot.gd, scripts/runtime/feedback_bundle.gd, scripts/runtime/feedback_outbox.gd, scripts/runtime/feedback_reporter.gd, scripts/core/bounded_jsonl.gd, scripts/core/feedback_redactor.gd, scripts/core/trace_logger.gd, scripts/app/ui_tree_dump_writer.gd, services/feedback-relay/src/errors.ts, services/feedback-relay/src/report_access.ts, services/feedback-relay/src/index.ts, services/feedback-relay/src/github.ts, services/feedback-relay/src/security.ts, services/feedback-relay/src/types.ts, services/feedback-relay/migrations/0001_initial.sql, services/feedback-relay/wrangler.jsonc, tools/feedback_endpoint.py, tools/package_playtest.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/test_feedback_bundle.py, tools/play_agent_loop.py, tools/play_agent_findings.py, scripts/app/play_agent_loop_file.gd, docs/references/agent-step-bridge.md, export_presets.cfg, scripts/runtime/update_identity.gd, services/feedback-relay/src/updates.ts, services/feedback-relay/test/routes.test.ts, tools/publish_update.py
 
@@ -254,7 +254,10 @@ The fixture never truncates or deletes the player's trace log.
 ## Agent-play closed loop (optional)
 
 `play_agent_loop` is an optional windowed driver, not a change to human F.
-It plays through the same capture/dialog/relay path: real `feedback_report`
+The default explorer stays in the overworld long enough to attempt harvest
+(`Z` / `action_a`), build (`C` / `build_toggle`, then `Z` to place), and a
+contact battle (overworld mons are live for this scenario). After that it
+plays through the same capture/dialog/relay path: real `feedback_report`
 input, a 1–1000 character public sentence that starts with `[agent-play]`,
 Enter to send. Default runs inject a mock transport. Live production POST
 requires `PLAY_AGENT_LIVE_FILE=1` plus a public stamp. Novelty is checked

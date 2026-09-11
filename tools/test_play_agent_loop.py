@@ -68,11 +68,18 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertEqual(plan[0]["action"], "boot_new_game")
         self.assertEqual(plan[-1]["action"], "quit")
         self.assertTrue(any(step["action"] == "observe" for step in plan))
+        self.assertTrue(any(
+            step.get("payload", {}).get("input") == "build_toggle" for step in plan
+        ))
+        self.assertTrue(any(
+            step.get("payload", {}).get("input") == "action_a" for step in plan
+        ))
         for step in plan:
             self.assertIn(step["action"], pal.ACTIONS)
             payload = step.get("payload") or {}
             if step["action"] in {"press", "hold"}:
                 self.assertIn(payload.get("input"), pal.INPUTS)
+        self.assertIn("build_toggle", pal.INPUTS)
 
     def test_turn_budget_error(self) -> None:
         err = pal.turn_budget_error()
@@ -81,22 +88,98 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertTrue(err["hint"])
 
     def test_next_command_starts_with_boot(self) -> None:
-        command, index, filed = pal._next_command(1, None, 0, False, None)
+        command, state, filed = pal._next_command(1, None, pal.new_explorer_state(), False, None)
         self.assertEqual(command["action"], "boot_new_game")
-        self.assertEqual(index, 1)
+        self.assertTrue(state["booted"])
         self.assertFalse(filed)
 
     def test_last_turn_forces_quit(self) -> None:
-        command, _, _ = pal._next_command(8, {"screen": "overworld"}, 3, True, None, 8)
+        command, _, _ = pal._next_command(
+            8, {"screen": "overworld"}, pal.new_explorer_state(), True, None, 8,
+        )
         self.assertEqual(command["action"], "quit")
 
     def test_last_turn_still_files_novel(self) -> None:
         novelty = {"anomaly": True, "novel": True, "live_fileable": False}
         command, _, filed = pal._next_command(
-            8, {"screen": "overworld", "exceptions": ["boom"]}, 3, False, novelty, 8,
+            8, {"screen": "overworld", "exceptions": ["boom"]},
+            pal.new_explorer_state(), False, novelty, 8,
         )
         self.assertEqual(command["action"], "file_feedback")
         self.assertTrue(filed)
+
+    def test_explorer_harvests_faced_tile(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [3, 4],
+            "facing": [1, 0],
+            "faced_action": "cut",
+            "harvest_near": {"action": "cut", "tile": [4, 4], "from_tile": [3, 4]},
+            "nearby": [],
+        })
+        self.assertEqual(command["action"], "press")
+        self.assertEqual(command["payload"]["input"], "action_a")
+        self.assertTrue(state["saw_harvest"])
+
+    def test_explorer_walks_to_harvest_stand(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [1, 4],
+            "facing": [1, 0],
+            "faced_action": "",
+            "harvest_near": {"action": "cut", "tile": [4, 4], "from_tile": [3, 4]},
+            "nearby": [],
+        })
+        self.assertEqual(command["action"], "hold")
+        self.assertEqual(command["payload"]["input"], "move_right")
+
+    def test_explorer_builds_after_harvest(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        state["saw_harvest"] = True
+        state["harvest_tries"] = 2
+        command = pal.explorer_command(state, {
+            "screen": "overworld", "tile": [3, 4], "nearby": [],
+        })
+        self.assertEqual(command["payload"]["input"], "build_toggle")
+        self.assertTrue(state["saw_build"])
+
+    def test_explorer_fights_in_battle(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        command = pal.explorer_command(state, {"screen": "battle", "tile": [3, 4]})
+        self.assertEqual(command["payload"]["input"], "action_a")
+        self.assertTrue(state["saw_battle"])
+
+    def test_explorer_hunts_nearby_mon(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        state["saw_harvest"] = True
+        state["harvest_tries"] = 2
+        state["build_phase"] = 3
+        state["saw_build"] = True
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [3, 4],
+            "nearby": [{"tile": [3, 7], "species_id": "PIDGEY", "kind": "roamer"}],
+        })
+        self.assertEqual(command["action"], "hold")
+        self.assertEqual(command["payload"]["input"], "move_down")
+
+    def test_explorer_quits_after_verbs(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": True, "saw_build": True,
+            "saw_battle": True, "battle_presses": pal.MIN_BATTLE_PRESSES,
+        })
+        first = pal.explorer_command(state, {"screen": "overworld", "tile": [3, 4]})
+        self.assertEqual(first["action"], "observe")
+        second = pal.explorer_command(state, {"screen": "overworld", "tile": [3, 4]})
+        self.assertEqual(second["action"], "quit")
 
     def test_godot_cmd_uses_dummy_audio(self) -> None:
         argv = pal.godot_cmd("/godot", Path("/tmp/proj"))

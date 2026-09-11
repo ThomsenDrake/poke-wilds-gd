@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-09-10
+Last verified: 2026-09-11
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, .github/workflows/enqueue-playtest-feedback.yml, docs/registry/subsystems.toml, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, services/feedback-relay, scripts, scenes, tools, LICENSING.md, THIRD_PARTY.md
 
@@ -7,10 +7,12 @@ Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/pla
 
 Scores use `0-3` where `3` means strong, mechanically supported coverage.
 
-Closed-loop play agent (2026-09-10): optional `play_agent_loop` file bridge,
+Closed-loop play agent (2026-09-11): optional `play_agent_loop` file bridge,
 novelty gate, and real-F filing land beside the existing `play_agent`
-one-shot. Off the default gate (`--with-play-agent-loop`). Windowed runs
-record `.godot-smoke/play_agent_loop.mp4` when ffmpeg is available. Human F
+one-shot. The default explorer is observation-driven (harvest, build, contact
+battle) with a 96-turn budget. Off the default gate
+(`--with-play-agent-loop`). Windowed runs record
+`.godot-smoke/play_agent_loop.mp4` when ffmpeg is available. Human F
 and the 67-scenario suite are unchanged. `app_bootstrap` scores unchanged:
 verification harness, not player behavior.
 

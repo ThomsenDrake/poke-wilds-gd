@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-09-07
+Last verified: 2026-09-11
 Review cadence days: 21
 Source paths: scripts/core/trace_logger.gd, scripts/app/trace_cursor_checks.gd, scripts/runtime/smoke_scenario_runner.gd, scenes/ui/StartMenu.tscn, scenes/ui/PartyScreen.tscn, scenes/ui/BagScreen.tscn, scenes/ui/MessageBox.tscn, scenes/ui/OptionsScreen.tscn, scripts/ui/start_menu.gd, scripts/ui/party_screen.gd, scripts/ui/bag_screen.gd, scripts/ui/party_rows.gd, scripts/ui/party_row_style.gd, scripts/ui/message_box.gd, scripts/ui/options_screen.gd, scripts/ui/menu_context.gd, scripts/ui/seed_prompt.gd, scripts/runtime/game_runtime.gd, scripts/runtime/stone_evolution_runtime.gd, scripts/runtime/session_state.gd, scripts/runtime/session_payload.gd, scripts/runtime/save_store.gd, scripts/runtime/camping_runtime.gd, scripts/runtime/crafting_runtime.gd, scripts/domain/encounter_selection.gd
 
@@ -65,7 +65,7 @@ Phase 5 (spec: [breeding-shinies-drops-fishing.md](breeding-shinies-drops-fishin
 
 ## Phase 6 integration note (overworld Pokémon)
 
-Phase 6 (`overworld-pokemon.md`) wires `overworld_mons_runtime` into `game_runtime.gd` (setup with NO `_rng` parameter — the derived-hash determinism guarantee is structural; the forced-battle pending seam is taken in `generate_wild_encounter` BEFORE fishing/Repel/ghosts; `note_battle_outcome` rides `_finish_battle`) and spends `smoke_scenario_runner.gd`'s ONE free line on the `scenario_uses_overworld` activation opt-out. Persistence is TRANSIENT by explicit decision: NO new save keys, NO `SAVE_VERSION` bump (v5 stays reserved for the Phase-7 `world_id` chaining; `session_state.gd` untouched at 4) — entities re-derive from `(world_seed, total_steps)` + clock; recruits/taken eggs persist via the existing party channels.
+Phase 6 (`overworld-pokemon.md`) wires `overworld_mons_runtime` into `game_runtime.gd` (setup with NO `_rng` parameter — the derived-hash determinism guarantee is structural; the forced-battle pending seam is taken in `generate_wild_encounter` BEFORE fishing/Repel/ghosts; `note_battle_outcome` rides `_finish_battle`) and spends `smoke_scenario_runner.gd`'s ONE free line on the `scenario_uses_overworld` activation opt-out (`overworld_mons`, `encounter_config`, `visual_sweep_overworld` + update, and `play_agent_loop` so the closed-loop explorer can start contact battles). Persistence is TRANSIENT by explicit decision: NO new save keys, NO `SAVE_VERSION` bump (v5 stays reserved for the Phase-7 `world_id` chaining; `session_state.gd` untouched at 4) — entities re-derive from `(world_seed, total_steps)` + clock; recruits/taken eggs persist via the existing party channels.
 
 ## Pre-Phase-7 suite expansion (co-modification note)
 

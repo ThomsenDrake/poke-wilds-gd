@@ -9,7 +9,7 @@ const UiTreeDumpWriter := preload("res://scripts/app/ui_tree_dump_writer.gd")
 const SmokeScenarioRunner := preload("res://scripts/runtime/smoke_scenario_runner.gd")
 const FILE_HELPER_PATH := "res://scripts/app/play_agent_loop_file.gd"
 const PIN := 2026080701
-const TURN_BUDGET := 40
+const TURN_BUDGET := 96
 const POLL_S := 0.05
 const IDLE_S := 45.0
 const WALL_S := 180.0
@@ -44,6 +44,7 @@ func run(ctx: Dictionary) -> void:
 	_runtime().emit_trace("play_agent_loop_started", "PlayAgentLoop", {"pin": PIN})
 	var origin := Time.get_ticks_msec()
 	var idle_at := origin
+	var quit_seen := false
 	while _turns < TURN_BUDGET and Time.get_ticks_msec() - origin < int(WALL_S * 1000.0):
 		var consumed: Dictionary = AgentStepReader.consume_command()
 		if consumed.is_empty():
@@ -55,8 +56,9 @@ func run(ctx: Dictionary) -> void:
 		idle_at = Time.get_ticks_msec()
 		await _apply(consumed)
 		if str((consumed.get("command", {}) as Dictionary).get("action", "")) == "quit":
+			quit_seen = true
 			break
-	if _turns >= TURN_BUDGET:
+	if _turns >= TURN_BUDGET and not quit_seen:
 		_failures.append("turn budget exhausted")
 	_restore()
 	_finish()
@@ -109,7 +111,7 @@ func _publish(command_id: String, action: String, payload: Dictionary, feedback)
 	AgentStepReader.write_ui_tree(ui_tree)
 	var stuck := _update_stuck(action, payload)
 	var exceptions := _failures.duplicate()
-	var observation := AgentStepReader.build_observation(command_id, _runtime(), _player(), ui_tree, exceptions, stuck, feedback, _trace_from)
+	var observation := AgentStepReader.build_observation(command_id, _runtime(), _player(), ui_tree, exceptions, stuck, feedback, _trace_from, _world())
 	if stuck or not exceptions.is_empty() or _tail_has_failed(observation.get("trace_tail", [])):
 		_runtime().emit_trace("play_agent_anomaly_observed", "PlayAgentLoop", {"command_id": command_id, "stuck": stuck})
 	AgentStepReader.write_observation(observation)
@@ -163,3 +165,4 @@ func _title() -> Control: return _ctx["title_screen"]
 func _creation() -> Control: return _ctx["creation_screen"]
 func _player() -> Node: return _ctx["player"]
 func _runtime() -> Node: return _ctx["runtime"]
+func _world() -> Node: return _ctx.get("world") as Node

@@ -30,7 +30,7 @@ TOOLS = Path(__file__).resolve().parent
 
 DEFAULT_GODOT_BIN = "/Applications/Godot.app/Contents/MacOS/Godot"
 PLAY_TIMEOUT = 180
-TURN_BUDGET = 40
+TURN_BUDGET = 96
 SCENARIO = "play_agent_loop"
 FORCE_HEADLESS_ENV = "PLAYTEST_FORCE_HEADLESS"
 LIVE_FILE_ENV = "PLAY_AGENT_LIVE_FILE"
@@ -46,8 +46,16 @@ ACTIONS = (
 )
 INPUTS = (
     "move_up", "move_down", "move_left", "move_right",
-    "action_a", "action_b", "menu",
+    "action_a", "action_b", "menu", "build_toggle",
 )
+MOVE_DELTA = {
+    "move_right": (1, 0),
+    "move_left": (-1, 0),
+    "move_down": (0, 1),
+    "move_up": (0, -1),
+}
+DIR_ORDER = ("move_right", "move_down", "move_left", "move_up")
+MIN_BATTLE_PRESSES = 8
 MESSAGE_PREFIX = "[agent-play]"
 
 
@@ -244,16 +252,236 @@ def apply_live_policy(command: dict[str, Any]) -> dict[str, Any]:
 
 
 def explorer_plan() -> list[dict[str, Any]]:
+    """Verb mix the observation-driven explorer covers (tests + docs)."""
     return [
         {"action": "boot_new_game", "payload": {}},
         {"action": "hold", "payload": {"input": "move_right"}},
-        {"action": "hold", "payload": {"input": "move_down"}},
-        {"action": "hold", "payload": {"input": "move_left"}},
-        {"action": "hold", "payload": {"input": "move_up"}},
-        {"action": "press", "payload": {"input": "menu"}},
+        {"action": "press", "payload": {"input": "action_a"}},
+        {"action": "press", "payload": {"input": "build_toggle"}},
+        {"action": "press", "payload": {"input": "action_a"}},
+        {"action": "press", "payload": {"input": "build_toggle"}},
         {"action": "observe", "payload": {}},
         {"action": "quit", "payload": {}},
     ]
+
+
+def new_explorer_state() -> dict[str, Any]:
+    return {
+        "booted": False,
+        "harvest_tries": 0,
+        "build_phase": 0,
+        "battle_presses": 0,
+        "dir": 0,
+        "last_tile": None,
+        "blocked": 0,
+        "spiral_leg": 1,
+        "spiral_left": 1,
+        "saw_harvest": False,
+        "saw_build": False,
+        "saw_battle": False,
+        "observed": False,
+        "explore_steps": 0,
+    }
+
+
+def _as_tile(value: Any) -> tuple[int, int] | None:
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        try:
+            return int(value[0]), int(value[1])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _input_toward(here: tuple[int, int], dest: tuple[int, int]) -> str | None:
+    dx = dest[0] - here[0]
+    dy = dest[1] - here[1]
+    if dx == 0 and dy == 0:
+        return None
+    if abs(dx) >= abs(dy):
+        return "move_right" if dx > 0 else "move_left"
+    return "move_down" if dy > 0 else "move_up"
+
+
+def _facing_toward(facing: Any, here: tuple[int, int], dest: tuple[int, int]) -> bool:
+    face = _as_tile(facing)
+    needed = _input_toward(here, dest)
+    if face is None or needed is None:
+        return False
+    return (face[0], face[1]) == MOVE_DELTA[needed]
+
+
+def _note_tile(state: dict[str, Any], observation: dict[str, Any]) -> tuple[int, int] | None:
+    tile = _as_tile(observation.get("tile"))
+    if tile is None:
+        return None
+    if state.get("last_tile") == tile:
+        state["blocked"] = int(state.get("blocked") or 0) + 1
+    else:
+        state["blocked"] = 0
+        state["last_tile"] = tile
+    return tile
+
+
+def _spiral_hold(state: dict[str, Any]) -> dict[str, Any]:
+    if int(state.get("blocked") or 0) >= 2:
+        state["dir"] = (int(state.get("dir") or 0) + 1) % 4
+        state["blocked"] = 0
+        state["spiral_left"] = int(state.get("spiral_leg") or 1)
+    else:
+        left = int(state.get("spiral_left") or 1) - 1
+        state["spiral_left"] = left
+        if left <= 0:
+            state["dir"] = (int(state.get("dir") or 0) + 1) % 4
+            if int(state.get("dir") or 0) % 2 == 0:
+                state["spiral_leg"] = int(state.get("spiral_leg") or 1) + 1
+            state["spiral_left"] = int(state.get("spiral_leg") or 1)
+    return {
+        "action": "hold",
+        "payload": {"input": DIR_ORDER[int(state.get("dir") or 0) % 4]},
+    }
+
+
+def _walk_or_face(
+    state: dict[str, Any],
+    here: tuple[int, int],
+    dest: tuple[int, int],
+    facing: Any,
+    arrive_action: str,
+) -> dict[str, Any]:
+    if here == dest:
+        if _facing_toward(facing, here, dest) or arrive_action != "action_a":
+            return {"action": "press", "payload": {"input": arrive_action}}
+        toward = _input_toward(here, dest)
+        if toward:
+            return {"action": "hold", "payload": {"input": toward}}
+        return {"action": "press", "payload": {"input": arrive_action}}
+    toward = _input_toward(here, dest)
+    if toward is None:
+        return _spiral_hold(state)
+    if int(state.get("blocked") or 0) >= 2:
+        return _spiral_hold(state)
+    return {"action": "hold", "payload": {"input": toward}}
+
+
+def _harvest_command(
+    state: dict[str, Any],
+    observation: dict[str, Any],
+    here: tuple[int, int],
+) -> dict[str, Any] | None:
+    if int(state.get("harvest_tries") or 0) >= 2:
+        return None
+    faced = str(observation.get("faced_action") or "")
+    if faced in {"cut", "smash", "dig"}:
+        state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
+        state["saw_harvest"] = True
+        return {"action": "press", "payload": {"input": "action_a"}}
+    target = observation.get("harvest_near")
+    if not isinstance(target, dict):
+        return None
+    stand = _as_tile(target.get("from_tile")) or _as_tile(target.get("tile"))
+    harvest_tile = _as_tile(target.get("tile"))
+    if stand is None or harvest_tile is None:
+        return None
+    if here == stand:
+        if _facing_toward(observation.get("facing"), here, harvest_tile):
+            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
+            state["saw_harvest"] = True
+            return {"action": "press", "payload": {"input": "action_a"}}
+        toward = _input_toward(here, harvest_tile)
+        if toward:
+            return {"action": "hold", "payload": {"input": toward}}
+    return _walk_or_face(state, here, stand, observation.get("facing"), "action_a")
+
+
+def _build_command(state: dict[str, Any]) -> dict[str, Any] | None:
+    phase = int(state.get("build_phase") or 0)
+    if phase >= 3:
+        return None
+    if phase == 0:
+        state["build_phase"] = 1
+        state["saw_build"] = True
+        return {"action": "press", "payload": {"input": "build_toggle"}}
+    if phase == 1:
+        state["build_phase"] = 2
+        return {"action": "press", "payload": {"input": "action_a"}}
+    state["build_phase"] = 3
+    return {"action": "press", "payload": {"input": "build_toggle"}}
+
+
+def _hunt_command(
+    state: dict[str, Any],
+    observation: dict[str, Any],
+    here: tuple[int, int],
+) -> dict[str, Any]:
+    nearby = observation.get("nearby") or []
+    best: tuple[int, int] | None = None
+    best_dist = 10**9
+    for entity in nearby:
+        if not isinstance(entity, dict):
+            continue
+        tile = _as_tile(entity.get("tile"))
+        if tile is None:
+            continue
+        dist = abs(tile[0] - here[0]) + abs(tile[1] - here[1])
+        if dist < best_dist:
+            best = tile
+            best_dist = dist
+    if best is None:
+        return _spiral_hold(state)
+    if best_dist == 0:
+        return {"action": "press", "payload": {"input": "action_a"}}
+    toward = _input_toward(here, best)
+    if toward is None or int(state.get("blocked") or 0) >= 2:
+        return _spiral_hold(state)
+    return {"action": "hold", "payload": {"input": toward}}
+
+
+def explorer_command(
+    state: dict[str, Any],
+    observation: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not state.get("booted"):
+        state["booted"] = True
+        return {"action": "boot_new_game", "payload": {}}
+    obs = observation or {}
+    screen = str(obs.get("screen") or "")
+    if screen == "battle":
+        state["saw_battle"] = True
+        state["battle_presses"] = int(state.get("battle_presses") or 0) + 1
+        return {"action": "press", "payload": {"input": "action_a"}}
+    if screen in {"menu", "party", "bag", "feedback", "camp", "storage", "waystone"}:
+        return {"action": "press", "payload": {"input": "action_b"}}
+    if (
+        state.get("saw_harvest")
+        and state.get("saw_build")
+        and state.get("saw_battle")
+        and int(state.get("battle_presses") or 0) >= MIN_BATTLE_PRESSES
+    ):
+        if not state.get("observed"):
+            state["observed"] = True
+            return {"action": "observe", "payload": {}}
+        return {"action": "quit", "payload": {}}
+    here = _note_tile(state, obs)
+    if screen != "overworld" or here is None:
+        return {"action": "observe", "payload": {}}
+    harvest = _harvest_command(state, obs, here)
+    if harvest is not None:
+        return harvest
+    if not state.get("saw_harvest") and int(state.get("harvest_tries") or 0) < 2:
+        state["explore_steps"] = int(state.get("explore_steps") or 0) + 1
+        if int(state["explore_steps"]) >= 24:
+            state["harvest_tries"] = 2
+        elif int(state["explore_steps"]) % 6 == 0:
+            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
+            state["saw_harvest"] = True
+            return {"action": "press", "payload": {"input": "action_a"}}
+        else:
+            return _spiral_hold(state)
+    build = _build_command(state)
+    if build is not None:
+        return build
+    return _hunt_command(state, obs, here)
 
 
 def turn_budget_error() -> dict[str, str | bool]:
@@ -329,17 +557,17 @@ def _planner_command(observation: dict[str, Any], cmd: str) -> dict[str, Any] | 
 def _next_command(
     turn: int,
     observation: dict[str, Any] | None,
-    explorer_i: int,
+    state: dict[str, Any],
     file_once: bool,
     novelty: dict[str, Any] | None,
     turn_budget: int = TURN_BUDGET,
-) -> tuple[dict[str, Any], int, bool]:
+) -> tuple[dict[str, Any], dict[str, Any], bool]:
     planner = os.environ.get(PLANNER_CMD_ENV, "").strip()
     if planner and observation is not None:
         planned = _planner_command(observation, planner)
         if planned:
             planned.setdefault("id", f"t{turn}")
-            return apply_live_policy(planned), explorer_i, file_once
+            return apply_live_policy(planned), state, file_once
     if (
         novelty
         and novelty.get("anomaly")
@@ -355,13 +583,12 @@ def _next_command(
                 "live": live_file_enabled() and bool(novelty.get("live_fileable")),
             },
         }
-        return apply_live_policy(command), explorer_i, True
+        return apply_live_policy(command), state, True
     if turn >= turn_budget:
-        return apply_live_policy({"id": f"t{turn}", "action": "quit", "payload": {}}), explorer_i, file_once
-    plan = explorer_plan()
-    step = plan[min(explorer_i, len(plan) - 1)]
+        return apply_live_policy({"id": f"t{turn}", "action": "quit", "payload": {}}), state, file_once
+    step = explorer_command(state, observation)
     command = {"id": f"t{turn}", "action": step["action"], "payload": dict(step.get("payload") or {})}
-    return apply_live_policy(command), explorer_i + 1, file_once
+    return apply_live_policy(command), state, file_once
 
 
 def _wait_observation(path: Path, command_id: str, proc: subprocess.Popen, deadline: float) -> dict[str, Any] | None:
@@ -417,7 +644,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     issue_number = 0
     errors: list[dict[str, Any]] = []
     session_sigs: list[str] = []
-    explorer_i = 0
+    explorer_state = new_explorer_state()
     file_once = False
     observation: dict[str, Any] | None = None
     sent_quit = False
@@ -452,8 +679,8 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         novelty: dict[str, Any] | None = None
         while turns < turn_budget and time.monotonic() < deadline:
             drain()
-            command, explorer_i, file_once = _next_command(
-                turns + 1, observation, explorer_i, file_once, novelty, turn_budget,
+            command, explorer_state, file_once = _next_command(
+                turns + 1, observation, explorer_state, file_once, novelty, turn_budget,
             )
             if command["action"] == "file_feedback" and novelty and not novelty.get("novel"):
                 skipped_duplicate += 1

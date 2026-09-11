@@ -1,5 +1,5 @@
 Status: current
-Last verified: 2026-09-10
+Last verified: 2026-09-11
 Review cadence days: 14
 Source paths: .github/workflows/feedback-relay-deploy.yml, .github/workflows/playtest-release.yml, .github/workflows/public-release.yml, .github/workflows/enqueue-playtest-feedback.yml, tools/setup_worktree.py, tools/test_setup_worktree.py, tools/setup_codex_cloud.sh, tools/test_setup_codex_cloud.py, tools/run_codex_cloud_visuals.sh, tools/test_run_codex_cloud_visuals.py, tools/probe_command_code.py, tools/test_probe_command_code.py, tools/ensure_cloud_display.sh, tools/test_ensure_cloud_display.py, tools/vlm_reviewer.py, tools/test_vlm_reviewer_command_code.py, tools/test_feedback_bundle.py, tools/publish_update.py, tools/test_publish_update.py, tools/update_manifest.py, tools/update_apply.py, tools/feedback_endpoint.py, tools/fetch_feedback_report.py, tools/inspect_feedback_bundle.py, tools/check_repo_contracts.py, tools/legibility_lib.py, tools/check_architecture.py, tools/check_quality_docs.py, tools/check_change_contract.py, tools/verify_all.py, tools/run_playtests.py, tools/godot_dap_smoketest.py, tools/play_agent_loop.py, tools/play_agent_findings.py, tools/test_play_agent_loop.py, tools/test_play_agent_findings.py, tools/test_agent_step_contract.py, docs/references/agent-step-bridge.md, tools/cloud_env.py, tools/determinism_verify.py, tools/visual_region_diff.py, tools/visual_explain.py, tools/contrast_check.py, tools/cvd_sim.py, tools/vision_review.py, tools/art_geometry.py, tools/generate_legibility_report.py, tools/png_canvas.py, tools/graduation_ledger.py, tools/vision_metrics.py, docs/registry/art-anchors.toml, docs/registry/agent-surface.toml, docs/references/miss-postmortem-protocol.md, docs/references/agent-integration.md, docs/generated/miss-postmortems.json, LICENSING.md, THIRD_PARTY.md
 
@@ -113,7 +113,7 @@ python3 tools/verify_all.py [--skip-windowed] [--timeout N] [--windowed-timeout 
 | `--fail-fast` | Abort at the first nonzero step (default is run-all). |
 | `--quiet` | Suppress echoing each tool's stdout; still print the per-step status line + timing, and on failure the captured output tail. |
 | `--with-play-agent` | Opt-in S8.5 one-shot windowed play agent. Default off. SKIP under `--skip-windowed`. |
-| `--with-play-agent-loop` | Opt-in S8.6 closed-loop play agent (file bridge + novelty + optional F). Default off. SKIP under `--skip-windowed`. Windowed runs also write `.godot-smoke/play_agent_loop.mp4` unless `PLAY_AGENT_RECORD_VIDEO=0`. |
+| `--with-play-agent-loop` | Opt-in S8.6 closed-loop play agent (file bridge + novelty + optional F). Default explorer is observation-driven (harvest, build, contact battle; 96-turn budget). Default off. SKIP under `--skip-windowed`. Windowed runs also write `.godot-smoke/play_agent_loop.mp4` unless `PLAY_AGENT_RECORD_VIDEO=0`. |
 
 ### Steps (what each proves)
 

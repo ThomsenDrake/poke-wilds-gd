@@ -1488,7 +1488,8 @@ quality_bucket = "overworld_mons"
 #     wall: the overworld_attack_hook / overworld_charm_hook public vars get registered by the
 #     entity runtime and called post-trace; zero added lines. Owned by field_moves.
 #   scripts/runtime/smoke_scenario_runner.gd:18 — the ONE activation opt-out line:
-#     scenario_uses_overworld() = {overworld_mons, visual_sweep_overworld(+update)}; every
+#     scenario_uses_overworld() = {overworld_mons, encounter_config,
+#     visual_sweep_overworld(+update), play_agent_loop}; every
 #     other scenario runs entities INERT, so the 26 committed baselines stay byte-identical.
 #     Owned by app_bootstrap.
 #   scripts/app/world_consistency_audit.gd:18,42-48,53 — the clears/mutation lane EXTRACTED
