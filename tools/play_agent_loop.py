@@ -55,7 +55,8 @@ MOVE_DELTA = {
     "move_up": (0, -1),
 }
 DIR_ORDER = ("move_right", "move_down", "move_left", "move_up")
-MIN_BATTLE_PRESSES = 8
+MIN_BATTLE_PRESSES = 12
+HARVEST_BUMP = ("cut", "smash")
 MESSAGE_PREFIX = "[agent-play]"
 
 
@@ -281,6 +282,8 @@ def new_explorer_state() -> dict[str, Any]:
         "saw_battle": False,
         "observed": False,
         "explore_steps": 0,
+        "last_input": "",
+        "blocked_dirs": [],
     }
 
 
@@ -315,16 +318,50 @@ def _note_tile(state: dict[str, Any], observation: dict[str, Any]) -> tuple[int,
     tile = _as_tile(observation.get("tile"))
     if tile is None:
         return None
+    last_input = str(state.get("last_input") or "")
     if state.get("last_tile") == tile:
         state["blocked"] = int(state.get("blocked") or 0) + 1
+        blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
+        if last_input and last_input not in blocked:
+            blocked.append(last_input)
+        state["blocked_dirs"] = blocked
     else:
         state["blocked"] = 0
+        state["blocked_dirs"] = []
         state["last_tile"] = tile
     return tile
 
 
+def _hold(state: dict[str, Any], input_name: str) -> dict[str, Any]:
+    state["last_input"] = input_name
+    return {"action": "hold", "payload": {"input": input_name}}
+
+
+def _press(input_name: str) -> dict[str, Any]:
+    return {"action": "press", "payload": {"input": input_name}}
+
+
+def _dir_options(here: tuple[int, int], dest: tuple[int, int], blocked: list[str]) -> list[str]:
+    toward = _input_toward(here, dest)
+    opts: list[str] = []
+    if toward:
+        opts.append(toward)
+    dx = dest[0] - here[0]
+    dy = dest[1] - here[1]
+    if dx and ("move_right" if dx > 0 else "move_left") not in opts:
+        opts.append("move_right" if dx > 0 else "move_left")
+    if dy and ("move_down" if dy > 0 else "move_up") not in opts:
+        opts.append("move_down" if dy > 0 else "move_up")
+    for item in DIR_ORDER:
+        if item not in opts:
+            opts.append(item)
+    open_dirs = [item for item in opts if item not in blocked]
+    return open_dirs or list(DIR_ORDER)
+
+
 def _spiral_hold(state: dict[str, Any]) -> dict[str, Any]:
-    if int(state.get("blocked") or 0) >= 2:
+    blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
+    if int(state.get("blocked") or 0) >= 1:
         state["dir"] = (int(state.get("dir") or 0) + 1) % 4
         state["blocked"] = 0
         state["spiral_left"] = int(state.get("spiral_leg") or 1)
@@ -336,32 +373,44 @@ def _spiral_hold(state: dict[str, Any]) -> dict[str, Any]:
             if int(state.get("dir") or 0) % 2 == 0:
                 state["spiral_leg"] = int(state.get("spiral_leg") or 1) + 1
             state["spiral_left"] = int(state.get("spiral_leg") or 1)
-    return {
-        "action": "hold",
-        "payload": {"input": DIR_ORDER[int(state.get("dir") or 0) % 4]},
-    }
+    chosen = DIR_ORDER[int(state.get("dir") or 0) % 4]
+    if chosen in blocked:
+        for item in DIR_ORDER:
+            if item not in blocked:
+                chosen = item
+                break
+    return _hold(state, chosen)
 
 
-def _walk_or_face(
+def _approach(
     state: dict[str, Any],
     here: tuple[int, int],
     dest: tuple[int, int],
-    facing: Any,
-    arrive_action: str,
+    observation: dict[str, Any],
 ) -> dict[str, Any]:
+    faced = str(observation.get("faced_action") or "")
     if here == dest:
-        if _facing_toward(facing, here, dest) or arrive_action != "action_a":
-            return {"action": "press", "payload": {"input": arrive_action}}
-        toward = _input_toward(here, dest)
-        if toward:
-            return {"action": "hold", "payload": {"input": toward}}
-        return {"action": "press", "payload": {"input": arrive_action}}
-    toward = _input_toward(here, dest)
-    if toward is None:
-        return _spiral_hold(state)
-    if int(state.get("blocked") or 0) >= 2:
-        return _spiral_hold(state)
-    return {"action": "hold", "payload": {"input": toward}}
+        return _press("action_a")
+    blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
+    if faced in HARVEST_BUMP:
+        if int(state.get("harvest_tries") or 0) < 2:
+            state["saw_harvest"] = True
+            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
+            return _press("action_a")
+        last = str(state.get("last_input") or "")
+        if last and last not in blocked:
+            blocked.append(last)
+            state["blocked_dirs"] = blocked
+    return _hold(state, _dir_options(here, dest, blocked)[0])
+
+
+def _cut_target(observation: dict[str, Any]) -> dict[str, Any] | None:
+    target = observation.get("harvest_near")
+    if not isinstance(target, dict):
+        return None
+    if str(target.get("action") or "") not in HARVEST_BUMP:
+        return None
+    return target
 
 
 def _harvest_command(
@@ -372,26 +421,29 @@ def _harvest_command(
     if int(state.get("harvest_tries") or 0) >= 2:
         return None
     faced = str(observation.get("faced_action") or "")
-    if faced in {"cut", "smash", "dig"}:
+    if faced in HARVEST_BUMP:
         state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
         state["saw_harvest"] = True
-        return {"action": "press", "payload": {"input": "action_a"}}
-    target = observation.get("harvest_near")
-    if not isinstance(target, dict):
+        return _press("action_a")
+    target = _cut_target(observation)
+    if target is None:
         return None
     stand = _as_tile(target.get("from_tile")) or _as_tile(target.get("tile"))
     harvest_tile = _as_tile(target.get("tile"))
     if stand is None or harvest_tile is None:
         return None
     if here == stand:
-        if _facing_toward(observation.get("facing"), here, harvest_tile):
+        if _facing_toward(observation.get("facing"), here, harvest_tile) or faced in HARVEST_BUMP:
             state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
             state["saw_harvest"] = True
-            return {"action": "press", "payload": {"input": "action_a"}}
+            return _press("action_a")
         toward = _input_toward(here, harvest_tile)
         if toward:
-            return {"action": "hold", "payload": {"input": toward}}
-    return _walk_or_face(state, here, stand, observation.get("facing"), "action_a")
+            return _hold(state, toward)
+    if int(state.get("blocked") or 0) >= 3:
+        state["harvest_tries"] = 2
+        return None
+    return _approach(state, here, stand, observation)
 
 
 def _build_command(state: dict[str, Any]) -> dict[str, Any] | None:
@@ -401,23 +453,18 @@ def _build_command(state: dict[str, Any]) -> dict[str, Any] | None:
     if phase == 0:
         state["build_phase"] = 1
         state["saw_build"] = True
-        return {"action": "press", "payload": {"input": "build_toggle"}}
+        return _press("build_toggle")
     if phase == 1:
         state["build_phase"] = 2
-        return {"action": "press", "payload": {"input": "action_a"}}
+        return _press("action_a")
     state["build_phase"] = 3
-    return {"action": "press", "payload": {"input": "build_toggle"}}
+    return _press("build_toggle")
 
 
-def _hunt_command(
-    state: dict[str, Any],
-    observation: dict[str, Any],
-    here: tuple[int, int],
-) -> dict[str, Any]:
-    nearby = observation.get("nearby") or []
+def _closest_mon(observation: dict[str, Any], here: tuple[int, int]) -> tuple[int, int] | None:
     best: tuple[int, int] | None = None
     best_dist = 10**9
-    for entity in nearby:
+    for entity in observation.get("nearby") or []:
         if not isinstance(entity, dict):
             continue
         tile = _as_tile(entity.get("tile"))
@@ -427,14 +474,20 @@ def _hunt_command(
         if dist < best_dist:
             best = tile
             best_dist = dist
+    return best
+
+
+def _hunt_command(
+    state: dict[str, Any],
+    observation: dict[str, Any],
+    here: tuple[int, int],
+) -> dict[str, Any]:
+    best = _closest_mon(observation, here)
     if best is None:
         return _spiral_hold(state)
-    if best_dist == 0:
-        return {"action": "press", "payload": {"input": "action_a"}}
-    toward = _input_toward(here, best)
-    if toward is None or int(state.get("blocked") or 0) >= 2:
-        return _spiral_hold(state)
-    return {"action": "hold", "payload": {"input": toward}}
+    if best == here:
+        return _press("action_a")
+    return _approach(state, here, best, observation)
 
 
 def explorer_command(
@@ -449,9 +502,9 @@ def explorer_command(
     if screen == "battle":
         state["saw_battle"] = True
         state["battle_presses"] = int(state.get("battle_presses") or 0) + 1
-        return {"action": "press", "payload": {"input": "action_a"}}
+        return _press("action_a")
     if screen in {"menu", "party", "bag", "feedback", "camp", "storage", "waystone"}:
-        return {"action": "press", "payload": {"input": "action_b"}}
+        return _press("action_b")
     if (
         state.get("saw_harvest")
         and state.get("saw_build")
@@ -468,16 +521,6 @@ def explorer_command(
     harvest = _harvest_command(state, obs, here)
     if harvest is not None:
         return harvest
-    if not state.get("saw_harvest") and int(state.get("harvest_tries") or 0) < 2:
-        state["explore_steps"] = int(state.get("explore_steps") or 0) + 1
-        if int(state["explore_steps"]) >= 24:
-            state["harvest_tries"] = 2
-        elif int(state["explore_steps"]) % 6 == 0:
-            state["harvest_tries"] = int(state.get("harvest_tries") or 0) + 1
-            state["saw_harvest"] = True
-            return {"action": "press", "payload": {"input": "action_a"}}
-        else:
-            return _spiral_hold(state)
     build = _build_command(state)
     if build is not None:
         return build

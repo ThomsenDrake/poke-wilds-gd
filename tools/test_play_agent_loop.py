@@ -137,6 +137,19 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertEqual(command["action"], "hold")
         self.assertEqual(command["payload"]["input"], "move_right")
 
+    def test_explorer_ignores_faced_dig(self) -> None:
+        state = pal.new_explorer_state()
+        state["booted"] = True
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [3, 4],
+            "facing": [1, 0],
+            "faced_action": "dig",
+            "harvest_near": {"action": "dig", "tile": [4, 4], "from_tile": [3, 4]},
+            "nearby": [],
+        })
+        self.assertEqual(command["payload"]["input"], "build_toggle")
+
     def test_explorer_builds_after_harvest(self) -> None:
         state = pal.new_explorer_state()
         state["booted"] = True
@@ -147,6 +160,23 @@ class PlayAgentLoopTests(unittest.TestCase):
         })
         self.assertEqual(command["payload"]["input"], "build_toggle")
         self.assertTrue(state["saw_build"])
+
+    def test_explorer_sidesteps_blocked_tree(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": True, "harvest_tries": 2,
+            "build_phase": 3, "saw_build": True, "last_tile": (3, 4),
+            "last_input": "move_down", "blocked_dirs": ["move_down"],
+        })
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [3, 4],
+            "facing": [0, 1],
+            "faced_action": "cut",
+            "nearby": [{"tile": [3, 7], "species_id": "PIDGEY", "kind": "roamer"}],
+        })
+        self.assertEqual(command["action"], "hold")
+        self.assertNotEqual(command["payload"]["input"], "move_down")
 
     def test_explorer_fights_in_battle(self) -> None:
         state = pal.new_explorer_state()
