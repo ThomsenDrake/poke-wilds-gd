@@ -26,5 +26,5 @@
   "world_seed": 2026080702,
   "replayed": false,
   "source": "",
-  "coverage": {"screens": ["overworld"], "verbs": ["boot_new_game"]}
+  "coverage": {"screens": ["overworld"], "verbs": ["boot_new_game"], "biomes": []}
 }

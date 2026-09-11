@@ -3,8 +3,9 @@
 
 Launches windowed Godot with scenario play_agent_loop, publishes one
 command per turn, reads one observation, and writes play_agent_loop.json.
-Live F filing requires PLAY_AGENT_LIVE_FILE=1. Headless / FORCE_HEADLESS
-writes a skip envelope and exits 0.
+Live F filing defaults on unless PLAY_AGENT_LIVE_FILE is 0/false/no/off
+or CI / GITHUB_ACTIONS is set. Headless / FORCE_HEADLESS writes a skip
+envelope and exits 0. VLM-only findings never live-file.
 
 Stdlib-only. Reuses godot_dap_smoketest / run_playtests via importlib.
 """
@@ -58,7 +59,9 @@ MOVE_DELTA = {
 }
 DIR_ORDER = ("move_right", "move_down", "move_left", "move_up")
 MIN_BATTLE_PRESSES = 12
-HARVEST_BUMP = ("cut", "smash")
+HARVEST_BUMP = ("cut", "smash", "dig")
+OVERLAY_SCREENS = ("menu", "party", "bag", "camp", "storage", "waystone")
+ANOMALY_PNG_NAME = "play_agent_anomaly.png"
 MESSAGE_PREFIX = "[agent-play]"
 
 
@@ -87,8 +90,20 @@ def skip_reason() -> str:
     )
 
 
+def _env_truthy(name: str) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return False
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def live_file_enabled() -> bool:
-    return os.environ.get(LIVE_FILE_ENV, "").lower() in ("1", "true", "yes", "on")
+    if _env_truthy("GITHUB_ACTIONS") or _env_truthy("CI"):
+        return False
+    raw = os.environ.get(LIVE_FILE_ENV)
+    if raw is None or raw.strip() == "":
+        return True
+    return raw.strip().lower() not in ("0", "false", "no", "off")
 
 
 def skip_report(reason: str) -> dict[str, Any]:
@@ -119,7 +134,7 @@ def session_report(**overrides: Any) -> dict[str, Any]:
         "world_seed": 0,
         "replayed": False,
         "source": "",
-        "coverage": {"screens": [], "verbs": []},
+        "coverage": {"screens": [], "verbs": [], "biomes": []},
     }
     report.update(overrides)
     return report
@@ -243,11 +258,39 @@ def video_report_fields(project: Path, recorder: subprocess.Popen | None,
     return {"video": "", "video_bytes": 0, "video_reason": reason or "recorder_empty"}
 
 
+def capture_display_png(out: Path) -> str:
+    ffmpeg = ffmpeg_path()
+    if not ffmpeg:
+        return "ffmpeg_missing"
+    display = os.environ.get("DISPLAY", "")
+    if not (sys.platform.startswith("linux") and display):
+        return "no_capture_source"
+    width, height = _x11_size()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    argv = [
+        ffmpeg, "-y", "-hide_banner", "-loglevel", "error",
+        "-f", "x11grab", "-draw_mouse", "0",
+        "-video_size", f"{width}x{height}", "-frames:v", "1",
+        "-i", display, str(out),
+    ]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=8)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"png_capture_failed:{exc}"
+    if proc.returncode != 0 or not out.is_file() or out.stat().st_size <= 0:
+        err = (proc.stderr or proc.stdout or "png_capture_failed").strip()
+        return err[:200] or "png_capture_failed"
+    return ""
+
+
 def apply_live_policy(command: dict[str, Any]) -> dict[str, Any]:
     out = json.loads(json.dumps(command))
     if out.get("action") == "file_feedback":
         payload = dict(out.get("payload") or {})
-        payload["live"] = bool(payload.get("live")) and live_file_enabled()
+        want = payload.get("live")
+        if want is None:
+            want = True
+        payload["live"] = bool(want) and live_file_enabled()
         out["payload"] = payload
     return out
 
@@ -261,8 +304,11 @@ def explorer_plan() -> list[dict[str, Any]]:
         {"action": "press", "payload": {"input": "build_toggle"}},
         {"action": "press", "payload": {"input": "action_a"}},
         {"action": "press", "payload": {"input": "build_toggle"}},
+        {"action": "press", "payload": {"input": "menu"}},
+        {"action": "press", "payload": {"input": "move_down"}},
+        {"action": "press", "payload": {"input": "action_a"}},
+        {"action": "press", "payload": {"input": "action_b"}},
         {"action": "observe", "payload": {}},
-        {"action": "quit", "payload": {}},
     ]
 
 
@@ -284,6 +330,13 @@ def new_explorer_state() -> dict[str, Any]:
         "explore_steps": 0,
         "last_input": "",
         "blocked_dirs": [],
+        "opened_menu": False,
+        "overlay_linger": 0,
+        "in_battle": False,
+        "capture_phase": 0,
+        "capture_done": False,
+        "saw_menu": False,
+        "saw_capture": False,
     }
 
 
@@ -501,20 +554,61 @@ def explorer_command(
     screen = str(obs.get("screen") or "")
     if screen == "battle":
         state["saw_battle"] = True
+        if not state.get("in_battle"):
+            state["in_battle"] = True
+            state["capture_phase"] = 0
+            state["capture_done"] = False
         state["battle_presses"] = int(state.get("battle_presses") or 0) + 1
+        cap = int(state.get("capture_phase") or 0)
+        if cap > 0:
+            state["capture_phase"] = cap + 1
+            if cap == 1:
+                return _press("move_down")
+            if cap == 2:
+                return _press("action_a")
+            if cap == 3:
+                state["saw_capture"] = True
+                return _press("action_a")
+            state["capture_phase"] = 0
+            state["capture_done"] = True
+            return _press("action_a")
+        if int(state.get("battle_presses") or 0) == 4 and not state.get("capture_done"):
+            state["capture_phase"] = 1
+            return _press("action_b")
         return _press("action_a")
-    if screen in {"menu", "party", "bag", "feedback", "camp", "storage", "waystone"}:
+    state["in_battle"] = False
+    state["capture_phase"] = 0
+    if screen == "feedback":
         return _press("action_b")
+    if screen in OVERLAY_SCREENS:
+        state["saw_menu"] = True
+        linger = int(state.get("overlay_linger") or 0)
+        state["overlay_linger"] = linger + 1
+        if linger % 3 == 0:
+            return _press("move_down")
+        if linger % 3 == 1:
+            return _press("action_a")
+        return _press("action_b")
+    state["overlay_linger"] = 0
     if (
         state.get("saw_harvest")
         and state.get("saw_build")
         and state.get("saw_battle")
         and int(state.get("battle_presses") or 0) >= MIN_BATTLE_PRESSES
+        and not state.get("opened_menu")
+        and screen in {"overworld", "indoor"}
     ):
-        if not state.get("observed"):
-            state["observed"] = True
-            return {"action": "observe", "payload": {}}
-        return {"action": "quit", "payload": {}}
+        state["opened_menu"] = True
+        return _press("menu")
+    if (
+        state.get("saw_harvest")
+        and state.get("saw_build")
+        and state.get("saw_battle")
+        and int(state.get("battle_presses") or 0) >= MIN_BATTLE_PRESSES
+        and not state.get("observed")
+    ):
+        state["observed"] = True
+        return {"action": "observe", "payload": {}}
     here = _note_tile(state, obs)
     if screen != "overworld" or here is None:
         return {"action": "observe", "payload": {}}
@@ -559,7 +653,17 @@ def _findings():
     return _load_module("play_agent_findings", path)
 
 
-def _evaluate_novelty(observation: dict[str, Any], session: list[str], prior: list[Any]) -> dict[str, Any]:
+def _evaluate_novelty(
+    observation: dict[str, Any],
+    session: list[str],
+    prior: list[Any],
+    *,
+    previous: dict[str, Any] | None = None,
+    last_command: dict[str, Any] | None = None,
+    oracle_session: dict[str, Any] | None = None,
+    github_issues: list[Any] | None = None,
+    vision_review: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     findings = _findings()
     if findings is None:
         anomalies = bool(observation.get("exceptions") or observation.get("stuck"))
@@ -571,13 +675,18 @@ def _evaluate_novelty(observation: dict[str, Any], session: list[str], prior: li
             "reason": "novelty_helper_missing",
             "anomalies": [],
         }
-    return findings.evaluate_novelty(observation, session, prior)
+    return findings.evaluate_novelty(
+        observation, session, prior, github_issues,
+        previous=previous, last_command=last_command,
+        session=oracle_session, vision_review=vision_review,
+    )
 
 
 def _file_message(
     observation: dict[str, Any],
     transcript: list[dict[str, Any]] | None = None,
     signature_text: str = "",
+    anomalies: list[str] | None = None,
 ) -> str:
     findings = _findings()
     if findings is None:
@@ -589,7 +698,9 @@ def _file_message(
         if exceptions:
             extra = str(exceptions[0])[:80]
         return f"{MESSAGE_PREFIX} {extra} on {screen} tile {tile_s}".strip()[:1000]
-    return findings.file_message(observation, transcript, signature_text)
+    return findings.file_message(
+        observation, transcript, signature_text, anomalies=anomalies,
+    )
 
 
 def prior_path_for(project: Path) -> Path:
@@ -654,8 +765,8 @@ def _next_command(
         novelty
         and novelty.get("anomaly")
         and novelty.get("novel")
+        and novelty.get("live_fileable")
         and not file_once
-        and (novelty.get("live_fileable") or not live_file_enabled())
     ):
         command = {
             "id": f"t{turn}",
@@ -665,6 +776,7 @@ def _next_command(
                     observation or {},
                     transcript,
                     str((novelty or {}).get("signature") or ""),
+                    list((novelty or {}).get("anomalies") or []),
                 ),
                 "live": live_file_enabled() and bool(novelty.get("live_fileable")),
             },
@@ -717,6 +829,7 @@ def _note_finding(
     transcript: list[dict[str, Any]],
     video: str,
     findings_out: list[dict[str, Any]],
+    vision_review: dict[str, Any] | None = None,
 ) -> None:
     helper = _findings()
     if helper is None:
@@ -728,6 +841,7 @@ def _note_finding(
         anomalies=list(novelty.get("anomalies") or []),
         video=video,
         report=str(Path(".godot-smoke") / REPORT_NAME),
+        vision_review=vision_review,
     )
     helper.write_finding_pack(findings_dir_for(project), pack)
     findings_out.append(pack)
@@ -763,6 +877,12 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
     transcript: list[dict[str, Any]] = []
     findings_out: list[dict[str, Any]] = []
     helper = _findings()
+    github_issues: list[Any] = []
+    if helper is not None and live_file_enabled() and replay_commands is None:
+        github_issues = helper.search_open_issues()
+    oracle_session: dict[str, Any] = {"battle_streak": 0}
+    previous: dict[str, Any] | None = None
+    biomes: list[str] = []
     try:
         recorder, video_reason = start_recorder(video_path_for(project))
         env = os.environ.copy()
@@ -812,7 +932,22 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                 break
             if helper is not None:
                 transcript.append(helper.compact_turn(command, observation))
-            novelty = _evaluate_novelty(observation, session_sigs, prior_findings)
+                biomes = helper.merge_biomes(biomes, observation)
+            vision_review = None
+            novelty = _evaluate_novelty(
+                observation, session_sigs, prior_findings,
+                previous=previous, last_command=command,
+                oracle_session=oracle_session, github_issues=github_issues,
+            )
+            if novelty.get("anomaly") and novelty.get("live_fileable") and helper is not None:
+                png_path = project / ".godot-smoke" / ANOMALY_PNG_NAME
+                capture_err = capture_display_png(png_path)
+                png = png_path if not capture_err and png_path.is_file() else None
+                vision_review = helper.maybe_review_anomaly_frame(png)
+                for item in helper.vision_finding_ids(vision_review):
+                    if item not in novelty["anomalies"]:
+                        novelty["anomalies"].append(item)
+            previous = observation
             if novelty.get("anomaly"):
                 anomalies += 1
                 session_sigs.append(str(novelty.get("signature") or ""))
@@ -822,7 +957,7 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
                         expected_video = ""
                     _note_finding(
                         project, observation, novelty, transcript,
-                        expected_video, findings_out,
+                        expected_video, findings_out, vision_review,
                     )
                 else:
                     skipped_duplicate += 1
@@ -883,7 +1018,10 @@ def _drive(project: Path, godot_bin: str, timeout: float, prior_findings: list[A
         if video_fields.get("video"):
             for pack in findings_out:
                 pack["video"] = video_fields["video"]
-    coverage = helper.coverage_from_turns(transcript) if helper is not None else {"screens": [], "verbs": []}
+    coverage = (
+        helper.coverage_from_turns(transcript, biomes)
+        if helper is not None else {"screens": [], "verbs": [], "biomes": []}
+    )
     seed = helper.world_seed_of(observation) if helper is not None else 0
     return session_report(
         ok=not failed,

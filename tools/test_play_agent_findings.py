@@ -85,6 +85,18 @@ class PlayAgentFindingsTests(unittest.TestCase):
         self.assertFalse(verdict["live_fileable"])
         self.assertFalse(verdict["anomaly"])
 
+    def test_vision_review_is_quarantine_not_live_fileable(self) -> None:
+        obs = _obs()
+        verdict = evaluate_novelty(
+            obs,
+            vision_review={"findings": ["blur"], "quarantine": True, "source": "vlm"},
+        )
+        self.assertTrue(verdict["anomaly"])
+        self.assertFalse(verdict["novel"])
+        self.assertFalse(verdict["live_fileable"])
+        self.assertEqual(verdict["reason"], "quarantine_only")
+        self.assertTrue(any(item.startswith("vision:") for item in verdict["anomalies"]))
+
     def test_github_issue_duplicate(self) -> None:
         obs = _obs(exceptions=["NullRef"])
         issues = ["[agent-play] overworld NullRef already filed"]
@@ -112,6 +124,9 @@ class PlayAgentFindingsTests(unittest.TestCase):
         coverage = coverage_from_turns([turn, {"action": "press", "payload": {"input": "action_a"}, "screen": "battle"}])
         self.assertEqual(coverage["screens"], ["overworld", "battle"])
         self.assertIn("hold:move_right", coverage["verbs"])
+        self.assertEqual(coverage["biomes"], [])
+        with_biome = coverage_from_turns([turn], biomes=["forest"])
+        self.assertEqual(with_biome["biomes"], ["forest"])
 
     def test_finding_pack_round_trip_and_replay(self) -> None:
         from play_agent_findings import (
@@ -169,7 +184,147 @@ class PlayAgentFindingsTests(unittest.TestCase):
         self.assertLessEqual(len(message), MESSAGE_MAX)
         self.assertIn("seed 2026080702", message)
         self.assertIn("boot_new_game", message)
+        self.assertIn("replay:", message)
+        self.assertIn("python3 tools/play_agent_loop.py --replay .godot-smoke/play_agent_findings/", message)
         self.assertNotIn("/home/", message)
+
+
+    def test_screen_disagree(self) -> None:
+        from play_agent_findings import detect_anomalies
+        obs = _obs()
+        obs["ui_tree"] = dict(obs["ui_tree"])
+        obs["ui_tree"]["screen"] = "battle"
+        found = detect_anomalies(obs)
+        self.assertTrue(any(item.startswith("screen_disagree:") for item in found))
+        looped = _obs()
+        looped["ui_tree"] = dict(looped["ui_tree"])
+        looped["ui_tree"]["screen"] = "loop"
+        self.assertEqual(detect_anomalies(looped), [])
+
+    def test_party_wiped_outside_wipe_confirm(self) -> None:
+        from play_agent_findings import detect_anomalies
+        obs = _obs()
+        obs["monitors"] = dict(obs["monitors"])
+        obs["monitors"]["game/party_size"] = 0
+        self.assertIn("party_wiped", detect_anomalies(obs))
+        title = _obs(screen="title")
+        title["monitors"] = dict(title["monitors"])
+        title["monitors"]["game/party_size"] = 0
+        title["ui_tree"] = dict(title["ui_tree"])
+        title["ui_tree"]["screen"] = "title"
+        title["monitors"]["game/current_screen"] = "title"
+        self.assertNotIn("party_wiped", detect_anomalies(title))
+        wipe = _obs()
+        wipe["monitors"] = dict(wipe["monitors"])
+        wipe["monitors"]["game/party_size"] = 0
+        wipe["trace_tail"] = [{"event": "title_new_game_chosen", "payload": {}}]
+        self.assertNotIn("party_wiped", detect_anomalies(wipe))
+
+    def test_catch_uncommitted_and_box_full_quiet(self) -> None:
+        from play_agent_findings import detect_anomalies
+        previous = _obs()
+        caught = _obs()
+        caught["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "battle_finished", "ts_msec": 9, "payload": {"outcome": "caught"}},
+        ]
+        self.assertIn("catch_uncommitted", detect_anomalies(caught, previous=previous))
+        full = _obs()
+        full["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "battle_finished", "ts_msec": 9, "payload": {"outcome": "caught_box_full"}},
+        ]
+        self.assertNotIn("catch_uncommitted", detect_anomalies(full, previous=previous))
+        grew = _obs()
+        grew["monitors"] = dict(grew["monitors"])
+        grew["monitors"]["game/party_size"] = 2
+        grew["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "battle_finished", "ts_msec": 9, "payload": {"outcome": "caught"}},
+        ]
+        self.assertNotIn("catch_uncommitted", detect_anomalies(grew, previous=previous))
+
+    def test_despawn_uncommitted(self) -> None:
+        from play_agent_findings import detect_anomalies
+        previous = _obs()
+        obs = _obs()
+        obs["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "overworld_mon_despawned", "ts_msec": 9,
+             "payload": {"species_id": "PIDGEY", "tile": [5, 4], "reason": "ko"}},
+        ]
+        self.assertTrue(any(item.startswith("despawn_uncommitted:") for item in detect_anomalies(obs, previous=previous)))
+
+    def test_injection_failed_not_generic_exception(self) -> None:
+        from play_agent_findings import detect_anomalies
+        obs = _obs(exceptions=["injection: no key event is bound to move_right"])
+        found = detect_anomalies(obs)
+        self.assertTrue(any(item.startswith("injection_failed:") for item in found))
+        self.assertFalse(any(item.startswith("exception:") for item in found))
+
+    def test_input_swallowed_and_empty_tile_quiet(self) -> None:
+        from play_agent_findings import detect_anomalies
+        previous = _obs()
+        after = _obs()
+        after["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {"action": "press"}},
+        ]
+        command = {"action": "press", "payload": {"input": "action_a"}}
+        found = detect_anomalies(after, previous=previous, last_command=command)
+        self.assertIn("input_swallowed:action_a", found)
+        empty_prev = _obs(faced_action="")
+        empty_prev["harvest_near"] = None
+        empty = _obs(faced_action="")
+        empty["harvest_near"] = None
+        empty["trace_tail"] = list(empty_prev["trace_tail"]) + [
+            {"event": "play_agent_step_applied", "ts_msec": 9, "payload": {}},
+        ]
+        self.assertNotIn(
+            "input_swallowed:action_a",
+            detect_anomalies(empty, previous=empty_prev, last_command=command),
+        )
+
+    def test_world_unchanged_after_field_move(self) -> None:
+        from play_agent_findings import detect_anomalies
+        previous = _obs()
+        stuck = _obs()
+        stuck["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "field_move_used", "ts_msec": 9,
+             "payload": {"move_id": "cut", "tile": [4, 4], "yield": "log"}},
+        ]
+        self.assertIn("world_unchanged:cut", detect_anomalies(stuck, previous=previous))
+        gone = _obs()
+        gone["harvest_near"] = None
+        gone["trace_tail"] = list(previous["trace_tail"]) + [
+            {"event": "field_move_used", "ts_msec": 9,
+             "payload": {"move_id": "cut", "tile": [4, 4], "yield": "log"}},
+        ]
+        self.assertNotIn("world_unchanged:cut", detect_anomalies(gone, previous=previous))
+
+    def test_battle_stalled(self) -> None:
+        from play_agent_findings import BATTLE_STALL_TURNS, detect_anomalies
+        session: dict = {}
+        last = []
+        for _ in range(BATTLE_STALL_TURNS):
+            obs = _obs(screen="battle")
+            obs["monitors"] = dict(obs["monitors"])
+            obs["monitors"]["game/current_screen"] = "battle"
+            obs["ui_tree"] = dict(obs["ui_tree"])
+            obs["ui_tree"]["screen"] = "battle"
+            last = detect_anomalies(obs, session=session)
+        self.assertIn("battle_stalled", last)
+        overworld = detect_anomalies(_obs(), session=session)
+        self.assertNotIn("battle_stalled", overworld)
+        self.assertEqual(session["battle_streak"], 0)
+
+    def test_maybe_review_anomaly_frame_skips(self) -> None:
+        from play_agent_findings import maybe_review_anomaly_frame
+        missing = maybe_review_anomaly_frame(None)
+        self.assertEqual(missing["status"], "skipped")
+        self.assertTrue(missing["quarantine"])
+        self.assertEqual(missing["findings"], [])
+        with tempfile.TemporaryDirectory() as raw:
+            png = Path(raw) / "frame.png"
+            png.write_bytes(b"png")
+            disabled = maybe_review_anomaly_frame(png, allow_model=False)
+            self.assertEqual(disabled["reason"], "disabled")
+            self.assertTrue(disabled["quarantine"])
 
 
 if __name__ == "__main__":

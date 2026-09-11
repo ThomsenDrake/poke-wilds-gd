@@ -113,7 +113,7 @@ python3 tools/verify_all.py [--skip-windowed] [--timeout N] [--windowed-timeout 
 | `--fail-fast` | Abort at the first nonzero step (default is run-all). |
 | `--quiet` | Suppress echoing each tool's stdout; still print the per-step status line + timing, and on failure the captured output tail. |
 | `--with-play-agent` | Opt-in S8.5 one-shot windowed play agent. Default off. SKIP under `--skip-windowed`. |
-| `--with-play-agent-loop` | Opt-in S8.6 closed-loop play agent (file bridge + novelty + optional F). Default explorer is observation-driven (harvest, build, contact battle; 96-turn budget). Default off. SKIP under `--skip-windowed`. Windowed runs also write `.godot-smoke/play_agent_loop.mp4` unless `PLAY_AGENT_RECORD_VIDEO=0`. Novel anomalies write replayable packs under `.godot-smoke/play_agent_findings/` and a local prior ledger; `--replay PATH` re-drives the recorded commands. |
+| `--with-play-agent-loop` | Opt-in S8.6 closed-loop play agent (file bridge + novelty + optional F). Default explorer is observation-driven (harvest including dig, build, fight, capture, then menus/camp linger; 96-turn budget). Default off. SKIP under `--skip-windowed`. Windowed runs also write `.godot-smoke/play_agent_loop.mp4` unless `PLAY_AGENT_RECORD_VIDEO=0`. Novel hard anomalies write replayable packs under `.godot-smoke/play_agent_findings/` and a local prior ledger; `--replay PATH` re-drives the recorded commands. Live F defaults on except CI / explicit off; VLM-only never live-file. |
 
 ### Steps (what each proves)
 

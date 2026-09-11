@@ -141,8 +141,11 @@ section that is its machine-readable source instead of restating paths.
   `python3 tools/play_agent_loop.py --project <abs>` drives a windowed
   session over the file bridge in [agent-step-bridge.md](agent-step-bridge.md).
   The default explorer is observation-driven (`boot_new_game`, harvest
-  `action_a`, `build_toggle` place attempt, then a contact battle). Novelty is checked before F. Live GitHub
-  filing requires `PLAY_AGENT_LIVE_FILE=1`. Windowed runs record
+  `action_a` including dig, `build_toggle` place attempt, contact battle
+  plus a capture try, then menus/camp linger until the 96-turn cap).
+  Novelty is checked before F. Live GitHub filing defaults on unless
+  `PLAY_AGENT_LIVE_FILE` is off or `CI` / `GITHUB_ACTIONS` is set; VLM-only
+  rows never live-file. Windowed runs record
   `.godot-smoke/play_agent_loop.mp4` when ffmpeg can see `DISPLAY`. A novel
   anomaly also writes a replayable pack under
   `.godot-smoke/play_agent_findings/` and merges signatures into

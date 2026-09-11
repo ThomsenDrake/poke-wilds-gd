@@ -125,7 +125,8 @@ func _publish(command_id: String, action: String, payload: Dictionary, feedback)
 func _snapshot_ui() -> Dictionary:
 	var ui := _runtime().get_node_or_null("/root/Main/UI")
 	var root: Node = ui if ui != null else _runtime()
-	return UiTreeDumpWriter.snapshot_screen("loop", root, {})
+	var screen := str(AgentStepReader.monitors_for(_runtime()).get("game/current_screen", "unknown"))
+	return UiTreeDumpWriter.snapshot_screen(screen, root, {})
 
 
 func _update_stuck(action: String, payload: Dictionary) -> bool:
