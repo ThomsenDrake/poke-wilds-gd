@@ -256,8 +256,10 @@ The fixture never truncates or deletes the player's trace log.
 `play_agent_loop` is an optional windowed driver, not a change to human F.
 The default explorer stays in the overworld long enough to attempt harvest
 (`Z` / `action_a`, including dig), build (`C` / `build_toggle`, then `Z` to place),
-a contact battle (fight plus a capture try; overworld mons are live for this
-scenario), then menus and camp rather than quitting. After that it
+and hunt for a contact battle (fight plus a capture try; overworld mons are live
+for this scenario). Menus and camp open after the verbs that are possible this
+session rather than waiting on a completed battle. Hunt walks around a
+Cut/Smash/Dig bump the party cannot perform. After that it
 plays through the same capture/dialog/relay path: real `feedback_report`
 input, a 1–1000 character public sentence that starts with `[agent-play]`,
 Enter to send. Default runs live-file unless `PLAY_AGENT_LIVE_FILE` is off or

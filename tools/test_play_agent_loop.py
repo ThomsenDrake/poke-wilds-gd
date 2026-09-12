@@ -290,33 +290,97 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertFalse(state["saw_harvest"])
         self.assertEqual(int(state.get("harvest_tries") or 0), 0)
 
-    def test_explorer_retries_cut_on_bump_text(self) -> None:
-        state = pal.new_explorer_state()
-        state.update({
-            "booted": True, "saw_harvest": False, "harvest_tries": 0,
-            "build_phase": 3, "saw_build": True, "last_tile": (-4, 5),
-            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
-        })
-        command = pal.explorer_command(state, {
+    def _cut_bump_obs(
+        self,
+        tile: list[int],
+        nearby: list[dict],
+        *,
+        faced: str = "cut",
+        party: list[str] | None = None,
+        facing: list[int] | None = None,
+    ) -> dict:
+        return {
             "screen": "overworld",
-            "tile": [-4, 5],
-            "facing": [0, 1],
-            "faced_action": "cut",
-            "party_field_moves": [],
-            "nearby": [{"tile": [-4, 8], "species_id": "PIDGEY", "kind": "roamer"}],
+            "tile": tile,
+            "facing": facing if facing is not None else [0, 1],
+            "faced_action": faced,
+            "party_field_moves": [] if party is None else party,
+            "nearby": nearby,
             "ui_tree": {
                 "screen": "overworld",
-                "nodes": [{"path": ".", "type": "Label", "text": "A TALL TREE BLOCKS THE WAY. IT COULD BE CUT."}],
+                "nodes": [{
+                    "path": ".", "type": "Label",
+                    "text": "A TALL TREE BLOCKS THE WAY. IT COULD BE CUT.",
+                }],
             },
             "trace_tail": [{
                 "event": "traversal_blocked", "ts_msec": 12,
-                "payload": {"reason": "A tall tree blocks the way. It could be CUT.", "requires_field_move": "cut"},
+                "payload": {
+                    "reason": "A tall tree blocks the way. It could be CUT.",
+                    "requires_field_move": "cut",
+                },
             }],
+        }
+
+    def test_explorer_skips_cut_when_party_cannot(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (-4, 5),
+            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
         })
-        self.assertEqual(command["action"], "press")
-        self.assertEqual(command["payload"]["input"], "action_a")
+        command = pal.explorer_command(state, self._cut_bump_obs(
+            [-4, 5],
+            [{"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"}],
+        ))
+        self.assertEqual(command["action"], "hold")
+        self.assertIn(command["payload"]["input"], ("move_right", "move_left"))
+        self.assertNotEqual(command["payload"]["input"], "action_a")
         self.assertFalse(state["saw_harvest"])
         self.assertEqual(int(state.get("harvest_tries") or 0), 0)
+
+    def test_explorer_retries_cut_when_party_can(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": True, "harvest_tries": 2,
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (-4, 5),
+            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
+        })
+        first = pal.explorer_command(state, self._cut_bump_obs(
+            [-4, 5],
+            [{"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"}],
+            party=["cut"],
+        ))
+        self.assertEqual(first["action"], "press")
+        self.assertEqual(first["payload"]["input"], "action_a")
+        second = pal.explorer_command(state, self._cut_bump_obs(
+            [-4, 5],
+            [{"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"}],
+            party=["cut"],
+        ))
+        self.assertNotEqual(second.get("payload", {}).get("input"), "action_a")
+
+    def test_explorer_does_not_retry_cut_after_leaving_tile(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (-4, 5),
+            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
+        })
+        weedle = [{"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"}]
+        first = pal.explorer_command(state, self._cut_bump_obs([-4, 5], weedle))
+        self.assertNotEqual(first.get("payload", {}).get("input"), "action_a")
+        pal.explorer_command(state, {
+            "screen": "overworld", "tile": [-3, 5], "facing": [1, 0],
+            "faced_action": "", "party_field_moves": [], "nearby": weedle,
+        })
+        back = pal.explorer_command(state, self._cut_bump_obs([-4, 5], weedle))
+        self.assertNotEqual(back.get("payload", {}).get("input"), "action_a")
+        self.assertEqual(back["action"], "hold")
+        self.assertIn(back["payload"]["input"], ("move_right", "move_left"))
 
     def test_explorer_builds_after_harvest(self) -> None:
         state = pal.new_explorer_state()
@@ -333,7 +397,8 @@ class PlayAgentLoopTests(unittest.TestCase):
         state = pal.new_explorer_state()
         state.update({
             "booted": True, "saw_harvest": True, "harvest_tries": 2,
-            "build_phase": 3, "saw_build": True, "last_tile": (3, 4),
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (3, 4),
             "last_input": "move_down", "blocked_dirs": ["move_down"],
         })
         command = pal.explorer_command(state, {
@@ -361,6 +426,8 @@ class PlayAgentLoopTests(unittest.TestCase):
         state["harvest_tries"] = 2
         state["build_phase"] = 3
         state["saw_build"] = True
+        state["opened_menu"] = True
+        state["observed"] = True
         command = pal.explorer_command(state, {
             "screen": "overworld",
             "tile": [3, 4],
@@ -373,7 +440,7 @@ class PlayAgentLoopTests(unittest.TestCase):
         state = pal.new_explorer_state()
         state.update({
             "booted": True, "saw_harvest": True, "saw_build": True,
-            "saw_battle": True, "battle_presses": pal.MIN_BATTLE_PRESSES,
+            "build_phase": 3, "saw_battle": True, "battle_presses": pal.MIN_BATTLE_PRESSES,
         })
         first = pal.explorer_command(state, {"screen": "overworld", "tile": [3, 4]})
         self.assertEqual(first["payload"]["input"], "menu")
@@ -381,6 +448,82 @@ class PlayAgentLoopTests(unittest.TestCase):
         self.assertEqual(second["action"], "observe")
         third = pal.explorer_command(state, {"screen": "overworld", "tile": [3, 4]})
         self.assertNotEqual(third["action"], "quit")
+
+    def test_explorer_opens_menu_without_battle(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True,
+        })
+        command = pal.explorer_command(state, self._cut_bump_obs(
+            [-4, 5],
+            [{"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"}],
+        ))
+        self.assertEqual(command["payload"]["input"], "menu")
+        self.assertTrue(state["opened_menu"])
+        self.assertFalse(state["saw_battle"])
+
+    def test_explorer_does_not_open_menu_before_possible_harvest(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True,
+        })
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [1, 4],
+            "facing": [1, 0],
+            "faced_action": "",
+            "party_field_moves": ["cut"],
+            "harvest_near": {"action": "cut", "tile": [4, 4], "from_tile": [3, 4]},
+            "nearby": [],
+        })
+        self.assertNotEqual(command.get("payload", {}).get("input"), "menu")
+        self.assertEqual(command["action"], "hold")
+        self.assertEqual(command["payload"]["input"], "move_right")
+
+    def test_explorer_prefers_reachable_mon_over_cut_wall(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (-4, 5),
+            "last_input": "move_down", "blocked": 1, "blocked_dirs": ["move_down"],
+        })
+        command = pal.explorer_command(state, self._cut_bump_obs(
+            [-4, 5],
+            [
+                {"tile": [-4, 9], "species_id": "WEEDLE", "kind": "roamer"},
+                {"tile": [2, 5], "species_id": "PIDGEY", "kind": "roamer"},
+            ],
+        ))
+        self.assertEqual(command["action"], "hold")
+        self.assertEqual(command["payload"]["input"], "move_right")
+        self.assertNotEqual(command["payload"]["input"], "action_a")
+
+    def test_explorer_walks_around_unusable_smash(self) -> None:
+        state = pal.new_explorer_state()
+        state.update({
+            "booted": True, "saw_harvest": False, "harvest_tries": 0,
+            "build_phase": 3, "saw_build": True, "opened_menu": True,
+            "observed": True, "last_tile": (1, 1),
+            "last_input": "move_right", "blocked": 1, "blocked_dirs": ["move_right"],
+        })
+        command = pal.explorer_command(state, {
+            "screen": "overworld",
+            "tile": [1, 1],
+            "facing": [1, 0],
+            "faced_action": "smash",
+            "party_field_moves": [],
+            "nearby": [{"tile": [4, 1], "species_id": "GEODUDE", "kind": "roamer"}],
+            "trace_tail": [{
+                "event": "traversal_blocked", "ts_msec": 8,
+                "payload": {"reason": "A rock blocks the way.", "requires_field_move": "smash"},
+            }],
+        })
+        self.assertEqual(command["action"], "hold")
+        self.assertNotEqual(command["payload"]["input"], "action_a")
+        self.assertNotEqual(command["payload"]["input"], "move_right")
 
     def test_explorer_lingers_in_menu(self) -> None:
         state = pal.new_explorer_state()

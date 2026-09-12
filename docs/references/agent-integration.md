@@ -142,8 +142,10 @@ section that is its machine-readable source instead of restating paths.
   session over the file bridge in [agent-step-bridge.md](agent-step-bridge.md).
   The default explorer is observation-driven (`boot_new_game`, harvest
   `action_a` including dig when the party can use that verb, `build_toggle`
-  place attempt, contact battle plus a capture try, then menus/camp linger
-  until the 96-turn cap). Novelty is checked before F. Live GitHub filing
+  place attempt, hunt for a contact battle plus a capture try, then
+  menus/camp after the verbs that are possible this session — not gated on a
+  contact battle — until the 96-turn cap). Hunt walks around a Cut/Smash/Dig
+  bump the party cannot perform. Novelty is checked before F. Live GitHub filing
   defaults on unless `PLAY_AGENT_LIVE_FILE` is off or `CI` / `GITHUB_ACTIONS`
   is set; VLM-only rows never live-file. Public F `commit_sha` is `unknown`
   or HEAD hex. Windowed runs record
