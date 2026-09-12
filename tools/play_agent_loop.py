@@ -426,7 +426,8 @@ def new_explorer_state() -> dict[str, Any]:
         "pending_harvest": "",
         "pending_harvest_ts": 0,
         "unusable_harvest": [],
-        "cut_try_here": None,
+        "field_try_tiles": [],
+        "blocked_field_tiles": [],
     }
 
 
@@ -455,6 +456,16 @@ def _facing_toward(facing: Any, here: tuple[int, int], dest: tuple[int, int]) ->
     if face is None or needed is None:
         return False
     return (face[0], face[1]) == MOVE_DELTA[needed]
+
+
+def _dir_from_facing(facing: Any) -> str | None:
+    face = _as_tile(facing)
+    if face is None:
+        return None
+    for name, delta in MOVE_DELTA.items():
+        if face == delta:
+            return name
+    return None
 
 
 def _note_tile(state: dict[str, Any], observation: dict[str, Any]) -> tuple[int, int] | None:
@@ -603,35 +614,150 @@ def _harvest_press(
     return _press("action_a")
 
 
-def _cut_hint(observation: dict[str, Any]) -> bool:
+def _required_field_move(
+    observation: dict[str, Any],
+    here: tuple[int, int] | None = None,
+) -> str:
+    faced = str(observation.get("faced_action") or "")
+    if faced in HARVEST_BUMP:
+        return faced
     tree = observation.get("ui_tree") if isinstance(observation.get("ui_tree"), dict) else {}
     texts: list[str] = []
     for node in tree.get("nodes") or []:
         if isinstance(node, dict):
             texts.append(str(node.get("text") or ""))
     if CUT_HINT in " ".join(texts).upper():
-        return True
-    for record in observation.get("trace_tail") or []:
+        return "cut"
+    here_tile = here or _as_tile(observation.get("tile"))
+    for record in reversed(list(observation.get("trace_tail") or [])):
         if not isinstance(record, dict):
             continue
         payload = _trace_payload(record)
-        reason = str(payload.get("reason") or "").upper()
         req = str(payload.get("requires_field_move") or "")
-        if CUT_HINT in reason or req == "cut":
+        if req not in HARVEST_BUMP:
+            continue
+        bump = _as_tile(payload.get("tile"))
+        if here_tile is not None and bump is not None:
+            if abs(bump[0] - here_tile[0]) + abs(bump[1] - here_tile[1]) > 1:
+                continue
+        return req
+    return ""
+
+
+def _remember_field_block(
+    state: dict[str, Any],
+    here: tuple[int, int],
+    action: str,
+    observation: dict[str, Any],
+) -> None:
+    tiles = [list(item) for item in (state.get("blocked_field_tiles") or [])]
+    key = [here[0], here[1], action]
+    if key not in tiles:
+        tiles.append(key)
+    state["blocked_field_tiles"] = tiles
+    blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
+    face = _dir_from_facing(observation.get("facing"))
+    last = str(state.get("last_input") or "")
+    for item in (face, last):
+        if item and item not in blocked:
+            blocked.append(item)
+    state["blocked_dirs"] = blocked
+
+
+def _behind_field_block(
+    here: tuple[int, int],
+    dest: tuple[int, int],
+    state: dict[str, Any],
+    observation: dict[str, Any],
+) -> bool:
+    toward = _input_toward(here, dest)
+    if toward is None:
+        return False
+    blocked = {str(item) for item in (state.get("blocked_dirs") or [])}
+    if toward in blocked:
+        return True
+    req = _required_field_move(observation, here)
+    if req and not _can_harvest(state, observation, req):
+        face = _dir_from_facing(observation.get("facing"))
+        if face and toward == face:
             return True
+    for item in state.get("blocked_field_tiles") or []:
+        if not isinstance(item, (list, tuple)) or len(item) < 2:
+            continue
+        try:
+            bx, by = int(item[0]), int(item[1])
+        except (TypeError, ValueError):
+            continue
+        if here[0] == dest[0] == bx:
+            if here[1] < by <= dest[1] or here[1] > by >= dest[1]:
+                return True
+        if here[1] == dest[1] == by:
+            if here[0] < bx <= dest[0] or here[0] > bx >= dest[0]:
+                return True
+        if (bx, by) == here:
+            face = _dir_from_facing(observation.get("facing"))
+            if face and toward == face:
+                return True
     return False
 
 
-def _path_cut(
+def _harvest_settled(state: dict[str, Any], observation: dict[str, Any]) -> bool:
+    if state.get("saw_harvest") or int(state.get("harvest_tries") or 0) >= 2:
+        return True
+    if "party_field_moves" not in observation:
+        return False
+    raw = observation.get("party_field_moves")
+    if not isinstance(raw, list):
+        return False
+    unused = {str(item) for item in (state.get("unusable_harvest") or [])}
+    known = {str(item) for item in raw}
+    for action in HARVEST_BUMP:
+        if action in unused:
+            continue
+        if action in known:
+            return False
+    return True
+
+
+def _ready_for_overlays(state: dict[str, Any], observation: dict[str, Any]) -> bool:
+    if not state.get("saw_build") or int(state.get("build_phase") or 0) < 3:
+        return False
+    return _harvest_settled(state, observation)
+
+
+def _lateral_hold(
+    state: dict[str, Any],
+    here: tuple[int, int],
+    dest: tuple[int, int],
+    blocked: list[str],
+) -> dict[str, Any]:
+    last = str(state.get("last_input") or "")
+    laterals = ("move_right", "move_left")
+    if last in laterals and last not in blocked:
+        return _hold(state, last)
+    for item in laterals:
+        if item not in blocked:
+            return _hold(state, item)
+    return _hold(state, _dir_options(here, dest, blocked)[0])
+
+
+def _path_field_press(
     state: dict[str, Any],
     observation: dict[str, Any],
     here: tuple[int, int],
 ) -> dict[str, Any] | None:
-    if not _cut_hint(observation):
+    req = _required_field_move(observation, here)
+    if not req:
         return None
-    if state.get("cut_try_here") == here:
+    if not _can_harvest(state, observation, req):
+        _remember_field_block(state, here, req, observation)
         return None
-    state["cut_try_here"] = here
+    tried = [list(item) for item in (state.get("field_try_tiles") or [])]
+    key = [here[0], here[1], req]
+    if key in tried:
+        return None
+    tried.append(key)
+    state["field_try_tiles"] = tried
     return _press("action_a")
 
 
@@ -645,20 +771,19 @@ def _approach(
     if here == dest:
         return _press("action_a")
     blocked = [str(item) for item in (state.get("blocked_dirs") or [])]
-    if faced in HARVEST_BUMP:
-        if _can_harvest(state, observation, faced) and int(state.get("harvest_tries") or 0) < 2:
-            return _harvest_press(state, observation, faced)
-        cut = _path_cut(state, observation, here)
-        if cut is not None:
-            return cut
-        last = str(state.get("last_input") or "")
-        if last and last not in blocked:
-            blocked.append(last)
+    req = _required_field_move(observation, here)
+    if faced in HARVEST_BUMP and _can_harvest(state, observation, faced) and int(state.get("harvest_tries") or 0) < 2:
+        return _harvest_press(state, observation, faced)
+    path = _path_field_press(state, observation, here)
+    if path is not None:
+        return path
+    if req and not _can_harvest(state, observation, req):
+        face = _dir_from_facing(observation.get("facing"))
+        if face and face not in blocked:
+            blocked.append(face)
             state["blocked_dirs"] = blocked
-    else:
-        cut = _path_cut(state, observation, here)
-        if cut is not None:
-            return cut
+        if _behind_field_block(here, dest, state, observation):
+            return _lateral_hold(state, here, dest, blocked)
     return _hold(state, _dir_options(here, dest, blocked)[0])
 
 
@@ -718,7 +843,12 @@ def _build_command(state: dict[str, Any]) -> dict[str, Any] | None:
     return _press("build_toggle")
 
 
-def _closest_mon(observation: dict[str, Any], here: tuple[int, int]) -> tuple[int, int] | None:
+def _closest_mon(
+    observation: dict[str, Any],
+    here: tuple[int, int],
+    *,
+    skip=None,
+) -> tuple[int, int] | None:
     best: tuple[int, int] | None = None
     best_dist = 10**9
     for entity in observation.get("nearby") or []:
@@ -726,6 +856,8 @@ def _closest_mon(observation: dict[str, Any], here: tuple[int, int]) -> tuple[in
             continue
         tile = _as_tile(entity.get("tile"))
         if tile is None:
+            continue
+        if skip is not None and skip(tile):
             continue
         dist = abs(tile[0] - here[0]) + abs(tile[1] - here[1])
         if dist < best_dist:
@@ -739,7 +871,11 @@ def _hunt_command(
     observation: dict[str, Any],
     here: tuple[int, int],
 ) -> dict[str, Any]:
-    best = _closest_mon(observation, here)
+    def _blocked(tile: tuple[int, int]) -> bool:
+        return _behind_field_block(here, tile, state, observation)
+    best = _closest_mon(observation, here, skip=_blocked)
+    if best is None:
+        best = _closest_mon(observation, here)
     if best is None:
         return _spiral_hold(state)
     if best == here:
@@ -796,20 +932,14 @@ def explorer_command(
         return _press("action_b")
     state["overlay_linger"] = 0
     if (
-        state.get("saw_harvest")
-        and state.get("saw_build")
-        and state.get("saw_battle")
-        and int(state.get("battle_presses") or 0) >= MIN_BATTLE_PRESSES
+        _ready_for_overlays(state, obs)
         and not state.get("opened_menu")
         and screen in {"overworld", "indoor"}
     ):
         state["opened_menu"] = True
         return _press("menu")
     if (
-        state.get("saw_harvest")
-        and state.get("saw_build")
-        and state.get("saw_battle")
-        and int(state.get("battle_presses") or 0) >= MIN_BATTLE_PRESSES
+        _ready_for_overlays(state, obs)
         and not state.get("observed")
     ):
         state["observed"] = True

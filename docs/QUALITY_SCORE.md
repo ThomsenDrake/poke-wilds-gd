@@ -23,8 +23,10 @@ verification harness, not player behavior.
 Play-agent live-run gaps (2026-09-11): public F `commit_sha` is `unknown` or
 HEAD hex (never the literal `agent-play`); `filed: "live"` requires a real
 issue number. Oracle E stays quiet when the party cannot use the faced harvest
-verb. The explorer does not spend harvest tries on a swallowed spawn A and
-retries Cut on bump text so hunt can reach a contact battle. Scores unchanged.
+verb. The explorer does not spend harvest tries on a swallowed spawn A. It
+stops retrying a Cut/Smash/Dig bump the party cannot perform, walks around, and
+opens menus after possible verbs rather than waiting on a contact battle.
+Scores unchanged.
 
 Trace cursor validation (2026-09-07): repeated oracle checks now read uncapped
 session traces with absolute line cursors and one streamed historical count.
